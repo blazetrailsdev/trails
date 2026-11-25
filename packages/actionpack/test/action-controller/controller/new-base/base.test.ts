@@ -1,5 +1,7 @@
 import { constSetPath } from "../../../support/const-set-path.js";
-import { TopLevel, constGet, constSet } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
+import { constGet } from "@blazetrails/ruby-compat/variable";
 import { assertEqual } from "@blazetrails/activesupport/testing/assertions";
 import { beforeEach, describe, it } from "vitest";
 import { Base } from "../../../../lib/action-controller/base.js";

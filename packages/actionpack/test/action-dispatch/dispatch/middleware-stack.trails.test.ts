@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { block, rbFSend } from "@blazetrails/ruby-compat";
+import { block } from "@blazetrails/ruby-compat/hash";
+import { rbFSend } from "@blazetrails/ruby-compat/object";
 import {
   MiddlewareStack,
   type MiddlewareBlock,

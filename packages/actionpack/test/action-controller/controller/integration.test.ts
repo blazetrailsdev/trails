@@ -12,17 +12,13 @@ import {
   assertNot,
   assertNotIncludes,
 } from "@blazetrails/activesupport/testing/assertions";
-import {
-  ArgumentError,
-  Dir,
-  File,
-  LoadError,
-  NoMethodError,
-  rbFSend,
-  rbObjSingletonClass,
-  stderr,
-  rbInspect,
-} from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { Dir } from "@blazetrails/ruby-compat/dir";
+import { File } from "@blazetrails/ruby-compat/file";
+import { LoadError } from "@blazetrails/ruby-compat/load-error";
+import { NoMethodError } from "@blazetrails/ruby-compat/no-method-error";
+import { rbFSend, rbObjSingletonClass, rbInspect } from "@blazetrails/ruby-compat/object";
+import { stderr } from "@blazetrails/ruby-compat/process-adapter";
 import { HTML5, XML, type Html5Document } from "@blazetrails/nokogiri";
 import { Engine } from "@blazetrails/trailties/engine";
 import { Trailtie } from "@blazetrails/trailties/trailtie";

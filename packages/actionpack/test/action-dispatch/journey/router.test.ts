@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { UrlGenerationError } from "../../../lib/action-controller/metal/exceptions.js";
 import { RouteSet } from "../../../lib/action-dispatch/routing/route-set.js";
-import { StringIO } from "@blazetrails/ruby-compat";
+import { StringIO } from "@blazetrails/ruby-compat/string-io";
 import { Request } from "../../../lib/action-dispatch/http/request.js";
 import type { RouterRequest } from "../../../lib/action-dispatch/journey/router.js";
 

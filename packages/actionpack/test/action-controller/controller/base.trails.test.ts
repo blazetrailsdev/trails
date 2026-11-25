@@ -1,4 +1,4 @@
-import { rbModName } from "@blazetrails/ruby-compat";
+import { rbModName } from "@blazetrails/ruby-compat/object";
 import { describe, it, expect } from "vitest";
 import { htmlSafe } from "@blazetrails/activesupport";
 import { FixtureResolver } from "@blazetrails/actionview/testing/resolvers";

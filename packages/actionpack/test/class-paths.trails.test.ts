@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { rbModName } from "@blazetrails/ruby-compat";
+import { rbModName } from "@blazetrails/ruby-compat/object";
 import { ActionNotFound } from "../lib/abstract-controller/base.js";
 import { BadRequest } from "../lib/action-controller/metal/exceptions.js";
 

@@ -1,11 +1,7 @@
 import { camelize } from "@blazetrails/activesupport";
-import {
-  constSet,
-  constDefined,
-  constGet,
-  rbModRemoveConst,
-  TopLevel,
-} from "@blazetrails/ruby-compat";
+import { constSet, constDefined } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
+import { constGet, rbModRemoveConst } from "@blazetrails/ruby-compat/variable";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { RouteSet } from "../../../lib/action-dispatch/routing/route-set.js";
 import { X_CASCADE } from "../../../lib/action-dispatch/constants.js";

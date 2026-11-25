@@ -5,7 +5,9 @@ import { FixtureResolver } from "@blazetrails/actionview/testing/resolvers";
 import { Logger } from "@blazetrails/activesupport";
 import { assertEqual, assertMatch } from "@blazetrails/activesupport/testing/assertions";
 import { MockRequest } from "@blazetrails/rack";
-import { StringIO, TopLevel, constSet, rbObjRespondTo, rbProcCall } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { TopLevel, rbObjRespondTo, rbProcCall } from "@blazetrails/ruby-compat/object";
+import { StringIO } from "@blazetrails/ruby-compat/string-io";
 import { Base } from "../../../../lib/action-controller/base.js";
 import { Rack } from "../../../support/abstract-unit.js";
 

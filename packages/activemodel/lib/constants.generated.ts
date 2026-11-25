@@ -1,4 +1,4 @@
-import { defineConstants } from "@blazetrails/ruby-compat";
+import { defineConstants } from "@blazetrails/ruby-compat/classpath";
 import * as m0 from "./access.js";
 import * as m1 from "./api.js";
 import * as m2 from "./attribute-assignment.js";

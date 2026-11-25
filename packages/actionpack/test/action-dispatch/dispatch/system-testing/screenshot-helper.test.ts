@@ -2,7 +2,10 @@ import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { Dir, File, FileUtils, Pathname } from "@blazetrails/ruby-compat";
+import { Dir } from "@blazetrails/ruby-compat/dir";
+import { File } from "@blazetrails/ruby-compat/file";
+import { FileUtils } from "@blazetrails/ruby-compat/file-utils";
+import { Pathname } from "@blazetrails/ruby-compat/pathname";
 import { TopLevel } from "@blazetrails/activesupport";
 import { assert, assertEqual, assertNot } from "@blazetrails/activesupport/testing/assertions";
 import {

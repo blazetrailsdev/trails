@@ -9,7 +9,10 @@ import {
   assertRaise,
   assertRespondTo,
 } from "@blazetrails/activesupport/testing/assertions";
-import { ArgumentError, File, RuntimeError, StringIO } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { File } from "@blazetrails/ruby-compat/file";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
+import { StringIO } from "@blazetrails/ruby-compat/string-io";
 import "../../support/abstract-unit.js";
 import { Base } from "../../../lib/action-controller/base.js";
 import { Live } from "../../../lib/action-controller/metal/live.js";

@@ -1,4 +1,4 @@
-import { defineConstants } from "@blazetrails/ruby-compat";
+import { defineConstants } from "@blazetrails/ruby-compat/classpath";
 import * as m0 from "./builder.js";
 import * as m1 from "./chainable.js";
 import * as m2 from "./image-processing.js";

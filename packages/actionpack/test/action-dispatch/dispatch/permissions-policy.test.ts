@@ -1,14 +1,10 @@
 import { constSetPath } from "../../support/const-set-path.js";
 import { afterAll, beforeEach, describe, it, expect } from "vitest";
 import { assertEqual, assertRaises } from "@blazetrails/activesupport/testing/assertions";
-import {
-  ArgumentError,
-  constDefined,
-  rbModRemoveConst,
-  rbFSend,
-  TopLevel,
-  constSet,
-} from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { constDefined, constSet } from "@blazetrails/ruby-compat/include";
+import { rbFSend, TopLevel } from "@blazetrails/ruby-compat/object";
+import { rbModRemoveConst } from "@blazetrails/ruby-compat/variable";
 import {
   CONTENT_TYPE,
   Lint,

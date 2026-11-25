@@ -1,6 +1,7 @@
 import { beforeEach, describe, it } from "vitest";
 import { assertEqual } from "@blazetrails/activesupport/testing/assertions";
-import { include, constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { include, constSet } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
 import { Base } from "../../../../lib/action-controller/base.js";
 import { RouteSet } from "../../../../lib/action-dispatch/routing/route-set.js";
 import { IntegrationTest } from "../../../../lib/action-dispatch/testing/integration.js";

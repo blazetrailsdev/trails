@@ -1,6 +1,7 @@
 import { beforeEach, describe, it } from "vitest";
 import { I18n } from "@blazetrails/activesupport";
-import { TopLevel, constSet } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
 import { SharedTestRoutes } from "../../support/abstract-unit.js";
 import { Base } from "../../../lib/action-controller/base.js";
 import { TestCase } from "../../../lib/action-controller/test-case.js";

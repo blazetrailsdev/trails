@@ -1,11 +1,8 @@
 import { describe, expect, it } from "vitest";
-import {
-  ArgumentError,
-  TopLevel,
-  constSet,
-  constDefined,
-  rbModRemoveConst,
-} from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { constSet, constDefined } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
+import { rbModRemoveConst } from "@blazetrails/ruby-compat/variable";
 import {
   AbstractSecureStore,
   AbstractStore,

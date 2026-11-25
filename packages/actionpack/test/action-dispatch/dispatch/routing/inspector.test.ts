@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { BacktraceCleaner, callerLocations, TopLevel } from "@blazetrails/activesupport";
-import { File, rbInspect, stringSplit } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat/file";
+import { rbInspect } from "@blazetrails/ruby-compat/object";
+import { stringSplit } from "@blazetrails/ruby-compat/string/split";
 import { Engine } from "@blazetrails/trailties/engine";
 import { Trailtie } from "@blazetrails/trailties/trailtie";
 import { Mapper, type MountableApp } from "../../../../lib/action-dispatch/routing/mapper.js";

@@ -2,7 +2,11 @@ import { beforeEach, describe, it } from "vitest";
 import { Conversion, ModelName, Naming } from "@blazetrails/activemodel";
 import { Concern, extend, underscore } from "@blazetrails/activesupport";
 import { assertEqual, assertRaises } from "@blazetrails/activesupport/testing/assertions";
-import { include, merge, NameError, rbFSend, RuntimeError } from "@blazetrails/ruby-compat";
+import { merge } from "@blazetrails/ruby-compat/hash";
+import { include } from "@blazetrails/ruby-compat/include";
+import { NameError } from "@blazetrails/ruby-compat/name-error";
+import { rbFSend } from "@blazetrails/ruby-compat/object";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
 import {
   Parameters,
   UnfilteredParameters,

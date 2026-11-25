@@ -1,7 +1,8 @@
 import { beforeEach, describe, it, expect } from "vitest";
 import { reverseMergeBang } from "@blazetrails/activesupport";
 import { CachingKeyGenerator, KeyGenerator } from "@blazetrails/activesupport/key-generator";
-import { hashDelete, OpenSSL } from "@blazetrails/ruby-compat";
+import { hashDelete } from "@blazetrails/ruby-compat/hash";
+import { OpenSSL } from "@blazetrails/ruby-compat/openssl";
 import { Base } from "../../../lib/action-controller/base.js";
 import {
   HttpAuthentication,

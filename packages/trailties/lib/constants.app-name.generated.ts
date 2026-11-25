@@ -1,4 +1,4 @@
-import { defineConstants } from "@blazetrails/ruby-compat";
+import { defineConstants } from "@blazetrails/ruby-compat/classpath";
 import * as m0 from "./generators/app-name.js";
 
 defineConstants([[() => m0, "AppName", "Trails::Generators::AppName"]]);

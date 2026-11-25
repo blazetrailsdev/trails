@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { rbObjIvarDefined, rbObjIvarGet } from "@blazetrails/ruby-compat";
+import { rbObjIvarDefined, rbObjIvarGet } from "@blazetrails/ruby-compat/object";
 import { DelegationError } from "@blazetrails/activesupport";
 import { DebugView } from "../../../lib/action-dispatch/middleware/debug-view.js";
 

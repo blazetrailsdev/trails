@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { underscore } from "@blazetrails/activesupport";
-import { b, StringIO } from "@blazetrails/ruby-compat";
+import { StringIO } from "@blazetrails/ruby-compat/string-io";
+import { b } from "@blazetrails/ruby-compat/string/b";
 import { AbstractStore } from "../../../../lib/action-dispatch/middleware/session/abstract-store.js";
 import { TestRequest, TestSession } from "../../../../lib/action-controller/test-case.js";
 

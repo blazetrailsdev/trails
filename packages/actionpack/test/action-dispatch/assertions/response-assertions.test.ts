@@ -4,7 +4,7 @@ import {
   assertMatch,
   assertRaises,
 } from "@blazetrails/activesupport/testing/assertions";
-import { ArgumentError } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
 import {
   assertResponse,
   type AssertionResponseHost,

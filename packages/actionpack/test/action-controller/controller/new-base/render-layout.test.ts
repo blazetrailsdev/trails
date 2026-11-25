@@ -1,7 +1,8 @@
 import { constSetPath } from "../../../support/const-set-path.js";
 import { beforeEach, describe, it } from "vitest";
 import { FixtureResolver } from "@blazetrails/actionview/testing/resolvers";
-import { TopLevel, constSet } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
 import { ApplicationController, Rack } from "../../../support/abstract-unit.js";
 import { TestRenderable } from "../../../support/lib/test-renderable.js";
 

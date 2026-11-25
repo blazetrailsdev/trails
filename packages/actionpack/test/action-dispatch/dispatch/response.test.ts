@@ -1,7 +1,7 @@
 import { beforeEach, describe, it, expect } from "vitest";
 import { Request } from "../../../lib/action-dispatch/http/request.js";
 import { Response } from "../../../lib/action-dispatch/http/response.js";
-import { IOError } from "@blazetrails/ruby-compat";
+import { IOError } from "@blazetrails/ruby-compat/io-error";
 import {
   assert,
   assertEqual,
@@ -11,7 +11,7 @@ import {
   assertNotRespondTo,
   assertRaises,
 } from "@blazetrails/activesupport/testing/assertions";
-import { flatten } from "@blazetrails/ruby-compat";
+import { flatten } from "@blazetrails/ruby-compat/array";
 import {
   ContentLength,
   MockRequest,

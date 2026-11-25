@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { b, Encoding, rbObjEncoding, RFC2396_PARSER } from "@blazetrails/ruby-compat";
+import { Encoding } from "@blazetrails/ruby-compat/encoding";
+import { b } from "@blazetrails/ruby-compat/string/b";
+import { rbObjEncoding } from "@blazetrails/ruby-compat/string/force-encoding";
+import { RFC2396_PARSER } from "@blazetrails/ruby-compat/uri/common";
 import { Base } from "../../../lib/action-controller/base.js";
 import { TestCase } from "../../../lib/action-controller/test-case.js";
 import "../../support/abstract-unit.js";

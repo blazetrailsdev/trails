@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { Notifications, type NotificationEvent as Event } from "@blazetrails/activesupport";
-import { TopLevel, constSet } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
 import { Request } from "../../../../lib/action-dispatch/http/request.js";
 import type { DrawCallback } from "../../../../lib/action-dispatch/routing/route-set.js";
 import { IntegrationTest } from "../../../../lib/action-dispatch/testing/integration.js";

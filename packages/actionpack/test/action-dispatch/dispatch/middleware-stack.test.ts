@@ -1,4 +1,4 @@
-import { rbFSend } from "@blazetrails/ruby-compat";
+import { rbFSend } from "@blazetrails/ruby-compat/object";
 import { beforeEach, describe, it, expect } from "vitest";
 import { Notifications, type NotificationEvent as Event } from "@blazetrails/activesupport";
 import {
@@ -7,7 +7,8 @@ import {
   assertNothingRaised,
   assertRaises,
 } from "@blazetrails/activesupport/testing/assertions";
-import { RuntimeError, block } from "@blazetrails/ruby-compat";
+import { block } from "@blazetrails/ruby-compat/hash";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
 import {
   Middleware,
   MiddlewareStack,

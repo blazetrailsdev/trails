@@ -1,12 +1,14 @@
 import { constSetPath } from "../../../support/const-set-path.js";
 import type { RackResponse } from "@blazetrails/rack";
-import { rbFSend } from "@blazetrails/ruby-compat";
+import { rbFSend } from "@blazetrails/ruby-compat/object";
 import { beforeEach, describe, it } from "vitest";
 import { FileSystemResolver } from "@blazetrails/actionview";
 import { FixtureResolver } from "@blazetrails/actionview/testing/resolvers";
 import { assert, assertEqual, assertRaises } from "@blazetrails/activesupport/testing/assertions";
 import { MockRequest } from "@blazetrails/rack";
-import { File, TopLevel, constSet } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat/file";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
 import { ActionNotFound } from "../../../../lib/abstract-controller/base.js";
 import { ApplicationController, Rack } from "../../../support/abstract-unit.js";
 

@@ -7,16 +7,12 @@ import {
   TopLevel,
 } from "@blazetrails/activesupport";
 import { TestCase as ActiveSupportTestCase } from "@blazetrails/activesupport/test-case";
-import {
-  b,
-  setVerbose,
-  stderr,
-  StringIO,
-  verbose,
-  constSet,
-  constDefined,
-  rbModRemoveConst,
-} from "@blazetrails/ruby-compat";
+import { constSet, constDefined } from "@blazetrails/ruby-compat/include";
+import { stderr } from "@blazetrails/ruby-compat/process-adapter";
+import { StringIO } from "@blazetrails/ruby-compat/string-io";
+import { b } from "@blazetrails/ruby-compat/string/b";
+import { rbModRemoveConst } from "@blazetrails/ruby-compat/variable";
+import { setVerbose, verbose } from "@blazetrails/ruby-compat/verbose";
 import { SessionId } from "@blazetrails/rack-session";
 import { UploadedFile } from "@blazetrails/rack-test";
 import {

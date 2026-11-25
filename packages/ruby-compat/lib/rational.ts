@@ -5,6 +5,7 @@
  * and Rails calls the function, so both ship here.
  */
 import { ArgumentError } from "./argument-error.js";
+import { classpaths } from "./classpath.js";
 import { FloatDomainError } from "./float-domain-error.js";
 import { FrozenError } from "./frozen-error.js";
 import { rbIntegerTypeP } from "./numeric.js";
@@ -414,3 +415,5 @@ export function rational(
   }
   return new Rational(numv, denv);
 }
+
+classpaths.set(Rational, { path: "Rational", permanent: true });

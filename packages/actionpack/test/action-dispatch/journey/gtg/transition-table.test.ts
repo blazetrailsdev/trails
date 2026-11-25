@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { getChildProcess } from "@blazetrails/ruby-compat";
+import { getChildProcess } from "@blazetrails/ruby-compat/child-process-adapter";
 import { ActiveSupportJSON } from "@blazetrails/activesupport";
 import { Parser } from "../../../../lib/action-dispatch/journey/parser.js";
 import { Or } from "../../../../lib/action-dispatch/journey/nodes/node.js";

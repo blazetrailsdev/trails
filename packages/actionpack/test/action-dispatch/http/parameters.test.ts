@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { EOFError, StringIO, b } from "@blazetrails/ruby-compat";
+import { EOFError } from "@blazetrails/ruby-compat/eof-error";
+import { StringIO } from "@blazetrails/ruby-compat/string-io";
+import { b } from "@blazetrails/ruby-compat/string/b";
 import { Mime } from "../../../lib/action-dispatch/http/mime-type.js";
 import { Request } from "../../../lib/action-dispatch/http/request.js";
 import {

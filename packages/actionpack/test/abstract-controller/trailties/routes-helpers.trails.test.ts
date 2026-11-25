@@ -5,7 +5,8 @@ import {
   RoutesHelpers,
   type RoutesHelpersControllerClass,
 } from "../../../lib/abstract-controller/trailties/routes-helpers.js";
-import { constSet, include, rbFSend, TopLevel } from "@blazetrails/ruby-compat";
+import { constSet, include } from "@blazetrails/ruby-compat/include";
+import { rbFSend, TopLevel } from "@blazetrails/ruby-compat/object";
 
 describe("RoutesHelpers.with (trails)", () => {
   it("accepts a real RouteSet with no cast", () => {

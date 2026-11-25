@@ -9,7 +9,7 @@ import {
   assertPredicate,
   assertRaise,
 } from "@blazetrails/activesupport/testing/assertions";
-import { File } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat/file";
 import { Engine } from "@blazetrails/trailties/engine";
 import { Trailtie } from "@blazetrails/trailties/trailtie";
 import { Base } from "../../../lib/action-controller/base.js";

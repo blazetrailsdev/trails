@@ -2,7 +2,7 @@ import { beforeEach, describe, it } from "vitest";
 import { TopLevel } from "@blazetrails/activesupport";
 import { assert, assertEqual, assertNotEqual } from "@blazetrails/activesupport/testing/assertions";
 import { type RackEnv, type RackResponse } from "@blazetrails/rack";
-import { rbModMethodDefined } from "@blazetrails/ruby-compat";
+import { rbModMethodDefined } from "@blazetrails/ruby-compat/object";
 import { Engine } from "@blazetrails/trailties/engine";
 import { Trailtie } from "@blazetrails/trailties/trailtie";
 import type { MountableApp } from "../../../lib/action-dispatch/routing/mapper.js";

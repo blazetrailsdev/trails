@@ -3,7 +3,8 @@
    merge is how `include()` surfaces those members on the type side. */
 import { beforeEach, describe, expect, it } from "vitest";
 import { include, type Included } from "@blazetrails/activesupport";
-import { rbInspect, URI } from "@blazetrails/ruby-compat";
+import { rbInspect } from "@blazetrails/ruby-compat/object";
+import { URI } from "@blazetrails/ruby-compat/uri/common";
 
 import type { Base } from "../../../lib/action-controller/base.js";
 import { deprecator } from "../../../lib/action-dispatch/deprecator.js";

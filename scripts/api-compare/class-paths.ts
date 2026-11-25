@@ -571,7 +571,7 @@ export function renderClassPaths(entries: readonly ClassPathEntry[], entry?: str
     return `import * as ${ns} from "./${file.replace(/\.ts$/, ".js")}";`;
   });
   return [
-    'import { defineConstants } from "@blazetrails/ruby-compat";',
+    'import { defineConstants } from "@blazetrails/ruby-compat/classpath";',
     ...(entry === undefined ? [] : [`import "./${entry}";`]),
     ...imports,
     "",

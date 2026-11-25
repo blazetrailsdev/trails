@@ -1,6 +1,6 @@
 import { beforeEach, describe, it } from "vitest";
 import { assertEqual } from "@blazetrails/activesupport/testing/assertions";
-import { StringIO } from "@blazetrails/ruby-compat";
+import { StringIO } from "@blazetrails/ruby-compat/string-io";
 import { ApplicationController } from "../../support/abstract-unit.js";
 import { IntegrationTest } from "../../../lib/action-dispatch/testing/integration.js";
 

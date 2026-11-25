@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeAll, afterAll } from "vitest";
 import type { BrowserType, LaunchOptions } from "playwright";
 import { assertNoChanges } from "@blazetrails/activesupport/testing/assertions";
-import { rbObjIvarGet } from "@blazetrails/ruby-compat";
+import { rbObjIvarGet } from "@blazetrails/ruby-compat/object";
 import {
   Driver,
   requirePlaywright,

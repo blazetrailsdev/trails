@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Handler } from "@blazetrails/rackup";
 import type { RackResponse } from "@blazetrails/rack";
-import { Thread } from "@blazetrails/ruby-compat";
+import { Thread } from "@blazetrails/ruby-compat/thread";
 import { Executor, type ExecutorLike } from "../../../lib/action-dispatch/middleware/executor.js";
 
 await Handler.get("node");

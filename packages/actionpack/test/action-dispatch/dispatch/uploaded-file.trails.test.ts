@@ -1,4 +1,5 @@
-import { b, Tempfile } from "@blazetrails/ruby-compat";
+import { b } from "@blazetrails/ruby-compat/string/b";
+import { Tempfile } from "@blazetrails/ruby-compat/tempfile";
 import { describe, expect, it } from "vitest";
 
 import { UploadedFile } from "../../../lib/action-dispatch/http/upload.js";

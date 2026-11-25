@@ -1,5 +1,5 @@
 import type { RackResponse } from "@blazetrails/rack";
-import { rbFSend } from "@blazetrails/ruby-compat";
+import { rbFSend } from "@blazetrails/ruby-compat/object";
 import { describe, it } from "vitest";
 import { assertMatch, assertNot } from "@blazetrails/activesupport/testing/assertions";
 import { Headers } from "@blazetrails/rack";

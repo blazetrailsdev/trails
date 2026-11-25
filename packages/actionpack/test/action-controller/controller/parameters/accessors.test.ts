@@ -14,7 +14,8 @@ import {
   assertSame,
 } from "@blazetrails/activesupport/testing/assertions";
 import { ForbiddenAttributesError, Model } from "@blazetrails/activemodel";
-import { Enumerator, rbInspect } from "@blazetrails/ruby-compat";
+import { Enumerator } from "@blazetrails/ruby-compat/enumerator";
+import { rbInspect } from "@blazetrails/ruby-compat/object";
 import { Parameters } from "../../../../lib/action-controller/metal/strong-parameters.js";
 
 describe("ParametersAccessorsTest", () => {

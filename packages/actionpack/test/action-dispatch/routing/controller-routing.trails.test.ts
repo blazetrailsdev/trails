@@ -1,6 +1,8 @@
 import { constSetPath } from "../../support/const-set-path.js";
 import { camelize } from "@blazetrails/activesupport";
-import { constDefined, rbModRemoveConst, constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { constDefined, constSet } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
+import { rbModRemoveConst } from "@blazetrails/ruby-compat/variable";
 import { describe, it, expect, afterEach, beforeEach } from "vitest";
 import { RouteSet } from "../../../lib/action-dispatch/routing/route-set.js";
 import type { RackEnv } from "@blazetrails/rack";

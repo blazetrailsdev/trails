@@ -1,4 +1,4 @@
-import { defineConstants } from "@blazetrails/ruby-compat";
+import { defineConstants } from "@blazetrails/ruby-compat/classpath";
 import * as m0 from "./xchar.js";
 import * as m1 from "./xmlbase.js";
 import * as m2 from "./xmlevents.js";

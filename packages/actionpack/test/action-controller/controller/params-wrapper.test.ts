@@ -1,15 +1,10 @@
 import { classAttribute, Inflections, inflections } from "@blazetrails/activesupport";
 import { assertCalled } from "@blazetrails/activesupport/testing/method-call-assertions";
 import { assertEqual } from "@blazetrails/activesupport/testing/assertions";
-import {
-  except,
-  rbObjDup,
-  TopLevel,
-  constGet,
-  constSet,
-  constDefined,
-  rbModRemoveConst,
-} from "@blazetrails/ruby-compat";
+import { except } from "@blazetrails/ruby-compat/hash";
+import { rbObjDup, constSet, constDefined } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
+import { constGet, rbModRemoveConst } from "@blazetrails/ruby-compat/variable";
 import { afterEach, beforeEach, describe, it } from "vitest";
 import { Base } from "../../../lib/action-controller/base.js";
 import { TestCase } from "../../../lib/action-controller/test-case.js";

@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { Metal } from "../../../lib/action-controller/metal.js";
 import { Head } from "../../../lib/action-controller/metal/head.js";
-import { include, type Included } from "@blazetrails/ruby-compat";
+import { include } from "@blazetrails/ruby-compat/include";
+import type { Included } from "@blazetrails/ruby-compat/include";
 import { Request } from "../../../lib/action-dispatch/http/request.js";
 import { Response } from "../../../lib/action-dispatch/http/response.js";
 import { Parameters } from "../../../lib/action-controller/metal/strong-parameters.js";

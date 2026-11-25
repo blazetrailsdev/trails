@@ -1,6 +1,6 @@
-import { rbModName, TopLevel } from "@blazetrails/ruby-compat";
+import { rbModName, TopLevel } from "@blazetrails/ruby-compat/object";
 import type { RackResponse } from "@blazetrails/rack";
-import { rbFSend } from "@blazetrails/ruby-compat";
+import { rbFSend } from "@blazetrails/ruby-compat/object";
 import { beforeEach, describe, it, expect } from "vitest";
 import {
   assert,
@@ -14,7 +14,7 @@ import { assertNotDeprecated } from "@blazetrails/activesupport/testing/deprecat
 import { ActionNotFound } from "../../../lib/abstract-controller/base.js";
 import { ModelName } from "@blazetrails/activemodel";
 import { domClass, domId } from "@blazetrails/actionview";
-import { include, publicInstanceMethods, constSet } from "@blazetrails/ruby-compat";
+import { include, publicInstanceMethods, constSet } from "@blazetrails/ruby-compat/include";
 import { Base } from "../../../lib/action-controller/base.js";
 import { deprecator } from "../../../lib/action-controller/deprecator.js";
 import { TestCase } from "../../../lib/action-controller/test-case.js";

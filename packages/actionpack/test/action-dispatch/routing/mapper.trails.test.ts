@@ -1,11 +1,8 @@
 import { constSetPath } from "../../support/const-set-path.js";
 import { camelize } from "@blazetrails/activesupport";
-import {
-  constDefined,
-  constGet,
-  rbModMethodDefined,
-  rbModRemoveConst,
-} from "@blazetrails/ruby-compat";
+import { constDefined } from "@blazetrails/ruby-compat/include";
+import { rbModMethodDefined } from "@blazetrails/ruby-compat/object";
+import { constGet, rbModRemoveConst } from "@blazetrails/ruby-compat/variable";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { TopLevel } from "@blazetrails/activesupport";
 import { Engine } from "@blazetrails/trailties/engine";

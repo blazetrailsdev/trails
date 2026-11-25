@@ -4,7 +4,7 @@ import { Notifications } from "@blazetrails/activesupport";
 import { assertMatch, assertNoMatch } from "@blazetrails/activesupport/testing/assertions";
 import { Lint, MockRequest } from "@blazetrails/rack";
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
-import { rbFSend } from "@blazetrails/ruby-compat";
+import { rbFSend } from "@blazetrails/ruby-compat/object";
 import { Base } from "../../../lib/action-controller/base.js";
 import { SERVER_TIMING } from "../../../lib/action-dispatch/constants.js";
 import type { MiddlewareFactory } from "../../../lib/action-dispatch/middleware/stack.js";

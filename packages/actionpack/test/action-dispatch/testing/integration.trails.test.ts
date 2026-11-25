@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { type RackEnv } from "@blazetrails/rack";
-import { RuntimeError, extend } from "@blazetrails/ruby-compat";
+import { extend } from "@blazetrails/ruby-compat/include";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
 import { IntegrationTest, Session } from "../../../lib/action-dispatch/testing/integration.js";
 import { RouteSet } from "../../../lib/action-dispatch/routing/route-set.js";
 

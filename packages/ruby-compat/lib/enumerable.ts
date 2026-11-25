@@ -9,6 +9,7 @@
  */
 
 import { classModule } from "./class-module.js";
+import { classpaths } from "./classpath.js";
 import { ArgumentError } from "./argument-error.js";
 import { TypeError as RbTypeError } from "./type-error.js";
 import { Hash } from "./hash.js";
@@ -1476,6 +1477,8 @@ export class Enumerable<T = unknown, E = unknown> {
     return iterator.call(this) as IterableIterator<T>;
   }
 }
+
+classpaths.set(Enumerable, { path: "Enumerable", permanent: true });
 
 /** `select` is `enum_find_all` under a second name (`vendor/ruby/v3.3.11/enum.c:5076`). */
 Object.defineProperty(Enumerable.prototype, "select", {

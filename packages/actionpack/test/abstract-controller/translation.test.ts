@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { MissingTranslationData } from "@blazetrails/i18n";
 import { I18n, include, isHtmlSafe, type Included } from "@blazetrails/activesupport";
 import { stub } from "@blazetrails/activesupport/testing/method-call-assertions";
-import { constSet } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
 import { AbstractController } from "../../lib/namespaces.js";
 import "../support/abstract-unit.js";
 import { Base } from "../../lib/abstract-controller/base.js";

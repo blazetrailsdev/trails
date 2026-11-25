@@ -1,4 +1,4 @@
-import { defineConstants } from "@blazetrails/ruby-compat";
+import { defineConstants } from "@blazetrails/ruby-compat/classpath";
 import * as m0 from "./crass/parser.js";
 import * as m1 from "./crass/scanner.js";
 import * as m2 from "./crass/token-scanner.js";

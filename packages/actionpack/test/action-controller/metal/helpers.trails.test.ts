@@ -1,4 +1,4 @@
-import { isModuleIncluded } from "@blazetrails/ruby-compat";
+import { isModuleIncluded } from "@blazetrails/ruby-compat/include";
 import { describe, expect, it } from "vitest";
 
 import { FooHelper } from "../../fixtures/alternate-helpers/foo-helper.js";

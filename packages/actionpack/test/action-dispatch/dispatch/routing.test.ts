@@ -20,19 +20,11 @@ import {
   assertRaises,
 } from "@blazetrails/activesupport/testing/assertions";
 import { stub } from "@blazetrails/activesupport/testing/method-call-assertions";
-import {
-  Encoding,
-  include,
-  NoMethodError,
-  rbConstGet,
-  rbObjRespondTo,
-  rbFSend,
-  constDefined,
-  constGet,
-  rbModRemoveConst,
-  constSet,
-  TopLevel,
-} from "@blazetrails/ruby-compat";
+import { Encoding } from "@blazetrails/ruby-compat/encoding";
+import { include, constDefined, constSet } from "@blazetrails/ruby-compat/include";
+import { NoMethodError } from "@blazetrails/ruby-compat/no-method-error";
+import { rbObjRespondTo, rbFSend, TopLevel } from "@blazetrails/ruby-compat/object";
+import { rbConstGet, constGet, rbModRemoveConst } from "@blazetrails/ruby-compat/variable";
 import { CachingKeyGenerator, KeyGenerator } from "@blazetrails/activesupport/key-generator";
 import { RotationConfiguration } from "@blazetrails/activesupport/messages/rotation-configuration";
 import { Flash } from "../../../lib/action-dispatch/middleware/flash.js";

@@ -1,4 +1,6 @@
-import { forceEncoding, TopLevel, constSet } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
+import { forceEncoding } from "@blazetrails/ruby-compat/string/force-encoding";
 import { htmlSafe } from "@blazetrails/activesupport";
 import {
   ActiveSupportJSON,
@@ -24,16 +26,16 @@ import {
   assertRespondTo,
 } from "@blazetrails/activesupport/testing/assertions";
 import { silenceWarnings } from "@blazetrails/activesupport/core-ext/kernel/reporting";
+import { Encoding } from "@blazetrails/ruby-compat/encoding";
+import { File } from "@blazetrails/ruby-compat/file";
 import {
-  Encoding,
-  File,
   rbInspect,
   rbObjClassname,
   rbObjId,
   rbObjIvarGet,
   rbObjIvarSet,
-  RuntimeError,
-} from "@blazetrails/ruby-compat";
+} from "@blazetrails/ruby-compat/object";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
 import { UploadedFile } from "@blazetrails/rack-test";
 import { Engine } from "@blazetrails/trailties/engine";
 import { describe, it, afterEach, beforeEach, vi } from "vitest";

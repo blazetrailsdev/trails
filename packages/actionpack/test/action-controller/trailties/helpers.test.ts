@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 
-import { File, isModuleIncluded } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat/file";
+import { isModuleIncluded } from "@blazetrails/ruby-compat/include";
 import { helpersPath, setHelpersPath } from "../../../lib/action-controller/metal/helpers.js";
 import { Base as ActionControllerBase } from "../../../lib/action-controller/base.js";
 import {

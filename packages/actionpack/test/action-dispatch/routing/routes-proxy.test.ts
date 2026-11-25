@@ -1,4 +1,4 @@
-import { rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { rbObjRespondTo } from "@blazetrails/ruby-compat/object";
 import { describe, expect, it } from "vitest";
 
 import { RouteSet } from "../../../lib/action-dispatch/routing/route-set.js";

@@ -17,7 +17,7 @@ import {
   assertPredicate,
 } from "@blazetrails/activesupport/testing/assertions";
 import { stub } from "@blazetrails/activesupport/testing/method-call-assertions";
-import { setEnv } from "@blazetrails/ruby-compat";
+import { setEnv } from "@blazetrails/ruby-compat/process-adapter";
 import { CacheHelper, Digestor, OutputBuffer, PartialRenderer } from "@blazetrails/actionview";
 import { Time } from "@blazetrails/date";
 import "../../support/abstract-unit.js";

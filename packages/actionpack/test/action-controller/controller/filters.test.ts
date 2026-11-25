@@ -1,6 +1,7 @@
 import type { RackResponse } from "@blazetrails/rack";
-import { rbFSend } from "@blazetrails/ruby-compat";
-import { TopLevel, constSet } from "@blazetrails/ruby-compat";
+import { rbFSend } from "@blazetrails/ruby-compat/object";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
 import { beforeEach, describe, it, expect } from "vitest";
 import { type CallbackChain } from "@blazetrails/activesupport";
 import {
@@ -9,7 +10,7 @@ import {
   assertNothingRaised,
   assertRaises,
 } from "@blazetrails/activesupport/testing/assertions";
-import { rbInspect, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { rbInspect, rbObjRespondTo } from "@blazetrails/ruby-compat/object";
 import { type Base as AbstractControllerBase } from "../../../lib/abstract-controller/base.js";
 import { Base } from "../../../lib/action-controller/base.js";
 import { TestCase } from "../../../lib/action-controller/test-case.js";

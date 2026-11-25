@@ -23,18 +23,14 @@ import {
 import { Request } from "../../../lib/action-dispatch/http/request.js";
 import { Digest } from "@blazetrails/activesupport/digest";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
-import {
-  Concurrent,
-  STDOUT,
-  rbInspect,
-  rbObjId,
-  rbObjRespondTo,
-  RuntimeError,
-  StandardError,
-  StringIO,
-  Thread,
-  Timeout,
-} from "@blazetrails/ruby-compat";
+import { Concurrent } from "@blazetrails/ruby-compat/concurrent/map";
+import { STDOUT } from "@blazetrails/ruby-compat/io";
+import { rbInspect, rbObjId, rbObjRespondTo } from "@blazetrails/ruby-compat/object";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
+import { StandardError } from "@blazetrails/ruby-compat/standard-error";
+import { StringIO } from "@blazetrails/ruby-compat/string-io";
+import { Thread } from "@blazetrails/ruby-compat/thread";
+import { Timeout } from "@blazetrails/ruby-compat/timeout";
 import "../../support/abstract-unit.js";
 import type { RackBody } from "../../../lib/action-dispatch/http/response.js";
 import { RouteSet } from "../../../lib/action-dispatch/routing/route-set.js";

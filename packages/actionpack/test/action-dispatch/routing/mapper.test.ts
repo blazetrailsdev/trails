@@ -4,7 +4,7 @@ import { mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { loadIseqEval, registerCompiledFiles } from "@blazetrails/ruby-compat";
+import { loadIseqEval, registerCompiledFiles } from "@blazetrails/ruby-compat/load";
 import { Mapper } from "../../../lib/action-dispatch/routing/mapper.js";
 import { RouteSet } from "../../../lib/action-dispatch/routing/route-set.js";
 

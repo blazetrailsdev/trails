@@ -1,4 +1,4 @@
-import { defineConstants } from "@blazetrails/ruby-compat";
+import { defineConstants } from "@blazetrails/ruby-compat/classpath";
 import * as m0 from "./inbound-email.js";
 
 defineConstants([[() => m0, "InboundEmail", "ActionMailbox::InboundEmail"]]);

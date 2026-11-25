@@ -1,6 +1,6 @@
 import { describe, it } from "vitest";
 import { assertEqual } from "@blazetrails/activesupport/testing/assertions";
-import { extend } from "@blazetrails/ruby-compat";
+import { extend } from "@blazetrails/ruby-compat/include";
 import { Runner } from "../../../lib/action-dispatch/testing/integration.js";
 
 describe("RunnerTest", () => {

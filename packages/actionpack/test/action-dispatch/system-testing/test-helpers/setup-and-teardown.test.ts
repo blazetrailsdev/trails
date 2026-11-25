@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { TopLevel } from "@blazetrails/activesupport";
-import { Dir, include } from "@blazetrails/ruby-compat";
+import { Dir } from "@blazetrails/ruby-compat/dir";
+import { include } from "@blazetrails/ruby-compat/include";
 import { vite } from "../../../../lib/action-dispatch/system-testing/server.js";
 import {
   SetupAndTeardown,

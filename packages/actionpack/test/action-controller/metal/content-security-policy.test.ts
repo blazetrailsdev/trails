@@ -1,4 +1,4 @@
-import { extend } from "@blazetrails/ruby-compat";
+import { extend } from "@blazetrails/ruby-compat/include";
 import { describe, it, expect, beforeEach } from "vitest";
 import { Base } from "../../../lib/action-controller/base.js";
 import type { ContentSecurityPolicyBlock } from "../../../lib/action-controller/metal/content-security-policy.js";

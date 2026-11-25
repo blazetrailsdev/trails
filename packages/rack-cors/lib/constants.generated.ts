@@ -1,4 +1,4 @@
-import { defineConstants } from "@blazetrails/ruby-compat";
+import { defineConstants } from "@blazetrails/ruby-compat/classpath";
 import * as m0 from "./cors.js";
 import * as m1 from "./cors/resource.js";
 import * as m2 from "./cors/resources.js";

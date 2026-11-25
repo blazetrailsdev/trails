@@ -8,7 +8,7 @@ import {
   assertNotEmpty,
   assertRaises,
 } from "@blazetrails/activesupport/testing/assertions";
-import { ArgumentError } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
 import { MockRequest } from "@blazetrails/rack";
 import { RouteSet, type DrawCallback } from "../../../../lib/action-dispatch/routing/route-set.js";
 import { Base } from "../../../../lib/action-controller/base.js";

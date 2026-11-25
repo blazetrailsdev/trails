@@ -6,7 +6,8 @@ import {
   TestHelper,
   type MockLogger,
 } from "@blazetrails/activesupport/log-subscriber/test-helper";
-import { include, type Included } from "@blazetrails/ruby-compat";
+import { include } from "@blazetrails/ruby-compat/include";
+import type { Included } from "@blazetrails/ruby-compat/include";
 import { LogSubscriber } from "../../../../lib/action-dispatch/log-subscriber.js";
 import type { DrawCallback } from "../../../../lib/action-dispatch/routing/route-set.js";
 import { IntegrationTest } from "../../../../lib/action-dispatch/testing/integration.js";

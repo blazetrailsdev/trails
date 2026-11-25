@@ -10,7 +10,7 @@ import {
 } from "../../../../lib/action-controller/metal/exceptions.js";
 import type { VariantCollector } from "../../../../lib/action-controller/metal/mime-responds.js";
 import { Logger } from "@blazetrails/activesupport";
-import { rbInspect } from "@blazetrails/ruby-compat";
+import { rbInspect } from "@blazetrails/ruby-compat/object";
 import { TestCase } from "../../../../lib/action-controller/test-case.js";
 
 type Variants = VariantCollector & Record<string, (block?: () => unknown) => void>;

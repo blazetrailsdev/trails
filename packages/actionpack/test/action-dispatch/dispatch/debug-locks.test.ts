@@ -2,7 +2,8 @@ import { describe, it } from "vitest";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { Dependencies } from "@blazetrails/activesupport";
 import { assertMatch } from "@blazetrails/activesupport/testing/assertions";
-import { Concurrent, Thread } from "@blazetrails/ruby-compat";
+import { Concurrent } from "@blazetrails/ruby-compat/concurrent/map";
+import { Thread } from "@blazetrails/ruby-compat/thread";
 import { DebugLocks } from "../../../lib/action-dispatch/middleware/debug-locks.js";
 
 const okApp = async (_env: RackEnv): Promise<RackResponse> => [200, {}, ["ok"]];

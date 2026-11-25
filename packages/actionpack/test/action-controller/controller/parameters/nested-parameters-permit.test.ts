@@ -7,7 +7,7 @@ import {
   assertNotNil,
   assertPredicate,
 } from "@blazetrails/activesupport/testing/assertions";
-import { rbInspect } from "@blazetrails/ruby-compat";
+import { rbInspect } from "@blazetrails/ruby-compat/object";
 import { Parameters } from "../../../../lib/action-controller/metal/strong-parameters.js";
 
 describe("NestedParametersPermitTest", () => {

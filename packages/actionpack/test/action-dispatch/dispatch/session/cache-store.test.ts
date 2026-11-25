@@ -13,16 +13,10 @@ import type { Entry } from "@blazetrails/activesupport/cache/entry";
 import { LocalCache } from "@blazetrails/activesupport/cache/strategy/local-cache";
 import { MockRequest, type RackApp } from "@blazetrails/rack";
 import { SessionId } from "@blazetrails/rack-session";
-import {
-  constSet,
-  include,
-  rbObjRespondTo,
-  type Included,
-  prepend,
-  rbInspect,
-  Thread,
-  TopLevel,
-} from "@blazetrails/ruby-compat";
+import { constSet, include, prepend } from "@blazetrails/ruby-compat/include";
+import type { Included } from "@blazetrails/ruby-compat/include";
+import { rbObjRespondTo, rbInspect, TopLevel } from "@blazetrails/ruby-compat/object";
+import { Thread } from "@blazetrails/ruby-compat/thread";
 import { Base } from "../../../../lib/action-controller/base.js";
 import { deprecator } from "../../../../lib/action-dispatch/deprecator.js";
 import { CacheStore } from "../../../../lib/action-dispatch/middleware/session/cache-store.js";

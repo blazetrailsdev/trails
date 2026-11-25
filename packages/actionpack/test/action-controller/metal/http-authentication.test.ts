@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { HashWithIndifferentAccess } from "@blazetrails/activesupport";
-import { OpenSSL } from "@blazetrails/ruby-compat";
+import { OpenSSL } from "@blazetrails/ruby-compat/openssl";
 import { Base } from "../../../lib/action-controller/base.js";
 import { Request } from "../../../lib/action-dispatch/http/request.js";
 import { HttpAuthentication } from "../../../lib/action-controller/metal/http-authentication.js";

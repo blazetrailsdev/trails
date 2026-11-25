@@ -1,4 +1,6 @@
-import { block, TopLevel, constSet } from "@blazetrails/ruby-compat";
+import { block } from "@blazetrails/ruby-compat/hash";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
 import { describe, it, beforeEach, afterEach } from "vitest";
 import { LogSubscriber as ActiveSupportLogSubscriber } from "@blazetrails/activesupport";
 import {
@@ -13,17 +15,14 @@ import {
   TestHelper,
   type MockLogger,
 } from "@blazetrails/activesupport/log-subscriber/test-helper";
-import {
-  Dir,
-  Exception,
-  File,
-  FileUtils,
-  include,
-  rbInspect,
-  kernelCatch,
-  kernelThrow,
-  type Included,
-} from "@blazetrails/ruby-compat";
+import { Dir } from "@blazetrails/ruby-compat/dir";
+import { Exception } from "@blazetrails/ruby-compat/exception";
+import { File } from "@blazetrails/ruby-compat/file";
+import { FileUtils } from "@blazetrails/ruby-compat/file-utils";
+import { include } from "@blazetrails/ruby-compat/include";
+import type { Included } from "@blazetrails/ruby-compat/include";
+import { kernelCatch, kernelThrow } from "@blazetrails/ruby-compat/kernel-catch";
+import { rbInspect } from "@blazetrails/ruby-compat/object";
 import type { Headers } from "../../../lib/action-dispatch/http/headers.js";
 import { LogSubscriber } from "../../../lib/action-controller/log-subscriber.js";
 import { Base } from "../../../lib/action-controller/base.js";

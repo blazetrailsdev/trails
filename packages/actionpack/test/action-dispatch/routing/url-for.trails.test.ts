@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import { TopLevel } from "@blazetrails/activesupport";
-import { include, isModuleIncluded, rbObjSingletonClass } from "@blazetrails/ruby-compat";
+import { include, isModuleIncluded } from "@blazetrails/ruby-compat/include";
+import { rbObjSingletonClass } from "@blazetrails/ruby-compat/object";
 
 import { RouteSet } from "../../../lib/action-dispatch/routing/route-set.js";
 import { UrlFor, urlFor, type UrlForHost } from "../../../lib/action-dispatch/routing/url-for.js";

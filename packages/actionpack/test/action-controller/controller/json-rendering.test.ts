@@ -4,13 +4,10 @@ import { Request } from "../../../lib/action-dispatch/http/request.js";
 import { Response } from "../../../lib/action-dispatch/http/response.js";
 import { Base } from "../../../lib/action-controller/base.js";
 import { API } from "../../../lib/action-controller/api.js";
-import {
-  StringIO,
-  constDefined,
-  rbModRemoveConst,
-  constSet,
-  TopLevel,
-} from "@blazetrails/ruby-compat";
+import { constDefined, constSet } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
+import { StringIO } from "@blazetrails/ruby-compat/string-io";
+import { rbModRemoveConst } from "@blazetrails/ruby-compat/variable";
 
 afterEach(() => {
   if (constDefined(Object, "PostsController", false)) rbModRemoveConst(Object, "PostsController");

@@ -8,7 +8,9 @@ import {
   assertMatch,
   assertRaise,
 } from "@blazetrails/activesupport/testing/assertions";
-import { RuntimeError, StandardError, stderr } from "@blazetrails/ruby-compat";
+import { stderr } from "@blazetrails/ruby-compat/process-adapter";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
+import { StandardError } from "@blazetrails/ruby-compat/standard-error";
 import { TemplateError } from "@blazetrails/actionview";
 import { ActionNotFound } from "../../../lib/abstract-controller/base.js";
 import {

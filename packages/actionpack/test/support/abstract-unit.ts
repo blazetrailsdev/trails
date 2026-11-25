@@ -7,21 +7,15 @@ import {
   assertNotEqual,
   assertNotIncludes,
 } from "@blazetrails/activesupport/testing/assertions";
-import {
-  DelegateClass,
-  Dir,
-  rbCallSuper,
-  type Generic,
-  hashAref,
-  hashAset,
-  rbInspect,
-  rbStrSend,
-  stringSplit,
-  URI,
-  rbProcCall,
-  constSet,
-  TopLevel,
-} from "@blazetrails/ruby-compat";
+import { DelegateClass } from "@blazetrails/ruby-compat/delegate";
+import { Dir } from "@blazetrails/ruby-compat/dir";
+import { hashAref, hashAset } from "@blazetrails/ruby-compat/hash";
+import { rbCallSuper, constSet } from "@blazetrails/ruby-compat/include";
+import { rbInspect, rbProcCall, TopLevel } from "@blazetrails/ruby-compat/object";
+import { rbStrSend } from "@blazetrails/ruby-compat/string/method-table";
+import { stringSplit } from "@blazetrails/ruby-compat/string/split";
+import { URI } from "@blazetrails/ruby-compat/uri/common";
+import type { Generic } from "@blazetrails/ruby-compat/uri/generic";
 import { Head, MethodOverride, type RackEnv, type RackResponse } from "@blazetrails/rack";
 import { RoutesHelpers } from "../../lib/abstract-controller/trailties/routes-helpers.js";
 import { ActionDispatch } from "../../lib/namespaces.js";

@@ -32,4 +32,24 @@ describe("ruby-compat entry modules", () => {
     }
     expect(failures).toEqual([]);
   }, 300_000);
+
+  it("serves the readers of include.js's load-time mixins only from include.js", async () => {
+    const files = (await readdir(DIST, { recursive: true })).filter((f) => f.endsWith(".js"));
+    const failures: string[] = [];
+    for (const f of files) {
+      const script = [
+        `const ns = await import(${JSON.stringify(`./${f}`)});`,
+        `const readers = ["rbModAncestors", "rbObjIsKindOf", "rbClassInheritedP"];`,
+        `const seen = readers.filter((r) => r in ns).map((r) => [r, ns[r]]);`,
+        `const inc = await import("./include.js");`,
+        `for (const [r, fn] of seen) if (fn !== inc[r]) throw new Error(r + " is not include.js's");`,
+      ].join("\n");
+      await promisify(execFile)(process.execPath, ["--input-type=module", "-e", script], {
+        cwd: DIST,
+      }).catch((e: { stderr: string }) => {
+        failures.push(`${f}: ${e.stderr.split("\n").find((l) => /Error/.test(l))}`);
+      });
+    }
+    expect(failures).toEqual([]);
+  }, 300_000);
 });

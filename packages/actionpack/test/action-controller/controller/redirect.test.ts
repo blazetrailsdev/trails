@@ -6,13 +6,10 @@ import {
   assertRaise,
   assertRaises,
 } from "@blazetrails/activesupport/testing/assertions";
-import {
-  ArgumentError,
-  constSet,
-  rbObjSingletonClass,
-  RuntimeError,
-  TopLevel,
-} from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { rbObjSingletonClass, TopLevel } from "@blazetrails/ruby-compat/object";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
 import "../../support/abstract-unit.js";
 import { Base } from "../../../lib/action-controller/base.js";
 import { ActionControllerError } from "../../../lib/action-controller/metal/exceptions.js";

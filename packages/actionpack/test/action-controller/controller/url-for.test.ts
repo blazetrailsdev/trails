@@ -6,7 +6,8 @@ import {
   assertRaise,
   assertRespondTo,
 } from "@blazetrails/activesupport/testing/assertions";
-import { ArgumentError, include } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { include } from "@blazetrails/ruby-compat/include";
 import { deprecator } from "../../../lib/action-dispatch/deprecator.js";
 import { URL } from "../../../lib/action-dispatch/http/url.js";
 import { RouteSet } from "../../../lib/action-dispatch/routing/route-set.js";

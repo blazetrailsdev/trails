@@ -1,4 +1,4 @@
-import { defineConstants } from "@blazetrails/ruby-compat";
+import { defineConstants } from "@blazetrails/ruby-compat/classpath";
 import * as m0 from "./app/helpers/action-text/content-helper.js";
 import * as m1 from "./app/helpers/action-text/tag-helper.js";
 import * as m2 from "./attachable.js";

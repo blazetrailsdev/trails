@@ -20,7 +20,8 @@ import {
   assertNothingRaised,
   assertRespondTo,
 } from "@blazetrails/activesupport/testing/assertions";
-import { rbObjAsString, constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { rbObjAsString, TopLevel } from "@blazetrails/ruby-compat/object";
 import { Metal } from "../../../lib/action-controller/metal.js";
 import { TestCase } from "../../../lib/action-controller/test-case.js";
 import { Flash as ControllerFlash } from "../../../lib/action-controller/metal/flash.js";

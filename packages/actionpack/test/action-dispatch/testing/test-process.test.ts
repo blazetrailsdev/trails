@@ -1,6 +1,6 @@
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { File } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat/file";
 import { describe, expect, it } from "vitest";
 
 import { FlashHash } from "../../../lib/action-dispatch/middleware/flash.js";
