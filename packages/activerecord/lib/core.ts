@@ -1,31 +1,32 @@
-import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
-import { cmp } from "@blazetrails/ruby-compat/comparable";
-import { Concurrent } from "@blazetrails/ruby-compat/concurrent/map";
-import { DelegateClass } from "@blazetrails/ruby-compat/delegate";
-import { filterMap } from "@blazetrails/ruby-compat/enumerable";
-import { type Hash, hashAref, keys as hashKeys } from "@blazetrails/ruby-compat/hash";
 import {
+  ArgumentError,
+  Concurrent,
+  DelegateClass,
+  cmp,
+  rbClassSuperclass,
+  rbEqual,
+  rbObjClass,
   rbObjIsKindOf,
   Module,
+  type Hash,
+  hashAref,
+  keys as hashKeys,
   include,
+  rbHash,
   constSet,
-  rbCallSuper,
-  inherited,
-  rbObjClone,
-} from "@blazetrails/ruby-compat/include";
-import {
-  rbClassSuperclass,
-  rbObjClass,
   rbModSingletonP,
   rbModToS,
+  rbObjHash,
   basicObjRespondTo,
   rbFSend,
   rbObjSingletonClass,
+  rbCallSuper,
+  filterMap,
   rbObjRespondTo,
+  inherited,
   rbInspect,
-} from "@blazetrails/ruby-compat/object";
-import { rbEqual } from "@blazetrails/ruby-compat/rb-equal";
-import { rbHash, rbObjHash } from "@blazetrails/ruby-compat/rb-hash";
+  rbObjClone,
+} from "@blazetrails/ruby-compat";
 import {
   NameError,
   RecordNotFound,
@@ -46,7 +47,7 @@ import { AsynchronousQueriesTracker, type Session } from "./asynchronous-queries
 import { _reflectOnAssociation, reflectOnAggregation } from "./reflection.js";
 import { PredicateBuilder } from "./relation/predicate-builder.js";
 import { TableMetadata } from "./table-metadata.js";
-import type { PP } from "@blazetrails/ruby-compat/pp";
+import type { PP } from "@blazetrails/ruby-compat";
 import { Table } from "@blazetrails/arel";
 import { Map as TypeCasterMap } from "./type-caster/map.js";
 import { cachedTableExists, isSchemaLoaded } from "./model-schema.js";

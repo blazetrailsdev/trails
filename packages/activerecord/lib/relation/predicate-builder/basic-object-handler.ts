@@ -1,6 +1,6 @@
 import type * as Arel from "@blazetrails/arel";
 import { Nodes } from "@blazetrails/arel";
-import { rbObjAsString as toS } from "@blazetrails/ruby-compat/object";
+import { rbObjAsString as toS } from "@blazetrails/ruby-compat";
 
 export class BasicObjectHandler {
   private _predicateBuilder: {

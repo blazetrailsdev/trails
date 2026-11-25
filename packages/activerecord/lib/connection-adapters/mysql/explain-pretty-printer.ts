@@ -1,5 +1,5 @@
 import "../../constants.mysql-explain-pretty-printer.generated.js";
-import { eachWithIndex } from "@blazetrails/ruby-compat/enumerable";
+import { eachWithIndex } from "@blazetrails/ruby-compat";
 export interface ExplainResult {
   columns: string[];
   rows: Array<Array<unknown>>;

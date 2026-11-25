@@ -1,9 +1,7 @@
 import type { DatabaseConfigOptions } from "./database-config.js";
 import { camelize, isBlank, reverseMerge, transformKeys } from "@blazetrails/activesupport";
 import { compactBlank } from "@blazetrails/activesupport/hash-utils";
-import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
-import { stringSplit } from "@blazetrails/ruby-compat/string/split";
-import { type Generic, RFC2396Parser } from "@blazetrails/ruby-compat/uri";
+import { type Generic, RFC2396Parser, RuntimeError, stringSplit } from "@blazetrails/ruby-compat";
 import { protocolAdapters } from "../active-record.js";
 
 export class ConnectionUrlResolver {

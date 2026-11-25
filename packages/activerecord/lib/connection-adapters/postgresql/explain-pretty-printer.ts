@@ -1,5 +1,5 @@
 import "../../constants.postgresql-explain-pretty-printer.generated.js";
-import { first } from "@blazetrails/ruby-compat/array";
+import { first } from "@blazetrails/ruby-compat";
 import type { Result } from "../../result.js";
 
 export class ExplainPrettyPrinter {

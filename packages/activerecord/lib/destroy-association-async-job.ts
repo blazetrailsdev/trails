@@ -1,8 +1,7 @@
 import "./constants.destroy-association-async-job.generated.js";
 import { constantize } from "@blazetrails/activesupport";
 import { Base as JobBase, DeserializationError } from "@blazetrails/activejob";
-import { rbFSend } from "@blazetrails/ruby-compat/object";
-import { StandardError } from "@blazetrails/ruby-compat/standard-error";
+import { rbFSend, StandardError } from "@blazetrails/ruby-compat";
 import { queues } from "./active-record.js";
 import { Base } from "./base.js";
 import { ActiveRecord } from "./namespaces.js";

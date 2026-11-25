@@ -1,9 +1,7 @@
 import type { Base } from "./base.js";
 import type { AssociationOptions } from "./associations.js";
 import { camelize, constantize, inquiry, singularize, tableize } from "@blazetrails/activesupport";
-import { hashDelete } from "@blazetrails/ruby-compat/hash";
-import { rbClearMethodCache } from "@blazetrails/ruby-compat/include";
-import { rbFSend } from "@blazetrails/ruby-compat/object";
+import { hashDelete, rbFSend, rbClearMethodCache } from "@blazetrails/ruby-compat";
 
 export interface DelegatedTypeOptions extends Omit<AssociationOptions, "scope"> {
   types: string[];

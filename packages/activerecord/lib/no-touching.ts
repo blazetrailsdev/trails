@@ -1,5 +1,5 @@
 import { IsolatedExecutionState } from "@blazetrails/activesupport";
-import { rbClassInheritedP, rbCallSuper } from "@blazetrails/ruby-compat/include";
+import { rbClassInheritedP, rbCallSuper } from "@blazetrails/ruby-compat";
 import type { Base } from "./base.js";
 
 export const NoTouching = {};

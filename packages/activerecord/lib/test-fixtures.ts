@@ -1,13 +1,17 @@
-import { Dir } from "@blazetrails/ruby-compat/dir";
-import { File as RubyFile } from "@blazetrails/ruby-compat/file";
-import { Hash } from "@blazetrails/ruby-compat/hash";
-import { rbCallSuper } from "@blazetrails/ruby-compat/include";
-import { NoMethodError } from "@blazetrails/ruby-compat/no-method-error";
-import { rbObjClassname, toS } from "@blazetrails/ruby-compat/object";
-import { rbEql } from "@blazetrails/ruby-compat/rb-equal";
-import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
-import { StandardError } from "@blazetrails/ruby-compat/standard-error";
-import { isSymbol, symbolToS } from "@blazetrails/ruby-compat/symbol";
+import {
+  Dir,
+  Hash,
+  File as RubyFile,
+  NoMethodError,
+  rbCallSuper,
+  RuntimeError,
+  StandardError,
+  isSymbol,
+  rbEql,
+  rbObjClassname,
+  symbolToS,
+  toS,
+} from "@blazetrails/ruby-compat";
 import {
   Concern,
   Notifications,

@@ -1,5 +1,5 @@
 import { included } from "@blazetrails/activesupport";
-import type { Hash } from "@blazetrails/ruby-compat/hash";
+import type { Hash } from "@blazetrails/ruby-compat";
 import { AttributeMethods } from "../namespaces.js";
 
 interface BeforeTypeCastIncludeHost {

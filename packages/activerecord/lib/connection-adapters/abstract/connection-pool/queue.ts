@@ -1,9 +1,7 @@
 import type { AbstractAdapter as DatabaseAdapter } from "../../abstract-adapter.js";
 import { ConnectionTimeoutError } from "../../../errors.js";
 import { include, type Included } from "@blazetrails/activesupport";
-import { aryDelete } from "@blazetrails/ruby-compat/array";
-import { rbEnsure } from "@blazetrails/ruby-compat/ensure";
-import { Process } from "@blazetrails/ruby-compat/process";
+import { aryDelete, Process, rbEnsure } from "@blazetrails/ruby-compat";
 
 interface Waiter {
   resolve: () => void;

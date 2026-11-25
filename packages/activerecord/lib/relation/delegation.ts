@@ -16,21 +16,25 @@ import {
 } from "@blazetrails/activesupport";
 import { toFs, toXml } from "@blazetrails/activesupport/core-ext/array/conversions";
 import { NotImplementedError } from "../errors.js";
-import { ARRAY_METHOD_TABLE, arySlice } from "@blazetrails/ruby-compat/array";
-import { fetch } from "@blazetrails/ruby-compat/hash";
-import { Module, extend, include, constSet } from "@blazetrails/ruby-compat/include";
-import { Mutex } from "@blazetrails/ruby-compat/mutex";
-import { NoMethodError } from "@blazetrails/ruby-compat/no-method-error";
 import {
+  Module,
+  Mutex,
+  ThreadError,
+  NoMethodError,
+  ARRAY_METHOD_TABLE,
+  Range,
+  arySlice,
+  extend,
+  fetch,
+  include,
   rbFSend,
+  constSet,
   rbClassSuperclass,
   rbModName,
   rbObjIvarGet,
   rbObjIvarSet,
   rbObjRespondTo,
-} from "@blazetrails/ruby-compat/object";
-import { Range } from "@blazetrails/ruby-compat/range";
-import { ThreadError } from "@blazetrails/ruby-compat/thread-error";
+} from "@blazetrails/ruby-compat";
 import type { Psych } from "@blazetrails/ruby-compat/psych";
 import { ActiveRecord, Associations } from "../namespaces.js";
 

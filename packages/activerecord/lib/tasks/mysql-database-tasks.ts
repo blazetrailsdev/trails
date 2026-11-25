@@ -1,7 +1,5 @@
 import "../constants.mysql-database-tasks.generated.js";
-import { rbFSystem } from "@blazetrails/ruby-compat/kernel-system";
-import { rbEqq } from "@blazetrails/ruby-compat/rb-equal";
-import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
+import { rbEqq, rbFSystem, RuntimeError } from "@blazetrails/ruby-compat";
 import { kernelArray } from "@blazetrails/activesupport";
 import type { Mysql2Adapter } from "../connection-adapters/mysql2-adapter.js";
 import type { ConnectionPool } from "../connection-adapters/abstract/connection-pool.js";

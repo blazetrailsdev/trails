@@ -1,6 +1,5 @@
 import { Time } from "@blazetrails/date";
-import type { Hash } from "@blazetrails/ruby-compat/hash";
-import { fixDiv, fixMod } from "@blazetrails/ruby-compat/numeric";
+import { fixDiv, fixMod, type Hash } from "@blazetrails/ruby-compat";
 
 export class Session {
   readonly session: Pick<Hash<string, unknown>, "get" | "set">;

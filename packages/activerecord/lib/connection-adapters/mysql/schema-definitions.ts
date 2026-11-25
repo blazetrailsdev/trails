@@ -15,8 +15,7 @@ import type { SchemaStatementsLike } from "../abstract/schema-statements-like.js
 import { type VisitorHostAdapter } from "./schema-creation.js";
 import { deprecator } from "../../deprecator.js";
 import { deprecate } from "@blazetrails/activesupport";
-import { include, included } from "@blazetrails/ruby-compat/include";
-import { rtest } from "@blazetrails/ruby-compat/object";
+import { include, included, rtest } from "@blazetrails/ruby-compat";
 
 export interface ColumnMethods {
   blob(...names: string[]): unknown;

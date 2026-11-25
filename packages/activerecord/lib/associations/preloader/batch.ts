@@ -2,7 +2,7 @@ import type { Base } from "../../base.js";
 import type { Preloader } from "../preloader.js";
 import type { Association } from "./association.js";
 import type { Branch } from "./branch.js";
-import { groupBy, partition } from "@blazetrails/ruby-compat/enumerable";
+import { groupBy, partition } from "@blazetrails/ruby-compat";
 import { ThroughAssociation } from "./through-association.js";
 
 export class Batch {

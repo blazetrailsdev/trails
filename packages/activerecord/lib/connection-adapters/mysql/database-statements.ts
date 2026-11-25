@@ -1,10 +1,6 @@
 import { sql as arelSql } from "@blazetrails/arel";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { aryJoin } from "@blazetrails/ruby-compat/array";
-import { cmp, rbCmpint } from "@blazetrails/ruby-compat/comparable";
-import { eachWithObject } from "@blazetrails/ruby-compat/enumerable";
-import { rbRegMatchP } from "@blazetrails/ruby-compat/regexp";
-import { b } from "@blazetrails/ruby-compat/string/b";
+import { aryJoin, b, cmp, eachWithObject, rbCmpint, rbRegMatchP } from "@blazetrails/ruby-compat";
 import { ActiveRecordError } from "../../errors.js";
 import type { ExplainOption } from "../abstract/database-statements.js";
 import type { Nodes } from "@blazetrails/arel";

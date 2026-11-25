@@ -5,7 +5,7 @@ import {
   completeHalfAccessor,
 } from "@blazetrails/activemodel";
 import { included, type CodeGenerator } from "@blazetrails/activesupport";
-import { rtest } from "@blazetrails/ruby-compat/object";
+import { rtest } from "@blazetrails/ruby-compat";
 import { AttributeMethods as AttributeMethodsNamespace } from "../namespaces.js";
 
 export interface Write {

@@ -1,4 +1,4 @@
-import { StandardError } from "@blazetrails/ruby-compat/standard-error";
+import { StandardError } from "@blazetrails/ruby-compat";
 import * as Errors from "./errors.js";
 import { Encryption as ActiveRecordEncryption } from "../namespaces.js";
 export class Base extends StandardError {}

@@ -1,10 +1,16 @@
-import { uniq } from "@blazetrails/ruby-compat/array";
-import { hashDelete } from "@blazetrails/ruby-compat/hash";
-import { include, rbObjDup } from "@blazetrails/ruby-compat/include";
-import { KERNEL_METHODS, PROTOCOL_PROBES } from "@blazetrails/ruby-compat/method-missing-proxy";
-import { NoMethodError } from "@blazetrails/ruby-compat/no-method-error";
-import { rbFSend, rbObjRespondTo, rtest } from "@blazetrails/ruby-compat/object";
-import { isEmpty } from "@blazetrails/ruby-compat/ruby-empty";
+import {
+  KERNEL_METHODS,
+  NoMethodError,
+  PROTOCOL_PROBES,
+  hashDelete,
+  include,
+  isEmpty,
+  rbFSend,
+  rbObjDup,
+  rbObjRespondTo,
+  rtest,
+  uniq,
+} from "@blazetrails/ruby-compat";
 import { extractOptionsBang, isBlank, isPlainObject } from "@blazetrails/activesupport";
 
 import { ActiveRecord } from "../namespaces.js";

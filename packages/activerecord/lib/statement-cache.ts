@@ -1,7 +1,6 @@
 import { Attribute, RangeError as ActiveModelRangeError } from "@blazetrails/activemodel";
 import { isPlainObject } from "@blazetrails/activesupport";
-import { eachWithIndex, findAll } from "@blazetrails/ruby-compat/enumerable";
-import { Range } from "@blazetrails/ruby-compat/range";
+import { eachWithIndex, findAll, Range } from "@blazetrails/ruby-compat";
 import { RangeError as ARRangeError } from "./errors.js";
 import type { Base } from "./base.js";
 import { ActiveRecord } from "./namespaces.js";

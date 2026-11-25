@@ -2,11 +2,13 @@ import "../../../constants.postgresql-oid-hstore.generated.js";
 import { ConnectionAdapters } from "../../../namespaces.js";
 import { ArgumentError, Mutable, ValueType } from "@blazetrails/activemodel";
 import { include, isPlainObject } from "@blazetrails/activesupport";
-import { eachPair } from "@blazetrails/ruby-compat/hash";
-import { rbObjRespondTo } from "@blazetrails/ruby-compat/object";
-import { rbEqual } from "@blazetrails/ruby-compat/rb-equal";
-import { StringScanner } from "@blazetrails/ruby-compat/string-scanner";
-import { stringInspect } from "@blazetrails/ruby-compat/string/inspect";
+import {
+  eachPair,
+  rbEqual,
+  rbObjRespondTo,
+  stringInspect,
+  StringScanner,
+} from "@blazetrails/ruby-compat";
 
 import { StringKeyedHashAccessor } from "../../../store.js";
 

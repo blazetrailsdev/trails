@@ -1,7 +1,5 @@
 import { AttributeAssignmentError, MultiparameterAssignmentErrors } from "./errors.js";
-import { eachPair, eachValue } from "@blazetrails/ruby-compat/hash";
-import { rbInspect } from "@blazetrails/ruby-compat/object";
-import { rbStrToF, rbStrToI } from "@blazetrails/ruby-compat/string/convert";
+import { eachPair, eachValue, rbInspect, rbStrToF, rbStrToI } from "@blazetrails/ruby-compat";
 
 interface AttributeAssignmentHost {
   writeAttribute(key: string, value: unknown): void;

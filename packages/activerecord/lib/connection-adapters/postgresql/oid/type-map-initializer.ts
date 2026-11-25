@@ -1,7 +1,6 @@
 import "../../../constants.postgresql-oid-type-map-initializer.generated.js";
 import { ArgumentError, type ValueType } from "@blazetrails/activemodel";
-import type { Enumerable } from "@blazetrails/ruby-compat/enumerable";
-import { toI } from "@blazetrails/ruby-compat/numeric";
+import { toI, type Enumerable } from "@blazetrails/ruby-compat";
 
 import { HashLookupTypeMap } from "../../../type/hash-lookup-type-map.js";
 import { Array as OidArray } from "./array.js";

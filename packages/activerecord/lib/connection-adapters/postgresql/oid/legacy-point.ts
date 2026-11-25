@@ -1,9 +1,6 @@
 import "../../../constants.postgresql-oid-legacy-point.generated.js";
 import { ConnectionAdapters } from "../../../namespaces.js";
-import { kernelFloat } from "@blazetrails/ruby-compat/kernel-float";
-import { rbObjAsString } from "@blazetrails/ruby-compat/object";
-import { rbEqual } from "@blazetrails/ruby-compat/rb-equal";
-import { rbStrSend } from "@blazetrails/ruby-compat/string/method-table";
+import { kernelFloat, rbEqual, rbObjAsString, rbStrSend } from "@blazetrails/ruby-compat";
 import { ValueType } from "@blazetrails/activemodel";
 
 export class LegacyPoint extends ValueType {

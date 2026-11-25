@@ -1,7 +1,6 @@
 import { ArgumentError } from "@blazetrails/activemodel";
 import { isPlainObject } from "@blazetrails/activesupport";
-import { defineModule } from "@blazetrails/ruby-compat/include";
-import { rbModDefineMethod, rbObjRespondTo } from "@blazetrails/ruby-compat/object";
+import { defineModule, rbModDefineMethod, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import type { Base } from "../base.js";
 
 import { Relation } from "../relation.js";

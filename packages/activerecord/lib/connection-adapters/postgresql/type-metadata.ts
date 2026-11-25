@@ -1,9 +1,6 @@
 import "../../constants.postgresql-type-metadata.generated.js";
 import { ConnectionAdapters } from "../../namespaces.js";
-import { DelegateClass } from "@blazetrails/ruby-compat/delegate";
-import { include, type Included } from "@blazetrails/ruby-compat/include";
-import { rbEqual } from "@blazetrails/ruby-compat/rb-equal";
-import { rbHash } from "@blazetrails/ruby-compat/rb-hash";
+import { DelegateClass, include, type Included, rbEqual, rbHash } from "@blazetrails/ruby-compat";
 import { Deduplicable } from "../deduplicable.js";
 import type { ClassMethods } from "../deduplicable.js";
 import { SqlTypeMetadata } from "../sql-type-metadata.js";

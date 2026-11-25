@@ -7,8 +7,7 @@ import {
   type EventPayload,
   type Instrumenter,
 } from "@blazetrails/activesupport";
-import { Mutex } from "@blazetrails/ruby-compat/mutex";
-import { Process } from "@blazetrails/ruby-compat/process";
+import { Mutex, Process } from "@blazetrails/ruby-compat";
 import { Result } from "./result.js";
 
 /** @internal */

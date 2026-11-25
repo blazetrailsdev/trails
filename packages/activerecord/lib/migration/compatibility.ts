@@ -1,8 +1,13 @@
 import { ArgumentError } from "@blazetrails/activemodel";
 import { isPresent, reverseMergeBang } from "@blazetrails/activesupport";
-import { include, rbCallSuper } from "@blazetrails/ruby-compat/include";
-import { rbInspect, rbObjSingletonClass, rtest } from "@blazetrails/ruby-compat/object";
-import { stringDelete } from "@blazetrails/ruby-compat/string/delete";
+import {
+  include,
+  rbCallSuper,
+  rbInspect,
+  rbObjSingletonClass,
+  rtest,
+  stringDelete,
+} from "@blazetrails/ruby-compat";
 import { prepend } from "@blazetrails/ruby-compat/include";
 import { Current, Migration } from "../migration.js";
 import * as Compatibility from "./compatibility.js";

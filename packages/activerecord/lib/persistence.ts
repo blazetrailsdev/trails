@@ -1,16 +1,18 @@
 import { Time as RubyTime } from "@blazetrails/date";
 import { type TouchArgs, type TouchOptions } from "./timestamp.js";
-import { eachWithObject, eachWithIndex } from "@blazetrails/ruby-compat/enumerable";
-import { keys } from "@blazetrails/ruby-compat/hash";
-import { methodCacheSerial, rbClearMethodCache } from "@blazetrails/ruby-compat/include";
 import {
   basicObjRespondTo,
+  keys,
+  methodCacheSerial,
+  rbEqual,
   rbFSend,
   rbObjAsString,
   rbObjSingletonClass,
   rtest,
-} from "@blazetrails/ruby-compat/object";
-import { rbEqual } from "@blazetrails/ruby-compat/rb-equal";
+  eachWithObject,
+  eachWithIndex,
+  rbClearMethodCache,
+} from "@blazetrails/ruby-compat";
 import type { AttributeSet, ValueType } from "@blazetrails/activemodel";
 import type { Base } from "./base.js";
 import type { CounterCacheCounters } from "./counter-cache.js";

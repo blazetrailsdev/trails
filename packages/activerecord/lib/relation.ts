@@ -2,29 +2,32 @@ import { Time as RubyTime } from "@blazetrails/date";
 import { _loadSerializedAttributes } from "./type/serialized.js";
 import { isBlank, isPresent, stripThenable } from "@blazetrails/activesupport";
 import { Digest } from "@blazetrails/activesupport/digest";
-import { uniq } from "@blazetrails/ruby-compat/array";
-import { rbEnsure } from "@blazetrails/ruby-compat/ensure";
-import { hashDelete } from "@blazetrails/ruby-compat/hash";
-import { isModuleIncluded } from "@blazetrails/ruby-compat/include";
-import { rtest } from "@blazetrails/ruby-compat/object";
-import { Range } from "@blazetrails/ruby-compat/range";
-import { Enumerable, type Each } from "@blazetrails/ruby-compat/enumerable";
-import { rbDefineAllocFunc, rbObjClone } from "@blazetrails/ruby-compat/include";
-import { toS } from "@blazetrails/ruby-compat/object";
-import { isEmpty } from "@blazetrails/ruby-compat/ruby-empty";
+import {
+  hashDelete,
+  isModuleIncluded,
+  Range,
+  rbEnsure,
+  rtest,
+  uniq,
+} from "@blazetrails/ruby-compat";
+import {
+  Enumerable,
+  isEmpty,
+  rbDefineAllocFunc,
+  rbObjClone,
+  toS,
+  type Each,
+} from "@blazetrails/ruby-compat";
 import { RelationMethods as SignedIdRelationMethods } from "./signed-id.js";
 import { RelationMethods as TokenForRelationMethods } from "./token-for.js";
-import { ARRAY_METHOD_TABLE } from "@blazetrails/ruby-compat/array";
-import { fetch } from "@blazetrails/ruby-compat/hash";
-import { rbClearMethodCache } from "@blazetrails/ruby-compat/include";
+import { ARRAY_METHOD_TABLE, fetch, rbClearMethodCache } from "@blazetrails/ruby-compat";
 import { toYaml } from "@blazetrails/ruby-compat/yaml";
 import type { Psych } from "@blazetrails/ruby-compat/psych";
 import * as Arel from "@blazetrails/arel";
 import { Table, SelectManager, Nodes, sql, star, type ArelNode } from "@blazetrails/arel";
 import type { Base } from "./base.js";
 import { ActiveRecordError, RecordNotUnique, Rollback } from "./errors.js";
-import { max, min } from "@blazetrails/ruby-compat/comparable";
-import { groupBy } from "@blazetrails/ruby-compat/enumerable";
+import { groupBy, max, min } from "@blazetrails/ruby-compat";
 import { ArgumentError, awaitingAssignment } from "@blazetrails/activemodel";
 import type { PermittedAttributes, SerializeOptions } from "@blazetrails/activemodel";
 
@@ -86,14 +89,14 @@ import {
 import { Explain } from "./explain.js";
 import type { ExplainOption } from "./connection-adapters/abstract/database-statements.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
-import type { PP } from "@blazetrails/ruby-compat/pp";
+import type { PP } from "@blazetrails/ruby-compat";
 import type { JoinDependency } from "./associations/join-dependency.js";
 import {
   DeferredIdsIn,
   DeferredIdsNotIn,
 } from "./relation/predicate-builder/deferred-distinct-pk-in.js";
 import { AliasTracker } from "./associations/alias-tracker.js";
-import type { Hash } from "@blazetrails/ruby-compat/hash";
+import type { Hash } from "@blazetrails/ruby-compat";
 
 export type LoadedRelation<R> = Omit<R, "then">;
 

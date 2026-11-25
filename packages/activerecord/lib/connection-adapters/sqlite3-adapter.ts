@@ -2,11 +2,7 @@ import { SQLite3 } from "@blazetrails/sqlite3";
 import "../constants.sqlite3-adapter.generated.js";
 import { ConnectionAdapters } from "../namespaces.js";
 import type { DatabaseConfig } from "../database-configurations/database-config.js";
-import { sortByBang } from "@blazetrails/ruby-compat/array";
-import { fetch } from "@blazetrails/ruby-compat/hash";
-import { anybits } from "@blazetrails/ruby-compat/numeric";
-import { rbObjAsString } from "@blazetrails/ruby-compat/object";
-import { rbRegMatchP } from "@blazetrails/ruby-compat/regexp";
+import { sortByBang, anybits, fetch, rbRegMatchP, rbObjAsString } from "@blazetrails/ruby-compat";
 import type {
   DatabaseOptions,
   EngineOpenV2,
@@ -20,13 +16,16 @@ import type { AddReferenceOptions } from "./abstract/schema-definitions.js";
 import type { InsertBuilder } from "../insert-all.js";
 import type { SQLite3Config } from "./pool-config.js";
 import { AbstractAdapter, Version } from "./abstract-adapter.js";
-import { Concurrent } from "@blazetrails/ruby-compat/concurrent/map";
-import { groupBy } from "@blazetrails/ruby-compat/enumerable";
-import { Errno, SystemCallError } from "@blazetrails/ruby-compat/errno";
-import { LoadError } from "@blazetrails/ruby-compat/load-error";
-import { rtest } from "@blazetrails/ruby-compat/object";
-import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
-import { TypeError } from "@blazetrails/ruby-compat/type-error";
+import {
+  Concurrent,
+  Errno,
+  LoadError,
+  RuntimeError,
+  SystemCallError,
+  TypeError,
+  groupBy,
+  rtest,
+} from "@blazetrails/ruby-compat";
 import { type SchemaCreation as SQLite3SchemaCreation } from "./sqlite3/schema-creation.js";
 import { type NativeDatabaseTypes } from "./abstract/native-database-types.js";
 import { type TableDefinition as SQLite3TableDefinition } from "./sqlite3/schema-definitions.js";
@@ -68,11 +67,15 @@ import {
   runLoadHooks,
   trailsRoot,
 } from "@blazetrails/activesupport";
-import { toA, toH } from "@blazetrails/ruby-compat/array";
-import { eachWithObject, sortBy } from "@blazetrails/ruby-compat/enumerable";
-import { File } from "@blazetrails/ruby-compat/file";
-import { FileUtils } from "@blazetrails/ruby-compat/file-utils";
-import { rbRegSUnion } from "@blazetrails/ruby-compat/regexp";
+import {
+  File,
+  FileUtils,
+  eachWithObject,
+  rbRegSUnion,
+  sortBy,
+  toA,
+  toH,
+} from "@blazetrails/ruby-compat";
 import {
   returningColumnValues as sqliteReturningColumnValues,
   buildTruncateStatement as sqliteBuildTruncateStatement,

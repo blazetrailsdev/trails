@@ -1,26 +1,26 @@
 import { CodeGenerator, include, indexWith, Module } from "@blazetrails/activesupport";
 import { AttributeMethods as AMAttributeMethods, Model } from "@blazetrails/activemodel";
-import { rbFCaller } from "@blazetrails/ruby-compat/backtrace-location";
-import type { Concurrent } from "@blazetrails/ruby-compat/concurrent/map";
-import { type Hash, hasKey, keys as hashKeys } from "@blazetrails/ruby-compat/hash";
-import {
-  constSet,
-  rbModInstanceMethod,
-  type UnboundMethod,
-} from "@blazetrails/ruby-compat/include";
-import { rbObjMethod } from "@blazetrails/ruby-compat/method";
-import { NameError } from "@blazetrails/ruby-compat/name-error";
 import {
   rbFSend,
+  type Concurrent,
+  type Hash,
+  hasKey,
+  isEmpty,
+  keys as hashKeys,
   objRespondToMissing,
   rbClassSuperclass,
+  rbFCaller,
   rbInspect as inspect,
+  constSet,
   rbModMethodDefined,
+  rbModInstanceMethod,
   rbObjIvarGet,
   rbObjIvarSet,
+  rbObjMethod,
   rbObjRespondTo,
-} from "@blazetrails/ruby-compat/object";
-import { isEmpty } from "@blazetrails/ruby-compat/ruby-empty";
+  NameError,
+  type UnboundMethod,
+} from "@blazetrails/ruby-compat";
 import {
   ArgumentError,
   type AttributeMethodPattern,

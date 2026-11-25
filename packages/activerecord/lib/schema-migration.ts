@@ -1,7 +1,6 @@
 import type { ConnectionPool, NullPool } from "./connection-adapters/abstract/connection-pool.js";
 import { ActiveRecordError } from "./errors.js";
-import { format } from "@blazetrails/ruby-compat/kernel-format";
-import { toI } from "@blazetrails/ruby-compat/numeric";
+import { format, toI } from "@blazetrails/ruby-compat";
 import { toI as stringToI } from "@blazetrails/activesupport";
 import type { Base } from "./base.js";
 import { Table, SelectManager, InsertManager, DeleteManager, Nodes, star } from "@blazetrails/arel";

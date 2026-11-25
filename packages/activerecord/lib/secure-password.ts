@@ -1,8 +1,6 @@
 import { camelize } from "@blazetrails/activesupport";
 import { ArgumentError, hasSecurePassword } from "@blazetrails/activemodel";
-import { toH } from "@blazetrails/ruby-compat/array";
-import { partition } from "@blazetrails/ruby-compat/enumerable";
-import { hashAref, keys } from "@blazetrails/ruby-compat/hash";
+import { hashAref, keys, partition, toH } from "@blazetrails/ruby-compat";
 import type { Base } from "./base.js";
 import { ActiveRecord } from "./namespaces.js";
 import * as SecurePassword from "./secure-password.js";

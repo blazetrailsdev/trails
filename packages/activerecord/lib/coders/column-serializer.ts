@@ -1,7 +1,12 @@
 import { ActiveRecord } from "../namespaces.js";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { rbClassNewInstance, rbObjIsKindOf } from "@blazetrails/ruby-compat/include";
-import { rbInspect, rbModToS, rbObjClassname } from "@blazetrails/ruby-compat/object";
+import {
+  rbClassNewInstance,
+  rbInspect,
+  rbModToS,
+  rbObjClassname,
+  rbObjIsKindOf,
+} from "@blazetrails/ruby-compat";
 import { SerializationTypeMismatch } from "../errors.js";
 
 type CoderLike = { dump(obj: unknown): string | null; load(payload: unknown): unknown };

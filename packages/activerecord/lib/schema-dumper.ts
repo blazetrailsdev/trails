@@ -1,11 +1,18 @@
-import { eachWithIndex, partition } from "@blazetrails/ruby-compat/enumerable";
-import { rbClassNewInstance } from "@blazetrails/ruby-compat/include";
-import { STDOUT, type IO } from "@blazetrails/ruby-compat/io";
-import { rbInspect, rbObjAsString, rbObjClassname, toS } from "@blazetrails/ruby-compat/object";
-import { rbEqq } from "@blazetrails/ruby-compat/rb-equal";
-import { regexpEscape } from "@blazetrails/ruby-compat/regexp";
-import { StandardError } from "@blazetrails/ruby-compat/standard-error";
-import { StringIO } from "@blazetrails/ruby-compat/string-io";
+import {
+  rbClassNewInstance,
+  STDOUT,
+  StandardError,
+  StringIO,
+  eachWithIndex,
+  partition,
+  rbEqq,
+  rbInspect,
+  rbObjAsString,
+  rbObjClassname,
+  regexpEscape,
+  toS,
+  type IO,
+} from "@blazetrails/ruby-compat";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import type { Column } from "./connection-adapters/column.js";
 import type { PostgreSQLAdapter } from "./connection-adapters/postgresql-adapter.js";

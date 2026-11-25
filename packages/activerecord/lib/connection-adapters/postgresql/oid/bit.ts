@@ -1,7 +1,6 @@
 import "../../../constants.postgresql-oid-bit.generated.js";
 import { ConnectionAdapters } from "../../../namespaces.js";
-import { rbObjAsString, rtest } from "@blazetrails/ruby-compat/object";
-import { rbStrHex } from "@blazetrails/ruby-compat/string/convert";
+import { rbObjAsString, rbStrHex, rtest } from "@blazetrails/ruby-compat";
 import { ValueType } from "@blazetrails/activemodel";
 
 export class Bit extends ValueType<string> {

@@ -1,4 +1,4 @@
-import { rbFSend, rbObjRespondTo } from "@blazetrails/ruby-compat/object";
+import { rbFSend, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import type { Base } from "../../base.js";
 import { ActiveRecord } from "../../namespaces.js";
 import type { Relation } from "../../relation.js";

@@ -15,12 +15,17 @@ import type {
 import type { SchemaStatementsLike } from "../abstract/schema-statements-like.js";
 import type { TableDefinitionConn } from "../abstract/schema-definitions.js";
 import { wrap } from "@blazetrails/activesupport";
-import { fetch, slice } from "@blazetrails/ruby-compat/hash";
-import { include, included, rbCallSuper } from "@blazetrails/ruby-compat/include";
-import { toS } from "@blazetrails/ruby-compat/object";
-import { rbEqual } from "@blazetrails/ruby-compat/rb-equal";
-import { rbRegMatchP } from "@blazetrails/ruby-compat/regexp";
-import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
+import {
+  fetch,
+  include,
+  included,
+  rbCallSuper,
+  rbEqual,
+  rbRegMatchP,
+  RuntimeError,
+  slice,
+  toS,
+} from "@blazetrails/ruby-compat";
 
 export interface ColumnMethods {
   bigserial(...names: string[]): unknown;

@@ -1,8 +1,5 @@
 import { assertValidKeys, isPlainObject } from "@blazetrails/activesupport";
-import { Enumerable } from "@blazetrails/ruby-compat/enumerable";
-import { include } from "@blazetrails/ruby-compat/include";
-import { rtest } from "@blazetrails/ruby-compat/object";
-import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
+import { Enumerable, include, rtest, RuntimeError } from "@blazetrails/ruby-compat";
 import { ConfigurationFile } from "@blazetrails/activesupport/configuration-file";
 
 import { ActiveRecord } from "../namespaces.js";

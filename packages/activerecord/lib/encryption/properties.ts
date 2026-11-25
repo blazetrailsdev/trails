@@ -1,10 +1,8 @@
 import { Encryption } from "../namespaces.js";
 import { Message } from "./message.js";
-import { BigDecimal } from "@blazetrails/ruby-compat/big-decimal";
-import type { Bytes } from "@blazetrails/ruby-compat/fs-adapter";
-import { eachPair } from "@blazetrails/ruby-compat/hash";
-import { rbObjIsKindOf, rbClearMethodCache } from "@blazetrails/ruby-compat/include";
 import {
+  BigDecimal,
+  eachPair,
   rbCFalseClass,
   rbCFloat,
   rbCInteger,
@@ -15,7 +13,10 @@ import {
   rbInspect,
   rbObjClass,
   rbObjClassname,
-} from "@blazetrails/ruby-compat/object";
+  rbObjIsKindOf,
+  type Bytes,
+  rbClearMethodCache,
+} from "@blazetrails/ruby-compat";
 import { EncryptedContentIntegrity, ForbiddenClass } from "./errors.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging

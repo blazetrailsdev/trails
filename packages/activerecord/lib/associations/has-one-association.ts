@@ -1,8 +1,11 @@
-import { fetch } from "@blazetrails/ruby-compat/hash";
-import { include } from "@blazetrails/ruby-compat/include";
-import { kernelThrow } from "@blazetrails/ruby-compat/kernel-catch";
-import { rbFSend, rbObjAsString } from "@blazetrails/ruby-compat/object";
-import { rbEqual } from "@blazetrails/ruby-compat/rb-equal";
+import {
+  fetch,
+  include,
+  kernelThrow,
+  rbEqual,
+  rbFSend,
+  rbObjAsString,
+} from "@blazetrails/ruby-compat";
 import { Associations } from "../namespaces.js";
 import type { Base } from "../base.js";
 import { DeleteRestrictionError } from "./errors.js";

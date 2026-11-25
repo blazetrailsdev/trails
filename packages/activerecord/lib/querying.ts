@@ -1,7 +1,6 @@
 import { Nodes } from "@blazetrails/arel";
 import { _loadSerializedAttributes } from "./type/serialized.js";
-import { hasKey } from "@blazetrails/ruby-compat/hash";
-import { toI } from "@blazetrails/ruby-compat/numeric";
+import { hasKey, toI } from "@blazetrails/ruby-compat";
 import type { TouchAllArgs } from "./timestamp.js";
 import { Notifications, isPlainObject as _isPlainObject } from "@blazetrails/activesupport";
 import type { AbstractModel, Base } from "./base.js";

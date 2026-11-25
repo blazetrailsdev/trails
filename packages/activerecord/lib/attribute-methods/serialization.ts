@@ -1,4 +1,4 @@
-import { rbModName, rbObjClass, rbObjRespondTo } from "@blazetrails/ruby-compat/object";
+import { rbModName, rbObjClass, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { classAttribute, extend, included, squish } from "@blazetrails/activesupport";
 import type { Base } from "../base.js";
 import { type AttributeOptions, type ValueType, ArgumentError } from "@blazetrails/activemodel";

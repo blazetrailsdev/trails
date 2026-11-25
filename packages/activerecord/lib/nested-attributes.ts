@@ -13,10 +13,16 @@ import {
   isPresent,
   kernelArray,
 } from "@blazetrails/activesupport";
-import { except, hashAref, keys as hashKeys, size } from "@blazetrails/ruby-compat/hash";
-import { rbObjMethod } from "@blazetrails/ruby-compat/method";
-import { rbFSend, rbObjRespondTo } from "@blazetrails/ruby-compat/object";
-import { rbEqual } from "@blazetrails/ruby-compat/rb-equal";
+import {
+  except,
+  hashAref,
+  keys as hashKeys,
+  rbEqual,
+  rbFSend,
+  rbObjMethod,
+  rbObjRespondTo,
+  size,
+} from "@blazetrails/ruby-compat";
 import { defineAutosaveValidationCallbacks } from "./autosave-association.js";
 import { ArgumentError, BooleanType, capturingAssignment } from "@blazetrails/activemodel";
 

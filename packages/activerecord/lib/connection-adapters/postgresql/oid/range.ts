@@ -1,9 +1,13 @@
 import { ValueType } from "@blazetrails/activemodel";
-import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
-import { rbFSend, rbInspect, rbObjRespondTo } from "@blazetrails/ruby-compat/object";
-import { Range } from "@blazetrails/ruby-compat/range";
-import { rbEqual } from "@blazetrails/ruby-compat/rb-equal";
-import { stringSplit } from "@blazetrails/ruby-compat/string/split";
+import {
+  ArgumentError,
+  Range,
+  rbEqual,
+  rbFSend,
+  rbInspect,
+  rbObjRespondTo,
+  stringSplit,
+} from "@blazetrails/ruby-compat";
 
 export interface RangeSubtype {
   cast(value: unknown): unknown;

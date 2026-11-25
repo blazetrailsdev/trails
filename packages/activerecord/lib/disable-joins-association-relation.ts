@@ -1,8 +1,6 @@
 import { Relation, type LoadedRelation } from "./relation.js";
 import { ActiveRecord } from "./namespaces.js";
-import { take, uniq } from "@blazetrails/ruby-compat/array";
-import { groupBy } from "@blazetrails/ruby-compat/enumerable";
-import { rbFSend } from "@blazetrails/ruby-compat/object";
+import { groupBy, rbFSend, take, uniq } from "@blazetrails/ruby-compat";
 import { stripThenable } from "@blazetrails/activesupport";
 import type { Base } from "./base.js";
 

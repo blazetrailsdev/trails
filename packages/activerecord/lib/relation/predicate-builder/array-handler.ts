@@ -4,9 +4,7 @@ import { extractBang } from "@blazetrails/activesupport";
 import type { PredicateBuilder } from "../predicate-builder.js";
 
 import { ActiveRecord } from "../../namespaces.js";
-import { compactBang } from "@blazetrails/ruby-compat/array";
-import { Range } from "@blazetrails/ruby-compat/range";
-import { isEmpty } from "@blazetrails/ruby-compat/ruby-empty";
+import { compactBang, isEmpty, Range } from "@blazetrails/ruby-compat";
 
 export const NullPredicate = {
   or(other: Nodes.Node): Nodes.Node {

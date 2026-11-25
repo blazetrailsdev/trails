@@ -1,6 +1,5 @@
 import type { Base } from "../../base.js";
-import { eachWithObject } from "@blazetrails/ruby-compat/enumerable";
-import { Hash } from "@blazetrails/ruby-compat/hash";
+import { Hash, eachWithObject } from "@blazetrails/ruby-compat";
 import { ActiveRecord } from "../../namespaces.js";
 export class PolymorphicArrayValue {
   private readonly _associatedTable: {

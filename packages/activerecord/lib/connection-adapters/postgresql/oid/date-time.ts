@@ -1,8 +1,6 @@
 import "../../../constants.postgresql-oid-date-time.generated.js";
 import { Time as RubyTime } from "@blazetrails/date";
-import { format } from "@blazetrails/ruby-compat/kernel-format";
-import { toI } from "@blazetrails/ruby-compat/numeric";
-import { rbStrSend } from "@blazetrails/ruby-compat/string/method-table";
+import { format, rbStrSend, toI } from "@blazetrails/ruby-compat";
 import * as Type from "../../../type.js";
 import { ConnectionAdapters } from "../../../namespaces.js";
 import {

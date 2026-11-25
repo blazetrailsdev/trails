@@ -4,8 +4,7 @@ import {
   type Serializer,
 } from "@blazetrails/activesupport/message-pack";
 import type { Factory, Packer, Unpacker } from "@blazetrails/msgpack";
-import { rbInspect } from "@blazetrails/ruby-compat/object";
-import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
+import { RuntimeError, rbInspect } from "@blazetrails/ruby-compat";
 import { AssociationNotFoundError } from "./associations/errors.js";
 import { Base } from "./base.js";
 

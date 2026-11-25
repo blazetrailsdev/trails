@@ -7,7 +7,7 @@ import {
   rbObjRespondTo,
   rtest,
   toS,
-} from "@blazetrails/ruby-compat/object";
+} from "@blazetrails/ruby-compat";
 import { UnknownPrimaryKey } from "../errors.js";
 import { stripThenable } from "@blazetrails/activesupport";
 import type { Base } from "../base.js";

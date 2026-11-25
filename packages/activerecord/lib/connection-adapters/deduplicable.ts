@@ -1,6 +1,5 @@
 import { Concern } from "@blazetrails/activesupport";
-import { Hash, hashAref, hashAset } from "@blazetrails/ruby-compat/hash";
-import { extend } from "@blazetrails/ruby-compat/include";
+import { Hash, extend, hashAref, hashAset } from "@blazetrails/ruby-compat";
 
 type DeduplicableClass = { registry(): Hash<object, object> };
 

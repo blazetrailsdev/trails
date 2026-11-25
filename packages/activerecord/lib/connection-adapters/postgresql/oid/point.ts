@@ -1,11 +1,13 @@
 import "../../../constants.postgresql-oid-point.generated.js";
 import { ConnectionAdapters } from "../../../namespaces.js";
-import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
-import { kernelFloat } from "@blazetrails/ruby-compat/kernel-float";
-import { rbObjAsString } from "@blazetrails/ruby-compat/object";
-import { rbEqual } from "@blazetrails/ruby-compat/rb-equal";
-import { rbStrSend } from "@blazetrails/ruby-compat/string/method-table";
-import { Struct } from "@blazetrails/ruby-compat/struct";
+import {
+  ArgumentError,
+  kernelFloat,
+  rbEqual,
+  rbObjAsString,
+  rbStrSend,
+  Struct,
+} from "@blazetrails/ruby-compat";
 import { ValueType } from "@blazetrails/activemodel";
 import { isBlank, isPlainObject } from "@blazetrails/activesupport";
 import { ActiveRecord } from "../../../namespaces.js";

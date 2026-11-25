@@ -1,5 +1,5 @@
 import { extractOptionsBang, isPresent } from "@blazetrails/activesupport";
-import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
+import { RuntimeError } from "@blazetrails/ruby-compat";
 import type { Base } from "../base.js";
 import { Locking } from "../namespaces.js";
 

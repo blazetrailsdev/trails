@@ -1,15 +1,15 @@
-import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
-import { eachWithObject } from "@blazetrails/ruby-compat/enumerable";
-import { rbObjIsKindOf } from "@blazetrails/ruby-compat/include";
 import {
+  ArgumentError,
   rbCBasicObject as BasicObject,
   rbFSend,
   rbObjAsString as toS,
+  rbObjIsKindOf,
   rbObjRespondTo,
   rtest,
-} from "@blazetrails/ruby-compat/object";
-import { Range } from "@blazetrails/ruby-compat/range";
-import { Set } from "@blazetrails/ruby-compat/set";
+  Range,
+  Set,
+  eachWithObject,
+} from "@blazetrails/ruby-compat";
 import type * as Arel from "@blazetrails/arel";
 import { Nodes, sql } from "@blazetrails/arel";
 import { kernelArray, stringifyKeys, Tryable, wrap } from "@blazetrails/activesupport";

@@ -7,10 +7,7 @@ import {
   HasOneThroughNestedAssociationsAreReadonly,
 } from "./errors.js";
 import { compositeQueryConstraintsList } from "../persistence.js";
-import { filterMap } from "@blazetrails/ruby-compat/enumerable";
-import { rbCallSuper } from "@blazetrails/ruby-compat/include";
-import { isNil } from "@blazetrails/ruby-compat/object";
-import { rbEqual } from "@blazetrails/ruby-compat/rb-equal";
+import { isNil, rbCallSuper, rbEqual, filterMap } from "@blazetrails/ruby-compat";
 import { delegate, kernelArray as Array, presence } from "@blazetrails/activesupport";
 
 /** @internal */

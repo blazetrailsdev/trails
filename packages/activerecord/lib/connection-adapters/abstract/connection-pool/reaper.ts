@@ -1,6 +1,5 @@
 import { selectBang } from "@blazetrails/activesupport";
-import { Mutex } from "@blazetrails/ruby-compat/mutex";
-import { Thread } from "@blazetrails/ruby-compat/thread";
+import { Mutex, Thread } from "@blazetrails/ruby-compat";
 
 export interface ReapablePool {
   reap(): Promise<void>;

@@ -3,10 +3,7 @@ import type { ClassMethods } from "./deduplicable.js";
 import { SqlTypeMetadata } from "./sql-type-metadata.js";
 import { ConnectionAdapters } from "../namespaces.js";
 import { humanize } from "@blazetrails/activesupport";
-import { Encoding } from "@blazetrails/ruby-compat/encoding";
-import { hashAref } from "@blazetrails/ruby-compat/hash";
-import { include, type Included } from "@blazetrails/ruby-compat/include";
-import { rbHash } from "@blazetrails/ruby-compat/rb-hash";
+import { Encoding, include, type Included, rbHash, hashAref } from "@blazetrails/ruby-compat";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type -- Ruby `include Deduplicable` (`column.rb:8`); the class/interface merge is how a mixin surfaces on the type side.
 export interface Column extends Included<typeof Deduplicable> {}

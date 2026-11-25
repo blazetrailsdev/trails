@@ -1,10 +1,13 @@
 import { ArgumentError } from "@blazetrails/activemodel";
 import { ActiveSupport, any, Autoload, InheritableOptions } from "@blazetrails/activesupport";
-import { File } from "@blazetrails/ruby-compat/file";
-import { LOAD_PATH } from "@blazetrails/ruby-compat/load";
-import { rbObjIvarGet, rbObjIvarSet } from "@blazetrails/ruby-compat/object";
-import { rbEqq } from "@blazetrails/ruby-compat/rb-equal";
-import { ThreadPoolExecutor } from "@blazetrails/ruby-compat/thread-pool-executor";
+import {
+  File,
+  LOAD_PATH,
+  rbEqq,
+  rbObjIvarGet,
+  rbObjIvarSet,
+  ThreadPoolExecutor,
+} from "@blazetrails/ruby-compat";
 import { YAML } from "@blazetrails/ruby-compat/yaml";
 import { ActiveRecord } from "./namespaces.js";
 import type { SQLWarning } from "./errors.js";

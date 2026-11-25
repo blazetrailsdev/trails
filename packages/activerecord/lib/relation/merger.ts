@@ -6,9 +6,7 @@ import { any, assertValidKeys, isBlank, isPlainObject } from "@blazetrails/activ
 import { ActiveRecord } from "../namespaces.js";
 import type { ValueMethod } from "../relation.js";
 import type { AssociationSpec } from "./query-methods.js";
-import { union } from "@blazetrails/ruby-compat/array";
-import { partition } from "@blazetrails/ruby-compat/enumerable";
-import { isEmpty } from "@blazetrails/ruby-compat/ruby-empty";
+import { isEmpty, partition, union } from "@blazetrails/ruby-compat";
 import { arelColumns, constructJoinDependency, QueryMethods } from "./query-methods.js";
 
 type BangMethod = (...args: unknown[]) => unknown;

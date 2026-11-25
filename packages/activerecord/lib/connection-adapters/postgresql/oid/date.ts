@@ -7,9 +7,7 @@ import {
   type DateInfinityType,
   type DateNegativeInfinityType,
 } from "@blazetrails/activemodel";
-import { format } from "@blazetrails/ruby-compat/kernel-format";
-import { toI } from "@blazetrails/ruby-compat/numeric";
-import { rbStrSend } from "@blazetrails/ruby-compat/string/method-table";
+import { format, rbStrSend, toI } from "@blazetrails/ruby-compat";
 
 export class Date extends DateType {
   override castValue(

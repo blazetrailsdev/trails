@@ -1,10 +1,14 @@
 import "../../constants.sqlite3-schema-statements.generated.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { any, isPresent, pluralize, symbolizeKeys } from "@blazetrails/activesupport";
-import { hashDelete, slice } from "@blazetrails/ruby-compat/hash";
-import { coreHashMergeKwd } from "@blazetrails/ruby-compat/keyword-splat";
-import { rbInspect, rbObjAsString as toS } from "@blazetrails/ruby-compat/object";
-import { rbStrScanSubexpCall } from "@blazetrails/ruby-compat/string/sub";
+import {
+  coreHashMergeKwd,
+  hashDelete,
+  rbInspect,
+  rbObjAsString as toS,
+  rbStrScanSubexpCall,
+  slice,
+} from "@blazetrails/ruby-compat";
 import type { AbstractAdapter as DatabaseAdapter } from "../abstract-adapter.js";
 import type {
   AddForeignKeyOptions,

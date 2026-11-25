@@ -1,5 +1,4 @@
-import { block, fetch } from "@blazetrails/ruby-compat/hash";
-import { rbModName } from "@blazetrails/ruby-compat/object";
+import { block, fetch, rbModName } from "@blazetrails/ruby-compat";
 import type { Base } from "../../base.js";
 import { foreignKey, singularize, pluralize, camelize } from "@blazetrails/activesupport";
 import { ActiveRecord } from "../../namespaces.js";

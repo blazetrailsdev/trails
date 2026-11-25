@@ -1,5 +1,5 @@
 import { first } from "@blazetrails/activesupport";
-import { Digest } from "@blazetrails/ruby-compat/digest";
+import { Digest } from "@blazetrails/ruby-compat";
 import { Encryption } from "../namespaces.js";
 import type { KeyGenerator } from "./key-generator.js";
 import { Properties } from "./properties.js";

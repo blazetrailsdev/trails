@@ -1,7 +1,6 @@
 import { isPlainObject } from "@blazetrails/activesupport";
-import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
-import { last } from "@blazetrails/ruby-compat/array";
 import {
+  ArgumentError,
   block,
   eachKey,
   fetch,
@@ -9,12 +8,13 @@ import {
   keys as hashKeys,
   Hash,
   hashAref,
+  KeyError,
+  last,
+  rbEqual,
+  rbInspect,
   size,
   transformValues,
-} from "@blazetrails/ruby-compat/hash";
-import { KeyError } from "@blazetrails/ruby-compat/key-error";
-import { rbInspect } from "@blazetrails/ruby-compat/object";
-import { rbEqual } from "@blazetrails/ruby-compat/rb-equal";
+} from "@blazetrails/ruby-compat";
 import { ActiveRecord } from "./namespaces.js";
 import { FutureResult, type Complete } from "./future-result.js";
 import { defaultValue } from "./type.js";

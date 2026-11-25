@@ -20,15 +20,15 @@
 import { DateTime, Time as RubyTime } from "@blazetrails/date";
 import { actsLike, BigDecimal, Chars, SafeBuffer, TimeWithZone } from "@blazetrails/activesupport";
 import { Attribute as ModelAttribute, BinaryData, type ValueType } from "@blazetrails/activemodel";
-import { sprintf } from "@blazetrails/ruby-compat/kernel-format";
 import {
   rbFSend,
   rbObjAsString,
   rbObjClassname,
   rbObjRespondTo,
-} from "@blazetrails/ruby-compat/object";
-import { Rational } from "@blazetrails/ruby-compat/rational";
-import { TypeError } from "@blazetrails/ruby-compat/type-error";
+  Rational,
+  sprintf,
+  TypeError,
+} from "@blazetrails/ruby-compat";
 import type { TypeMap } from "../../type/type-map.js";
 import { NotImplementedError } from "../../errors.js";
 import { Value as TimeValue } from "../../type/time.js";

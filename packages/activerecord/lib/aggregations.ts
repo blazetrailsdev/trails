@@ -5,11 +5,11 @@ import { ArgumentError } from "@blazetrails/activemodel";
 import {
   include,
   isModuleIncluded,
+  NoMethodError,
   rbCallSuper,
   rbClearMethodCache,
   rbObjDup,
-} from "@blazetrails/ruby-compat/include";
-import { NoMethodError } from "@blazetrails/ruby-compat/no-method-error";
+} from "@blazetrails/ruby-compat";
 
 export const Aggregations = {};
 

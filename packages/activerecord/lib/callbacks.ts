@@ -3,8 +3,7 @@ import type { CallbackConditions, CallbackObject } from "@blazetrails/activemode
 import { RecordNotDestroyed } from "./errors.js";
 import { include, included } from "@blazetrails/activesupport";
 import { Callbacks as ActiveModelCallbacks, ValidationsCallbacks } from "@blazetrails/activemodel";
-import { rbCallSuper } from "@blazetrails/ruby-compat/include";
-import { rtest } from "@blazetrails/ruby-compat/object";
+import { rtest, rbCallSuper } from "@blazetrails/ruby-compat";
 import type { TouchArgs } from "./timestamp.js";
 import { _createRecord as counterCacheCreateRecord } from "./counter-cache.js";
 import { _createRecord as lockingCreateRecord } from "./locking/optimistic.js";

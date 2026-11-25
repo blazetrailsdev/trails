@@ -1,5 +1,4 @@
-import type { DigestClass } from "@blazetrails/ruby-compat/digest";
-import { SecureRandom } from "@blazetrails/ruby-compat/secure-random";
+import { SecureRandom, type DigestClass } from "@blazetrails/ruby-compat";
 import { KeyGenerator as AsKeyGenerator } from "@blazetrails/activesupport/key-generator";
 
 import { Encryption } from "../namespaces.js";

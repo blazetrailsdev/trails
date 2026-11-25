@@ -7,9 +7,16 @@ import {
 } from "@blazetrails/activesupport";
 import { buildColumnSerializer } from "./attribute-methods/serialization.js";
 import { YAMLColumn, type YamlColumnOptions } from "./coders/yaml-column.js";
-import { type Hash, block, update } from "@blazetrails/ruby-compat/hash";
-import { Module, include } from "@blazetrails/ruby-compat/include";
-import { rbClassSuperclass, rbObjRespondTo, rtest } from "@blazetrails/ruby-compat/object";
+import {
+  type Hash,
+  Module,
+  block,
+  include,
+  rbClassSuperclass,
+  rbObjRespondTo,
+  rtest,
+  update,
+} from "@blazetrails/ruby-compat";
 import { ActiveRecord } from "./namespaces.js";
 import * as Store from "./store.js";
 

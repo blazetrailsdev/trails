@@ -2,10 +2,13 @@ import { Encryption } from "../namespaces.js";
 import { deflateSync, inflateSync } from "zlib";
 
 import { presence } from "@blazetrails/activesupport";
-import type { DigestClass } from "@blazetrails/ruby-compat/digest";
-import type { Bytes } from "@blazetrails/ruby-compat/fs-adapter";
-import { rbModAttrReader, rbModAttrWriter } from "@blazetrails/ruby-compat/object";
-import { OpenSSL } from "@blazetrails/ruby-compat/openssl";
+import {
+  OpenSSL,
+  rbModAttrReader,
+  rbModAttrWriter,
+  type Bytes,
+  type DigestClass,
+} from "@blazetrails/ruby-compat";
 
 import { Configuration } from "./errors.js";
 import { DerivedSecretKeyProvider } from "./derived-secret-key-provider.js";

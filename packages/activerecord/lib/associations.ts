@@ -13,7 +13,7 @@ import { HasOne as HasOneBuilder } from "./associations/builder/has-one.js";
 import { HasMany as HasManyBuilder } from "./associations/builder/has-many.js";
 import { HasAndBelongsToMany as HabtmBuilder } from "./associations/builder/has-and-belongs-to-many.js";
 import * as Reflection from "./reflection.js";
-import { include, constSet, rbCallSuper } from "@blazetrails/ruby-compat/include";
+import { include, constSet, rbCallSuper } from "@blazetrails/ruby-compat";
 
 export type CollectionCallback<K extends string> =
   | string

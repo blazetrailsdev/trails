@@ -1,9 +1,7 @@
 import "../constants.message-pack-message-serializer.generated.js";
 import { MessagePack } from "@blazetrails/activesupport/message-pack";
 import { isPlainObject } from "@blazetrails/activesupport";
-import type { Bytes } from "@blazetrails/ruby-compat/fs-adapter";
-import { transformValues, type Hash } from "@blazetrails/ruby-compat/hash";
-import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
+import { RuntimeError, transformValues, type Bytes, type Hash } from "@blazetrails/ruby-compat";
 import { Message } from "./message.js";
 import { Properties } from "./properties.js";
 import { Decryption, ForbiddenClass } from "./errors.js";

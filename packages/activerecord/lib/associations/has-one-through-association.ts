@@ -1,5 +1,4 @@
-import { include } from "@blazetrails/ruby-compat/include";
-import { rbDeclareIvar } from "@blazetrails/ruby-compat/object";
+import { include, rbDeclareIvar } from "@blazetrails/ruby-compat";
 import { Associations } from "../namespaces.js";
 import type { Base } from "../base.js";
 import { HasOneAssociation } from "./has-one-association.js";

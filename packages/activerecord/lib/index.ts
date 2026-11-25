@@ -18,7 +18,7 @@ import * as TypeModule from "./type.js";
 
 export { Relation, Range } from "./relation.js";
 export { RangeType } from "./connection-adapters/postgresql/oid/range.js";
-export { IPAddr } from "@blazetrails/ruby-compat/ipaddr";
+export { IPAddr } from "@blazetrails/ruby-compat";
 export type { LoadedRelation, RelationScopes } from "./relation.js";
 export type { ScopeMethod, ScopeOn } from "./scoping/named.js";
 export { QueryAttribute } from "./relation/query-attribute.js";

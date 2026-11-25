@@ -1,8 +1,12 @@
-import { groupBy } from "@blazetrails/ruby-compat/enumerable";
-import { rbInspect, toS } from "@blazetrails/ruby-compat/object";
-import { rbEqual } from "@blazetrails/ruby-compat/rb-equal";
-import { isSymbol, symbolToS } from "@blazetrails/ruby-compat/symbol";
-import { TypeError } from "@blazetrails/ruby-compat/type-error";
+import {
+  TypeError,
+  groupBy,
+  isSymbol,
+  rbEqual,
+  rbInspect,
+  symbolToS,
+  toS,
+} from "@blazetrails/ruby-compat";
 import { type StringInquirer, getEnv } from "@blazetrails/activesupport";
 import { AdapterNotSpecified } from "./errors.js";
 import {

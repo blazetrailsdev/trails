@@ -1,7 +1,6 @@
 import type { PermittedAttributes } from "@blazetrails/activemodel";
 import type { PluckColumn, PluckedRow } from "../relation/calculations.js";
-import { extend, rbClearMethodCache } from "@blazetrails/ruby-compat/include";
-import { NoMethodError } from "@blazetrails/ruby-compat/no-method-error";
+import { NoMethodError, extend, rbClearMethodCache } from "@blazetrails/ruby-compat";
 import type { HasManyThroughAssociation } from "./has-many-through-association.js";
 import type { Base } from "../base.js";
 import { Relation } from "../relation.js";
@@ -13,8 +12,7 @@ import {
   callbacksFor as assocCallbacksFor,
   type CallbackHost,
 } from "./collection-association.js";
-import type { PP } from "@blazetrails/ruby-compat/pp";
-import type { Set } from "@blazetrails/ruby-compat/set";
+import type { PP, Set } from "@blazetrails/ruby-compat";
 import { relationClassFor } from "../relation/delegation.js";
 
 import { stripThenable } from "@blazetrails/activesupport";

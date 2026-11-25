@@ -1,7 +1,5 @@
 import "../../constants.sqlite3-schema-dumper.generated.js";
-import type { IO } from "@blazetrails/ruby-compat/io";
-import { toS } from "@blazetrails/ruby-compat/object";
-import type { StringIO } from "@blazetrails/ruby-compat/string-io";
+import { toS, type IO, type StringIO } from "@blazetrails/ruby-compat";
 import type { Column } from "./column.js";
 import type { SQLite3Adapter } from "../sqlite3-adapter.js";
 import { SchemaDumper as AbstractSchemaDumper } from "../abstract/schema-dumper.js";

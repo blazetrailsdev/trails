@@ -1,7 +1,6 @@
 import { type Time as RubyTime } from "@blazetrails/date";
 import { MissingAttributeError } from "@blazetrails/activemodel";
-import { rbFArray } from "@blazetrails/ruby-compat/array";
-import { rbFSend, rbModDefineMethod, rbObjAsString } from "@blazetrails/ruby-compat/object";
+import { rbFArray, rbFSend, rbModDefineMethod, rbObjAsString } from "@blazetrails/ruby-compat";
 import {
   classAttribute,
   included,

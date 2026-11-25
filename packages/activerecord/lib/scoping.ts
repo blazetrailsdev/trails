@@ -1,6 +1,6 @@
 import { IsolatedExecutionState } from "@blazetrails/activesupport";
 import { assertAssignedSynchronously } from "@blazetrails/activemodel";
-import { constSet, rbCallSuper } from "@blazetrails/ruby-compat/include";
+import { constSet, rbCallSuper } from "@blazetrails/ruby-compat";
 import { ActiveRecord, Scoping } from "./namespaces.js";
 import { isSchemaLoaded } from "./model-schema.js";
 import type { Base } from "./base.js";

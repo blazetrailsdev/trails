@@ -6,7 +6,7 @@ import {
   AttributeRegistration,
 } from "@blazetrails/activemodel";
 import { registerSubclass } from "@blazetrails/activesupport";
-import { block, hashAset } from "@blazetrails/ruby-compat/hash";
+import { block, hashAset } from "@blazetrails/ruby-compat";
 import type { Column } from "./connection-adapters/column.js";
 import { lookup as typeLookup, adapterNameFrom } from "./type.js";
 import {

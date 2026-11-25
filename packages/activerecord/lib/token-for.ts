@@ -1,6 +1,5 @@
 import { InvalidSignature, MessageVerifier } from "@blazetrails/activesupport/message-verifier";
-import { fetch } from "@blazetrails/ruby-compat/hash";
-import { rbEqual } from "@blazetrails/ruby-compat/rb-equal";
+import { fetch, rbEqual } from "@blazetrails/ruby-compat";
 import { asJson, classAttribute, included } from "@blazetrails/activesupport";
 import type { Base } from "./base.js";
 import type { Relation } from "./relation.js";

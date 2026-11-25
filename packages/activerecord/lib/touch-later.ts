@@ -2,7 +2,7 @@ import type { Base } from "./base.js";
 import { ActiveRecordError } from "./errors.js";
 import type { TouchArgs, TouchOptions } from "./timestamp.js";
 import { extractOptionsBang } from "@blazetrails/activesupport";
-import { rbCallSuper } from "@blazetrails/ruby-compat/include";
+import { rbCallSuper } from "@blazetrails/ruby-compat";
 import { BelongsTo as BelongsToBuilder } from "./associations/builder/belongs-to.js";
 import { HasOne as HasOneBuilder } from "./associations/builder/has-one.js";
 import { addToTransaction } from "./transactions.js";

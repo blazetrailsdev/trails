@@ -1,11 +1,6 @@
 import "../constants.postgresql-database-tasks.generated.js";
 import { isBlank, kernelArray, Tempfile } from "@blazetrails/activesupport";
-import { File } from "@blazetrails/ruby-compat/file";
-import { FileUtils } from "@blazetrails/ruby-compat/file-utils";
-import { rbFSystem } from "@blazetrails/ruby-compat/kernel-system";
-import { rtest } from "@blazetrails/ruby-compat/object";
-import { rbEqq } from "@blazetrails/ruby-compat/rb-equal";
-import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
+import { File, FileUtils, rtest, rbEqq, rbFSystem, RuntimeError } from "@blazetrails/ruby-compat";
 import type { PostgreSQLAdapter } from "../connection-adapters/postgresql-adapter.js";
 import type { ConnectionPool } from "../connection-adapters/abstract/connection-pool.js";
 import type { HashConfig } from "../database-configurations/hash-config.js";

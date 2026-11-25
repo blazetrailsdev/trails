@@ -1,8 +1,15 @@
-import { isClassPathPending } from "@blazetrails/ruby-compat/classpath";
-import { type Hash, fetch, hashAref, block as rbBlock } from "@blazetrails/ruby-compat/hash";
-import { rbObjAsString, rbClassSuperclass, rbObjRespondTo } from "@blazetrails/ruby-compat/object";
+import {
+  type Hash,
+  fetch,
+  hashAref,
+  block as rbBlock,
+  rbObjAsString,
+  rbClassSuperclass,
+  rbObjRespondTo,
+  isClassPathPending,
+} from "@blazetrails/ruby-compat";
 import { ActiveRecord } from "./namespaces.js";
-import { Thread } from "@blazetrails/ruby-compat/thread";
+import { Thread } from "@blazetrails/ruby-compat";
 import * as ModelSchemaModule from "./model-schema.js";
 import type { Base } from "./base.js";
 import { Nodes, sql as arelSql } from "@blazetrails/arel";

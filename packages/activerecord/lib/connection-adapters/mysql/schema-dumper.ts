@@ -1,5 +1,5 @@
 import "../../constants.mysql-schema-dumper.generated.js";
-import { regexpEscape } from "@blazetrails/ruby-compat/regexp";
+import { regexpEscape } from "@blazetrails/ruby-compat";
 import type { AbstractMysqlAdapter } from "../abstract-mysql-adapter.js";
 import type { Column as MysqlColumn } from "./column.js";
 import { SchemaDumper as AbstractSchemaDumper } from "../abstract/schema-dumper.js";

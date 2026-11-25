@@ -15,10 +15,7 @@ import { Data as BitData } from "./oid/bit.js";
 import { Data as XmlData } from "./oid/xml.js";
 import { Utils } from "./utils.js";
 import { PG, type Connection as PGConnection } from "@blazetrails/pg";
-import { format } from "@blazetrails/ruby-compat/kernel-format";
-import { rbFSend, toS, rbObjRespondTo } from "@blazetrails/ruby-compat/object";
-import { Range } from "@blazetrails/ruby-compat/range";
-import { Rational } from "@blazetrails/ruby-compat/rational";
+import { format, rbFSend, toS, rbObjRespondTo, Range, Rational } from "@blazetrails/ruby-compat";
 import { raiseIntWiderThan64bit } from "../../active-record.js";
 
 export class IntegerOutOf64BitRange extends Error {

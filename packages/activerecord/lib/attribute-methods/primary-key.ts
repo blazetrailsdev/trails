@@ -1,6 +1,6 @@
 import type { AbstractAdapter } from "../connection-adapters/abstract-adapter.js";
 import { foreignKey, include, kernelArray } from "@blazetrails/activesupport";
-import { rtest } from "@blazetrails/ruby-compat/object";
+import { rtest } from "@blazetrails/ruby-compat";
 import {
   dangerousAttributeMethods,
   isInstanceMethodAlreadyImplemented as attributeMethodsIsInstanceMethodAlreadyImplemented,

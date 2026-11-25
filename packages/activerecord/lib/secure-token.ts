@@ -1,6 +1,5 @@
 import { base58, camelize } from "@blazetrails/activesupport";
-import { rbModDefineMethod } from "@blazetrails/ruby-compat/object";
-import { StandardError } from "@blazetrails/ruby-compat/standard-error";
+import { StandardError, rbModDefineMethod } from "@blazetrails/ruby-compat";
 import type { Base } from "./base.js";
 import { generateSecureTokenOn } from "./active-record.js";
 import { ActiveRecord } from "./namespaces.js";

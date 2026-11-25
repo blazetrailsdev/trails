@@ -1,7 +1,6 @@
 import "../../constants.postgresql-schema-dumper.generated.js";
 import { any } from "@blazetrails/activesupport";
-import type { IO } from "@blazetrails/ruby-compat/io";
-import type { StringIO } from "@blazetrails/ruby-compat/string-io";
+import type { IO, StringIO } from "@blazetrails/ruby-compat";
 import { SchemaDumper as AbstractSchemaDumper } from "../abstract/schema-dumper.js";
 import type {
   ExclusionConstraintDefinition,

@@ -1,5 +1,5 @@
 import { Encryption } from "../namespaces.js";
-import { rbCallSuper } from "@blazetrails/ruby-compat/include";
+import { rbCallSuper } from "@blazetrails/ruby-compat";
 import { prepend } from "@blazetrails/ruby-compat/include";
 import { UniquenessValidator } from "../validations/uniqueness.js";
 

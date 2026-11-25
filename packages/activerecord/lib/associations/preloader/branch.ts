@@ -1,10 +1,16 @@
 import { ArgumentError } from "@blazetrails/activemodel";
 import { wrap } from "@blazetrails/activesupport";
-import { rbCheckArrayType, rbFArray, uniq } from "@blazetrails/ruby-compat/array";
-import { groupBy } from "@blazetrails/ruby-compat/enumerable";
-import { NoMethodError } from "@blazetrails/ruby-compat/no-method-error";
-import { rbObjClassname, rtest, toSym } from "@blazetrails/ruby-compat/object";
-import { symbolToS } from "@blazetrails/ruby-compat/symbol";
+import {
+  groupBy,
+  NoMethodError,
+  rbCheckArrayType,
+  rbFArray,
+  rbObjClassname,
+  rtest,
+  symbolToS,
+  toSym,
+  uniq,
+} from "@blazetrails/ruby-compat";
 import type { Base } from "../../base.js";
 import type { Relation } from "../../relation.js";
 import type {

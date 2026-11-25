@@ -2,8 +2,7 @@ import type * as Arel from "@blazetrails/arel";
 import { Nodes } from "@blazetrails/arel";
 
 import type { PredicateBuilder } from "../predicate-builder.js";
-import { rbObjAsString as toS } from "@blazetrails/ruby-compat/object";
-import { Range } from "@blazetrails/ruby-compat/range";
+import { rbObjAsString as toS, Range } from "@blazetrails/ruby-compat";
 
 export class RangeWithBinds {
   #begin: unknown;

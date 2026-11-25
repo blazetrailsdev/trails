@@ -5,9 +5,12 @@ import {
   fetch,
   hasKey,
   hashAref,
-} from "@blazetrails/ruby-compat/hash";
-import { shadowsIncluded, rbClearMethodCache } from "@blazetrails/ruby-compat/include";
-import { rbDeclareIvar, rbModName, toS } from "@blazetrails/ruby-compat/object";
+  rbDeclareIvar,
+  rbModName,
+  shadowsIncluded,
+  toS,
+  rbClearMethodCache,
+} from "@blazetrails/ruby-compat";
 import { NotImplementedError } from "./errors.js";
 import "./i18n.js";
 import type { Identification } from "@blazetrails/globalid";

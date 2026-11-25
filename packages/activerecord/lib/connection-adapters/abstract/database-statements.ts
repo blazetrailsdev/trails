@@ -20,12 +20,16 @@ import {
 } from "@blazetrails/arel";
 import { YAML } from "@blazetrails/ruby-compat/yaml";
 import { RangeError as ActiveModelRangeError } from "@blazetrails/activemodel";
-import { aryReject } from "@blazetrails/ruby-compat/array";
-import { Hash } from "@blazetrails/ruby-compat/hash";
-import { kernelInteger } from "@blazetrails/ruby-compat/kernel-integer";
-import { rbGetKwargs } from "@blazetrails/ruby-compat/keyword-splat";
-import { rbInspect, rtest, rbObjRespondTo } from "@blazetrails/ruby-compat/object";
-import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
+import {
+  rbGetKwargs,
+  aryReject,
+  kernelInteger,
+  rbInspect,
+  rtest,
+  RuntimeError,
+  rbObjRespondTo,
+  Hash,
+} from "@blazetrails/ruby-compat";
 import {
   TransactionIsolationError,
   NotImplementedError,

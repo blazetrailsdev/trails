@@ -1,12 +1,14 @@
-import { block, fetch, hashDelete } from "@blazetrails/ruby-compat/hash";
-import { include } from "@blazetrails/ruby-compat/include";
 import {
+  block,
+  fetch,
+  hashDelete,
+  rbEqual,
   rbInspect,
   rbModName,
   rbModToS,
+  include,
   rbObjSingletonClass,
-} from "@blazetrails/ruby-compat/object";
-import { rbEqual } from "@blazetrails/ruby-compat/rb-equal";
+} from "@blazetrails/ruby-compat";
 import { ArgumentError, type PermittedAttributes } from "@blazetrails/activemodel";
 import type { Base } from "./base.js";
 import type { PredicateBuilder } from "./relation/predicate-builder.js";
@@ -26,12 +28,15 @@ import {
   included,
   kernelArray,
 } from "@blazetrails/activesupport";
-import { except } from "@blazetrails/ruby-compat/hash";
-import { NotImplementedError } from "@blazetrails/ruby-compat/not-implemented-error";
-import { rtest, toS } from "@blazetrails/ruby-compat/object";
-import { rbRegMatchP } from "@blazetrails/ruby-compat/regexp";
-import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
-import { StandardError } from "@blazetrails/ruby-compat/standard-error";
+import {
+  NotImplementedError,
+  RuntimeError,
+  StandardError,
+  except,
+  rbRegMatchP,
+  rtest,
+  toS,
+} from "@blazetrails/ruby-compat";
 import { Table, Nodes } from "@blazetrails/arel";
 import { deriveJoinTableName } from "./model-schema.js";
 

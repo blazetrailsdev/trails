@@ -1,5 +1,5 @@
 import { Psych } from "@blazetrails/ruby-compat/psych";
-import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
+import { RuntimeError } from "@blazetrails/ruby-compat";
 
 export const LegacyYamlAdapter = {
   convert<T>(coder: T): T {

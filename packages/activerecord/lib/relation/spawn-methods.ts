@@ -1,7 +1,6 @@
 import { defineModule, slice } from "@blazetrails/activesupport";
-import * as RubyCompatHash from "@blazetrails/ruby-compat/hash";
-import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
-import { rbInspect, rtest } from "@blazetrails/ruby-compat/object";
+import * as RubyCompat from "@blazetrails/ruby-compat";
+import { ArgumentError, rbInspect, rtest } from "@blazetrails/ruby-compat";
 import { Merger, HashMerger } from "./merger.js";
 import type { ExceptSkip } from "./query-methods.js";
 
@@ -58,7 +57,7 @@ export function mergeBang(this: any, other: any): any {
 }
 
 export function except<T extends SpawnRelation<T>>(this: T, ...skips: Array<ExceptSkip>): T {
-  return this.relationWith(RubyCompatHash.except(this.values(), ...skips));
+  return this.relationWith(RubyCompat.except(this.values(), ...skips));
 }
 
 export function only<T extends SpawnRelation<T>>(this: T, ...onlies: Array<ExceptSkip>): T {

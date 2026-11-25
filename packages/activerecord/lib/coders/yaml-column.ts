@@ -1,6 +1,6 @@
 import { ActiveRecord } from "../namespaces.js";
 import { Psych } from "@blazetrails/ruby-compat/psych";
-import { constSet } from "@blazetrails/ruby-compat/include";
+import { constSet } from "@blazetrails/ruby-compat";
 import { ColumnSerializer } from "./column-serializer.js";
 import { useYamlUnsafeLoad, yamlColumnPermittedClasses } from "../active-record.js";
 

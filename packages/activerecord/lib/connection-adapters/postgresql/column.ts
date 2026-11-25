@@ -4,9 +4,7 @@ import { Column as BaseColumn } from "../column.js";
 import type { ColumnCoder } from "../column.js";
 import { TypeMetadata } from "./type-metadata.js";
 import { isPresent } from "@blazetrails/activesupport";
-import { hashAref } from "@blazetrails/ruby-compat/hash";
-import { rbHash } from "@blazetrails/ruby-compat/rb-hash";
-import { rbStrSend } from "@blazetrails/ruby-compat/string/method-table";
+import { rbHash, rbStrSend, hashAref } from "@blazetrails/ruby-compat";
 
 export class Column extends BaseColumn {
   private _serial: boolean;
