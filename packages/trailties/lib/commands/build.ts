@@ -5,13 +5,13 @@ import { Base } from "../command/base.js";
 export class BuildCommand extends Base {
   static {
     const klass = this as unknown as ThorClass;
-    klass.desc("build", "Write the autoload manifests to .trails/autoload");
+    klass.desc("build", "Precompile the views and write the autoload manifests to .trails");
     klass.methodAdded("perform");
   }
 
   /** @noRailsEquivalent PERMANENT */
   async perform(): Promise<void> {
     const { buildAutoload } = await import("@blazetrails/trails-tsc");
-    await buildAutoload();
+    await buildAutoload({ views: true });
   }
 }
