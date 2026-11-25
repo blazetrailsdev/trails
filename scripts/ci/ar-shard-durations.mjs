@@ -6,8 +6,9 @@
 //   node scripts/ci/ar-shard-durations.mjs --latest <n>
 //
 // Each <run-id> is a green `CI` run on main; `--latest <n>` takes the n most
-// recent ones, newest first. A table holds only the files the newest run
-// reports, so a deleted or renamed file drops out. A file's time is the
+// recent ones that ran every lane, newest first (a docs-only or non-AR push
+// skips the AR lanes). A table holds only the files the newest run reports,
+// so a deleted or renamed file drops out. A file's time is the
 // median of its timed samples, so one slow hosted runner (about ±25% between
 // jobs, trails#10272) does not skew it. Every leg of the SQLite, PostgreSQL,
 // MariaDB and numbered Trailties lanes is read, so each table covers every
@@ -37,11 +38,16 @@ async function gh(args) {
 }
 
 const args = process.argv.slice(2);
-let runIds = args;
+const runs = [];
+const hasEveryLane = (jobs) =>
+  Object.values(LANES).every((pattern) => {
+    const legs = jobs.filter((job) => pattern.test(job.name));
+    return legs.length > 0 && legs.every((leg) => leg.conclusion === "success");
+  });
 if (args[0] === "--latest") {
   const n = Number(args[1]);
   if (!(n > 0)) throw new Error("--latest takes a positive count");
-  const runs = JSON.parse(
+  const candidates = JSON.parse(
     await gh([
       "run",
       "list",
@@ -54,14 +60,24 @@ if (args[0] === "--latest") {
       "-e",
       "push",
       "-L",
-      String(n),
+      "100",
       "--json",
       "databaseId",
     ]),
   );
-  runIds = runs.map((r) => String(r.databaseId));
+  for (const { databaseId } of candidates) {
+    const { jobs } = JSON.parse(await gh(["run", "view", String(databaseId), "--json", "jobs"]));
+    if (hasEveryLane(jobs)) runs.push([String(databaseId), jobs]);
+    if (runs.length === n) break;
+  }
+  if (runs.length < n)
+    throw new Error(`only ${runs.length} of the last 100 green main runs ran every lane`);
+} else {
+  for (const runId of args) {
+    runs.push([runId, JSON.parse(await gh(["run", "view", runId, "--json", "jobs"])).jobs]);
+  }
 }
-if (runIds.length === 0) {
+if (runs.length === 0) {
   console.error("usage: node scripts/ci/ar-shard-durations.mjs <run-id>... | --latest <n>");
   process.exit(2);
 }
@@ -74,8 +90,7 @@ const median = (xs) => {
 
 const samples = {};
 const newest = {};
-for (const runId of runIds) {
-  const { jobs } = JSON.parse(await gh(["run", "view", runId, "--json", "jobs"]));
+for (const [runId, jobs] of runs) {
   for (const [adapter, table] of Object.entries(await readRun(runId, jobs))) {
     samples[adapter] ??= {};
     newest[adapter] ??= new Set(Object.keys(table));
@@ -93,7 +108,7 @@ for (const adapter of Object.keys(LANES)) {
       }),
   );
   out[adapter] = Object.fromEntries(Object.entries(table).sort(([a], [b]) => (a < b ? -1 : 1)));
-  console.log(`${adapter}: ${Object.keys(table).length} files from ${runIds.length} runs`);
+  console.log(`${adapter}: ${Object.keys(table).length} files from ${runs.length} runs`);
 }
 
 async function readRun(runId, jobs) {
