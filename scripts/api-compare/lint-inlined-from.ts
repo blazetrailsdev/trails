@@ -225,7 +225,13 @@ function methodChain(
  * Every finding over the two manifests; `enrolled` gates the missing-tag arm.
  * A constructor in `pairs` takes the Rails class compare.ts compared it
  * against, so the two gates never pair it differently; any other is paired by
- * file and short name.
+ * file and short name. A guarded tag (CLAUDE.md, "A module installed at run
+ * time is inlined behind a guard") is credited where no Rails class includes
+ * its module, or where the module comes from another gem: the citation's
+ * directory under `<source>/<version>/` (`actionpack`) differs from the TS
+ * package (`rack-session`), so no class of the constructor's own gem can be
+ * the includer, while a same-gem includer the class's ancestry lacks is still
+ * flagged.
  */
 export function inlinedFromFindings(
   ruby: ApiManifest,
@@ -366,13 +372,14 @@ export function inlinedFromFindings(
       for (const tag of tags) {
         const hook = `${tag.module}#${tag.hook}`;
         if (resolveBody(tag) === undefined) continue;
+        const fromAnotherGem = tag.file.split("/")[0] !== name;
         if (reached === undefined) {
           report(hook, "sits on a constructor whose file and name mirror no Rails class or module");
         } else if (reached.sameFile.includes(hook)) {
           report(hook, "is redundant: a body from the mirrored Ruby file is inlined untagged");
         } else if (
           !reached.tagged.includes(hook) &&
-          !(tag.guarded === true && (!mixedIn.has(tag.module) || tag.file.split("/")[0] !== name))
+          !(tag.guarded === true && (!mixedIn.has(tag.module) || fromAnotherGem))
         ) {
           report(
             hook,

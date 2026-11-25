@@ -3223,7 +3223,8 @@ function guardNames(guard: IncludedGuard, tag: InlinedFrom): boolean {
  * `if (isModuleIncluded(new.target, Mod))`, or an `if (pred(klass))` whose
  * `klass` is `new.target` and whose same-file `pred` answers
  * `isModuleIncluded(<its parameter>, Mod)` (a cached predicate). Either may
- * end an `&&` chain, as where `Mod` is read off `TopLevel` and may be unset.
+ * be any operand of an `&&` chain, as where `Mod` is read off `TopLevel` and
+ * may be unset.
  */
 function includedGuardsOf(ctor: ts.ConstructorDeclaration): IncludedGuard[] {
   const sf = ctor.getSourceFile();
@@ -3266,22 +3267,29 @@ function includedGuardsOf(ctor: ts.ConstructorDeclaration): IncludedGuard[] {
   const guards: IncludedGuard[] = [];
   for (const stmt of ctor.body?.statements ?? []) {
     if (!ts.isIfStatement(stmt)) continue;
-    let test = stmt.expression;
-    while (
-      ts.isBinaryExpression(test) &&
-      test.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken
-    ) {
-      test = test.right;
-    }
-    if (!ts.isCallExpression(test)) continue;
-    const call = test;
-    const mod =
-      testedBy(call, isTarget) ??
-      (ts.isIdentifier(call.expression) &&
-      call.arguments.length === 1 &&
-      isTarget(call.arguments[0])
-        ? predicateModule(call.expression.text)
-        : undefined);
+    const operands: ts.Expression[] = [];
+    const flatten = (e: ts.Expression): void => {
+      if (
+        ts.isBinaryExpression(e) &&
+        e.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken
+      ) {
+        flatten(e.left);
+        flatten(e.right);
+      } else operands.push(e);
+    };
+    flatten(stmt.expression);
+    const mod = operands
+      .filter(ts.isCallExpression)
+      .map(
+        (call) =>
+          testedBy(call, isTarget) ??
+          (ts.isIdentifier(call.expression) &&
+          call.arguments.length === 1 &&
+          isTarget(call.arguments[0])
+            ? predicateModule(call.expression.text)
+            : undefined),
+      )
+      .find((found) => found !== undefined);
     if (mod === undefined) continue;
     const path = mod.getText(sf).split(".");
     guards.push({ path, ...importedPackage(sf, path[0]) });
