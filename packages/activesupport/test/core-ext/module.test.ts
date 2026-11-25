@@ -10,6 +10,7 @@ import {
   constDefined,
   rbModRemoveConst,
 } from "@blazetrails/ruby-compat";
+import { rbCBasicObject as BasicObject } from "@blazetrails/ruby-compat";
 import { delegate, delegateMissingTo } from "../../lib/module-ext.js";
 import { DelegationError } from "../../lib/delegation.js";
 import { callerLocations } from "../../lib/deprecation.js";
@@ -111,8 +112,10 @@ class Event {
 }
 delegate.call(Event.prototype, "foo", { to: "case" });
 
-class BasicEvent {
-  constructor(public case_: any) {}
+class BasicEvent extends BasicObject {
+  constructor(public case_: any) {
+    super();
+  }
 
   get case() {
     return this.case_;
@@ -236,8 +239,10 @@ class Cavern {
 }
 delegateMissingTo.call(Cavern, "target");
 
-class BasicCavern {
-  constructor(public _target: any) {}
+class BasicCavern extends BasicObject {
+  constructor(public _target: any) {
+    super();
+  }
 
   get target() {
     return this._target;
