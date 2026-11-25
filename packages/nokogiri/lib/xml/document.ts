@@ -175,9 +175,16 @@ export class XmlDocument {
     return this._doc;
   }
 
-  get root(): XmlNode {
-    if (this._root === null) throw new Error("Document has no root (parse failed or disposed)");
+  get root(): XmlNode | null {
     return this._root;
+  }
+
+  get type(): number {
+    return XmlNode.DOCUMENT_NODE;
+  }
+
+  isXml(): boolean {
+    return this.type === XmlNode.DOCUMENT_NODE;
   }
 
   fragment(tags: string | null = null): DocumentFragment {

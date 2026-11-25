@@ -68,6 +68,10 @@ export class DocumentFragment extends XmlNode {
     return this.children.toHtml(options);
   }
 
+  toXhtml(options: { saveWith?: number } = {}): string {
+    return this.children.toXhtml(options);
+  }
+
   toXml(options: { saveWith?: number; encoding?: string | null } = {}): string {
     return this.children.toXml(options);
   }

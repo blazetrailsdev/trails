@@ -27,6 +27,7 @@ export interface XmlNode {
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface above.
 export class XmlNode {
+  static readonly DOCUMENT_NODE = 9;
   static readonly IMPLIED_XPATH_CONTEXTS: readonly string[] = [".//"];
   static readonly SaveOptions = SaveOptions;
 
@@ -145,6 +146,10 @@ export class XmlNode {
     return new XML.DocumentFragment(this.document as XmlDocument, tags, this);
   }
 
+  toString(): string {
+    return (this.document as XmlDocument).isXml() ? this.toXml() : this.toHtml();
+  }
+
   /** @missingRailsArgs join — PERMANENT */
   innerHtml(...args: unknown[]): string {
     return this.children.map((x) => x.toHtml(...(args as [{ saveWith?: number }?]))).join("");
@@ -177,6 +182,10 @@ export class XmlNode {
     return this.serialize(options);
   }
 
+  toXhtml(options: { saveWith?: number } = {}): string {
+    return this.toFormat(SaveOptions.DEFAULT_XHTML, options);
+  }
+
   writeTo(io: StringIO, ...options: unknown[]): void {
     const block =
       typeof options.at(-1) === "function"
@@ -207,19 +216,17 @@ export class XmlNode {
   /** @internal */
   protected nativeWriteTo(
     io: StringIO,
-    _encoding: string | null,
+    encoding: string | null,
     indentString: string,
     options: number,
   ): StringIO {
-    io.write(
-      this._node instanceof Nokogiri.LibXml2!.XmlElement
-        ? this._node.toString({
-            format: (options & SaveOptions.FORMAT) !== 0,
-            noEmptyTags: (options & SaveOptions.NO_EMPTY_TAGS) !== 0,
-            indentString,
-          })
-        : (this._node as XmlTreeNode).toString(),
-    );
+    const libxml = Nokogiri.LibXml2!;
+    const handler = new libxml.XmlStringOutputBufferHandler();
+    const savectx = libxml.xmlSaveToIO(handler, encoding, options);
+    libxml.xmlSaveSetIndentString(savectx, indentString);
+    libxml.xmlSaveTree(savectx, this.pointerId);
+    libxml.xmlSaveClose(savectx);
+    io.write(handler.result);
     return io;
   }
 

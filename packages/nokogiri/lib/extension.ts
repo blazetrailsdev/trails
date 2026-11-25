@@ -6,6 +6,10 @@ import {
   xmlFreeParserCtxt,
   xmlNewParserCtxt,
   xmlReadString,
+  xmlSaveClose,
+  xmlSaveSetIndentString,
+  xmlSaveToIO,
+  xmlSaveTree,
   xmlUnlinkNode,
 } from "libxml2-wasm/lib/libxml2.mjs";
 import { Nokogiri, type LibXml2 } from "./namespaces.js";
@@ -18,5 +22,9 @@ Nokogiri.LibXml2 = {
   xmlFreeParserCtxt,
   xmlNewParserCtxt,
   xmlReadString,
+  xmlSaveClose,
+  xmlSaveSetIndentString,
+  xmlSaveToIO,
+  xmlSaveTree,
   xmlUnlinkNode,
 } as LibXml2;
