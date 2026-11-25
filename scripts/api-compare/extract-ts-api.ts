@@ -3222,7 +3222,8 @@ function guardNames(guard: IncludedGuard, tag: InlinedFrom): boolean {
  * module installed at run time is inlined behind a guard"): an
  * `if (isModuleIncluded(new.target, Mod))`, or an `if (pred(klass))` whose
  * `klass` is `new.target` and whose same-file `pred` answers
- * `isModuleIncluded(<its parameter>, Mod)` (a cached predicate).
+ * `isModuleIncluded(<its parameter>, Mod)` (a cached predicate). Either may
+ * end an `&&` chain, as where `Mod` is read off `TopLevel` and may be unset.
  */
 function includedGuardsOf(ctor: ts.ConstructorDeclaration): IncludedGuard[] {
   const sf = ctor.getSourceFile();
@@ -3264,8 +3265,16 @@ function includedGuardsOf(ctor: ts.ConstructorDeclaration): IncludedGuard[] {
   };
   const guards: IncludedGuard[] = [];
   for (const stmt of ctor.body?.statements ?? []) {
-    if (!ts.isIfStatement(stmt) || !ts.isCallExpression(stmt.expression)) continue;
-    const call = stmt.expression;
+    if (!ts.isIfStatement(stmt)) continue;
+    let test = stmt.expression;
+    while (
+      ts.isBinaryExpression(test) &&
+      test.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken
+    ) {
+      test = test.right;
+    }
+    if (!ts.isCallExpression(test)) continue;
+    const call = test;
     const mod =
       testedBy(call, isTarget) ??
       (ts.isIdentifier(call.expression) &&

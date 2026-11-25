@@ -358,17 +358,20 @@ export class Persisted {
   protected sidbits = 128;
   protected sidLength = 32;
 
-  /** @inventedArm if — PERMANENT */
+  /**
+   * @inlinedFrom ActionDispatch::Session::Compatibility#initialize rails/v8.0.5.2/actionpack/lib/action_dispatch/middleware/session/abstract_store.rb:25-31
+   * @inventedArm if — PERMANENT
+   */
   constructor(app?: RackApp, options: Record<string, unknown> = {}) {
-    const compatibility = (
+    const Compatibility = (
       TopLevel as {
         ActionDispatch?: { Session?: { Compatibility?: { DEFAULT_SAME_SITE: unknown } } };
       }
     ).ActionDispatch?.Session?.Compatibility;
-    if (compatibility !== undefined && isModuleIncluded(new.target, compatibility)) {
+    if (Compatibility !== undefined && isModuleIncluded(new.target, Compatibility)) {
       if (options.key == null || options.key === false) options.key = "_session_id";
       if (!("sameSite" in options || "sameSite" in new.target.DEFAULT_OPTIONS)) {
-        options = { ...options, sameSite: compatibility.DEFAULT_SAME_SITE };
+        options = { ...options, sameSite: Compatibility.DEFAULT_SAME_SITE };
       }
     }
     this.app = app;

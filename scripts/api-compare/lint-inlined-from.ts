@@ -372,7 +372,7 @@ export function inlinedFromFindings(
           report(hook, "is redundant: a body from the mirrored Ruby file is inlined untagged");
         } else if (
           !reached.tagged.includes(hook) &&
-          !(tag.guarded === true && !mixedIn.has(tag.module))
+          !(tag.guarded === true && (!mixedIn.has(tag.module) || tag.file.split("/")[0] !== name))
         ) {
           report(
             hook,

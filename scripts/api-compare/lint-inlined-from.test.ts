@@ -443,6 +443,15 @@ describe("inlinedFromFindings", () => {
     ]);
   });
 
+  it("admits a guarded tag on another gem's module that Rails classes include", () => {
+    expect(
+      messages([{ ...API, guarded: true }], { owner: "ProxyRecord", file: "proxy.ts" }),
+    ).toEqual([]);
+    expect(messages([API], { owner: "ProxyRecord", file: "proxy.ts" })).toEqual([
+      "ActiveModel::API#initialize names a module ActiveRecord::Proxy does not include or prepend",
+    ]);
+  });
+
   it("ends the chain at an initialize that calls no super", () => {
     const enrolled = ["activerecord"];
     expect(messages([], { owner: "Proxy", file: "proxy.ts", enrolled })).toEqual([]);
