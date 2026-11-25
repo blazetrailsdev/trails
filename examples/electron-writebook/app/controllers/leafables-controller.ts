@@ -1,9 +1,11 @@
 import { NotImplementedError, merge } from "@blazetrails/ruby-compat";
 import type { Parameters } from "@blazetrails/actionpack";
 import { include, type Included } from "@blazetrails/activesupport";
+import { Turbo } from "@blazetrails/turbo";
 import { ApplicationController } from "./application-controller.ts";
 import { SetBookLeaf } from "./concerns/set-book-leaf.ts";
 import type { Book } from "../models/book.ts";
+import { Current } from "../models/current.ts";
 import type { Leaf } from "../models/leaf.ts";
 import type { Leafable } from "../models/leafable.ts";
 
@@ -22,6 +24,7 @@ export class LeafablesController extends ApplicationController {
     include(this, SetBookLeaf);
 
     this.beforeAction(":ensureEditable", { except: "show" });
+    this.beforeAction(":broadcastBeingEditedIndicator", { only: "update" });
   }
 
   async new(): Promise<void> {
@@ -84,6 +87,13 @@ export class LeafablesController extends ApplicationController {
 
   protected leafableParams(): Parameters {
     throw new NotImplementedError("Implement in subclass");
+  }
+
+  private async broadcastBeingEditedIndicator(): Promise<void> {
+    await Turbo.StreamsChannel!.broadcastRenderLaterTo(this.leaf, "being_edited", {
+      partial: "leaves/being-edited-by",
+      locals: { leaf: this.leaf, user: Current.user! },
+    });
   }
 
   private async positionNewLeaf(leaf: Leaf): Promise<void> {

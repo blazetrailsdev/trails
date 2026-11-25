@@ -1,3 +1,4 @@
+import type { One } from "@blazetrails/activestorage";
 import { include, type Included } from "@blazetrails/activesupport";
 import { merge } from "@blazetrails/ruby-compat";
 import type { CollectionProxy, Relation } from "@blazetrails/activerecord";
@@ -5,10 +6,18 @@ import { ApplicationRecord } from "./application-record.ts";
 import { Accessable, type ClassMethods as AccessableClassMethods } from "./book/accessable.ts";
 import { Sluggable } from "./book/sluggable.ts";
 import type { Access } from "./access.ts";
-import type { Leaf } from "./leaf.ts";
+import type { Leaf, LeafScopes } from "./leaf.ts";
 import type { Leafable } from "./leafable.ts";
 
 export const THEMES = ["black", "blue", "green", "magenta", "orange", "violet", "white"] as const;
+
+export interface BookScopes {
+  published(): BookRelation;
+  ordered(): BookRelation;
+  withEveryoneAccess(): BookRelation;
+}
+
+export type BookRelation = Relation<Book> & BookScopes;
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Book extends Included<typeof Accessable>, Included<typeof Sluggable> {}
@@ -22,15 +31,14 @@ export class Book extends ApplicationRecord {
   declare slug: string;
   declare everyone_access: boolean;
   declare theme: (typeof THEMES)[number];
-  declare leaves: CollectionProxy<Leaf> & {
-    active(): Relation<Leaf> & { positioned(): Relation<Leaf> };
-  };
+  declare leaves: CollectionProxy<Leaf> & LeafScopes;
   declare accesses: CollectionProxy<Access>;
-  declare cover: { isAttached(): boolean; purge(): Promise<void> };
+  declare cover: One;
 
-  declare static published: () => Relation<Book>;
-  declare static ordered: () => Relation<Book>;
-  declare static withEveryoneAccess: () => Relation<Book>;
+  declare static published: () => BookRelation;
+  declare static ordered: () => BookRelation;
+  declare static withEveryoneAccess: () => BookRelation;
+  declare static themes: Record<(typeof THEMES)[number], string>;
 
   declare static accessableOrPublished: (typeof AccessableClassMethods)["accessableOrPublished"];
   declare static accessableOrPublishedBooks: (typeof AccessableClassMethods)["accessableOrPublishedBooks"];

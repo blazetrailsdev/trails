@@ -1,6 +1,6 @@
-<% const leafable = await leaf.leafable; %>
-<% if (leaf.isPicture()) { await leafable.image.load(); if (leafable.image.isAttached()) await (await leafable.image.attachment).blob; } %>
-<% const bodyMarkdown = leaf.isPage() ? await leafable.body() : null; %>
+<% const page = await leaf.page; const section = await leaf.section; const picture = await leaf.picture; %>
+<% if (picture) { await picture.image.load(); if (picture.image.isAttached()) await (await picture.image.attachment)!.blob; } %>
+<% const bodyMarkdown = page ? await page.body() : null; %>
 <% const deleteButton = await buttonTo(leafablePath(leaf), { method: "delete", class: "btn btn--negative txt-small" }, null, () => { %>
   <%= imageTag("trash.svg", { aria: { hidden: true }, size: 24 }) %>
   <span class="for-screen-reader">Delete this page</span>
@@ -12,13 +12,13 @@
   </span>
 
   <%= linkTo(leafablePath(leaf), { class: "toc__thumbnail", data: { turboFrame: "_top" } }, null, () => { %>
-    <%= leaf.isSection() ? leafable.body : "" %>
-    <%= leaf.isPage() ? sanitizeContent(bodyMarkdown.toHtml()) : "" %>
-    <%= leaf.isPicture() && leafable.image?.isAttached() ? imageTag(leafable.largeImage()) : "" %>
+    <%= section ? section.body : "" %>
+    <%= bodyMarkdown ? sanitizeContent(bodyMarkdown.toHtml()) : "" %>
+    <%= picture?.image.isAttached() ? imageTag(picture.largeImage()) : "" %>
   <% }) %>
 
   <div class="toc__title flex align-center min-width">
-    <%= await formWith({ model: [leaf.association("book").target, leaf], url: leafablePath(leaf), class: "flex align-center max-width min-width", id: domId(leaf, "form") }, (form) => { %>
+    <%= await formWith({ model: [await leaf.book, leaf], url: leafablePath(leaf), class: "flex align-center max-width min-width", id: domId(leaf, "form") }, (form) => { %>
       <%= form.textField("title", { class: "input full-width", autofocus: true, autocomplete: "off", data: { controller: "autoselect" } }) %>
     <% }) %>
 
@@ -33,7 +33,7 @@
   </div>
 
   <small class="toc__wordcount">
-    <% if (leaf.isPage()) { %>
+    <% if (bodyMarkdown) { %>
       <%= wordCount(bodyMarkdown.content) %>
     <% } %>
   </small>

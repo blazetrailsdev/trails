@@ -1,5 +1,5 @@
 <% const searchForm = await render("books/searches/form", { book }); %>
-<% const results = []; %>
+<% const results: unknown[] = []; %>
 <% for (const leaf of leaves) results.push(await render("books/searches/result", { leaf })); %>
 <%= turboFrameTag("search", block(() => { %>
   <%= searchForm %>

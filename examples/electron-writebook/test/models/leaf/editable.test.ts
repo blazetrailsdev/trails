@@ -29,7 +29,7 @@ describe("Leaf::EditableTest", () => {
 
   it("edits that are close together don't create new revisions", async () => {
     const leaf = await leaves("welcome_page");
-    const edits = () => leaf.edits.count();
+    const edits = async () => (await leaf.edits.count()) as number;
 
     let before = await edits();
     await leaf.edit({ leafableParams: { body: "First change" } });

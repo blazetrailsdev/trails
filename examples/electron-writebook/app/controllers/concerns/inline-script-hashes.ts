@@ -1,7 +1,7 @@
 import { defineModule, included } from "@blazetrails/activesupport";
 import type { ActionController, ContentSecurityPolicy } from "@blazetrails/actionpack";
 
-type Host = ActionController.Base & {
+type Host = Omit<ActionController.Base, "helpers"> & {
   helpers(): { javascriptPath(source: string): string };
   scriptOrigins(...entryPoints: string[]): string[];
 };
@@ -42,10 +42,7 @@ export const InlineScriptHashes = defineModule(
     scriptOrigins(this: Host, ...entryPoints: string[]): string[] {
       const baseUrl = this.request.baseUrl;
       const origins = entryPoints
-        .map((source) => {
-          const helpers = this.helpers();
-          return new URL(helpers.javascriptPath.call(helpers, source), baseUrl).origin;
-        })
+        .map((source) => new URL(this.helpers().javascriptPath(source), baseUrl).origin)
         .filter((origin) => origin !== baseUrl);
       return [...new Set(origins)];
     },

@@ -15,8 +15,8 @@ export const VersionHeaders = defineModule(
         appVersion: string;
         gitRevision?: string;
       };
-      this.response.headers["X-Version"] = config.appVersion;
-      this.response.headers["X-Rev"] = config.gitRevision;
+      this.response.headers.set("X-Version", config.appVersion);
+      this.response.headers.set("X-Rev", config.gitRevision as string);
     },
   },
 );

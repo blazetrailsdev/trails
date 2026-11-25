@@ -1,4 +1,9 @@
 import { Trails } from "@blazetrails/trailties";
 
-Trails.application.config.appVersion = process.env.APP_VERSION ?? "0";
-Trails.application.config.gitRevision = process.env.GIT_REVISION;
+const config = Trails.application.config as unknown as {
+  appVersion: string;
+  gitRevision: string | undefined;
+};
+
+config.appVersion = process.env.APP_VERSION ?? "0";
+config.gitRevision = process.env.GIT_REVISION;

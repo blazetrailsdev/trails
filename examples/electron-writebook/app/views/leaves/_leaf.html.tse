@@ -1,10 +1,10 @@
-<% const book = leaf.association("book").target; %>
+<% const book = await leaf.book; %>
 <% const editable = await book.isEditable(); %>
-<% const leafable = await leaf.leafable; %>
-<% if (leaf.isPicture()) { await leafable.image.load(); if (leafable.image.isAttached()) await (await leafable.image.attachment).blob; } %>
+<% const page = await leaf.page; const section = await leaf.section; const picture = await leaf.picture; %>
+<% if (picture) { await picture.image.load(); if (picture.image.isAttached()) await (await picture.image.attachment)!.blob; } %>
 <% const deleteButton = await render("leaves/delete", { leaf }); %>
-<% const bodyMarkdown = leaf.isPage() ? await leafable.body() : null; %>
-<% const preview = leaf.isPage() ? sanitizeContent(await leafable.htmlPreview()) : ""; %>
+<% const bodyMarkdown = page ? await page.body() : null; %>
+<% const preview = page ? sanitizeContent(await page.htmlPreview()) : ""; %>
 <%= await cache([leaf, book, editable, HtmlScrubber.cacheVersion()], {}, () => { %>
 <%= leafItemTag(leaf, {}, () => { %>
   <span class="btn btn--link arrangement__handle txt-small">
@@ -14,7 +14,7 @@
 
   <%= deleteButton %>
 
-  <div class="toc__thumbnail <%= leaf.isSection() && leafable.theme === "dark" ? "toc__thumbnail--dark" : "" %>">
+  <div class="toc__thumbnail <%= section?.theme === "dark" ? "toc__thumbnail--dark" : "" %>">
     <% if (editable) { %>
       <%= linkTo(editLeafablePath(leaf), { class: "toc__link hide_from_reading_mode", data: { turboFrame: "_top" } }, null, () => { %>
         <span class="for-screen-reader">Edit <%= leaf.title %></span>
@@ -29,12 +29,12 @@
       <% }) %>
     <% } %>
 
-    <%= leaf.isSection() ? tag().span(simpleFormat(leafable.body), { class: "txt-align-center" }) : "" %>
+    <%= section ? tag().span(simpleFormat(section.body), { class: "txt-align-center" }) : "" %>
 
     <%= preview %>
 
-    <% if (leaf.isPicture()) { %>
-      <%= imageTag(leafable.image.isAttached() ? leafable.largeImage() : "default-picture.webp") %>
+    <% if (picture) { %>
+      <%= imageTag(picture.image.isAttached() ? picture.largeImage() : "default-picture.webp") %>
     <% } %>
   </div>
 
@@ -59,7 +59,7 @@
   </span>
 
   <small class="toc__wordcount txt-small--responsive">
-    <% if (leaf.isPage()) { %>
+    <% if (bodyMarkdown) { %>
       <%= wordCount(bodyMarkdown.content) %>
     <% } %>
   </small>

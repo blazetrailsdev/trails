@@ -13,6 +13,14 @@ import {
 import { Current } from "./current.ts";
 import { Book } from "./book.ts";
 
+export interface UserScopes {
+  active(): UserRelation;
+  ordered(): UserRelation;
+  authenticateBy(attributes: Record<string, unknown>): Promise<User | null>;
+}
+
+export type UserRelation = Relation<User> & UserScopes;
+
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface User extends Included<typeof Role>, Included<typeof Transferable> {}
 
@@ -24,13 +32,15 @@ export class User extends ApplicationRecord {
   declare active: boolean;
   declare isAdministrator: () => boolean;
   declare isMember: () => boolean;
-  declare sessions: CollectionProxy<Session>;
+  declare sessions: CollectionProxy<Session> & {
+    startBang(options: Parameters<typeof Session.startBang>[0]): Promise<Session>;
+  };
   declare accesses: CollectionProxy<Access>;
   declare books: CollectionProxy<Book>;
   declare leaves: CollectionProxy<Leaf>;
 
-  declare static active: () => Relation<User>;
-  declare static ordered: () => Relation<User>;
+  declare static active: () => UserRelation;
+  declare static ordered: () => UserRelation;
 
   declare static findByTransferId: (typeof TransferableClassMethods)["findByTransferId"];
 

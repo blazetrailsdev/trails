@@ -25,8 +25,8 @@ export class SessionsController extends ApplicationController {
       password: this.params.get("password"),
     });
     if (user) {
-      await this.startNewSessionFor(user as User);
-      await this.redirectTo(this.postAuthenticatingUrl());
+      await this.startNewSessionFor(user);
+      await this.redirectTo(await this.postAuthenticatingUrl());
     } else {
       await this.renderRejection(":unauthorized");
     }
@@ -41,7 +41,7 @@ export class SessionsController extends ApplicationController {
     if (await User.isNone()) await this.redirectTo(this.firstRunUrl());
   }
 
-  private async renderRejection(status: string): Promise<void> {
+  private async renderRejection(status: ":too_many_requests" | ":unauthorized"): Promise<void> {
     (await this.flash).set("alert", "Too many requests or unauthorized.");
     await this.render("new", { status });
   }

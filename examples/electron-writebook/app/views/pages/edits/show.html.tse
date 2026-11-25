@@ -1,12 +1,12 @@
 <% const indexLink = await render("books/index-link"); %>
 <% contentFor("title", `Changes to ${leaf.title}`); %>
 <% this.layoutClass = "books"; %>
-<% const book = leaf.association("book").target; %>
+<% const book = await leaf.book; %>
 <% const previous = await edit.previous(); %>
 <% const next = await edit.next(); %>
-<% const editLeafable = await edit.leafable; %>
+<% const editLeafable = await edit.page; %>
 <% const previousHtml = editLeafable ? sanitizeContent((await editLeafable.body()).toHtml()) : ""; %>
-<% const currentHtml = sanitizeContent((await (await leaf.leafable).body()).toHtml()); %>
+<% const currentHtml = sanitizeContent((await (await leaf.page)!.body()).toHtml()); %>
 
 <% contentFor("header", () => { %>
   <nav>

@@ -1,12 +1,13 @@
 import { defineModule, included, isPresent, minutes } from "@blazetrails/activesupport";
+import { Parameters } from "@blazetrails/actionpack";
 import type { Base } from "@blazetrails/activerecord";
-import { merge } from "@blazetrails/ruby-compat";
+import { hasKey, merge } from "@blazetrails/ruby-compat";
 import type { Leaf } from "../leaf.ts";
 import type { Leafable } from "../leafable.ts";
 
 export const MINIMUM_TIME_BETWEEN_VERSIONS = minutes(10);
 
-type Params = Record<string, unknown>;
+type Params = Record<string, unknown> | Parameters;
 
 interface Host extends Leaf {
   isRecordNewEdit(leafableParams: Params): Promise<boolean>;
@@ -55,9 +56,11 @@ export const Editable = defineModule(
 
     async isWillChangeLeafable(this: Host, leafableParams: Params): Promise<boolean> {
       const leafable = await this.leafable;
-      const attributes = leafable.attributes as Params;
+      const attributes = leafable.attributes;
       return isPresent(
-        Object.entries(leafableParams).filter(([key, value]) => attributes[key] !== value),
+        leafableParams instanceof Parameters
+          ? leafableParams.select((key, value) => attributes[String(key)] !== value)
+          : Object.entries(leafableParams).filter(([key, value]) => attributes[key] !== value),
       );
     },
 
@@ -108,7 +111,7 @@ export const Editable = defineModule(
     },
 
     isWasTrashed(this: Host): boolean {
-      return this.isTrashed() && this.previousChanges.isInclude("status");
+      return this.isTrashed() && hasKey(this.previousChanges, "status");
     },
   },
 );

@@ -14,7 +14,7 @@ export class TransfersController extends ApplicationController {
     );
     if (user) {
       await this.startNewSessionFor(user);
-      await this.redirectTo(this.postAuthenticatingUrl());
+      await this.redirectTo(await this.postAuthenticatingUrl());
     } else {
       await this.head(":bad_request");
     }

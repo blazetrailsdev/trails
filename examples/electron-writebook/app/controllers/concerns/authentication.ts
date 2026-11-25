@@ -25,7 +25,7 @@ export interface Host extends ActionController.Base {
   resumeSession(session: Session): Promise<void>;
   terminateCurrentSession(): Promise<void>;
   authenticatedAs(session: Session): Promise<void>;
-  postAuthenticatingUrl(): string;
+  postAuthenticatingUrl(): Promise<string>;
   setAuthenticationCookie(session: Session): void;
   removeAuthenticationCookie(): void;
   setAuthenticatedBy(method: string): void;
@@ -82,7 +82,7 @@ export const Authentication = defineModule(
     },
 
     async requestAuthentication(this: Host): Promise<void> {
-      this.session["return_to_after_authenticating"] = this.request.url;
+      await this.session.set("return_to_after_authenticating", this.request.url);
       await this.redirectTo(this.newSessionUrl());
     },
 
@@ -116,10 +116,11 @@ export const Authentication = defineModule(
       this.setAuthenticationCookie(session);
     },
 
-    postAuthenticatingUrl(this: Host): string {
-      const url = this.session["return_to_after_authenticating"] as string | undefined;
-      delete this.session["return_to_after_authenticating"];
-      return url ?? this.rootUrl();
+    async postAuthenticatingUrl(this: Host): Promise<string> {
+      return (
+        ((await this.session.delete("return_to_after_authenticating")) as string | null) ??
+        this.rootUrl()
+      );
     },
 
     setAuthenticationCookie(this: Host, session: Session): void {
@@ -135,11 +136,11 @@ export const Authentication = defineModule(
     },
 
     setAuthenticatedBy(this: Host, method: string): void {
-      this._authenticatedBy = inquiry(String(method));
+      this._authenticatedBy = inquiry.call(String(method));
     },
 
     authenticatedBy(this: Host): ReturnType<typeof inquiry> {
-      return (this._authenticatedBy ??= inquiry(""));
+      return (this._authenticatedBy ??= inquiry.call(""));
     },
   },
 );

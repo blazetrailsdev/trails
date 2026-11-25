@@ -386,6 +386,9 @@ importers:
       '@blazetrails/bcrypt':
         specifier: workspace:*
         version: link:../../packages/bcrypt
+      '@blazetrails/date':
+        specifier: workspace:*
+        version: link:../../packages/date
       '@blazetrails/globalid':
         specifier: workspace:*
         version: link:../../packages/globalid

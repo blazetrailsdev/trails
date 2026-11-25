@@ -2,7 +2,7 @@
 <div class="flex flex-column align-center gap txt-medium--responsive">
   <label class="flex flex-column gap full-width">
     <div class="flex align-center gap">
-      <% if (Current.user.id !== user.id) { %>
+      <% if (Current.user!.id !== user.id) { %>
         <%= translationButton("transferSession") %>
         <strong id="session_transfer_label" class="txt-align-start">Share to get them back into their account</strong>
       <% } else { %>

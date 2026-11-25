@@ -22,6 +22,6 @@ export class CustomStylesController extends ApplicationController {
   }
 
   private accountParams(): Parameters {
-    return this.params.require("account").permit("custom_styles");
+    return (this.params.require("account") as Parameters).permit("custom_styles");
   }
 }

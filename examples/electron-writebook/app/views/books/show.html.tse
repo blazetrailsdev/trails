@@ -1,4 +1,4 @@
-<% await book.cover.load(); if (book.cover.isAttached()) await (await book.cover.attachment).blob; %>
+<% await book.cover.load(); if (book.cover.isAttached()) await (await book.cover.attachment)?.blob; %>
 <% const indexLink = await render("books/index-link"); %>
 <% contentFor("title", book.title); %>
 <% this.layoutClass = "book"; %>

@@ -1,4 +1,5 @@
 import { include, type Included } from "@blazetrails/activesupport";
+import type { One } from "@blazetrails/activestorage";
 import { ApplicationRecord } from "./application-record.ts";
 import { Leafable } from "./leafable.ts";
 
@@ -8,11 +9,7 @@ export interface Picture extends Included<typeof Leafable>, Leafable {}
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Picture extends ApplicationRecord {
   declare caption: string | null;
-  declare image: {
-    isVariable(): boolean;
-    variant(name: string): unknown;
-    isAttached(): boolean;
-  };
+  declare image: One;
 
   static {
     include(this, Leafable);

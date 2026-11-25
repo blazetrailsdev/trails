@@ -1,6 +1,6 @@
 <% const indexLink = await render("books/index-link"); %>
 <% contentFor("title", user.name); %>
-<% const transfer = Current.user.isCanAdminister() ? await render("users/transfer", { user }) : ""; %>
+<% const transfer = Current.user!.isCanAdminister() ? await render("users/transfer", { user }) : ""; %>
 
 <% contentFor("header", () => { %>
   <nav>
@@ -26,7 +26,7 @@
   <h2 class="margin-none-block-end"><%= user.name %></h2>
   <p class="margin-none-block-start"><%= mailTo(user.email_address) %></p>
 
-  <% if (Current.user.isCanAdminister()) { %>
+  <% if (Current.user!.isCanAdminister()) { %>
     <hr class="full-width margin-block-double" aria-hidden="true">
     <%= transfer %>
   <% } %>

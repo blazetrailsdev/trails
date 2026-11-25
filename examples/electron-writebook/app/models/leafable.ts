@@ -1,4 +1,4 @@
-import { defineModule, extend, included } from "@blazetrails/activesupport";
+import { defineModule, extend, included, type SafeBuffer } from "@blazetrails/activesupport";
 import { ModelName } from "@blazetrails/activemodel";
 import type { Base } from "@blazetrails/activerecord";
 import type { Book } from "./book.ts";
@@ -13,7 +13,7 @@ export interface Leafable extends Base {
   edit: Promise<Edit | null>;
   title(): Promise<string>;
   owningBook(): Promise<Book | null>;
-  searchableContent(): Promise<string | null>;
+  searchableContent(): Promise<string | SafeBuffer | null>;
   markable(): Promise<string | null>;
   leafableName(): string;
 }
@@ -44,7 +44,7 @@ export const Leafable = defineModule({
     return (await this.book) ?? (await (await (await this.edit)?.leaf)?.book) ?? null;
   },
 
-  async searchableContent(this: Leafable): Promise<string | null> {
+  async searchableContent(this: Leafable): Promise<string | SafeBuffer | null> {
     return null;
   },
 

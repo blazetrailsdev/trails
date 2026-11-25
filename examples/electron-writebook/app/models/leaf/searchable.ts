@@ -5,10 +5,12 @@ import {
   isHtmlSafe,
   isPresent,
   presence,
+  type SafeBuffer,
 } from "@blazetrails/activesupport";
 import type { Base, Relation } from "@blazetrails/activerecord";
 import { sql } from "@blazetrails/arel";
 import { HTML } from "@blazetrails/html-sanitizer";
+import type { Database } from "@blazetrails/sqlite3";
 import type { Leaf } from "../leaf.ts";
 
 export const ClassMethods = {
@@ -58,7 +60,7 @@ export const ClassMethods = {
 
 interface Host extends Leaf {
   isSearchable(): Promise<boolean>;
-  sanitizeForIndex(text: string | null): string | null;
+  sanitizeForIndex(text: string | SafeBuffer | null): string | SafeBuffer | null | undefined;
   createInSearchIndex(): Promise<void>;
   updateInSearchIndex(): Promise<void>;
   removeFromSearchIndex(): Promise<void>;
@@ -105,12 +107,15 @@ export const Searchable = defineModule(
       return isPresent(await this.searchableContent());
     },
 
-    sanitizeForIndex(this: Host, text: string | null): string | null {
+    sanitizeForIndex(
+      this: Host,
+      text: string | SafeBuffer | null,
+    ): string | SafeBuffer | null | undefined {
       if (text == null) return text;
       if (isHtmlSafe(text)) {
         return text;
       } else {
-        return new HTML.FullSanitizer().sanitize(text);
+        return new HTML.FullSanitizer().sanitize(String(text));
       }
     },
 
@@ -145,7 +150,7 @@ export const Searchable = defineModule(
       const connection = await klass.leaseConnection();
       await connection.execute(klass.sanitizeSql(statement as [string, ...unknown[]]));
 
-      return (await (await connection.rawConnection()).changes()) !== 0;
+      return (await ((await connection.rawConnection()) as Database).changes()) !== 0;
     },
 
     uniqueMatchingTerms(this: Host, content: string): string[] {

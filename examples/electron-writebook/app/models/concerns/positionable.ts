@@ -4,13 +4,17 @@ import type { Base, Relation } from "@blazetrails/activerecord";
 export const REBALANCE_THRESHOLD = 1e-10;
 export const ELEMENT_GAP = 1;
 
-interface Positioned extends Base {
+/** The readers `positionedWithin` defines on the including class. */
+export interface PositionedWithin {
+  positioningParent(): Promise<Base>;
+  allPositionedSiblings(): Promise<Siblings>;
+  otherPositionedSiblings(): Promise<Siblings>;
+}
+
+interface Positioned extends Base, PositionedWithin {
   position_score: number;
   _rebalanceRequired?: boolean;
-  positioningParent(): Promise<Base>;
-  allPositionedSiblings(): Promise<Relation<Positioned>>;
-  otherPositionedSiblings(): Promise<Relation<Positioned>>;
-  withPositioningLock<T>(block: () => Promise<T>): Promise<T>;
+  withPositioningLock<T>(block: () => Promise<T>): Promise<T | undefined>;
   ordinalPosition(): Promise<number>;
   positionAtEnd(): Promise<void>;
   positionAtStart(): Promise<void>;
@@ -25,6 +29,9 @@ type Scoped = Relation<Positioned> & {
   before(other: Positioned): Relation<Positioned>;
   after(other: Positioned): Relation<Positioned>;
 };
+
+/** A sibling relation handed back unevaluated through `stripThenable`. */
+type Siblings = Omit<Scoped, "then">;
 
 export const ClassMethods = {
   positionedWithin(
@@ -86,20 +93,20 @@ export const Positionable = defineModule(
     },
 
     async previous(this: Positioned): Promise<Positioned | null> {
-      return await ((await this.otherPositionedSiblings()) as Scoped).before(this).last();
+      return await (await this.otherPositionedSiblings()).before(this).last();
     },
 
     async next(this: Positioned): Promise<Positioned | null> {
-      return await ((await this.otherPositionedSiblings()) as Scoped).after(this).first();
+      return await (await this.otherPositionedSiblings()).after(this).first();
     },
 
     async moveToPosition(
       this: Positioned,
       offset: number,
-      { followedBy = [] }: { followedBy?: Positioned[] } = {},
+      { followedBy = [] }: { followedBy?: Base[] } = {},
     ): Promise<void> {
       await this.withPositioningLock(async () => {
-        const allToMove = [this, ...followedBy];
+        const allToMove = [this, ...(followedBy as Positioned[])];
         const [before, after] = await this.beforeAndAfterFor({ offset, moving: allToMove });
         const gap = (after - before) / (allToMove.length + 1);
 
@@ -121,7 +128,7 @@ export const Positionable = defineModule(
   undefined,
   {
     async ordinalPosition(this: Positioned): Promise<number> {
-      return (await ((await this.otherPositionedSiblings()) as Scoped).before(this).count()) + 1;
+      return (await (await this.otherPositionedSiblings()).before(this).count()) + 1;
     },
 
     async insertAtDefaultPosition(this: Positioned, block: () => Promise<void>): Promise<void> {
@@ -190,7 +197,10 @@ export const Positionable = defineModule(
       this._rebalanceRequired = false;
     },
 
-    async withPositioningLock<T>(this: Positioned, block: () => Promise<T>): Promise<T> {
+    async withPositioningLock<T>(
+      this: Positioned,
+      block: () => Promise<T>,
+    ): Promise<T | undefined> {
       return await (await this.positioningParent()).withLock(block);
     },
   },

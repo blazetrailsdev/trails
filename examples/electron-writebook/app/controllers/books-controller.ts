@@ -21,7 +21,7 @@ export class BooksController extends ApplicationController {
   }
 
   async index(): Promise<void> {
-    this.books = (await Book.accessableOrPublished().ordered().toArray()) as Book[];
+    this.books = await Book.accessableOrPublished().ordered().toArray();
   }
 
   async new(): Promise<void> {
@@ -36,11 +36,7 @@ export class BooksController extends ApplicationController {
   }
 
   async show(): Promise<void> {
-    this.leaves = (await this.book.leaves
-      .active()
-      .withLeafables()
-      .positioned()
-      .toArray()) as Leaf[];
+    this.leaves = await this.book.leaves.active().withLeafables().positioned().toArray();
     for (const leaf of this.leaves) leaf.association("book").target = this.book;
   }
 
@@ -65,7 +61,7 @@ export class BooksController extends ApplicationController {
   }
 
   private async setUsers(): Promise<void> {
-    this.users = (await User.active().ordered().toArray()) as User[];
+    this.users = await User.active().ordered().toArray();
   }
 
   private async ensureEditable(): Promise<void> {
@@ -80,9 +76,15 @@ export class BooksController extends ApplicationController {
 
   private bookParams(): Parameters {
     return this.uploadedFilesOnly(
-      this.params
-        .require("book")
-        .permit("title", "subtitle", "author", "cover", "remove_cover", "everyone_access", "theme"),
+      (this.params.require("book") as Parameters).permit(
+        "title",
+        "subtitle",
+        "author",
+        "cover",
+        "remove_cover",
+        "everyone_access",
+        "theme",
+      ),
       "cover",
     );
   }

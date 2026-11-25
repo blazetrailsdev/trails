@@ -1,4 +1,4 @@
-<% await picture.image.load(); if (picture.image.isAttached()) await (await picture.image.attachment).blob; %>
+<% await picture.image.load(); if (picture.image.isAttached()) await (await picture.image.attachment)?.blob; %>
 <%= leafableEditForm(picture, { id: "leafable-editor" }, (form) => { %>
   <label class="input input--file input--picture unpad" data-controller="upload-preview">
     <%= imageTag(picture.image.isAttached() ? picture.largeImage() : "default-picture.webp", { alt: "Picture", data: { uploadPreviewTarget: "image" } }) %>

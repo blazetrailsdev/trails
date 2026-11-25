@@ -1,5 +1,5 @@
-<% await book.cover.load(); if (book.cover.isAttached()) await (await book.cover.attachment).blob; %>
-<% const accesses = []; %>
+<% await book.cover.load(); if (book.cover.isAttached()) await (await book.cover.attachment)?.blob; %>
+<% const accesses: unknown[] = []; %>
 <% for (const user of users) accesses.push(await render("books/accesses/access", { user, book, creatingUser })); %>
 <%= await formWith({ model: book, id: "book-editor" }, (form) => { %>
   <%= tag().div({ class: `book__form flex align-center gap full-width ${book.cover.isAttached() ? "" : `theme--${book?.theme}`}`, style: "--input-padding: 0.5rem 1rem; --input-border-radius: 0.5rem" }, () => { %>

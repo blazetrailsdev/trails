@@ -1,5 +1,5 @@
-<% const url = joinUrl((await Current.account()).join_code); %>
-<% const regenerate = Current.user.isCanAdminister() ? await buttonTo(accountJoinCodePath(), { class: "btn btn--regenerate" }, null, () => { %>
+<% const url = joinUrl((await Current.account())!.join_code); %>
+<% const regenerate = Current.user!.isCanAdminister() ? await buttonTo(accountJoinCodePath(), { class: "btn btn--regenerate" }, null, () => { %>
   <%= imageTag("refresh.svg", { aria: { hidden: "true" }, size: 24, class: "colorize--black" }) %>
   <span class="for-screen-reader">Regenerate join link</span>
 <% }) : ""; %>

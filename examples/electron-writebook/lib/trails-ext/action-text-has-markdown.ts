@@ -74,11 +74,11 @@ export const HasMarkdown = defineModule({
     extend(base, ClassMethods);
   },
 
-  async safeMarkdownAttribute(this: Host, name: string): Promise<Markdown | undefined> {
+  async safeMarkdownAttribute(this: Base, name: string): Promise<Markdown | undefined> {
     const klass = this.constructor;
     const association = `markdown${name[0].toUpperCase()}${name.slice(1)}`;
     if (klass.reflectOnAssociation(association)?.klass === Markdown) {
-      return await (this[name] as () => Promise<Markdown>)();
+      return await ((this as Host)[name] as () => Promise<Markdown>)();
     }
   },
 });

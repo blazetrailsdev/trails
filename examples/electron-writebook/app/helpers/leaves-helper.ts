@@ -1,3 +1,4 @@
+import type { FormBuilder } from "@blazetrails/actionview";
 import type { SafeBuffer } from "@blazetrails/activesupport";
 import type { Leaf } from "../models/leaf.ts";
 import type { Leafable } from "../models/leafable.ts";
@@ -44,7 +45,7 @@ export const LeavesHelper = {
     this: ViewHost,
     leafable: Leafable,
     options: Record<string, unknown> = {},
-    block?: unknown,
+    block?: (form: FormBuilder) => unknown,
   ) {
     return this.formWith(
       {

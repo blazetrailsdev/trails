@@ -1,4 +1,5 @@
-import { hours, type TimeWithZone } from "@blazetrails/activesupport";
+import { hours } from "@blazetrails/activesupport";
+import { Time } from "@blazetrails/date";
 import { ApplicationRecord } from "./application-record.ts";
 import type { User } from "./user.ts";
 
@@ -6,7 +7,6 @@ export class Session extends ApplicationRecord {
   static ACTIVITY_REFRESH_RATE = hours(1);
 
   declare token: string;
-  declare last_active_at: TimeWithZone;
   declare user: Promise<User>;
 
   static {
@@ -15,7 +15,7 @@ export class Session extends ApplicationRecord {
     this.belongsTo("user");
 
     this.beforeCreate(function (this: Session) {
-      this.last_active_at ??= new Date();
+      this.last_active_at ??= Time.now();
     });
   }
 
@@ -37,7 +37,7 @@ export class Session extends ApplicationRecord {
       await this.updateBang({
         user_agent: userAgent,
         ip_address: ipAddress,
-        last_active_at: new Date(),
+        last_active_at: Time.now(),
       });
     }
   }

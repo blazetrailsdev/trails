@@ -1,12 +1,12 @@
 import { minutes, years } from "@blazetrails/activesupport";
-import { ActiveStorage } from "@blazetrails/activestorage";
+import { ActiveStorage, Current as ActiveStorageCurrent } from "@blazetrails/activestorage";
 import { GlobalID } from "@blazetrails/globalid";
 import { ApplicationController } from "../../application-controller.ts";
 import { Book } from "../../../models/book.ts";
 import { Page } from "../../../models/page.ts";
 import { Markdown } from "../../../../lib/trails-ext/action-text-markdown.ts";
 
-type Attachment = {
+export type Attachment = {
   slug: string;
   filename: { toString(): string };
   contentType: string;
@@ -96,7 +96,7 @@ export class UploadsController extends ApplicationController {
   }
 
   private async redirectToAttachmentPath(): Promise<void> {
-    await ActiveStorage.Current!.set({ urlOptions: { onlyPath: true } }, async () => {
+    await ActiveStorageCurrent.set({ urlOptions: { onlyPath: true } }, async () => {
       await this.head(":found", { location: await this.attachment.url() });
     });
   }

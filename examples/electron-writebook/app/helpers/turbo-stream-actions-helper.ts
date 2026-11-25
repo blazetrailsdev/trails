@@ -12,3 +12,9 @@ export const TurboStreamActionsHelper = {
 };
 
 prepend(TagBuilder, TurboStreamActionsHelper);
+
+declare module "@blazetrails/turbo/app/models/turbo/streams/tag-builder.js" {
+  interface TagBuilder {
+    scrollIntoView: (typeof TurboStreamActionsHelper)["scrollIntoView"];
+  }
+}

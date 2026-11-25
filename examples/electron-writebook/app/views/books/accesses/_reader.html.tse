@@ -1,4 +1,0 @@
-<%= await buttonTo(bookUserAccessPath(book, user), { params: { level: "editor" }, class: "btn txt-small flex-item-no-shrink" }, null, () => { %>
-  <%= imageTag("eye.svg", { size: 24, aria: { hidden: "true" } }) %>
-  <span class="for-screen-reader">Role: Reader</span>
-<% }) %>

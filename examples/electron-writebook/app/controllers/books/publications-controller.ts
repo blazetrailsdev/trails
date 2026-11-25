@@ -27,6 +27,6 @@ export class PublicationsController extends ApplicationController {
   }
 
   private bookParams(): Parameters {
-    return this.params.require("book").permit("published", "slug");
+    return (this.params.require("book") as Parameters).permit("published", "slug");
   }
 }

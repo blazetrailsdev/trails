@@ -16,7 +16,7 @@
       <%= imageTag("settings.svg", { aria: { label: "Settings" }, size: 19, class: "colorize--black", alt: "Settings" }) %>
     </div>
 
-    <% if (Current.user.isCanAdminister()) { %>
+    <% if (Current.user!.isCanAdminister()) { %>
       <%= linkTo(editAccountCustomStylesUrl(), { class: "btn" }, null, () => { %>
         <%= imageTag("art.svg", { aria: { hidden: true }, size: 24 }) %>
         <span class="for-screen-reader">Custom styles</span>

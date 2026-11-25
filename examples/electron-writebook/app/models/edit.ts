@@ -1,13 +1,17 @@
 import type { TimeWithZone } from "@blazetrails/activesupport";
 import { ApplicationRecord } from "./application-record.ts";
-import { TYPES, type Leafable } from "./leafable.ts";
+import { TYPES } from "./leafable.ts";
+import type { Page } from "./page.ts";
+import type { Picture } from "./picture.ts";
+import type { Section } from "./section.ts";
 import type { Leaf } from "./leaf.ts";
 
 export class Edit extends ApplicationRecord {
   declare action: "revision" | "trash";
   declare created_at: TimeWithZone;
   declare leaf: Promise<Leaf>;
-  declare leafable: Promise<Leafable | null>;
+  declare leafable: Promise<Page | Section | Picture | null>;
+  declare page: Promise<Page | null> | null;
   declare isRevision: () => boolean;
 
   static {

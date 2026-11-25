@@ -19,7 +19,7 @@
     "db:prepare": "trails db:prepare",
     "start": "electron .",
     "test": "vitest run",
-    "typecheck": "trails-tsc --schema db/schema.ts --noEmit -p tsconfig.json",
+    "typecheck": "trails-tsc-views build-autoload && trails-tsc --schema db/schema.ts --noEmit -p tsconfig.json",
     "test:system": "pnpm build:assets && TRAILS_SYSTEM_TESTS=1 vitest run"
   },
   "dependencies": {
@@ -33,6 +33,7 @@
     "@blazetrails/activesupport": "workspace:*",
     "@blazetrails/arel": "workspace:*",
     "@blazetrails/bcrypt": "workspace:*",
+    "@blazetrails/date": "workspace:*",
     "@blazetrails/globalid": "workspace:*",
     "@blazetrails/html-sanitizer": "workspace:*",
     "@blazetrails/nokogiri": "workspace:*",

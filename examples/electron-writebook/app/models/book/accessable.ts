@@ -1,15 +1,15 @@
 import { defineModule, extend, included, isPresent } from "@blazetrails/activesupport";
-import type { Base, Relation } from "@blazetrails/activerecord";
+import type { Base } from "@blazetrails/activerecord";
 import { Current } from "../current.ts";
 import { User } from "../user.ts";
 import type { Access } from "../access.ts";
-import type { Book } from "../book.ts";
+import type { Book, BookRelation } from "../book.ts";
 
 export const ClassMethods = {
   accessableOrPublished(
     this: typeof Book,
     { user = Current.user }: { user?: User | null } = {},
-  ): Relation<Book> {
+  ): BookRelation {
     if (isPresent(user)) {
       return this.accessableOrPublishedBooks();
     } else {
@@ -20,8 +20,8 @@ export const ClassMethods = {
   accessableOrPublishedBooks(
     this: typeof Book,
     { user = Current.user }: { user?: User | null } = {},
-  ): Relation<Book> {
-    return user!.books.or(this.published()).distinct() as Relation<Book>;
+  ): BookRelation {
+    return user!.books.or(this.published()).distinct() as BookRelation;
   },
 };
 

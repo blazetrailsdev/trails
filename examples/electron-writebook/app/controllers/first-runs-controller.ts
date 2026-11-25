@@ -34,6 +34,6 @@ export class FirstRunsController extends ApplicationController {
   }
 
   private userParams(): Parameters {
-    return this.params.require("user").permit("name", "email_address", "password");
+    return (this.params.require("user") as Parameters).permit("name", "email_address", "password");
   }
 }

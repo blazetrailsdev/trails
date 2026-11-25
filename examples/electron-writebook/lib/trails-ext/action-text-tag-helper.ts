@@ -109,3 +109,12 @@ Object.defineProperty(FormBuilder.prototype, "markdownArea", {
   writable: true,
   configurable: true,
 });
+
+declare module "@blazetrails/actionview" {
+  interface FormBuilder {
+    markdownArea(
+      method: string,
+      options?: Record<string, unknown>,
+    ): ReturnType<(typeof TagHelper)["markdownArea"]>;
+  }
+}

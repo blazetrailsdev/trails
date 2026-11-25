@@ -32,7 +32,9 @@ export class UsersController extends ApplicationController {
       await this.redirectTo(this.rootUrl());
     } catch (error) {
       if (!(error instanceof RecordNotUnique)) throw error;
-      await this.redirectTo(this.newSessionUrl({ email_address: this.userParams().email_address }));
+      await this.redirectTo(
+        this.newSessionUrl({ email_address: this.userParams().get("email_address") }),
+      );
     }
   }
 
@@ -56,7 +58,7 @@ export class UsersController extends ApplicationController {
   }
 
   private userParams(): Parameters {
-    return this.params.require("user").permit("name", "email_address", "password");
+    return (this.params.require("user") as Parameters).permit("name", "email_address", "password");
   }
 
   private async verifyJoinCode(): Promise<void> {
