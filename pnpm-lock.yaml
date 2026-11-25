@@ -1075,6 +1075,12 @@ importers:
         specifier: ^0.2.16
         version: 0.2.16
     devDependencies:
+      '@blazetrails/libxml-ruby':
+        specifier: workspace:*
+        version: link:../libxml-ruby
+      '@blazetrails/listen':
+        specifier: workspace:*
+        version: link:../listen
       '@blazetrails/msgpack':
         specifier: workspace:*
         version: link:../msgpack

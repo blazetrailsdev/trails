@@ -386,8 +386,8 @@ export async function setCurrentThreadBackend(
 
 const XML_MINI_BACKENDS: Record<string, (() => Promise<unknown>) | string> = {
   jdom: "JRuby is required to use the JDOM backend for XmlMini",
-  libxml: "cannot load such file -- libxml",
-  libxmlsax: "cannot load such file -- libxml",
+  libxml: () => import("./xml-mini/libxml.js"),
+  libxmlsax: () => import("./xml-mini/libxmlsax.js"),
   nokogiri: () => import("./xml-mini/nokogiri.js"),
   nokogirisax: () => import("./xml-mini/nokogirisax.js"),
   rexml: () => import("./xml-mini/rexml.js"),

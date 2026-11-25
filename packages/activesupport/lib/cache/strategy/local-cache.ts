@@ -120,11 +120,11 @@ export const LocalCache = {
     ));
   },
 
-  async clear(this: Host, options: StoreOptions | null = null): Promise<void> {
+  async clear(this: Host, options: StoreOptions | null = null): Promise<unknown> {
     const cache = this.localCache();
-    if (cache == null) return (await rbCallSuper(this, LocalCache.clear, options)) as void;
+    if (cache == null) return await rbCallSuper(this, LocalCache.clear, options);
     cache.clear(options);
-    await rbCallSuper(this, LocalCache.clear, options);
+    return await rbCallSuper(this, LocalCache.clear, options);
   },
 
   async cleanup(this: Host, options: StoreOptions | null = null): Promise<void> {
@@ -297,13 +297,19 @@ export const LocalCache = {
   },
 
   /** @internal */
-  writeSerializedEntry(
+  async writeSerializedEntry(
     this: Host,
     key: unknown,
     payload: unknown,
     options?: StoreOptions,
-  ): unknown {
-    const returnValue = rbCallSuper(this, LocalCache.writeSerializedEntry, key, payload, options);
+  ): Promise<unknown> {
+    const returnValue = await rbCallSuper(
+      this,
+      LocalCache.writeSerializedEntry,
+      key,
+      payload,
+      options,
+    );
     const localCache = this.localCache();
     if (returnValue != null && returnValue !== false) {
       if (localCache != null) localCache.writeEntry(key, payload);

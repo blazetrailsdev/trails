@@ -11,6 +11,8 @@
     { "path": "../date" },
     { "path": "../tzinfo" },
     { "path": "../i18n" },
+    { "path": "../libxml-ruby" },
+    { "path": "../listen" },
     { "path": "../msgpack" },
     { "path": "../nokogiri" },
     { "path": "../rack" },

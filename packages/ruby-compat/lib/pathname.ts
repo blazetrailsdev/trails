@@ -242,6 +242,21 @@ export class Pathname {
     }
   }
 
+  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/ext/pathname/lib/pathname.rb:330` `ascend` */
+  *ascend(): Generator<Pathname> {
+    let path = this._path;
+    yield this;
+    let r: [string, string] | null;
+    while ((r = this.chopBasename(path))) {
+      [path] = r;
+      if (path.length === 0) break;
+      const d = this.chopBasename(path);
+      yield new (this.constructor as typeof Pathname)(
+        d ? d[0] + d[1] : path.replace(/\/+$/, "") + /\/*$/.exec(File.dirname(path))![0],
+      );
+    }
+  }
+
   private addTrailingSeparator(path: string): string {
     if (File.basename(path + "a") === "a") {
       return path;

@@ -244,13 +244,13 @@ export class RedisCacheStore extends Store implements CacheStore {
     await super.cleanup(options);
   }
 
-  override async clear(options?: StoreOptions): Promise<void> {
-    await this.failsafe("clear", async () => {
+  override async clear(options?: StoreOptions): Promise<unknown> {
+    return await this.failsafe("clear", async () => {
       const namespace = this.mergedOptions(options).namespace;
       if (namespace != null && namespace !== false) {
-        await this.deleteMatched("*", { namespace });
+        return await this.deleteMatched("*", { namespace });
       } else {
-        await _then(this.redis, (c) => c.flushdb());
+        return await _then(this.redis, (c) => c.flushdb());
       }
     });
   }
@@ -267,7 +267,8 @@ export class RedisCacheStore extends Store implements CacheStore {
     await _then(this.redis, async (c) => {
       const pipe = c.pipeline();
       await block(pipe, entries);
-      await pipe.exec();
+      const error = (await pipe.exec())?.find(([e]) => e != null)?.[0];
+      if (error != null) throw error;
     });
   }
 
@@ -278,7 +279,12 @@ export class RedisCacheStore extends Store implements CacheStore {
 
   /** @internal */
   protected async readSerializedEntry(key: Buffer, _options?: StoreOptions): Promise<unknown> {
-    return await this.failsafe("read_entry", () => _then(this.redis, (c) => c.getBuffer(key)));
+    return await this.failsafe("read_entry", () =>
+      _then(this.redis, async (c) => {
+        const value = await c.getBuffer(key);
+        return value && new Uint8Array(value.buffer, value.byteOffset, value.length);
+      }),
+    );
   }
 
   /** @internal */

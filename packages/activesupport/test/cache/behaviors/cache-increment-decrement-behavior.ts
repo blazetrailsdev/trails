@@ -48,10 +48,10 @@ export function cacheIncrementDecrementBehavior(host: CacheIncrementDecrementBeh
     const cache = host.lookupStore();
     const key = uniqueKey();
 
-    expect(await cache.increment(key, 1, { expiresIn: 0.1 })).toBe(1);
+    expect(await cache.increment(key, 1, { expiresIn: 1 })).toBe(1);
     expect(await cache.increment(key, 1, { expiresIn: 5000 })).toBe(2);
 
-    await new Promise((r) => setTimeout(r, 150));
+    await new Promise((r) => setTimeout(r, 2000));
 
     assertNil(await cache.read(key, { raw: true }));
   });

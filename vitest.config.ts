@@ -813,7 +813,10 @@ export default defineConfig({
               : ["packages/actioncable/test/subscription-adapter/postgresql.test.ts"]),
             ...(process.env.REDIS_URL
               ? []
-              : ["packages/actioncable/test/subscription-adapter/redis.test.ts"]),
+              : [
+                  "packages/actioncable/test/subscription-adapter/redis.test.ts",
+                  "packages/activesupport/test/cache/stores/redis-cache-store.test.ts",
+                ]),
             ...SHARED_EXCLUDE,
           ],
           globalSetup: ["./packages/actionview/test/support/build-precompiled-fixtures.ts"],

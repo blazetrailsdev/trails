@@ -24,7 +24,7 @@ export interface CacheStore {
   isExist(key: unknown, options?: CacheOptions): Promise<boolean>;
   fetch(key: string, options: CacheOptions, fallback: () => unknown): Promise<unknown>;
   fetch(key: string, fallback: () => unknown): Promise<unknown>;
-  clear(): Promise<void>;
+  clear(): Promise<unknown>;
   cleanup(): Promise<void>;
   readMulti(...keys: unknown[]): Promise<Map<unknown, unknown>>;
   writeMulti(

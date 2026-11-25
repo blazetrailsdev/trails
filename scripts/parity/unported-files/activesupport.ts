@@ -28,39 +28,16 @@ export const ACTIVESUPPORT_UNPORTED_FILES: UnportedFile[] = [
   // `log_subscriber/test_helper.rb`, which AR's own log_subscriber and enum
   // tests include.
   {
-    testFile: "redis_cache_store_test.rb",
-    package: "activesupport",
-    reason: "CONVERGEABLE port-redis-cache-store-test",
-  },
-  {
     pattern: "cache/mem_cache_store.rb",
     testFile: "mem_cache_store_test.rb",
     package: "activesupport",
     reason: SOLID_STACK_ONLY,
   },
   {
-    pattern: "evented_file_update_checker.rb",
-    testFile: "evented_file_update_checker_test.rb",
-    package: "activesupport",
-    reason: "CONVERGEABLE activesupport-port-evented-file-update-checker",
-  },
-  {
     pattern: "xml_mini/jdom.rb",
     testFile: "jdom_engine_test.rb",
     package: "activesupport",
     reason: "PERMANENT: JRuby-only; it drives Java's javax.xml DOM, which has no Node runtime.",
-  },
-  {
-    pattern: "xml_mini/libxml.rb",
-    testFile: "libxml_engine_test.rb",
-    package: "activesupport",
-    reason: "CONVERGEABLE activesupport-port-xml-mini-libxml-engines",
-  },
-  {
-    pattern: "xml_mini/libxmlsax.rb",
-    testFile: "libxmlsax_engine_test.rb",
-    package: "activesupport",
-    reason: "CONVERGEABLE activesupport-port-xml-mini-libxml-engines",
   },
   {
     pattern: "testing/parallelization.rb",
