@@ -504,10 +504,11 @@ export class Application extends Engine {
     path: string | Pathname,
     opts: { keyPath?: string | Pathname; envKey?: string } = {},
   ): Promise<EncryptedConfiguration> {
-    const root = this.root()!;
     return new EncryptedConfiguration({
-      configPath: root.join(path).toString(),
-      keyPath: root.join(opts.keyPath ?? "config/master.key").toString(),
+      configPath: Trails.root()!.join(path).toString(),
+      keyPath: Trails.root()!
+        .join(opts.keyPath ?? "config/master.key")
+        .toString(),
       envKey: opts.envKey ?? "TRAILS_MASTER_KEY",
       raiseIfMissingKey: this.config.requireMasterKey,
     });
