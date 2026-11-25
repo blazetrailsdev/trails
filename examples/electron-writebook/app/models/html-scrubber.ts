@@ -60,7 +60,7 @@ export class HtmlScrubber extends PermitScrubber {
 
   protected override isKeepNode(node: Node): boolean {
     if (node.name === "iframe" && EmbedProvider.isConfigured()) {
-      return EmbedProvider.isAllows(node.getAttribute("src"));
+      return EmbedProvider.isAllows(node.get("src"));
     } else {
       return super.isKeepNode(node);
     }
@@ -68,7 +68,7 @@ export class HtmlScrubber extends PermitScrubber {
 
   protected override scrubAttributes(node: Node): void {
     if (node.name === "iframe" && EmbedProvider.isConfigured()) {
-      const permitted = EmbedProvider.match(node.getAttribute("src"))?.attributes ?? [];
+      const permitted = EmbedProvider.match(node.get("src"))?.attributes ?? [];
       for (const attr of node.attributeNodes) {
         if (!permitted.includes(attr.name)) node.removeAttribute(attr.name);
       }
