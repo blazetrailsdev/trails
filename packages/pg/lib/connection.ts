@@ -83,6 +83,12 @@ export class Connection {
   /** @internal */
   _copyIn = false;
   /** @internal */
+  _copyOut = false;
+  /** @internal */
+  _copyOutData: Uint8Array[] = [];
+  /** @internal */
+  _copyDone = false;
+  /** @internal */
   _errorMessage = "";
   /** @internal */
   _pollStatus: number = PG.PGRES_POLLING_OK;
@@ -90,6 +96,8 @@ export class Connection {
   _connecting: Promise<void> | null = null;
   /** @internal */
   _connectError: unknown = null;
+  /** @internal */
+  _whichhost = 0;
   /** @internal */
   _ioptsForReset: Record<string, unknown> | null = null;
   declare asyncIsnonblocking: Connection["isnonblocking"];
@@ -188,10 +196,7 @@ export class Connection {
     };
   }
 
-  /**
-   * @internal
-   * @missingRailsCall resolve_hosts — PERMANENT
-   */
+  /** @internal */
   private static async connectToHosts<T extends Connection>(
     this: { prototype: T } & typeof Connection,
     ...args: unknown[]
@@ -213,6 +218,11 @@ export class Connection {
     }
 
     const ioptsForReset = iopts;
+    // eslint-disable-next-line no-empty
+    if (iopts.hostaddr != null && iopts.hostaddr !== false) {
+    } else if (iopts.host != null && iopts.host !== false && String(iopts.host) !== "") {
+      iopts = await this.resolveHosts(iopts);
+    }
     const conn =
       ((await this.connectStart(iopts)) as T | null) ??
       (() => {
@@ -478,6 +488,9 @@ export class Connection {
   }
 
   host(): string | null {
+    const ch = engine!._connhost(this.connParams)[this._whichhost];
+    if (ch != null && ch.host !== "") return ch.host;
+    if (ch != null && ch.hostaddr !== "") return ch.hostaddr;
     return this.client.host ?? null;
   }
 
@@ -763,16 +776,39 @@ export class Connection {
     this._errorMessage = "";
     this._connectError = null;
     this._pollStatus = PG.PGRES_POLLING_WRITING;
-    this._connecting = this.client.connect().then(
-      () => {
-        this._pollStatus = PG.PGRES_POLLING_OK;
-      },
-      (error: unknown) => {
-        this._connectError = error;
-        this._errorMessage = `${(error as { message?: string })?.message ?? String(error)}\n`;
-        this._pollStatus = PG.PGRES_POLLING_FAILED;
-      },
-    );
+    this._whichhost = 0;
+    const nhosts = engine!._connhost(this.connParams).length;
+    this._connecting = (async () => {
+      for (;;) {
+        try {
+          await this.client.connect();
+          this._pollStatus = PG.PGRES_POLLING_OK;
+          return;
+        } catch (error) {
+          this._connectError = error;
+          this._errorMessage += `${(error as { message?: string })?.message ?? String(error)}\n`;
+        }
+        if (this._whichhost + 1 >= nhosts) break;
+        this._whichhost += 1;
+        this._swapClient(engine!.newClient(this.connParams, this._whichhost));
+      }
+      this._pollStatus = PG.PGRES_POLLING_FAILED;
+    })();
+  }
+
+  /**
+   * @internal
+   * @noRailsEquivalent PERMANENT
+   */
+  _swapClient(conn: NodePg.Client): void {
+    const client = this.client;
+    for (const event of client.eventNames()) {
+      for (const listener of client.rawListeners(event)) {
+        conn.on(event as "error", listener as () => void);
+      }
+    }
+    engine!.listen(this, conn);
+    this.client = conn;
   }
 
   connectPoll(): number {
@@ -788,15 +824,8 @@ export class Connection {
     const client = this.client;
     await client.end().catch(() => null);
 
-    const conn = engine!.newClient(_conninfoHashOf(conninfo));
-    for (const event of client.eventNames()) {
-      for (const listener of client.rawListeners(event)) {
-        conn.on(event as "error", listener as () => void);
-      }
-    }
-    engine!.listen(this, conn);
     this.connParams = _conninfoHashOf(conninfo);
-    this.client = conn;
+    this._swapClient(engine!.newClient(this.connParams));
     this.prepared.clear();
     this.readyForQuery = "I";
     this.bad = false;
@@ -807,6 +836,9 @@ export class Connection {
     this._sendError = null;
     this._chunkSize = 0;
     this._copyIn = false;
+    this._copyOut = false;
+    this._copyOutData = [];
+    this._copyDone = false;
     this._connectStart();
 
     if (this.status() == PG.CONNECTION_BAD) {
@@ -827,7 +859,9 @@ export class Connection {
     const stream = (
       this.client as unknown as { connection?: { stream?: { remoteAddress?: string } } }
     ).connection?.stream;
-    return stream?.remoteAddress ?? null;
+    return (
+      stream?.remoteAddress ?? engine!._connhost(this.connParams)[this._whichhost]?.hostaddr ?? null
+    );
   }
 
   conndefaults(): ConninfoOption[] {
@@ -879,7 +913,10 @@ export class Connection {
   }
 
   async reset(): Promise<this> {
-    const iopts: Record<string, unknown> = this._ioptsForReset ?? _compact(this.conninfoHash());
+    let iopts: Record<string, unknown> = this._ioptsForReset ?? _compact(this.conninfoHash());
+    if (iopts.host != null && iopts.host !== false && String(iopts.host) !== "") {
+      iopts = await (this.constructor as typeof Connection).resolveHosts(iopts);
+    }
     const conninfo = (this.constructor as typeof Connection).parseConnectArgs(iopts);
     await this.resetStart2(conninfo);
     await this.asyncConnectOrReset("resetPoll");
@@ -1103,10 +1140,7 @@ export class Connection {
     return engine!.execute(this, this.prepared.get(stmtName), params, stmtName);
   }
 
-  /**
-   * @missingRailsCall get_copy_data — CONVERGEABLE pg-copy-out-get-copy-data-and-discard-arm
-   * @missingRailsCall close_socket_io — PERMANENT
-   */
+  /** @missingRailsCall close_socket_io — PERMANENT */
   discardResults(): Promise<boolean> | null {
     switch (this.transactionStatus()) {
       case PG.PQTRANS_IDLE:
@@ -1132,6 +1166,24 @@ export class Connection {
         if (status == PG.PGRES_COPY_IN) {
           while (!this.syncPutCopyEnd("COPY terminated by new query or discard_results")) {
             this.flush();
+          }
+        }
+        if (status == PG.PGRES_COPY_OUT) {
+          for (;;) {
+            const st = engine!._getCopyData(this, true);
+            if (st === 0) {
+              try {
+                await this.block();
+              } catch (error) {
+                if (!(error instanceof ConnectionBad)) throw error;
+                this.bad = true;
+                return false;
+              }
+            } else if (st !== -1) {
+              continue;
+            } else {
+              break;
+            }
           }
         }
       }
@@ -1246,9 +1298,54 @@ export class Connection {
     return null;
   }
 
+  syncGetCopyData(asyncIn: unknown = null, decoder: Coder | null = null): unknown {
+    let pCoder: Coder | null = null;
+    if (decoder == null) {
+      if (this._decoderForGetCopyData != null) {
+        pCoder = this._decoderForGetCopyData;
+      }
+    } else {
+      if (!(decoder instanceof Coder)) {
+        throw new TypeError(`wrong argument type ${rbObjClassname(decoder)} (expected PG::Coder)`);
+      }
+      pCoder = decoder;
+    }
+
+    const ret = engine!._getCopyData(this, asyncIn);
+    if (ret === -1) {
+      return null;
+    }
+    if (ret === 0) {
+      return false;
+    }
+
+    const buffer = new TextDecoder().decode(ret);
+    if (pCoder) {
+      return (pCoder as Coder & { decode(value: string): unknown }).decode(buffer);
+    }
+    return buffer;
+  }
+
+  async getCopyData(async: unknown = false, decoder: Coder | null = null): Promise<unknown> {
+    if (async != null && async !== false) {
+      return this.syncGetCopyData(async, decoder);
+    } else {
+      let res: unknown;
+      while ((res = this.syncGetCopyData(true, decoder)) === false) {
+        await this.block();
+      }
+      return res;
+    }
+  }
+
+  declare asyncGetCopyData: Connection["getCopyData"];
+
   syncGetResult(): Result | null {
     if (this._results.length === 0 && this._copyIn) {
       return engine!.emptyResult(null, PG.PGRES_COPY_IN);
+    }
+    if (this._copyOut && this._results[0]?.resultStatus() !== PG.PGRES_COPY_OUT) {
+      return engine!.emptyResult(null, PG.PGRES_COPY_OUT);
     }
     const result = this._results.shift() ?? null;
     if (result?.resultStatus() === PG.PGRES_PIPELINE_SYNC) {
@@ -1321,7 +1418,8 @@ export class Connection {
       this._results.length > 0 ||
       this._cmdQueue.length === 0 ||
       this._sendError != null ||
-      this._copyIn;
+      this._copyIn ||
+      (this._copyOut && (this._copyOutData.length > 0 || this._copyDone));
     if (!ready()) {
       const ret = await new Promise<boolean>((resolve) => {
         const waiter = (): void => {
@@ -1678,6 +1776,7 @@ Connection.prototype.asyncSetnonblocking = Connection.prototype.setnonblocking;
 Connection.prototype.asyncPipelineSync = Connection.prototype.pipelineSync;
 Connection.prototype.asyncFlush = Connection.prototype.flush;
 Connection.prototype.asyncPutCopyData = Connection.prototype.putCopyData;
+Connection.prototype.asyncGetCopyData = Connection.prototype.getCopyData;
 Connection.prototype.asyncPutCopyEnd = Connection.prototype.putCopyEnd;
 Connection.prototype.escapeString = escapeString;
 Connection.prototype.escape = escapeString;

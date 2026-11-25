@@ -88,6 +88,8 @@ describeIfPg("PostgreSQLAdapter", () => {
         connect: () => Promise.reject(new ConnectionBad("actual bad connection error")),
         end: () => Promise.resolve(),
         on: () => fakeClient,
+        eventNames: () => [],
+        rawListeners: () => [],
         query: () => Promise.reject(new Error("not connected")),
       };
       const clientSpy = vi.spyOn(pgModule, "Client" as never).mockImplementation(() => fakeClient);
@@ -123,6 +125,8 @@ describeIfPg("PostgreSQLAdapter", () => {
         on() {
           return this;
         },
+        eventNames: () => [],
+        rawListeners: () => [],
       }));
       let connection: PostgreSQLAdapter | null = null;
       try {

@@ -38,8 +38,24 @@ export type Notification = pg.Notification;
 
 type QueryConfig = string | Record<string, unknown> | null;
 
-export function newClient(connParams: Record<string, unknown>): Client {
-  return new pg.Client(_clientConfig(connParams)) as Client;
+export function newClient(connParams: Record<string, unknown>, whichhost = 0): Client {
+  return new pg.Client(_clientConfig(connParams, whichhost)) as Client;
+}
+
+/** @noRailsEquivalent PERMANENT */
+export function _connhost(
+  connParams: Record<string, unknown>,
+): { host: string; hostaddr: string; port: string }[] {
+  const list = (value: unknown): string[] => (value == null ? [] : String(value).split(","));
+  const hosts = list(connParams.host);
+  const hostaddrs = list(connParams.hostaddr);
+  const ports = list(connParams.port);
+  const nhosts = Math.max(hosts.length, hostaddrs.length, 1);
+  return Array.from({ length: nhosts }, (_, i) => ({
+    host: hosts[i] ?? "",
+    hostaddr: hostaddrs[i] ?? "",
+    port: (ports.length == 1 ? ports[0] : ports[i]) ?? "",
+  }));
 }
 
 export function submit(
@@ -111,6 +127,13 @@ export function listen(conn: Connection, client: Client): void {
         }
       },
     );
+    connection.on("copyOutResponse", () => {
+      (conn._submittable as { handleCopyOutResponse?(): void } | null)?.handleCopyOutResponse?.();
+    });
+    connection.on("copyDone", () => {
+      conn._copyDone = true;
+      for (const waiter of [...conn._resultWaiters]) waiter();
+    });
     connection.on("errorMessage", () => {
       if (conn.readyForQuery === "T") conn.readyForQuery = "E";
     });
@@ -187,7 +210,8 @@ function result(raw: pg.QueryResult | pg.QueryResult[]): Result {
 }
 
 /** @noRailsEquivalent PERMANENT */
-export function _clientConfig(connParams: Record<string, unknown>): pg.ClientConfig {
+export function _clientConfig(connParams: Record<string, unknown>, whichhost = 0): pg.ClientConfig {
+  const ch = _connhost(connParams)[whichhost];
   const seconds = (value: unknown): number | undefined =>
     value == null ? undefined : Number(value) * 1000;
   const sslmode = connParams.sslmode as string | undefined;
@@ -200,8 +224,8 @@ export function _clientConfig(connParams: Record<string, unknown>): pg.ClientCon
     user: connParams.user as string | undefined,
     database: connParams.dbname as string | undefined,
     password: connParams.password as string | undefined,
-    host: connParams.host as string | undefined,
-    port: connParams.port == null ? undefined : Number(connParams.port),
+    host: ch.hostaddr !== "" ? ch.hostaddr : ch.host !== "" ? ch.host : undefined,
+    port: ch.port === "" ? undefined : Number(ch.port),
     options: connParams.options as string | undefined,
     client_encoding: connParams.clientEncoding as string | undefined,
     application_name: connParams.applicationName as string | undefined,
@@ -297,6 +321,15 @@ export function dispatch(conn: Connection, write: ProtocolWrite, cmds: ("query" 
       conn._copyIn = true;
       deliver(new Result({ ...native }, null, Constants.PGRES_COPY_IN));
     },
+    handleCopyOutResponse(): void {
+      conn._copyOut = true;
+      conn._copyDone = false;
+      deliver(new Result({ ...native }, null, Constants.PGRES_COPY_OUT));
+    },
+    handleCopyData(msg: { chunk: Uint8Array }): void {
+      conn._copyOutData.push(msg.chunk);
+      for (const waiter of [...conn._resultWaiters]) waiter();
+    },
     handleParseComplete(): void {},
     handlePortalSuspended(): void {},
     handleError(error: unknown): void {
@@ -307,6 +340,7 @@ export function dispatch(conn: Connection, write: ProtocolWrite, cmds: ("query" 
         for (const waiter of [...conn._resultWaiters]) waiter();
         return;
       }
+      if (conn._copyOut) conn._copyDone = true;
       deliver(emptyResult(error));
       if (!pipelined()) {
         reseat();
@@ -345,6 +379,15 @@ export function dispatch(conn: Connection, write: ProtocolWrite, cmds: ("query" 
     if (conn._submittable === submittable) conn._submittable = null;
     for (const waiter of [...conn._resultWaiters]) waiter();
   });
+}
+
+/** @noRailsEquivalent PERMANENT */
+export function _getCopyData(conn: Connection, _async: unknown): Uint8Array | 0 | -1 {
+  const buffer = conn._copyOutData.shift();
+  if (buffer !== undefined) return buffer;
+  if (!conn._copyDone) return 0;
+  conn._copyOut = false;
+  return -1;
 }
 
 export function bindValues(conn: Connection, params: unknown[], typemap: TypeMap): unknown[] {
