@@ -125,3 +125,30 @@ describe("S3Service public URLs (trails)", () => {
     );
   });
 });
+
+describe("S3Service public URLs on an endpoint (trails)", () => {
+  const configure = (bucket: string, endpoint: string) =>
+    Service.configure("s3_public", {
+      s3_public: {
+        service: "S3",
+        accessKeyId: "trails",
+        secretAccessKey: "trails-secret",
+        region: "us-east-1",
+        bucket: bucket,
+        endpoint: endpoint,
+        public: true,
+      },
+    }) as S3Service;
+
+  it("a dotted bucket on an https endpoint is path-style", async () => {
+    expect(await configure("public.example.dev", "https://s3.example.test").url("k")).toBe(
+      "https://s3.example.test/public.example.dev/k",
+    );
+  });
+
+  it("a dotted bucket on an http endpoint is virtual-host style", async () => {
+    expect(await configure("public.example.dev", "http://s3.example.test").url("k")).toBe(
+      "http://public.example.dev.s3.example.test/k",
+    );
+  });
+});

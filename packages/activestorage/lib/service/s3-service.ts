@@ -422,7 +422,8 @@ export class S3Service extends Service {
     const endpoint = await this.client.config.endpoint();
     const port = endpoint.port == null ? "" : `:${endpoint.port}`;
     const base = `${endpoint.protocol}//${endpoint.hostname}${port}${endpoint.path.endsWith("/") ? endpoint.path.slice(0, -1) : endpoint.path}`;
-    return this.client.config.forcePathStyle
+    return this.client.config.forcePathStyle ||
+      (endpoint.protocol === "https:" && this.bucket.includes("."))
       ? `${base}/${this.bucket}/${path}`
       : `${endpoint.protocol}//${this.bucket}.${endpoint.hostname}${port}/${path}`;
   }
