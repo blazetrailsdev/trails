@@ -30,7 +30,7 @@ export class InstallGenerator extends Base {
 
   async configureCacheStoreAdapter(): Promise<void> {
     await this.gsubFile(
-      new Pathname(this.destinationRoot).join("config/environments/production.ts").toPath(),
+      new Pathname(this.destinationRoot).join("config/environments/production.ts"),
       /(\/\/ )?this\.config\.cacheStore = (".*")/,
       'this.config.cacheStore = ":solid_cache_store"',
     );

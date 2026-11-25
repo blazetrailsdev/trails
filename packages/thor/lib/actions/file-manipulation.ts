@@ -242,7 +242,7 @@ export async function gsubFileBang(
 
 export async function gsubFile(
   this: ActionsHost,
-  path: string,
+  path: string | { toPath(): string },
   flag: RegExp | string,
   ...args: unknown[]
 ): Promise<void> {
