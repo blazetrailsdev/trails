@@ -2032,6 +2032,10 @@
       "module": "ruby-platform.js",
       "scc": null
     },
+    "runtime": {
+      "module": "process-adapter.js",
+      "scc": 0
+    },
     "RuntimeError": {
       "module": "runtime-error.js",
       "scc": null
