@@ -371,3 +371,14 @@ the "YAML syntax error occurred while parsing" message, a patched
 asserting one (`railties/test/application/configuration_test.rb:2687`,
 `:2698`, `:2723`) is parked as `it.skip` under a `PERMANENT-SKIP:` line citing
 this section. Ruled by the operator on 2026-11-25.
+
+## A sqlite `db:drop` in a read-only directory fails upstream too (`dbs_test.rb`'s bad permissions)
+
+`test "db:drop failure because bad permissions"`
+(`vendor/rails/v8.0.5.2/railties/test/application/rake/dbs_test.rb:251-259`)
+expects `Couldn't drop`, but SQLite opens the database in WAL mode, which needs
+to write `-wal` / `-shm` beside it, so connecting in a `chmod 0555` directory
+raises `SQLite3::ReadOnlyException` before `drop` runs. Rails 8.0.5.1 fails the
+test the same way as a non-root user, and its `Process.uid == 0` guard skips it
+only as root. The test is parked as `it.skip` under a `PERMANENT-SKIP:` line
+citing this section. Ruled by the operator on 2026-11-25.

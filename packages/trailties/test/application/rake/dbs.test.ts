@@ -261,7 +261,8 @@ export default { development };`,
     });
   });
 
-  it.skipIf(Process.uid === 0)("db:drop failure because bad permissions", async () => {
+  // PERMANENT-SKIP: packages/trailties/CLAUDE.md, "A sqlite `db:drop` in a read-only directory fails upstream too (`dbs_test.rb`'s bad permissions)".
+  it.skip("db:drop failure because bad permissions", async () => {
     await withDatabaseExisting(async () => {
       await withBadPermissions(async () => {
         const output = await t.trails("db:drop", { allowFailure: true });
