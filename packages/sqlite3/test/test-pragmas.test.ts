@@ -1,89 +1,84 @@
 import { SQLite3 } from "../lib/index.js";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { type SyncSqliteConnection } from "../lib/driver.js";
-import { betterSqlite3Driver } from "../lib/better-sqlite3.js";
 import { Exception } from "../lib/errors.js";
-import { Pragmas } from "../lib/pragmas.js";
 import { engine } from "../lib/engine/better-sqlite3.js";
 import { Encoding } from "@blazetrails/ruby-compat";
 
 describe("TestPragmas", () => {
   const BIGENDIAN = new Uint8Array(new Uint16Array([1]).buffer)[0] === 0;
 
-  let db: SyncSqliteConnection & { testStatements: string[] };
+  class DatabaseTracker extends SQLite3.Database {
+    testStatements: string[] = [];
 
-  beforeEach(async () => {
-    const conn = (await betterSqlite3Driver.open({
-      database: ":memory:",
-    })) as unknown as SyncSqliteConnection;
-    const execute = conn.execute.bind(conn);
-    db = Object.assign(conn, {
-      testStatements: [] as string[],
-      execute(sql: string, bindVars: never[] = []) {
-        db.testStatements.push(sql);
-        return execute(sql, bindVars);
-      },
-    });
+    override execute(sql: string, bindVars: unknown = [], block?: (row: unknown) => unknown) {
+      this.testStatements.push(sql);
+      return super.execute(sql, bindVars, block);
+    }
+  }
+
+  let db: DatabaseTracker;
+
+  beforeEach(() => {
+    db = new DatabaseTracker(":memory:", { engine });
   });
 
-  afterEach(() => {
-    db.close();
+  afterEach(async () => {
+    await db.close();
   });
 
   it("temp store mode", async () => {
-    Pragmas.setTempStore.call(db, "memory");
-    expect(await Pragmas.tempStore.call(db)).toBe(2);
-    Pragmas.setTempStore.call(db, 1);
-    expect(await Pragmas.tempStore.call(db)).toBe(1);
+    await db.setTempStore("memory");
+    expect(await db.tempStore()).toBe(2);
+    await db.setTempStore(1);
+    expect(await db.tempStore()).toBe(1);
   });
 
   it("encoding", async () => {
-    const database = new SQLite3.Database(":memory:", { engine });
-    try {
-      await database.setEncoding("utf-16le");
-      expect(await database.encoding()).toBe(Encoding.find("utf-16le"));
-    } finally {
-      await database.close();
-    }
+    await db.setEncoding("utf-16le");
+    expect(await db.encoding()).toBe(Encoding.find("utf-16le"));
   });
 
-  it("pragma errors", () => {
-    expect(() => Pragmas.setEnumPragma.call(db, "foo", "bar", [])).toThrow(Exception);
-    expect(() => Pragmas.setBooleanPragma.call(db, "read_uncommitted", "foo")).toThrow(Exception);
-    expect(() => Pragmas.setBooleanPragma.call(db, "read_uncommitted", 42)).toThrow(Exception);
+  it("pragma errors", async () => {
+    await expect(async () => db.setEnumPragma("foo", "bar", [])).rejects.toThrow(Exception);
+    await expect(async () => db.setBooleanPragma("read_uncommitted", "foo")).rejects.toThrow(
+      Exception,
+    );
+    await expect(async () => db.setBooleanPragma("read_uncommitted", 42)).rejects.toThrow(
+      Exception,
+    );
   });
 
-  it("invalid pragma", () => {
-    expect(() => Pragmas.setJournalMode.call(db, 0)).toThrow(Exception);
+  it("invalid pragma", async () => {
+    await expect(async () => db.setJournalMode(0)).rejects.toThrow(Exception);
   });
 
   it("get boolean pragma", async () => {
-    expect(await Pragmas.getBooleanPragma.call(db, "read_uncommitted")).toBeFalsy();
+    expect(await db.getBooleanPragma("read_uncommitted")).toBeFalsy();
   });
 
   it("set boolean pragma", async () => {
     try {
-      Pragmas.setBooleanPragma.call(db, "read_uncommitted", 1);
+      await db.setBooleanPragma("read_uncommitted", 1);
 
-      expect(await Pragmas.getBooleanPragma.call(db, "read_uncommitted")).toBeTruthy();
+      expect(await db.getBooleanPragma("read_uncommitted")).toBeTruthy();
     } finally {
-      Pragmas.setBooleanPragma.call(db, "read_uncommitted", 0);
+      await db.setBooleanPragma("read_uncommitted", 0);
     }
   });
 
-  it("optimize with no args", () => {
-    Pragmas.optimize.call(db);
+  it("optimize with no args", async () => {
+    await db.optimize();
 
     expect(db.testStatements).toEqual(["PRAGMA optimize"]);
   });
 
-  it("optimize with args", () => {
+  it("optimize with args", async () => {
     const Optimize = SQLite3.Constants.Optimize;
-    Pragmas.optimize.call(db, Optimize.DEFAULT);
-    Pragmas.optimize.call(db, Optimize.ANALYZE_TABLES | Optimize.LIMIT_ANALYZE);
-    Pragmas.optimize.call(db, Optimize.ANALYZE_TABLES | Optimize.DEBUG);
-    Pragmas.optimize.call(db, Optimize.DEFAULT | Optimize.CHECK_ALL_TABLES);
+    await db.optimize(Optimize.DEFAULT);
+    await db.optimize(Optimize.ANALYZE_TABLES | Optimize.LIMIT_ANALYZE);
+    await db.optimize(Optimize.ANALYZE_TABLES | Optimize.DEBUG);
+    await db.optimize(Optimize.DEFAULT | Optimize.CHECK_ALL_TABLES);
 
     expect(db.testStatements).toEqual([
       "PRAGMA optimize=18",
@@ -94,53 +89,53 @@ describe("TestPragmas", () => {
   });
 
   it("encoding uppercase", async () => {
-    expect(await Pragmas.encoding.call(db)).toBe("UTF-8");
+    expect(await db.encoding()).toBe(Encoding.UTF_8);
 
-    await Pragmas.setEncoding.call(db, "UTF-16");
-    const native = BIGENDIAN ? "UTF-16be" : "UTF-16le";
-    expect(await Pragmas.encoding.call(db)).toBe(native);
+    await db.setEncoding("UTF-16");
+    const native = Encoding.find(BIGENDIAN ? "UTF-16BE" : "UTF-16LE");
+    expect(await db.encoding()).toBe(native);
 
-    await Pragmas.setEncoding.call(db, "UTF-16LE");
-    expect(await Pragmas.encoding.call(db)).toBe("UTF-16le");
+    await db.setEncoding("UTF-16LE");
+    expect(await db.encoding()).toBe(Encoding.find("UTF-16LE"));
 
-    await Pragmas.setEncoding.call(db, "UTF-16BE");
-    expect(await Pragmas.encoding.call(db)).toBe("UTF-16be");
+    await db.setEncoding("UTF-16BE");
+    expect(await db.encoding()).toBe(Encoding.find("UTF-16BE"));
 
-    await Pragmas.setEncoding.call(db, "UTF-8");
-    expect(await Pragmas.encoding.call(db)).toBe("UTF-8");
+    await db.setEncoding("UTF-8");
+    expect(await db.encoding()).toBe(Encoding.UTF_8);
   });
 
   it("encoding lowercase", async () => {
-    expect(await Pragmas.encoding.call(db)).toBe("UTF-8");
+    expect(await db.encoding()).toBe(Encoding.UTF_8);
 
-    await Pragmas.setEncoding.call(db, "utf-16");
-    const native = BIGENDIAN ? "UTF-16be" : "UTF-16le";
-    expect(await Pragmas.encoding.call(db)).toBe(native);
+    await db.setEncoding("utf-16");
+    const native = Encoding.find(BIGENDIAN ? "UTF-16BE" : "UTF-16LE");
+    expect(await db.encoding()).toBe(native);
 
-    await Pragmas.setEncoding.call(db, "utf-16le");
-    expect(await Pragmas.encoding.call(db)).toBe("UTF-16le");
+    await db.setEncoding("utf-16le");
+    expect(await db.encoding()).toBe(Encoding.find("UTF-16LE"));
 
-    await Pragmas.setEncoding.call(db, "utf-16be");
-    expect(await Pragmas.encoding.call(db)).toBe("UTF-16be");
+    await db.setEncoding("utf-16be");
+    expect(await db.encoding()).toBe(Encoding.find("UTF-16BE"));
 
-    await Pragmas.setEncoding.call(db, "utf-8");
-    expect(await Pragmas.encoding.call(db)).toBe("UTF-8");
+    await db.setEncoding("utf-8");
+    expect(await db.encoding()).toBe(Encoding.UTF_8);
   });
 
   it("encoding objects", async () => {
-    expect(await Pragmas.encoding.call(db)).toBe("UTF-8");
+    expect(await db.encoding()).toBe(Encoding.UTF_8);
 
-    await Pragmas.setEncoding.call(db, "UTF-16");
-    const native = BIGENDIAN ? "UTF-16be" : "UTF-16le";
-    expect(await Pragmas.encoding.call(db)).toBe(native);
+    await db.setEncoding(Encoding.find("UTF-16")!);
+    const native = Encoding.find(BIGENDIAN ? "UTF-16BE" : "UTF-16LE");
+    expect(await db.encoding()).toBe(native);
 
-    await Pragmas.setEncoding.call(db, "UTF-16LE");
-    expect(await Pragmas.encoding.call(db)).toBe("UTF-16le");
+    await db.setEncoding(Encoding.find("UTF-16LE")!);
+    expect(await db.encoding()).toBe(Encoding.find("UTF-16LE"));
 
-    await Pragmas.setEncoding.call(db, "UTF-16BE");
-    expect(await Pragmas.encoding.call(db)).toBe("UTF-16be");
+    await db.setEncoding(Encoding.find("UTF-16BE")!);
+    expect(await db.encoding()).toBe(Encoding.find("UTF-16BE"));
 
-    await Pragmas.setEncoding.call(db, "UTF-8");
-    expect(await Pragmas.encoding.call(db)).toBe("UTF-8");
+    await db.setEncoding(Encoding.UTF_8);
+    expect(await db.encoding()).toBe(Encoding.UTF_8);
   });
 });

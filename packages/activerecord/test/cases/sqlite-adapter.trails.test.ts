@@ -8,7 +8,7 @@ import { HashConfig } from "../../lib/database-configurations/hash-config.js";
 import { engine, errors } from "@blazetrails/sqlite3/engine/better-sqlite3";
 import { engine as libsqlEngine } from "@blazetrails/sqlite3/engine/libsql";
 import { engine as nodeSqliteEngine } from "@blazetrails/sqlite3/engine/node-sqlite";
-import { isNodeSqliteAvailable } from "@blazetrails/sqlite3/node-sqlite";
+import { nodeSqlite } from "@blazetrails/sqlite3/engine/node-sqlite";
 import { Pragmas, SQLite3 } from "@blazetrails/sqlite3";
 import type { EngineDatabase, EngineOpenV2 } from "@blazetrails/sqlite3";
 import type { AbstractAdapter as DatabaseAdapter } from "../../lib/connection-adapters/abstract-adapter.js";
@@ -86,7 +86,7 @@ describe("SQLite adapter driver binding", () => {
     await adapter.disconnectBang();
   });
 
-  it.skipIf(!isNodeSqliteAvailable)(
+  it.skipIf(nodeSqlite === undefined)(
     "applies the busy timeout in configureConnection on node:sqlite",
     async () => {
       const set = vi.spyOn(SQLite3.Database.prototype, "setBusyHandlerTimeout");

@@ -1,4 +1,3 @@
-import "@blazetrails/sqlite3/better-sqlite3";
 import "../../lib/associations/collection-proxy.js";
 import "../../lib/association-relation.js";
 import "../../lib/associations/disable-joins-association-scope.js";

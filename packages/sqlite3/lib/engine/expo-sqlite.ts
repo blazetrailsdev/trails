@@ -32,7 +32,7 @@ interface ExpoModule {
 
 /**
  * @internal
- * @noRailsEquivalent CONVERGEABLE sqlite3-retire-the-sqlite-driver-interfaces
+ * @noRailsEquivalent CONVERGEABLE sqlite3-engine-module-surface-ruling
  */
 export const errors: EngineErrors = {
   errcode(error) {
@@ -65,10 +65,6 @@ async function open(file: string): Promise<ExpoDatabase> {
   return expoSqlite.openDatabaseAsync(file);
 }
 
-/**
- * @internal
- * @noRailsEquivalent PERMANENT
- */
 async function withBusyHandler<T>(
   handler: () => BusyHandler | null,
   attempt: () => Promise<T>,

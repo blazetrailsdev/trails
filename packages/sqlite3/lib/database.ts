@@ -620,10 +620,7 @@ export class Database<E extends EngineDatabase = EngineDatabase> {
     return this;
   }
 
-  /**
-   * @internal
-   * @noRailsEquivalent PERMANENT
-   */
+  /** @internal */
   _busyRetry<T>(attempt: () => T): T | Promise<T> {
     return withBusyHandler(this._engine, () => this.#busyHandler, attempt);
   }

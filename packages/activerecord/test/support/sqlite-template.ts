@@ -1,5 +1,4 @@
 import { Dir, File, FileUtils, getOsAsync } from "@blazetrails/ruby-compat";
-import { betterSqlite3Driver } from "@blazetrails/sqlite3/better-sqlite3";
 import { RUN_TOKEN_ENV, STALE_DB_AGE_MS } from "./run-token.js";
 import { activeLane } from "./connection.js";
 
@@ -94,14 +93,7 @@ export async function ensureWorkerClone(): Promise<string | null> {
   const slot = process.env.VITEST_POOL_ID ?? process.env.VITEST_WORKER_ID ?? "1";
   const dest = File.join(await tmpRoot(), `ar-test-worker-${runToken}-${slot}.sqlite`);
 
-  if (!File.isExist(dest)) {
-    const driver = betterSqlite3Driver;
-    if (driver.restoreFromPath) {
-      await driver.restoreFromPath(template, dest);
-    } else {
-      FileUtils.cp(template, dest);
-    }
-  }
+  if (!File.isExist(dest)) FileUtils.cp(template, dest);
   await registerDbFileCleanupOnExit(dest);
 
   g.__arWorkerDbPath = dest;

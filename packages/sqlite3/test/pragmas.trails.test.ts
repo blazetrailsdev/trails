@@ -1,61 +1,35 @@
 import { describe, expect, it } from "vitest";
 
-import type { SyncSqliteConnection } from "../lib/driver.js";
-import { betterSqlite3Driver } from "../lib/better-sqlite3.js";
+import { SQLite3 } from "../lib/index.js";
+import { engine } from "../lib/engine/better-sqlite3.js";
 import { Pragmas } from "../lib/pragmas.js";
 
 describe("SQLite3::Pragmas readers", () => {
   it("read back what the setters write, through the raw connection's getFirstValue", async () => {
-    const db = (await betterSqlite3Driver.open({
-      database: ":memory:",
-    })) as unknown as SyncSqliteConnection;
+    const db = new SQLite3.Database(":memory:", { engine, resultsAsHash: true });
     try {
-      Pragmas.setUserVersion.call(db, 7);
-      Pragmas.setForeignKeys.call(db, "on");
-      Pragmas.setJournalMode.call(db, "memory");
+      await Pragmas.setUserVersion.call(db, 7);
+      await Pragmas.setForeignKeys.call(db, "on");
+      await Pragmas.setJournalMode.call(db, "memory");
 
       expect(await Pragmas.userVersion.call(db)).toBe(7);
       expect(await Pragmas.foreignKeys.call(db)).toBe(true);
-      expect(Pragmas.journalMode.call(db)).toBe("memory");
-      expect(Pragmas.indexList.call(db, "sqlite_master")).toEqual([]);
+      expect(await Pragmas.journalMode.call(db)).toBe("memory");
+      expect(await Pragmas.indexList.call(db, "sqlite_master")).toEqual([]);
 
       const names: unknown[] = [];
-      expect(
-        Pragmas.collationList.call(db, (row) => names.push((row as { name: string }).name)),
-      ).toBeNull();
+      await Pragmas.collationList.call(db, (row) => names.push((row as { name: string }).name));
       expect(names).toContain("BINARY");
       const checked: unknown[] = [];
-      expect(Pragmas.integrityCheck.call(db, (row: unknown) => checked.push(row))).toBeNull();
+      await Pragmas.integrityCheck.call(db, (row: unknown) => checked.push(row));
       expect(checked).toEqual([{ integrity_check: "ok" }]);
     } finally {
-      db.close();
+      await db.close();
     }
   });
 });
 
-describe("SQLite3::Pragmas getters on an async host", () => {
-  it("resolve to the same values the sync host returns", async () => {
-    const db = (await betterSqlite3Driver.open({
-      database: ":memory:",
-    })) as unknown as SyncSqliteConnection;
-    const host = {
-      execute: async (sql: string, bindVars?: never[], block?: (row: unknown) => void) =>
-        db.execute(sql, bindVars, block),
-      getFirstValue: async (sql: string) => db.getFirstValue(sql),
-    };
-    try {
-      Pragmas.setUserVersion.call(db, 3);
-      Pragmas.setJournalMode.call(db, "memory");
-
-      expect(await Pragmas.userVersion.call(host)).toBe(3);
-      expect(await Pragmas.readUncommitted.call(host)).toBe(false);
-      expect(await Pragmas.journalMode.call(host)).toBe("memory");
-      expect(await Pragmas.indexList.call(host, "sqlite_master")).toEqual([]);
-    } finally {
-      db.close();
-    }
-  });
-
+describe("SQLite3::Pragmas setters", () => {
   it("interpolates an Array-arm match as Ruby's Array#to_s does", () => {
     const statements: string[] = [];
     const host = { execute: (sql: string) => statements.push(sql), getFirstValue: () => null };

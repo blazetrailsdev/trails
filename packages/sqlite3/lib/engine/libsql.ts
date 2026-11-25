@@ -16,7 +16,7 @@ const CONNECTION_FAILED = /^ConnectionFailed\(".*: (\d+)"\)$/;
 
 /**
  * @internal
- * @noRailsEquivalent CONVERGEABLE sqlite3-retire-the-sqlite-driver-interfaces
+ * @noRailsEquivalent CONVERGEABLE sqlite3-engine-module-surface-ruling
  */
 export const errors: EngineErrors = {
   errcode(error) {
@@ -33,7 +33,7 @@ export const errors: EngineErrors = {
 
 /**
  * @internal
- * @noRailsEquivalent CONVERGEABLE sqlite3-retire-the-sqlite-driver-interfaces
+ * @noRailsEquivalent CONVERGEABLE sqlite3-engine-module-surface-ruling
  */
 export interface LibsqlReplicaOptions extends Database.Options {
   authToken?: string;
@@ -254,21 +254,21 @@ function openEngine(
 
 export const engine: EngineOpenV2 = openEngine({}, false);
 
-/** @noRailsEquivalent CONVERGEABLE sqlite3-libsql-replica-sync-reaches-the-engine */
+/** @noRailsEquivalent CONVERGEABLE sqlite3-engine-module-surface-ruling */
 export function replicaEngine(
   options: LibsqlReplicaOptions,
 ): (...args: Parameters<EngineOpenV2>) => EngineDatabase & { sync(): Promise<void> } {
   return openEngine(options, true) as ReturnType<typeof replicaEngine>;
 }
 
-/** @noRailsEquivalent CONVERGEABLE sqlite3-retire-the-sqlite-driver-interfaces */
+/** @noRailsEquivalent CONVERGEABLE sqlite3-engine-module-surface-ruling */
 export function remoteEngine(options: Pick<LibsqlReplicaOptions, "authToken">): EngineOpenV2 {
   return openEngine(options, false, openRemote);
 }
 
 /**
  * @internal
- * @noRailsEquivalent CONVERGEABLE sqlite3-libsql-replica-sync-reaches-the-engine
+ * @noRailsEquivalent CONVERGEABLE sqlite3-engine-module-surface-ruling
  */
 export function buildReplicaOptions(
   options: Record<string, unknown> | undefined,

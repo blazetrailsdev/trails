@@ -13,8 +13,8 @@ import {
   status2klass,
 } from "../lib/errors.js";
 import { errors as nodeSqliteErrors } from "../lib/engine/node-sqlite.js";
-import { betterSqlite3Driver } from "../lib/better-sqlite3.js";
-import { errors } from "../lib/engine/better-sqlite3.js";
+import { SQLite3 } from "../lib/index.js";
+import { engine, errors } from "../lib/engine/better-sqlite3.js";
 
 const raised = (fn: () => never): unknown => {
   try {
@@ -82,11 +82,11 @@ describe("rbSqlite3RaiseWithSql", () => {
 
 describe("better-sqlite3 driver", () => {
   it("raises SQLite3::ReadOnlyException from a PRAGMA write on a readonly database", async () => {
-    const conn = await betterSqlite3Driver.open({ database: ":memory:", readOnly: true });
+    const db = new SQLite3.Database(":memory:", { engine, readonly: true });
     try {
-      expect(() => conn.pragma("user_version = 1")).toThrow(ReadOnlyException);
+      await expect(db.execute("PRAGMA user_version = 1")).rejects.toThrow(ReadOnlyException);
     } finally {
-      await conn.close();
+      await db.close();
     }
   });
 });

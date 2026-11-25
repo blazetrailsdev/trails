@@ -1,5 +1,4 @@
 import { describe, expect, test } from "vitest";
-import "@blazetrails/sqlite3/better-sqlite3";
 import { SQLite3Adapter } from "../../../lib/connection-adapters/sqlite3-adapter.js";
 import type { AbstractAdapter } from "../../../lib/connection-adapters/abstract-adapter.js";
 import { loadCanonicalSchema } from "../../support/canonical-schema.js";
