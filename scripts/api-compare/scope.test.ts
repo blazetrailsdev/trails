@@ -71,4 +71,16 @@ describe("the gates scripts/ci/scoped-comparison.sh skips", () => {
     const driver = await readFile(path.join(__dirname, "../ci/scoped-comparison.sh"), "utf8");
     expect(driver).toContain("lint-param-names.ts --package $pkg");
   });
+
+  it("passes a package rails-private-jsdoc.config.mjs does not lint", async () => {
+    const driver = await readFile(path.join(__dirname, "../ci/scoped-comparison.sh"), "utf8");
+    expect(driver).toMatch(
+      /rails-private after privates-manifest: pnpm exec eslint [^\n]*--no-error-on-unmatched-pattern/,
+    );
+  });
+
+  it("passes a package the extra-surface ratchet does not gate", async () => {
+    const ratchet = await readFile(path.join(__dirname, "lint-extra-surface-ratchet.ts"), "utf8");
+    expect(ratchet).toMatch(/is not a gated package; nothing to gate\.`\);\n\s*return 0;/);
+  });
 });
