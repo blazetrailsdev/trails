@@ -361,15 +361,14 @@ export class Persisted {
   /** @inventedArm if — PERMANENT */
   constructor(app?: RackApp, options: Record<string, unknown> = {}) {
     const compatibility = (
-      TopLevel as { ActionDispatch?: { Session?: { Compatibility?: object } } }
+      TopLevel as {
+        ActionDispatch?: { Session?: { Compatibility?: { DEFAULT_SAME_SITE: unknown } } };
+      }
     ).ActionDispatch?.Session?.Compatibility;
-    if (isModuleIncluded(new.target, compatibility as never)) {
+    if (compatibility !== undefined && isModuleIncluded(new.target, compatibility)) {
       if (options.key == null || options.key === false) options.key = "_session_id";
       if (!("sameSite" in options || "sameSite" in new.target.DEFAULT_OPTIONS)) {
-        options = {
-          ...options,
-          sameSite: (compatibility as { DEFAULT_SAME_SITE: unknown }).DEFAULT_SAME_SITE,
-        };
+        options = { ...options, sameSite: compatibility.DEFAULT_SAME_SITE };
       }
     }
     this.app = app;
