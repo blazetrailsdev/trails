@@ -1,15 +1,12 @@
-import {
-  ArgumentError,
-  block,
-  File,
-  Mutex,
-  ObjectSpace,
-  Pathname,
-  Thread,
-  rbClassNewInstance,
-  rbInspect,
-  rbObjId,
-} from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { File } from "@blazetrails/ruby-compat/file";
+import { block } from "@blazetrails/ruby-compat/hash";
+import { rbClassNewInstance } from "@blazetrails/ruby-compat/include";
+import { Mutex } from "@blazetrails/ruby-compat/mutex";
+import { rbInspect, rbObjId } from "@blazetrails/ruby-compat/object";
+import { ObjectSpace } from "@blazetrails/ruby-compat/object-space";
+import { Pathname } from "@blazetrails/ruby-compat/pathname";
+import { Thread } from "@blazetrails/ruby-compat/thread";
 import { Listen, type Listener } from "@blazetrails/listen";
 import { AtomicBoolean } from "@blazetrails/ruby-compat/concurrent/atomic-boolean";
 import { ForkTracker } from "./fork-tracker.js";
