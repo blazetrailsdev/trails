@@ -1238,18 +1238,10 @@ jobs:
       matrix:
         shard: [1, 2, 3, 4, 5, 6]
         include:
-          - shard: configuration
-            files: packages/trailties/test/application/configuration.test.ts
-          - shard: routing
-            files: packages/trailties/test/application/routing.test.ts
-          - shard: mailer-previews
-            files: packages/trailties/test/application/mailer-previews.test.ts
-          - shard: frameworks-exceptions
-            files: packages/trailties/test/application/initializers/frameworks.test.ts packages/trailties/test/application/middleware/exceptions.test.ts
-          - shard: multi-dbs
-            files: packages/trailties/test/application/rake/multi-dbs.test.ts
-          - shard: engine
-            files: packages/trailties/test/trailties/engine.test.ts
+          - shard: configuration-multi-dbs
+            files: packages/trailties/test/application/configuration.test.ts packages/trailties/test/application/rake/multi-dbs.test.ts
+          - shard: routing-mailers-frameworks
+            files: packages/trailties/test/application/routing.test.ts packages/trailties/test/application/mailer-previews.test.ts packages/trailties/test/application/initializers/frameworks.test.ts packages/trailties/test/application/middleware/exceptions.test.ts
           - shard: test-runner
             files: packages/trailties/test/application/test-runner.test.ts
     steps:
@@ -1260,7 +1252,7 @@ jobs:
       - run: pnpm build
       - if: needs.changes.outputs.thor_only != 'true' && needs.changes.outputs.actioncable_only != 'true' && !matrix.files
         env:
-          TRAILTIES_EXCLUDE: packages/trailties/test/application/configuration.test.ts,packages/trailties/test/application/routing.test.ts,packages/trailties/test/application/mailer-previews.test.ts,packages/trailties/test/application/initializers/frameworks.test.ts,packages/trailties/test/application/middleware/exceptions.test.ts,packages/trailties/test/application/rake/multi-dbs.test.ts,packages/trailties/test/trailties/engine.test.ts,packages/trailties/test/application/test-runner.test.ts
+          TRAILTIES_EXCLUDE: packages/trailties/test/application/configuration.test.ts,packages/trailties/test/application/routing.test.ts,packages/trailties/test/application/mailer-previews.test.ts,packages/trailties/test/application/initializers/frameworks.test.ts,packages/trailties/test/application/middleware/exceptions.test.ts,packages/trailties/test/application/rake/multi-dbs.test.ts,packages/trailties/test/application/test-runner.test.ts
           VITEST_SHARD_DURATIONS: trailties
         run: pnpm vitest run packages/trailties packages/thor --shard=${{ matrix.shard }}/${{ env.TRAILTIES_SHARD_TOTAL }}
       - if: needs.changes.outputs.thor_only != 'true' && needs.changes.outputs.actioncable_only != 'true' && matrix.files
