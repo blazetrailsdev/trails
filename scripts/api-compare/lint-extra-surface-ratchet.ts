@@ -97,14 +97,14 @@ async function main(tighten: boolean, scope: string | null): Promise<number> {
   const ruby = await readManifest("rails-api.json");
   const ts = await readManifest("ts-api.json");
   if (scope !== null) {
-    if (!(GATED_PACKAGES as readonly string[]).includes(scope)) {
-      console.error(`\nextra-surface gate: ${scope} is not a gated package.\n`);
-      return 1;
-    }
     const mismatch = scopeMismatch("extra-surface gate", Object.keys(ts.packages), scope);
     if (mismatch !== null) {
       console.error(mismatch);
       return 1;
+    }
+    if (!(GATED_PACKAGES as readonly string[]).includes(scope)) {
+      console.log(`extra-surface gate: ${scope} is not a gated package; nothing to gate.`);
+      return 0;
     }
   }
   const inScope = (name: string): boolean => scope === null || name === scope;
