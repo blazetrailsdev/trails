@@ -364,10 +364,6 @@ export async function withTransactionReturningStatus<T>(
   return status!;
 }
 
-export function _newRecordBeforeLastCommit(this: TransactionsRecord): boolean {
-  return this._newRecordBeforeLastCommit ?? false;
-}
-
 export function isTriggerTransactionalCallbacks(this: TransactionsRecord): boolean {
   const newBeforeLastCommit = this._newRecordBeforeLastCommit === true;
   const triggerUpdate = this._triggerUpdateCallback === true;
