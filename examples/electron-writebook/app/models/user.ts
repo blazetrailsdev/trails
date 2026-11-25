@@ -15,6 +15,8 @@ import { Book } from "./book.ts";
 
 export interface UserScopes {
   active(): UserRelation;
+  member(): UserRelation;
+  administrator(): UserRelation;
   ordered(): UserRelation;
   authenticateBy(attributes: Record<string, unknown>): Promise<User | null>;
 }
@@ -41,6 +43,8 @@ export class User extends ApplicationRecord {
 
   declare static active: () => UserRelation;
   declare static ordered: () => UserRelation;
+  declare static member: () => UserRelation;
+  declare static administrator: () => UserRelation;
 
   declare static findByTransferId: (typeof TransferableClassMethods)["findByTransferId"];
 

@@ -24,6 +24,8 @@ import type { Book } from "./book.ts";
 export interface LeafScopes {
   active(): LeafRelation;
   positioned(): LeafRelation;
+  before(other: Leaf): LeafRelation;
+  after(other: Leaf): LeafRelation;
   withLeafables(): LeafRelation;
   favoringTitle(): LeafRelation;
 }
