@@ -411,6 +411,17 @@ describe("InflectorTest", () => {
         stub.mockRestore();
       }
     }
+
+    const matchingError = new LoadError("Unable to autoload constant Example.Channel");
+
+    const stub = vi.spyOn(ActiveSupport.Inflector, "constantize").mockImplementation(() => {
+      throw matchingError;
+    });
+    try {
+      expect(safeConstantize("Example.Channel::Nested")).toBeUndefined();
+    } finally {
+      stub.mockRestore();
+    }
   });
 
   it("pluralize plurals", () => {
