@@ -34,6 +34,26 @@ class Markdown {
     const renderer = this.renderer;
     const marked = new Marked({ gfm: true, breaks: false, async: false });
     marked.use({
+      extensions: [
+        {
+          name: "image",
+          level: "inline",
+          start: (src: string) => src.indexOf("!["),
+          // redcarpet's char_link takes the title from the first quote to the last one before `)`
+          // (markdown.c), where CommonMark rejects a title holding an unescaped quote.
+          tokenizer(src: string) {
+            const match = /^!\[([^\]]*)\]\(\s*([^\s)]+)\s+(["'])(.*)\3\s*\)/.exec(src);
+            if (!match) return undefined;
+            return {
+              type: "image",
+              raw: match[0],
+              href: match[2],
+              title: match[4],
+              text: match[1],
+            };
+          },
+        },
+      ],
       renderer: {
         heading(
           this: { parser: { parseInline(t: Tokens.Generic[]): string } },
