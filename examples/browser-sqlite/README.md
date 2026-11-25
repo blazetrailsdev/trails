@@ -62,6 +62,12 @@ saves the images here.
 | Light | ![Validation errors](docs/screenshots/validation-preview-light.png) | ![Post page](docs/screenshots/show-preview-light.png) |
 | Dark  | ![Validation errors](docs/screenshots/validation-preview-dark.png)  | ![Post page](docs/screenshots/show-preview-dark.png)  |
 
+A syntax error, the database tab, and the page at phone width:
+
+| A syntax error                                                    | The database tab                                                | A phone                                             |
+| ----------------------------------------------------------------- | --------------------------------------------------------------- | --------------------------------------------------- |
+| ![A syntax error](docs/screenshots/syntax-error-editor-light.png) | ![The database tab](docs/screenshots/database-editor-light.png) | ![A phone](docs/screenshots/phone-editor-light.png) |
+
 The editor in dark mode:
 
 ![The editor in dark mode](docs/screenshots/index-editor-dark.png)

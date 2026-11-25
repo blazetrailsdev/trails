@@ -120,6 +120,7 @@ try {
   await page.locator("#tab-database").click();
   await page.locator("#database .tables button", { hasText: "posts (7)" }).click();
   await page.locator("#database td", { hasText: "Hello from the smoke test" }).waitFor();
+  await shot("database");
   await page.locator("#tab-console").click();
   console.log("the database tab lists the tables and their rows");
 
@@ -131,6 +132,7 @@ try {
     .waitFor({ timeout: 30_000 });
   if ((await status.getAttribute("data-state")) !== "error") throw new Error("status is not red");
   await page.locator("#problems", { hasText: "Line 6" }).waitFor();
+  await shot("syntax-error");
   await editor.fill(model);
   await page.locator("#overlay").waitFor({ state: "hidden", timeout: 30_000 });
   await see("h1", "Edited posts");
@@ -155,6 +157,7 @@ try {
   await page.locator("#phone-note").waitFor({ state: "visible" });
   if (await page.locator("#editor").isVisible()) throw new Error("the editor shows at phone width");
   await see("h1", "Edited posts");
+  await shot("phone");
   console.log("at phone width the page is the running app alone");
 } finally {
   console.log("--- console ---\n" + (await page.locator("#console").innerText()));
