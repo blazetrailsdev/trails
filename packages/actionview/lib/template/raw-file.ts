@@ -23,8 +23,4 @@ export class RawFile {
   render(..._args: unknown[]): string {
     return File.read(this.filename);
   }
-
-  supportsStreaming(): boolean {
-    return false;
-  }
 }

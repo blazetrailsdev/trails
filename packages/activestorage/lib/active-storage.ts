@@ -37,12 +37,6 @@ export const ActiveStorage = {
   name: "ActiveStorage",
   loadPath,
   Reflection: { name: "ActiveStorage::Reflection" },
-  streamingMaxRanges: 1,
-  ffmpegFormatWhitelistArguments(this: { ffmpegAllowedFormats: string[] | null }) {
-    return this.ffmpegAllowedFormats != null
-      ? ["-format_whitelist", Array.from(this.ffmpegAllowedFormats).join(",")]
-      : null;
-  },
 } as AutoloadModule & {
   Reflection: { name: string };
   Attached: unknown;
@@ -435,6 +429,8 @@ mattrAccessor.call(ActiveStorage, "resolveModelToRoute", { default: "trails_stor
 
 mattrAccessor.call(ActiveStorage, "trackVariants", { default: false });
 
+ActiveStorage.streamingMaxRanges = 1;
+
 mattrAccessor.call(ActiveStorage, "videoPreviewArguments", { default: "-y -vframes 1 -f image2" });
 
 mattrAccessor.call(ActiveStorage, "ffmpegAllowedFormats", {
@@ -455,6 +451,12 @@ mattrAccessor.call(ActiveStorage, "ffmpegAllowedFormats", {
     "caf",
   ]),
 });
+
+ActiveStorage.ffmpegFormatWhitelistArguments = function ffmpegFormatWhitelistArguments() {
+  return this.ffmpegAllowedFormats != null
+    ? ["-format_whitelist", Array.from(this.ffmpegAllowedFormats).join(",")]
+    : null;
+};
 
 export const Transformers = {
   name: "ActiveStorage::Transformers",
