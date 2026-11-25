@@ -1,7 +1,7 @@
 import { ActionController } from "../../namespaces.js";
 import { rbCallSuper } from "@blazetrails/ruby-compat/include";
 import { rbClearMethodCache } from "@blazetrails/ruby-compat/method-cache";
-import { classAttribute, Concern, extend } from "@blazetrails/activesupport";
+import { classAttribute, Concern, delegate, extend } from "@blazetrails/activesupport";
 import type { helperMethod, HelpersClassMethods } from "../../abstract-controller/helpers.js";
 import type { FlashHash } from "../../action-dispatch/middleware/flash.js";
 import type { RedirectToOptions, RedirectToResponseOptions } from "./redirecting.js";
@@ -20,10 +20,6 @@ export interface FlashClassHost extends HelpersClassMethods {
   _flashTypes: string[];
   methodAdded(name: string): void;
   addFlashTypes(...types: string[]): void;
-}
-
-export function flash(this: { request: { flash: Promise<FlashHash> } }): Promise<FlashHash> {
-  return this.request.flash;
 }
 
 export async function redirectTo<FlashType extends string = never>(
@@ -78,14 +74,12 @@ export function actionMethods(this: FlashClassHost): ReadonlySet<string> {
 
 export const ClassMethods = { addFlashTypes, actionMethods };
 
-/** @missingRailsCall delegate — CONVERGEABLE flash-reader-is-a-hand-written-getter-not-a-delegate-call */
 export const Flash = { ClassMethods, redirectTo };
 extend(Flash, Concern);
 Concern.included.call(Flash, null, function (this: FlashClassHost) {
   classAttribute.call(this, "_flashTypes", { instanceAccessor: false, default: [] });
 
-  Object.defineProperty(this.prototype, "flash", { get: flash, configurable: true });
-  rbClearMethodCache();
+  delegate.call(this.prototype, "flash", { to: "request" });
   this.addFlashTypes("alert", "notice");
 });
 
