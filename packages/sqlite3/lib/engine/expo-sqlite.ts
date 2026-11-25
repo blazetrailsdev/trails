@@ -65,7 +65,6 @@ async function open(file: string): Promise<ExpoDatabase> {
   return expoSqlite.openDatabaseAsync(file);
 }
 
-/** @internal */
 async function withBusyHandler<T>(
   handler: () => BusyHandler | null,
   attempt: () => Promise<T>,
