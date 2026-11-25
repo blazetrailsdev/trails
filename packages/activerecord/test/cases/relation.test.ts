@@ -159,6 +159,22 @@ describe("RelationTest", () => {
     });
   });
 
+  it("relation with annotation includes comment in update all query", async () => {
+    const postWithAnnotation = CanonPost.annotate("foo");
+    const allCount = (await CanonPost.all()).length;
+    await self().assertQueriesMatch(/\/\* foo \*\//, {}, async () => {
+      expect(await postWithAnnotation.updateAll({ title: "Same title" })).toBe(allCount);
+    });
+  });
+
+  it("relation with annotation includes comment in delete all query", async () => {
+    const postWithAnnotation = CanonPost.annotate("foo");
+    const allCount = (await CanonPost.all()).length;
+    await self().assertQueriesMatch(/\/\* foo \*\//, {}, async () => {
+      expect(await postWithAnnotation.deleteAll()).toBe(allCount);
+    });
+  });
+
   it("construction", () => {
     const table = CanonPost.arelTable;
     const relation = new Relation(CanonPost, { table: table });

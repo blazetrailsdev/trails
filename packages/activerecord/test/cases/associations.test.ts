@@ -24,7 +24,8 @@ import {
 } from "@blazetrails/activesupport/testing/assertions";
 import { assertNoQueries, assertQueriesCount } from "../../lib/testing/query-assertions.js";
 import { fixtures } from "../support/use-fixtures.js";
-import { Author, type Author as AuthorT } from "../models/author.js";
+import { Author, PublishedAuthor, type Author as AuthorT } from "../models/author.js";
+import { PublishedBook } from "../models/book.js";
 import { CpkOrder, CpkBook } from "../models/cpk.js";
 import type { Firm as FirmT } from "../models/company.js";
 import type { Tag as TagT } from "../models/tag.js";
@@ -1307,6 +1308,29 @@ describe("PreloaderTest", () => {
 
       assertSame(author, await post.author);
     });
+  });
+
+  it("preload group with klass", async () => {
+    const publishedAuthor = await PublishedAuthor.createBang({ name: "PublishedAuthor" });
+    await PublishedBook.createBang({
+      name: "PublishedBook",
+      author_id: publishedAuthor.id,
+      isbn: "12345",
+    });
+
+    const author = await Author.createBang({
+      name: "Author",
+      published_author_id: publishedAuthor.id,
+    });
+    await Book.createBang({ name: "Book", author_id: author.id, isbn: "67890" });
+
+    const result = (await Author.includes({
+      books: [],
+      publishedAuthor: { books: [] },
+    }).last()) as AuthorT;
+    expect((await (await result.publishedAuthor)!.books).map((b: Base) => b.constructor)).toEqual([
+      PublishedBook,
+    ]);
   });
 });
 

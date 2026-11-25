@@ -84,6 +84,31 @@ describe("ActiveRecord::Relation", () => {
       expect(a.merge(b).equals(expected)).toBe(true);
     });
 
+    it("merge with or/and correctly handles SQL literals and attributes", () => {
+      const t = table();
+      const a = new WhereClause([t.get("id").eq(1), new Nodes.Grouping(sql("foo = bar"))]);
+      const b = a
+        .plus(new WhereClause([t.get("attr_1").eq("val_1")]))
+        .or(new WhereClause([t.get("attr_2").eq("val_2")]));
+
+      const expected = new WhereClause([
+        t.get("id").eq(1),
+        new Nodes.Grouping(sql("foo = bar")),
+        new Nodes.Grouping(
+          new Nodes.Or([
+            new Nodes.And([
+              t.get("id").eq(1),
+              new Nodes.Grouping(sql("foo = bar")),
+              t.get("attr_1").eq("val_1"),
+            ]),
+            t.get("attr_2").eq("val_2"),
+          ]),
+        ),
+      ]);
+
+      expect(a.merge(b).equals(expected)).toBe(true);
+    });
+
     it("a clause knows if it is empty", () => {
       assertEmpty(WhereClause.empty().predicates);
       assertNotEmpty(new WhereClause(["anything"]).predicates);

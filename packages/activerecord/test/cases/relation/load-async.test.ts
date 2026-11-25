@@ -1,6 +1,11 @@
 import { describe, it, expect, afterEach, beforeEach } from "vitest";
 import { Concurrent, Thread, setEnv } from "@blazetrails/ruby-compat";
-import { Notifications, getEnv, type NotificationEvent } from "@blazetrails/activesupport";
+import {
+  IsolatedExecutionState,
+  Notifications,
+  getEnv,
+  type NotificationEvent,
+} from "@blazetrails/activesupport";
 import { asyncQueryExecutor, setAsyncQueryExecutor } from "../../../lib/active-record.js";
 import { Rollback } from "../../../lib/errors.js";
 import type { Relation } from "../../../lib/relation.js";
@@ -204,6 +209,43 @@ describe("LoadAsyncTest", () => {
       delete (connection as { log?: LogMethod }).log;
     }
     await promise;
+  });
+
+  it("execute or skip does not contaminate caller thread instrumenter", async (ctx) => {
+    ctx.skip(!(await Base.leaseConnection()).isAsyncEnabled());
+
+    const pool = Post.connectionPool() as unknown as {
+      scheduleQuery(futureResult: { executeOrSkip(): Promise<void> | void }): void;
+    };
+    const oldScheduleQuery = pool.scheduleQuery;
+    let executed: Promise<void> | void = undefined;
+    try {
+      pool.scheduleQuery = (futureResult) => {
+        executed = futureResult.executeOrSkip();
+      };
+
+      await Post.asyncCount();
+      await executed;
+
+      let notificationCalled = false;
+      await Notifications.subscribed(
+        () => {
+          notificationCalled = true;
+        },
+        "sql.active_record",
+        async () => {
+          await Post.count();
+        },
+      );
+
+      expect(
+        notificationCalled,
+        "sql.active_record notification was not published after execute_or_skip ran on the caller thread",
+      ).toBeTruthy();
+    } finally {
+      pool.scheduleQuery = oldScheduleQuery;
+      IsolatedExecutionState.delete("active_record_instrumenter");
+    }
   });
   it("eager loading query", async () => {
     const expectedRecords = await Post.where({ author_id: 1 }).eagerLoad("comments");

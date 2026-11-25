@@ -27,4 +27,10 @@ describe("DatabaseStatementsTest", () => {
   it("create should return the inserted id", async () => {
     expect(await returnTheInsertedId("create")).not.toBeNull();
   });
+
+  it("extract table ref from insert sql with hyphen in table name", async () => {
+    const connection = await Base.leaseConnection();
+    const sql = 'INSERT INTO "table-with-hyphen" (column1, column2) VALUES (value1, value2)';
+    expect(rbFSend(connection, "extractTableRefFromInsertSql", sql)).toBe("table-with-hyphen");
+  });
 });

@@ -1706,13 +1706,24 @@ describe("SameNameDifferentDatabaseFixturesTest", () => {
 
 describe("MultipleFixtureConnectionsTest", () => {
   describe("CompositePkFixturesTest", () => {
-    const { cpkOrders, cpkBooks, cpkAuthors, cpkReviews, cpkOrderAgreements } = fixtures([
-      "cpkOrders",
-      "cpkBooks",
-      "cpkAuthors",
-      "cpkReviews",
-      "cpkOrderAgreements",
-    ]);
+    const { cpkOrders, cpkBooks, cpkPosts, cpkTags, cpkAuthors, cpkReviews, cpkOrderAgreements } =
+      fixtures([
+        "cpkOrders",
+        "cpkBooks",
+        "cpkPosts",
+        "cpkTags",
+        "cpkAuthors",
+        "cpkReviews",
+        "cpkOrderAgreements",
+      ]);
+
+    it("supports inline habtm", async () => {
+      expect(await cpkPosts("welcome").tags).toInclude(cpkTags("cpk_tag_ruby_on_rails"));
+      expect(await cpkPosts("welcome").tags).toInclude(cpkTags("cpk_tag_digital_product"));
+      expect(await cpkPosts("welcome").tags).not.toInclude(cpkTags("cpk_tag_loyal_customer"));
+
+      expect(await cpkPosts("thinking").tags).toEqualRuby([cpkTags("cpk_tag_digital_product")]);
+    });
 
     it("generates composite primary key for partially filled fixtures", () => {
       const alice = cpkAuthors("cpk_great_author");

@@ -38,6 +38,7 @@ import { Topic as CanonicalTopic, TitlePrimaryKeyTopic } from "../models/topic.j
 import { NumericData } from "../models/numeric-data.js";
 import { Category } from "../models/category.js";
 import { Computer } from "../models/computer.js";
+import { BookIdentifier } from "../models/book-identifier.js";
 import { Company } from "../models/company.js";
 import { Minimalistic } from "../models/minimalistic.js";
 import { Keyboard } from "../models/keyboard.js";
@@ -116,7 +117,13 @@ class AbstractClassInBetween extends ParentWithAlias {
 class ChildWithAnAliasFromAbstractClass extends AbstractClassInBetween {}
 
 describe("AttributeMethodsTest", () => {
-  const { topics } = fixtures(["topics", "developers", "companies", "computers"]);
+  const { topics, bookIdentifiers } = fixtures([
+    "topics",
+    "developers",
+    "companies",
+    "computers",
+    "bookIdentifiers",
+  ]);
 
   let target: typeof Base;
   let oldMatchers: (typeof Base)["attributeMethodPatterns"];
@@ -222,6 +229,19 @@ describe("AttributeMethodsTest", () => {
     (Post as any).defineAttributeMethods();
     expect(Post.attributeNames()).toContain("id");
     expect(Object.keys((Post as any).attributeAliases ?? {})).toContain("id_value");
+  });
+
+  it("#id_value alias is not defined if id_value column exist", async () => {
+    class NewBookIdentifierModel extends Base {
+      static {
+        this.tableName = "book_identifiers";
+      }
+    }
+
+    await NewBookIdentifierModel.defineAttributeMethods();
+    assertIncludes(NewBookIdentifierModel.attributeNames(), "id");
+    assertIncludes(NewBookIdentifierModel.attributeNames(), "id_value");
+    assertEmpty(NewBookIdentifierModel.attributeAliases);
   });
 
   it("aliasing `id` attribute allows reading the column value", async () => {
@@ -1167,6 +1187,16 @@ describe("AttributeMethodsTest", () => {
 
     const p = new Post({ id: 1, title: "id_value_test" });
     expect((p as any).id_value).toBe(1);
+  });
+  it("#id_value returns the value in the id_value column, when id_value column exists", async () => {
+    type IdValue = { id_value: unknown };
+    let bookIdentifier = new BookIdentifier() as unknown as IdValue;
+    expect(bookIdentifier.id_value).toBeNull();
+
+    bookIdentifier = (await BookIdentifier.find(1)) as unknown as IdValue;
+    expect(bookIdentifier.id_value).toBe(
+      (bookIdentifiers("awdr_isbn13") as unknown as IdValue).id_value,
+    );
   });
   it("attribute_for_inspect with a string", () => {
     const t = topics("first") as any;

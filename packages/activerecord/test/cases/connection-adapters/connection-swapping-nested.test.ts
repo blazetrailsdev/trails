@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { getFs, getPath, getOsAsync } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/activemodel";
+import { assertRaises } from "@blazetrails/activesupport/testing/assertions";
 import { Base } from "../../../lib/base.js";
 import { DatabaseConfigurations } from "../../../lib/database-configurations.js";
 import { currentRole, currentPreventingWrites } from "../../../lib/core.js";
@@ -243,6 +245,51 @@ describe("ConnectionSwappingNestedTest", () => {
 
       expect(PrimaryBase.connectionPool().dbConfig.name).toBe("primary");
       expect(SecondaryBase.connectionPool().dbConfig.name).toBe("secondary");
+    });
+  });
+
+  it("shard swapping prohibition exception recovery", async () => {
+    Base.configurations({
+      default_env: {
+        primary: sqliteDb("primary"),
+        primary_shard_one: sqliteDb("primary_shard_one"),
+        primary_shard_two: sqliteDb("primary_shard_two"),
+      },
+    });
+
+    await PrimaryBase.connectsTo({
+      shards: {
+        default: { writing: ":primary" },
+        shard_one: { writing: ":primary_shard_one" },
+      },
+    });
+
+    const globalRole = "writing";
+
+    await Base.connectedTo({ role: globalRole, shard: "default" }, async () => {
+      expect(PrimaryBase.connectionPool().dbConfig.name).toBe("primary");
+
+      await PrimaryBase.connectedTo({ shard: "shard_one" }, async () => {
+        expect(PrimaryBase.connectionPool().dbConfig.name).toBe("primary_shard_one");
+
+        await PrimaryBase.prohibitShardSwapping(async () => {
+          const e = await assertRaises([ArgumentError], {}, () =>
+            PrimaryBase.connectedTo({ shard: "shard_two" }, () => {}),
+          );
+          expect(e.message).toMatch(/cannot swap/);
+        });
+
+        expect(PrimaryBase.connectionPool().dbConfig.name).toBe("primary_shard_one");
+
+        await PrimaryBase.prohibitShardSwapping(async () => {
+          const e = await assertRaises([ArgumentError], {}, () =>
+            Base.connectedToMany([PrimaryBase], { shard: "shard_two", role: "writing" }, () => {}),
+          );
+          expect(e.message).toMatch(/cannot swap/);
+        });
+
+        expect(PrimaryBase.connectionPool().dbConfig.name).toBe("primary_shard_one");
+      });
     });
   });
 

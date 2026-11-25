@@ -409,6 +409,29 @@ describe.runIf(currentAdapter("PostgreSQLAdapter"))("PostgreSQLStructureDumpTest
     ).toEqual([" statement \n", "-- lower comment\n"]);
   });
 
+  it("structure dump header comments with restrict commands removed", async () => {
+    const rawDumpSql =
+      "\\restrict pbgv1pF8SxQK6cuT7hwDi21uDYr8wpxKJ3wlLa9Zk5EIO1xBiu84SJQU8fL22PT\n" +
+      "\n" +
+      "-- header comment\n" +
+      "\n" +
+      "-- more header comment\n" +
+      "statement\n" +
+      "-- lower comment\n" +
+      "\\unrestrict pbgv1pF8SxQK6cuT7hwDi21uDYr8wpxKJ3wlLa9Zk5EIO1xBiu84SJQU8fL22PT\n" +
+      "\n" +
+      "other_statement\n";
+    const expectedDumpSql = "statement\n-- lower comment\nother_statement\n";
+    File.write(filename, rawDumpSql);
+    await DatabaseTasks.structureDump(configuration(), filename);
+    expect(
+      File.read(filename)
+        .split(/(?<=\n)/)
+        .slice(0, 3)
+        .join(""),
+    ).toBe(expectedDumpSql);
+  });
+
   it("structure dump with env", async () => {
     const expectedEnv = {
       PGHOST: "my.server.tld",

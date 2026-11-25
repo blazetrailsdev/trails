@@ -57,9 +57,14 @@ import {
   CpkComment,
   CpkNonCpkBook,
   CpkNonCpkOrder,
+  CpkOptionalChapter,
   CpkOrder,
   CpkPost,
 } from "../../models/cpk.js";
+import { ShardedBlog } from "../../models/sharded/blog.js";
+import { ShardedBlogPost } from "../../models/sharded/blog-post.js";
+import { ShardedComment } from "../../models/sharded/comment.js";
+import { Attachment } from "../../models/attachment.js";
 import { CompositePrimaryKeyMismatchError } from "../../../lib/associations/errors.js";
 import { Time as RubyTime } from "@blazetrails/date";
 import { travelTo, travelBack } from "@blazetrails/activesupport/testing/time-helpers";
@@ -682,6 +687,32 @@ describe("BelongsToAssociationsTest", () => {
     await order.save();
 
     expect((book as any).shop_id).toBe(3);
+  });
+
+  it("clearing optional cpk belongs to should preserve shared pk", async () => {
+    const book = await CpkBook.createBang({ id: [1, 2], title: "The Well-Grounded Rubyist" });
+    const chapter = await CpkOptionalChapter.createBang({ id: [1, 2], book });
+
+    expect(await chapter.book).toEqualRuby(book);
+    expect(chapter.id).toEqual([1, 2]);
+
+    await chapter.updateBang({ book: null });
+
+    expect(chapter.id).toEqual([1, 2]);
+    const chapterIds = chapter as unknown as { book_id: unknown; author_id: unknown };
+    expect(chapterIds.book_id).toBeNull();
+    expect(book.author_id).toBe(chapterIds.author_id);
+  });
+
+  it("should reload association on model with query constraints when foreign key changes", async () => {
+    const blog = await ShardedBlog.createBang();
+    const blogPost = await ShardedBlogPost.createBang({ blog });
+    const comment = await ShardedComment.createBang({ blog });
+
+    await comment.blogPost;
+    comment.blog_post_id = blogPost.id as number;
+
+    expect(await comment.blogPost).toEqualRuby(blogPost);
   });
 
   it("building the belonging object with implicit sti base class", async () => {
@@ -1810,6 +1841,23 @@ describe("BelongsToAssociationsTest", () => {
 
     const reloaded = await CarPolymorphicName.find(car.id);
     expect((reloaded.wheels_owned_at as RubyTime).toF() * 1000).toBe(touchTime.getTime());
+  });
+
+  it("polymorphic stale state handles nil foreign keys correctly", async () => {
+    class Klass extends Base {
+      static {
+        this.tableName = "records";
+        this.hasOne("attachment", { as: "record" });
+      }
+
+      static polymorphicName(): string {
+        return "Blob";
+      }
+    }
+
+    await assertNothingRaised(() =>
+      Attachment.createBang({ record: Klass.build(), record_type: "Document" }),
+    );
   });
 
   it("build with conditions", async () => {

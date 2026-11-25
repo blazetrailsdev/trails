@@ -4,6 +4,7 @@ import {
   Relation,
   RecordNotFound,
   RecordInvalid,
+  RecordNotSaved,
   IrreversibleOrderError,
   UnmodifiableRelation,
   Base,
@@ -15,6 +16,8 @@ import { toXml } from "@blazetrails/activesupport/core-ext/array/conversions";
 import {
   assertDifference,
   assertEmpty,
+  assertInstanceOf,
+  assertNoDifference,
   assertNotEmpty,
   assertNotPredicate,
   assertNotRespondTo,
@@ -32,7 +35,8 @@ import { Author, AuthorAddress } from "../models/author.js";
 import { Topic } from "../models/topic.js";
 import { Comment, SpecialComment, VerySpecialComment } from "../models/comment.js";
 import { Bird } from "../models/bird.js";
-import { Car, CoolCar, FastCar } from "../models/car.js";
+import { BrokenCar, Car, CoolCar, FastCar } from "../models/car.js";
+import "../models/wheel.js";
 import { Engine } from "../models/engine.js";
 import { Tyre } from "../models/tyre.js";
 import { Minivan } from "../models/minivan.js";
@@ -1962,6 +1966,41 @@ describe("RelationTest", () => {
     const subscriber = await Subscriber.createBang({ nick: "bob" });
     expect((await Subscriber.createOrFindBy({ nick: "bob" }))!.nick).toBe(subscriber.nick);
     expect((await Subscriber.createOrFindBy({ nick: "cat" }))!.nick).not.toBe(subscriber.nick);
+  });
+
+  it("create or find by rollbacks a transaction", async () => {
+    await assertNoDifference(
+      () => Car.count(),
+      null,
+      async () => {
+        const car = await BrokenCar.createOrFindBy({ name: "Civic" });
+
+        assertInstanceOf(BrokenCar, car);
+        assertNotPredicate(car!, (c) => c.isPersisted());
+      },
+    );
+  });
+
+  it("create or find by bang rollbacks a transaction", async () => {
+    await assertNoDifference(
+      () => Car.count(),
+      null,
+      async () => {
+        const car = await BrokenCar.createOrFindByBang({ name: "Civic" });
+
+        assertInstanceOf(BrokenCar, car);
+        assertNotPredicate(car!, (c) => c.isPersisted());
+      },
+    );
+  });
+
+  it("create or find by on a collections rollbacks a transaction when owner is not persisted", async () => {
+    const car = await BrokenCar.create({ name: "Civic" });
+    assertNotPredicate(car, (c) => c.isPersisted());
+
+    await assertRaises([RecordNotSaved], {}, async () => {
+      await car.wheels.createOrFindByBang({ size: 1500 });
+    });
   });
 
   it("create or find by with block", async () => {

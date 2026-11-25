@@ -10,6 +10,7 @@ import {
   rbFSend,
   rbObjIvarSet,
   RuntimeError,
+  StandardError,
   Thread,
   ThreadError,
 } from "@blazetrails/ruby-compat";
@@ -37,7 +38,10 @@ import { SchemaReflection } from "../../lib/connection-adapters/schema-cache.js"
 import { HashConfig } from "../../lib/database-configurations/hash-config.js";
 import { ambientPoolConfiguration, rawTestAdapterConfiguration } from "../support/test-adapter.js";
 import { inMemoryDb } from "../support/adapter-helper.js";
-import type { AbstractAdapter as DatabaseAdapter } from "../../lib/connection-adapters/abstract-adapter.js";
+import {
+  AbstractAdapter,
+  type AbstractAdapter as DatabaseAdapter,
+} from "../../lib/connection-adapters/abstract-adapter.js";
 import { Base } from "../../lib/base.js";
 import { assertNoQueries } from "../../lib/testing/query-assertions.js";
 
@@ -1015,6 +1019,29 @@ it("inspect does not show secrets", async () => {
   expect(readingPool.inspect()).toMatch(
     /#<ActiveRecord::ConnectionAdapters::ConnectionPool env_name="\w+" role=:reading shard=:shard_one>/,
   );
+});
+
+it("checkout callback error does not affect permanent lease and active connection state", async () => {
+  const pool = makePool();
+  const checkoutError = new StandardError("error during checkout");
+  const procToRaise = () => {
+    throw checkoutError;
+  };
+  AbstractAdapter.setCallback("checkout", "after", procToRaise);
+  try {
+    expect(pool.isPermanentLease()).toBeTruthy();
+    expect(pool.isActiveConnection()).toBeFalsy();
+
+    const error = await assertRaises([StandardError], {}, () => pool.leaseConnection());
+    expect(error).toBe(checkoutError);
+
+    expect(pool.isPermanentLease()).toBeTruthy();
+    expect(pool.isActiveConnection()).toBeFalsy();
+  } finally {
+    (
+      AbstractAdapter as unknown as { skipCallback(name: string, ...filterList: unknown[]): void }
+    ).skipCallback("checkout", "after", procToRaise);
+  }
 });
 
 describe("ConnectionPoolThreadTest", () => {

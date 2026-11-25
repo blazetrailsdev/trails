@@ -1785,6 +1785,35 @@ AND query LIKE '%${lockId}%'`;
       await self().assertNoColumn(Person, "column1");
       await self().assertNoColumn(Person, "column2");
     });
+
+    it("bulk revert with table name prefix", async () => {
+      try {
+        Base.tableNamePrefix = "prefix_";
+        await connection.createTable("prefix_testings", { force: true });
+
+        class BulkRevertWithPrefix extends Migration.Current {
+          write(_text = ""): void {}
+
+          async change() {
+            await this.changeTable("testings", { bulk: true }, async (t) => {
+              await t.column("foo", "string");
+              await t.column("bar", "string");
+              await t.index("foo");
+            });
+          }
+        }
+        const migration = new BulkRevertWithPrefix();
+
+        await migration.migrate("up");
+        expect(await connection.columnExists("prefix_testings", "foo")).toBeTruthy();
+
+        await migration.migrate("down");
+        expect(await connection.columnExists("prefix_testings", "foo")).toBeFalsy();
+      } finally {
+        await connection.dropTable("prefix_testings", { ifExists: true });
+        Base.tableNamePrefix = "";
+      }
+    });
   });
 
   describe("CopyMigrationsTest", () => {

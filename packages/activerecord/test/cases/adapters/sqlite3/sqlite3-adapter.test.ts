@@ -13,7 +13,8 @@ import { Notifications, indexBy } from "@blazetrails/activesupport";
 import { QueryAttribute } from "../../../../lib/relation/query-attribute.js";
 import { ValueType, IntegerType } from "@blazetrails/activemodel";
 import { assertLogged } from "./test-helper.js";
-import type { Column as SQLite3Column } from "../../../../lib/connection-adapters/sqlite3/column.js";
+import { Column as SQLite3Column } from "../../../../lib/connection-adapters/sqlite3/column.js";
+import { SqlTypeMetadata } from "../../../../lib/connection-adapters/sql-type-metadata.js";
 import { assertCalled } from "@blazetrails/activesupport/testing/method-call-assertions";
 import {
   assertNothingRaised,
@@ -1299,6 +1300,164 @@ describe.runIf(currentAdapter("SQLite3Adapter"))("SQLite3AdapterTest", () => {
         ).toBeFalsy();
       },
     );
+  });
+
+  it("rowid changes column equality", () => {
+    const typeMetadata = new SqlTypeMetadata({ sqlType: "integer", type: "integer" });
+
+    const rowidColumn = new SQLite3Column("id", null, typeMetadata, true, null, { rowid: true });
+    const regularColumn = new SQLite3Column("id", null, typeMetadata, true, null, { rowid: false });
+
+    expect(rowidColumn).not.toEqualRuby(regularColumn);
+  });
+
+  it("generated type changes column equality", () => {
+    const typeMetadata = new SqlTypeMetadata({ sqlType: "varchar", type: "string" });
+
+    const storedColumn = new SQLite3Column("name", null, typeMetadata, true, null, {
+      generatedType: "stored",
+    });
+    const virtualColumn = new SQLite3Column("name", null, typeMetadata, true, null, {
+      generatedType: "virtual",
+    });
+
+    expect(storedColumn).not.toEqualRuby(virtualColumn);
+  });
+
+  it("alter table with fk preserves rows when referenced table altered", async () => {
+    const conn = new SQLite3Adapter({ database: ":memory:", adapter: "sqlite3", strict: false });
+    try {
+      await conn.createTable("authors", {}, (t) => {
+        t.string("name", { null: false });
+      });
+
+      await conn.createTable("books", {}, (t) => {
+        t.string("title", { null: false });
+        t.integer("author_id", { null: false });
+      });
+      await conn.addForeignKey("books", "authors", { onDelete: "cascade" });
+
+      await conn.execute("INSERT INTO authors (id, name) VALUES (1, 'Douglas Adams');");
+      await conn.execute(
+        "INSERT INTO books (id, title, author_id) VALUES (42, 'The Hitchhiker''s Guide', 1);",
+      );
+      await conn.execute(
+        "INSERT INTO books (id, title, author_id) VALUES (43, 'Restaurant at the End', 1);",
+      );
+
+      const initialBookCount = await conn.selectValue("SELECT COUNT(*) FROM books");
+      expect(initialBookCount).toBe(2);
+
+      await conn.addColumn("authors", "email", "string");
+
+      const bookCount = await conn.selectValue("SELECT COUNT(*) FROM books");
+      const authorCount = await conn.selectValue("SELECT COUNT(*) FROM authors");
+
+      expect(bookCount, "Books were CASCADE deleted when authors table was altered!").toBe(2);
+      expect(authorCount, "Authors were lost during table alteration!").toBe(1);
+    } finally {
+      await conn.disconnectBang();
+    }
+  });
+
+  it("alter table with fk preserves rows when adding fk to referenced table", async () => {
+    const conn = new SQLite3Adapter({ database: ":memory:", adapter: "sqlite3", strict: false });
+    try {
+      await conn.createTable("groups", {}, (t) => {
+        t.string("name", { null: false });
+      });
+
+      await conn.createTable("users", {}, (t) => {
+        t.string("username", { null: false });
+      });
+
+      await conn.createTable("reports", {}, (t) => {
+        t.string("title", { null: false });
+        t.integer("group_id", { null: false });
+      });
+      await conn.addForeignKey("reports", "groups", { onDelete: "cascade" });
+
+      await conn.execute("INSERT INTO groups (id, name) VALUES (1, 'Admin Group');");
+      await conn.execute("INSERT INTO users (id, username) VALUES (1, 'alice');");
+      await conn.execute("INSERT INTO reports (id, title, group_id) VALUES (1, 'Report A', 1);");
+      await conn.execute("INSERT INTO reports (id, title, group_id) VALUES (2, 'Report B', 1);");
+
+      const initialReportCount = await conn.selectValue("SELECT COUNT(*) FROM reports");
+      expect(initialReportCount).toBe(2);
+
+      await conn.addColumn("groups", "owner_id", "integer");
+      await conn.addForeignKey("groups", "users", { column: "owner_id" });
+
+      const reportCount = await conn.selectValue("SELECT COUNT(*) FROM reports");
+      const groupCount = await conn.selectValue("SELECT COUNT(*) FROM groups");
+
+      expect(reportCount, "Reports were CASCADE deleted when groups table was altered!").toBe(2);
+      expect(groupCount, "Groups were lost during table alteration!").toBe(1);
+    } finally {
+      await conn.disconnectBang();
+    }
+  });
+
+  it("alter table with multiple cascade fks preserves all data", async () => {
+    const conn = new SQLite3Adapter({ database: ":memory:", adapter: "sqlite3", strict: false });
+    try {
+      await conn.createTable("authors", {}, (t) => {
+        t.string("name", { null: false });
+      });
+
+      await conn.createTable("books", {}, (t) => {
+        t.string("title", { null: false });
+        t.integer("author_id", { null: false });
+      });
+      await conn.addForeignKey("books", "authors", { onDelete: "cascade" });
+
+      await conn.createTable("articles", {}, (t) => {
+        t.string("headline", { null: false });
+        t.integer("author_id", { null: false });
+      });
+      await conn.addForeignKey("articles", "authors", { onDelete: "cascade" });
+
+      await conn.execute("INSERT INTO authors (id, name) VALUES (1, 'Douglas Adams');");
+      await conn.execute("INSERT INTO books (id, title, author_id) VALUES (1, 'HHGTTG', 1);");
+      await conn.execute(
+        "INSERT INTO articles (id, headline, author_id) VALUES (1, 'Towel Day', 1);",
+      );
+
+      await conn.addColumn("authors", "bio", "text");
+
+      const bookCount = await conn.selectValue("SELECT COUNT(*) FROM books");
+      const articleCount = await conn.selectValue("SELECT COUNT(*) FROM articles");
+
+      expect(bookCount, "Books were CASCADE deleted when authors table was altered!").toBe(1);
+      expect(articleCount, "Articles were CASCADE deleted when authors table was altered!").toBe(1);
+    } finally {
+      await conn.disconnectBang();
+    }
+  });
+
+  it("rename table with cascade fk preserves referencing data", async () => {
+    const conn = new SQLite3Adapter({ database: ":memory:", adapter: "sqlite3", strict: false });
+    try {
+      await conn.createTable("authors", {}, (t) => {
+        t.string("name", { null: false });
+      });
+
+      await conn.createTable("books", {}, (t) => {
+        t.string("title", { null: false });
+        t.integer("author_id", { null: false });
+      });
+      await conn.addForeignKey("books", "authors", { onDelete: "cascade" });
+
+      await conn.execute("INSERT INTO authors (id, name) VALUES (1, 'Douglas Adams');");
+      await conn.execute("INSERT INTO books (id, title, author_id) VALUES (1, 'HHGTTG', 1);");
+
+      await conn.renameTable("authors", "writers");
+
+      const bookCount = await conn.selectValue("SELECT COUNT(*) FROM books");
+      expect(bookCount, "Books were CASCADE deleted when authors table was renamed!").toBe(1);
+    } finally {
+      await conn.disconnectBang();
+    }
   });
 
   it("tables logs name", async () => {
