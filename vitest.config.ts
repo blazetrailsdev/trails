@@ -2,7 +2,7 @@ import { defineConfig } from "vitest/config";
 import path from "path";
 import os from "os";
 import { DurationSequencer } from "./scripts/ci/duration-sequencer.js";
-import { isolationDistResolver } from "./scripts/ci/isolation-dist-resolver.js";
+import { isolationDistPath, isolationDistResolver } from "./scripts/ci/isolation-dist-resolver.js";
 import { resolveForkCount } from "./packages/activerecord/test/support/ar-db-forks-default.js";
 
 // AR_DB_FORKS (read in test-setup-worker-db.ts) requests a vitest worker
@@ -872,7 +872,9 @@ export default defineConfig({
             "./packages/actiontext/test/support/build-templates.ts",
             "./packages/stimulus/test/support/build-templates.ts",
           ],
-          setupFiles: otherSetupFiles,
+          setupFiles: ISOLATION_DIST
+            ? otherSetupFiles.map((file) => isolationDistPath(path.resolve(__dirname, file)))
+            : otherSetupFiles,
         },
       },
       {
