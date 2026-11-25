@@ -21,8 +21,14 @@ import type { SyntaxError as CssSyntaxError } from "./css/syntax-error.js";
 import type { XPathVisitor } from "./css/xpath-visitor.js";
 import type { Tokenizer } from "./css/tokenizer.js";
 
-export const XML = { name: "Nokogiri::XML" } as {
+export const XML = {
+  name: "Nokogiri::XML",
+  fragment(...args: Parameters<typeof DocumentFragment.parse>): DocumentFragment {
+    return XML.DocumentFragment.parse(...args);
+  },
+} as {
   name: string;
+  fragment(...args: Parameters<typeof DocumentFragment.parse>): DocumentFragment;
   NodeSet: typeof NodeSet;
   Node: typeof XmlNode;
   XPathContext: typeof XPathContext;
@@ -93,6 +99,11 @@ export type LibXml2 = typeof import("libxml2-wasm") & {
     | "xmlReadString"
     | "xmlFreeParserCtxt"
     | "error"
+    | "XmlTreeCommonStruct"
+    | "xmlSaveToIO"
+    | "xmlSaveSetIndentString"
+    | "xmlSaveTree"
+    | "xmlSaveClose"
   >;
 
 const loadPath: Record<string, () => Promise<unknown>> = {

@@ -127,6 +127,11 @@ export class NodeSet implements Iterable<Node> {
   }
 
   /** @missingRailsArgs join — PERMANENT */
+  toXhtml(options: { saveWith?: number } = {}): string {
+    return this.map((x) => x.toXhtml(options)).join("");
+  }
+
+  /** @missingRailsArgs join — PERMANENT */
   toXml(options: { saveWith?: number; encoding?: string | null } = {}): string {
     return this.map((x) => x.toXml(options)).join("");
   }

@@ -17,6 +17,7 @@ export class XmlDocument {
   declare atCss: (...args: unknown[]) => XmlNode | undefined;
   declare xpath: (...args: unknown[]) => NodeSet;
   declare atXpath: (...args: unknown[]) => XmlNode | undefined;
+  declare isXml: () => boolean;
 
   static readonly IMPLIED_XPATH_CONTEXTS = ["//"] as const;
 
@@ -31,8 +32,9 @@ export class XmlDocument {
   errors: SyntaxError[] = [];
   url: string | null = null;
   encoding: string | null = null;
-  private _doc: LibXmlDocument | null = null;
   private _root: XmlNode | null = null;
+
+  constructor(private _doc: LibXmlDocument | null = Nokogiri.LibXml2!.XmlDocument.create()) {}
 
   static parse(
     stringOrIo: string | Readable | Pathname | null,
@@ -132,9 +134,8 @@ export class XmlDocument {
       }
     }
 
-    const document = new XmlDocument();
-    document._doc = libxml.XmlDocument.getInstance(cDocument);
-    document._root = new XmlNode(document._doc.root, document);
+    const document = new XmlDocument(libxml.XmlDocument.getInstance(cDocument));
+    document._root = new XmlNode(document._doc!.root, document);
     document.url = url;
     document.errors = rbErrors;
     return document;
@@ -175,9 +176,14 @@ export class XmlDocument {
     return this._doc;
   }
 
-  get root(): XmlNode {
-    if (this._root === null) throw new Error("Document has no root (parse failed or disposed)");
+  get root(): XmlNode | null {
     return this._root;
+  }
+
+  get type(): number {
+    return Nokogiri.LibXml2!.XmlTreeCommonStruct.type(
+      (this._doc as unknown as { _ptr: number })._ptr,
+    );
   }
 
   fragment(tags: string | null = null): DocumentFragment {
@@ -200,4 +206,5 @@ export class XmlDocument {
 }
 
 include(XmlDocument, Searchable);
+XmlDocument.prototype.isXml = XmlNode.prototype.isXml;
 XML.Document = XmlDocument;
