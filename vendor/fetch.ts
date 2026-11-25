@@ -156,10 +156,26 @@ export async function fetchSource(
   return { ref: source.origin.ref, sha };
 }
 
+const CLONE_ATTEMPTS = 5;
+const CLONE_BACKOFF_MS = 2000;
+
 async function cloneRef(source: UpstreamSource, ref: string, dest: string): Promise<string> {
   console.log(`[${source.name}] cloning ${source.origin.url}@${ref}...`);
   await mkdir(dirname(dest), { recursive: true });
-  await execFileAsync("git", ["clone", "--depth=1", "--branch", ref, source.origin.url, dest]);
+  for (let attempt = 1; ; attempt++) {
+    try {
+      await execFileAsync("git", ["clone", "--depth=1", "--branch", ref, source.origin.url, dest]);
+      break;
+    } catch (error) {
+      if (attempt >= CLONE_ATTEMPTS) throw error;
+      const delay = CLONE_BACKOFF_MS * 2 ** (attempt - 1);
+      console.warn(
+        `[${source.name}] clone attempt ${attempt} failed (${(error as Error).message.trim()}); retrying in ${delay}ms`,
+      );
+      await rm(dest, { recursive: true, force: true });
+      await new Promise((resolve) => setTimeout(resolve, delay));
+    }
+  }
   return git(["rev-parse", "HEAD"], dest);
 }
 
