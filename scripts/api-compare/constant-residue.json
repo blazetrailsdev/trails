@@ -345,7 +345,7 @@
     }
   },
   "activemodel": {
-    "rows": 100,
+    "rows": 101,
     "excluded": [],
     "unwalked": [
       "gem-version.ts::VERSION",

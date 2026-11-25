@@ -1,3 +1,4 @@
+import { include } from "@blazetrails/activesupport";
 import { FLOAT_DIG } from "@blazetrails/ruby-compat";
 import { BigDecimal, toD } from "@blazetrails/activesupport";
 import {
@@ -9,13 +10,15 @@ import {
   round,
 } from "@blazetrails/ruby-compat";
 import { ValueType } from "./value.js";
-import { applyNumericMixin } from "./helpers/numeric.js";
-
-const NumericValueType = applyNumericMixin(ValueType<BigDecimal>);
+import { Numeric } from "./helpers/numeric.js";
 
 const BIGDECIMAL_PRECISION = 18;
 
-export class DecimalType extends NumericValueType {
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type -- Ruby `include Helpers::Numeric`; the class/interface merge is how `include()` surfaces on the type side.
+export interface DecimalType extends Omit<Numeric, "cast" | "serialize" | "serializeCastValue"> {}
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export class DecimalType extends ValueType<BigDecimal> {
   type(): string {
     return "decimal";
   }
@@ -82,3 +85,5 @@ export class DecimalType extends NumericValueType {
     }
   }
 }
+
+include(DecimalType, Numeric);

@@ -1,87 +1,86 @@
 import { describe, it, expect } from "vitest";
 import { BigDecimal } from "@blazetrails/activesupport";
-import {
-  isNonNumericString,
-  isNumberToNonNumber,
-  isEqualNan,
-  applyNumericMixin,
-} from "../../../lib/type/helpers/numeric.js";
+import { include } from "@blazetrails/activesupport";
+import { Numeric } from "../../../lib/type/helpers/numeric.js";
 import { ValueType } from "../../../lib/type/value.js";
 
 describe("Helpers::Numeric private predicates", () => {
   describe("isNonNumericString", () => {
     it("returns false for strings starting with a digit", () => {
-      expect(isNonNumericString("1")).toBe(false);
-      expect(isNonNumericString("1abc")).toBe(false);
-      expect(isNonNumericString("  42")).toBe(false);
+      expect(Numeric.isNonNumericString("1")).toBe(false);
+      expect(Numeric.isNonNumericString("1abc")).toBe(false);
+      expect(Numeric.isNonNumericString("  42")).toBe(false);
     });
 
     it("returns false for signed numeric strings", () => {
-      expect(isNonNumericString("+1")).toBe(false);
-      expect(isNonNumericString("-42")).toBe(false);
-      expect(isNonNumericString("  -7")).toBe(false);
+      expect(Numeric.isNonNumericString("+1")).toBe(false);
+      expect(Numeric.isNonNumericString("-42")).toBe(false);
+      expect(Numeric.isNonNumericString("  -7")).toBe(false);
     });
 
     it("returns true for strings without a leading digit", () => {
-      expect(isNonNumericString("wibble")).toBe(true);
-      expect(isNonNumericString("")).toBe(true);
-      expect(isNonNumericString("abc1")).toBe(true);
-      expect(isNonNumericString(".5")).toBe(true);
+      expect(Numeric.isNonNumericString("wibble")).toBe(true);
+      expect(Numeric.isNonNumericString("")).toBe(true);
+      expect(Numeric.isNonNumericString("abc1")).toBe(true);
+      expect(Numeric.isNonNumericString(".5")).toBe(true);
     });
   });
 
   describe("isNumberToNonNumber", () => {
     it("returns false when oldValue is null/undefined", () => {
-      expect(isNumberToNonNumber(null, "wibble")).toBe(false);
-      expect(isNumberToNonNumber(undefined, "wibble")).toBe(false);
+      expect(Numeric.isNumberToNonNumber(null, "wibble")).toBe(false);
+      expect(Numeric.isNumberToNonNumber(undefined, "wibble")).toBe(false);
     });
 
     it("returns false when newValueBeforeTypeCast is numeric", () => {
-      expect(isNumberToNonNumber(5, 7)).toBe(false);
-      expect(isNumberToNonNumber(5, 7n)).toBe(false);
+      expect(Numeric.isNumberToNonNumber(5, 7)).toBe(false);
+      expect(Numeric.isNumberToNonNumber(5, 7n)).toBe(false);
     });
 
     it("returns true when oldValue is set and new raw input is non-numeric string", () => {
-      expect(isNumberToNonNumber(5, "wibble")).toBe(true);
-      expect(isNumberToNonNumber(0, "")).toBe(true);
+      expect(Numeric.isNumberToNonNumber(5, "wibble")).toBe(true);
+      expect(Numeric.isNumberToNonNumber(0, "")).toBe(true);
     });
 
     it("returns false when new raw input is a numeric string", () => {
-      expect(isNumberToNonNumber(5, "7")).toBe(false);
-      expect(isNumberToNonNumber(5, "-3.14")).toBe(false);
+      expect(Numeric.isNumberToNonNumber(5, "7")).toBe(false);
+      expect(Numeric.isNumberToNonNumber(5, "-3.14")).toBe(false);
     });
   });
 
   describe("isEqualNan", () => {
     it("returns true when both values are NaN", () => {
-      expect(isEqualNan(NaN, NaN)).toBe(true);
+      expect(Numeric.isEqualNan(NaN, NaN)).toBe(true);
     });
 
     it("returns false when only one side is NaN", () => {
-      expect(isEqualNan(NaN, 0)).toBe(false);
-      expect(isEqualNan(0, NaN)).toBe(false);
+      expect(Numeric.isEqualNan(NaN, 0)).toBe(false);
+      expect(Numeric.isEqualNan(0, NaN)).toBe(false);
     });
 
     it("returns false when neither side is NaN", () => {
-      expect(isEqualNan(1, 1)).toBe(false);
-      expect(isEqualNan(1, 2)).toBe(false);
+      expect(Numeric.isEqualNan(1, 1)).toBe(false);
+      expect(Numeric.isEqualNan(1, 2)).toBe(false);
     });
 
     it("returns false for non-number inputs", () => {
-      expect(isEqualNan(null, null)).toBe(false);
-      expect(isEqualNan("nan", "nan")).toBe(false);
-      expect(isEqualNan("NaN", NaN)).toBe(false);
-      expect(isEqualNan(NaN, "NaN")).toBe(false);
+      expect(Numeric.isEqualNan(null, null)).toBe(false);
+      expect(Numeric.isEqualNan("nan", "nan")).toBe(false);
+      expect(Numeric.isEqualNan("NaN", NaN)).toBe(false);
+      expect(Numeric.isEqualNan(NaN, "NaN")).toBe(false);
     });
 
     it('treats the decimal "NaN" sentinel as BigDecimal NaN on both sides', () => {
-      expect(isEqualNan(BigDecimal.NAN, BigDecimal.NAN)).toBe(true);
+      expect(Numeric.isEqualNan(BigDecimal.NAN, BigDecimal.NAN)).toBe(true);
     });
   });
 });
 
-describe("applyNumericMixin", () => {
-  class ConcreteNumeric extends applyNumericMixin(ValueType<number>) {
+describe("Numeric", () => {
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type
+  interface ConcreteNumeric extends Omit<Numeric, "cast" | "serialize" | "serializeCastValue"> {}
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+  class ConcreteNumeric extends ValueType<number> {
     readonly name = "test_numeric";
     type() {
       return this.name;
@@ -92,6 +91,8 @@ describe("applyNumericMixin", () => {
       return isNaN(n) ? null : n;
     }
   }
+
+  include(ConcreteNumeric, Numeric);
 
   const type = new ConcreteNumeric();
 

@@ -1,14 +1,17 @@
+import { include } from "@blazetrails/activesupport";
 import { isBlank } from "@blazetrails/activesupport";
 import { Range, rbDeclareIvar, rbModToS, toI } from "@blazetrails/ruby-compat";
 import { ValueType } from "./value.js";
 import { RangeError } from "../errors.js";
-import { applyNumericMixin, isNonNumericString } from "./helpers/numeric.js";
+import { Numeric } from "./helpers/numeric.js";
 
 const DEFAULT_LIMIT = 4;
 
-const NumericValueType = applyNumericMixin(ValueType<number | bigint>);
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type -- Ruby `include Helpers::Numeric`; the class/interface merge is how `include()` surfaces on the type side.
+export interface IntegerType extends Omit<Numeric, "cast" | "serialize" | "serializeCastValue"> {}
 
-export class IntegerType extends NumericValueType {
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export class IntegerType extends ValueType<number | bigint> {
   protected _range: Range<number | bigint>;
 
   constructor(options?: { precision?: number; scale?: number; limit?: number }) {
@@ -25,8 +28,9 @@ export class IntegerType extends NumericValueType {
     return this.castValue(value);
   }
 
+  /** @inlinedFrom ActiveModel::Type::Helpers::Numeric#serialize rails/v8.0.5.2/activemodel/lib/active_model/type/helpers/numeric.rb:7-9 */
   serialize(value: unknown): unknown {
-    if (typeof value === "string" && isNonNumericString(value)) return null;
+    if (typeof value === "string" && this.isNonNumericString(value)) return null;
     return this.ensureInRange(this.cast(value));
   }
 
@@ -94,3 +98,5 @@ export class IntegerType extends NumericValueType {
 }
 
 rbDeclareIvar(IntegerType, "@range", "_range");
+
+include(IntegerType, Numeric);
