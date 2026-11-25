@@ -54,18 +54,18 @@ export function runSafeConstantizeTestsOn(yieldFn: (name: string) => unknown): v
   expect(yieldFn("ConstantizeTestCases")).toBe(ConstantizeTestCases);
   expect(yieldFn("::ConstantizeTestCases")).toBe(ConstantizeTestCases);
 
-  expect(yieldFn("")).toBeUndefined();
-  expect(yieldFn("::")).toBeUndefined();
-  expect(yieldFn("UnknownClass")).toBeUndefined();
-  expect(yieldFn("UnknownClass::Ace")).toBeUndefined();
-  expect(yieldFn("UnknownClass::Ace::Base")).toBeUndefined();
-  expect(yieldFn("An invalid string")).toBeUndefined();
-  expect(yieldFn("InvalidClass\n")).toBeUndefined();
-  expect(yieldFn("blargle")).toBeUndefined();
-  expect(yieldFn("Ace::ConstantizeTestCases")).toBeUndefined();
-  expect(yieldFn("Ace::Base::ConstantizeTestCases")).toBeUndefined();
-  expect(yieldFn("Ace::Gas::Base")).toBeUndefined();
-  expect(yieldFn("Ace::Gas::ConstantizeTestCases")).toBeUndefined();
-  expect(yieldFn("#<Class:0x7b8b718b>::Nested_1")).toBeUndefined();
-  expect(yieldFn("Ace::gas")).toBeUndefined();
+  expect(yieldFn("")).toBeNull();
+  expect(yieldFn("::")).toBeNull();
+  expect(yieldFn("UnknownClass")).toBeNull();
+  expect(yieldFn("UnknownClass::Ace")).toBeNull();
+  expect(yieldFn("UnknownClass::Ace::Base")).toBeNull();
+  expect(yieldFn("An invalid string")).toBeNull();
+  expect(yieldFn("InvalidClass\n")).toBeNull();
+  expect(yieldFn("blargle")).toBeNull();
+  expect(yieldFn("Ace::ConstantizeTestCases")).toBeNull();
+  expect(yieldFn("Ace::Base::ConstantizeTestCases")).toBeNull();
+  expect(yieldFn("Ace::Gas::Base")).toBeNull();
+  expect(yieldFn("Ace::Gas::ConstantizeTestCases")).toBeNull();
+  expect(yieldFn("#<Class:0x7b8b718b>::Nested_1")).toBeNull();
+  expect(yieldFn("Ace::gas")).toBeNull();
 }
