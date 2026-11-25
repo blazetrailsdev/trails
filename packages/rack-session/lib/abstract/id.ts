@@ -12,6 +12,8 @@ import {
   eachPair,
   rbProcCall,
   hashAref,
+  TopLevel,
+  isModuleIncluded,
 } from "@blazetrails/ruby-compat";
 import { Time } from "@blazetrails/date";
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
@@ -356,7 +358,20 @@ export class Persisted {
   protected sidbits = 128;
   protected sidLength = 32;
 
+  /** @inventedArm if — PERMANENT */
   constructor(app?: RackApp, options: Record<string, unknown> = {}) {
+    const compatibility = (
+      TopLevel as { ActionDispatch?: { Session?: { Compatibility?: object } } }
+    ).ActionDispatch?.Session?.Compatibility;
+    if (isModuleIncluded(new.target, compatibility as never)) {
+      if (options.key == null || options.key === false) options.key = "_session_id";
+      if (!("sameSite" in options || "sameSite" in new.target.DEFAULT_OPTIONS)) {
+        options = {
+          ...options,
+          sameSite: (compatibility as { DEFAULT_SAME_SITE: unknown }).DEFAULT_SAME_SITE,
+        };
+      }
+    }
     this.app = app;
     this.defaultOptions = {
       ...(this.constructor as typeof Persisted).DEFAULT_OPTIONS,
