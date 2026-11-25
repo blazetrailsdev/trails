@@ -12,6 +12,7 @@ const NOT_CALLED = "not called by activesupport";
 
 export const LIBXML_RUBY_UNPORTED_FILES: UnportedFile[] = [
   { pattern: "/attr_decl.rb", package: "libxml-ruby", reason: NOT_CALLED },
+  { pattern: "/attributes.rb", package: "libxml-ruby", reason: NOT_CALLED },
   { pattern: "/attr.rb", package: "libxml-ruby", reason: NOT_CALLED },
   { pattern: "/document.rb", package: "libxml-ruby", reason: NOT_CALLED },
   { pattern: "/html_parser.rb", package: "libxml-ruby", reason: NOT_CALLED },
