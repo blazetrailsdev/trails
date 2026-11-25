@@ -35,33 +35,34 @@ import * as m32 from "./type/decimal.js";
 import * as m33 from "./type/float.js";
 import * as m34 from "./type/helpers/accepts-multiparameter-time.js";
 import * as m35 from "./type/helpers/mutable.js";
-import * as m36 from "./type/helpers/time-value.js";
-import * as m37 from "./type/helpers/timezone.js";
-import * as m38 from "./type/immutable-string.js";
-import * as m39 from "./type/integer.js";
-import * as m40 from "./type/registry.js";
-import * as m41 from "./type/serialize-cast-value.js";
-import * as m42 from "./type/string.js";
-import * as m43 from "./type/time.js";
-import * as m44 from "./type/value.js";
-import * as m45 from "./validations.js";
-import * as m46 from "./validations/absence.js";
-import * as m47 from "./validations/acceptance.js";
-import * as m48 from "./validations/callbacks.js";
-import * as m49 from "./validations/clusivity.js";
-import * as m50 from "./validations/comparability.js";
-import * as m51 from "./validations/comparison.js";
-import * as m52 from "./validations/confirmation.js";
-import * as m53 from "./validations/exclusion.js";
-import * as m54 from "./validations/format.js";
-import * as m55 from "./validations/helper-methods.js";
-import * as m56 from "./validations/inclusion.js";
-import * as m57 from "./validations/length.js";
-import * as m58 from "./validations/numericality.js";
-import * as m59 from "./validations/presence.js";
-import * as m60 from "./validations/resolve-value.js";
-import * as m61 from "./validations/with.js";
-import * as m62 from "./validator.js";
+import * as m36 from "./type/helpers/numeric.js";
+import * as m37 from "./type/helpers/time-value.js";
+import * as m38 from "./type/helpers/timezone.js";
+import * as m39 from "./type/immutable-string.js";
+import * as m40 from "./type/integer.js";
+import * as m41 from "./type/registry.js";
+import * as m42 from "./type/serialize-cast-value.js";
+import * as m43 from "./type/string.js";
+import * as m44 from "./type/time.js";
+import * as m45 from "./type/value.js";
+import * as m46 from "./validations.js";
+import * as m47 from "./validations/absence.js";
+import * as m48 from "./validations/acceptance.js";
+import * as m49 from "./validations/callbacks.js";
+import * as m50 from "./validations/clusivity.js";
+import * as m51 from "./validations/comparability.js";
+import * as m52 from "./validations/comparison.js";
+import * as m53 from "./validations/confirmation.js";
+import * as m54 from "./validations/exclusion.js";
+import * as m55 from "./validations/format.js";
+import * as m56 from "./validations/helper-methods.js";
+import * as m57 from "./validations/inclusion.js";
+import * as m58 from "./validations/length.js";
+import * as m59 from "./validations/numericality.js";
+import * as m60 from "./validations/presence.js";
+import * as m61 from "./validations/resolve-value.js";
+import * as m62 from "./validations/with.js";
+import * as m63 from "./validator.js";
 
 defineConstants([
   [() => m0, "Access", "ActiveModel::Access"],
@@ -102,12 +103,12 @@ defineConstants([
   [() => m6, "AttributeSet", "ActiveModel::AttributeSet"],
   [() => m7, "Builder", "ActiveModel::AttributeSet::Builder"],
   [() => m8, "YAMLEncoder", "ActiveModel::AttributeSet::YAMLEncoder"],
-  [() => m62, "BlockValidator", "ActiveModel::BlockValidator"],
+  [() => m63, "BlockValidator", "ActiveModel::BlockValidator"],
   [() => m12, "Callbacks", "ActiveModel::Callbacks"],
   [() => m13, "Conversion", "ActiveModel::Conversion"],
   [() => m13, "ClassMethods", "ActiveModel::Conversion::ClassMethods"],
   [() => m14, "Dirty", "ActiveModel::Dirty"],
-  [() => m62, "EachValidator", "ActiveModel::EachValidator"],
+  [() => m63, "EachValidator", "ActiveModel::EachValidator"],
   [() => m15, "Error", "ActiveModel::Error"],
   [() => m16, "Errors", "ActiveModel::Errors"],
   [() => m17, "ForbiddenAttributesError", "ActiveModel::ForbiddenAttributesError"],
@@ -148,48 +149,49 @@ defineConstants([
     "ActiveModel::Type::Helpers::AcceptsMultiparameterTime::InstanceMethods",
   ],
   [() => m35, "Mutable", "ActiveModel::Type::Helpers::Mutable"],
-  [() => m36, "TimeValue", "ActiveModel::Type::Helpers::TimeValue"],
-  [() => m37, "Timezone", "ActiveModel::Type::Helpers::Timezone"],
-  [() => m38, "ImmutableStringType", "ActiveModel::Type::ImmutableString"],
-  [() => m39, "IntegerType", "ActiveModel::Type::Integer"],
-  [() => m40, "TypeRegistry", "ActiveModel::Type::Registry"],
-  [() => m41, "SerializeCastValue", "ActiveModel::Type::SerializeCastValue"],
-  [() => m41, "ClassMethods", "ActiveModel::Type::SerializeCastValue::ClassMethods"],
+  [() => m36, "Numeric", "ActiveModel::Type::Helpers::Numeric"],
+  [() => m37, "TimeValue", "ActiveModel::Type::Helpers::TimeValue"],
+  [() => m38, "Timezone", "ActiveModel::Type::Helpers::Timezone"],
+  [() => m39, "ImmutableStringType", "ActiveModel::Type::ImmutableString"],
+  [() => m40, "IntegerType", "ActiveModel::Type::Integer"],
+  [() => m41, "TypeRegistry", "ActiveModel::Type::Registry"],
+  [() => m42, "SerializeCastValue", "ActiveModel::Type::SerializeCastValue"],
+  [() => m42, "ClassMethods", "ActiveModel::Type::SerializeCastValue::ClassMethods"],
   [
-    () => m41,
+    () => m42,
     "DefaultImplementation",
     "ActiveModel::Type::SerializeCastValue::DefaultImplementation",
   ],
-  [() => m42, "StringType", "ActiveModel::Type::String"],
-  [() => m43, "TimeType", "ActiveModel::Type::Time"],
-  [() => m44, "ValueType", "ActiveModel::Type::Value"],
+  [() => m43, "StringType", "ActiveModel::Type::String"],
+  [() => m44, "TimeType", "ActiveModel::Type::Time"],
+  [() => m45, "ValueType", "ActiveModel::Type::Value"],
   [() => m16, "UnknownAttributeError", "ActiveModel::UnknownAttributeError"],
-  [() => m45, "ValidationContext", "ActiveModel::ValidationContext"],
-  [() => m45, "ValidationError", "ActiveModel::ValidationError"],
-  [() => m45, "Validations", "ActiveModel::Validations"],
-  [() => m46, "AbsenceValidator", "ActiveModel::Validations::AbsenceValidator"],
-  [() => m47, "AcceptanceValidator", "ActiveModel::Validations::AcceptanceValidator"],
+  [() => m46, "ValidationContext", "ActiveModel::ValidationContext"],
+  [() => m46, "ValidationError", "ActiveModel::ValidationError"],
+  [() => m46, "Validations", "ActiveModel::Validations"],
+  [() => m47, "AbsenceValidator", "ActiveModel::Validations::AbsenceValidator"],
+  [() => m48, "AcceptanceValidator", "ActiveModel::Validations::AcceptanceValidator"],
   [
-    () => m47,
+    () => m48,
     "LazilyDefineAttributes",
     "ActiveModel::Validations::AcceptanceValidator::LazilyDefineAttributes",
   ],
-  [() => m48, "Callbacks", "ActiveModel::Validations::Callbacks"],
-  [() => m48, "ClassMethods", "ActiveModel::Validations::Callbacks::ClassMethods"],
-  [() => m45, "ClassMethods", "ActiveModel::Validations::ClassMethods"],
-  [() => m49, "Clusivity", "ActiveModel::Validations::Clusivity"],
-  [() => m50, "Comparability", "ActiveModel::Validations::Comparability"],
-  [() => m51, "ComparisonValidator", "ActiveModel::Validations::ComparisonValidator"],
-  [() => m52, "ConfirmationValidator", "ActiveModel::Validations::ConfirmationValidator"],
-  [() => m53, "ExclusionValidator", "ActiveModel::Validations::ExclusionValidator"],
-  [() => m54, "FormatValidator", "ActiveModel::Validations::FormatValidator"],
-  [() => m55, "HelperMethods", "ActiveModel::Validations::HelperMethods"],
-  [() => m56, "InclusionValidator", "ActiveModel::Validations::InclusionValidator"],
-  [() => m57, "LengthValidator", "ActiveModel::Validations::LengthValidator"],
-  [() => m58, "NumericalityValidator", "ActiveModel::Validations::NumericalityValidator"],
-  [() => m59, "PresenceValidator", "ActiveModel::Validations::PresenceValidator"],
-  [() => m60, "ResolveValue", "ActiveModel::Validations::ResolveValue"],
-  [() => m61, "WithValidator", "ActiveModel::Validations::WithValidator"],
-  [() => m62, "Validator", "ActiveModel::Validator"],
+  [() => m49, "Callbacks", "ActiveModel::Validations::Callbacks"],
+  [() => m49, "ClassMethods", "ActiveModel::Validations::Callbacks::ClassMethods"],
+  [() => m46, "ClassMethods", "ActiveModel::Validations::ClassMethods"],
+  [() => m50, "Clusivity", "ActiveModel::Validations::Clusivity"],
+  [() => m51, "Comparability", "ActiveModel::Validations::Comparability"],
+  [() => m52, "ComparisonValidator", "ActiveModel::Validations::ComparisonValidator"],
+  [() => m53, "ConfirmationValidator", "ActiveModel::Validations::ConfirmationValidator"],
+  [() => m54, "ExclusionValidator", "ActiveModel::Validations::ExclusionValidator"],
+  [() => m55, "FormatValidator", "ActiveModel::Validations::FormatValidator"],
+  [() => m56, "HelperMethods", "ActiveModel::Validations::HelperMethods"],
+  [() => m57, "InclusionValidator", "ActiveModel::Validations::InclusionValidator"],
+  [() => m58, "LengthValidator", "ActiveModel::Validations::LengthValidator"],
+  [() => m59, "NumericalityValidator", "ActiveModel::Validations::NumericalityValidator"],
+  [() => m60, "PresenceValidator", "ActiveModel::Validations::PresenceValidator"],
+  [() => m61, "ResolveValue", "ActiveModel::Validations::ResolveValue"],
+  [() => m62, "WithValidator", "ActiveModel::Validations::WithValidator"],
+  [() => m63, "Validator", "ActiveModel::Validator"],
   [() => m18, "VERSION", "ActiveModel::VERSION"],
 ]);

@@ -1,11 +1,14 @@
+import { include } from "@blazetrails/activesupport";
 import { BigDecimal } from "@blazetrails/activesupport";
 import { isNan, rbFloatTypeP, toF } from "@blazetrails/ruby-compat";
 import { ValueType } from "./value.js";
-import { applyNumericMixin } from "./helpers/numeric.js";
+import { Numeric } from "./helpers/numeric.js";
 
-const NumericValueType = applyNumericMixin(ValueType<number>);
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type -- Ruby `include Helpers::Numeric`; the class/interface merge is how `include()` surfaces on the type side.
+export interface FloatType extends Omit<Numeric, "cast" | "serialize" | "serializeCastValue"> {}
 
-export class FloatType extends NumericValueType {
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export class FloatType extends ValueType<number> {
   type(): string {
     return "float";
   }
@@ -37,3 +40,5 @@ export class FloatType extends NumericValueType {
     }
   }
 }
+
+include(FloatType, Numeric);
