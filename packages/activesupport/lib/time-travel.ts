@@ -1,3 +1,9 @@
+/**
+ * @boundary-file: `currentTime()` returns a JS `Date` for the Date-typed
+ *   consumers (`time-ext`, `duration`); `currentTimeInstant()` is the
+ *   Temporal form. Both read `Time.now`, which `travel_to` stubs.
+ */
+
 import { Time } from "@blazetrails/date";
 
 export function currentTimeInstant(): Temporal.Instant {
@@ -5,6 +11,5 @@ export function currentTimeInstant(): Temporal.Instant {
 }
 
 export function currentTime(): Date {
-  // boundary: Date-typed consumers (time-ext, duration)
   return new Date(currentTimeInstant().epochMilliseconds);
 }
