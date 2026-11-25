@@ -1,8 +1,9 @@
 import type { XmlDocument as LibXmlDocument } from "libxml2-wasm";
-import { include } from "@blazetrails/ruby-compat";
+import { Pathname, RuntimeError, include } from "@blazetrails/ruby-compat";
 
 import { HTML5, XML, Nokogiri } from "../namespaces.js";
 
+import type { DocumentFragment } from "./document-fragment.js";
 import type { NodeSet } from "./node-set.js";
 import * as Searchable from "./searchable.js";
 import { XmlNode } from "./node.js";
@@ -28,12 +29,13 @@ export class XmlDocument {
   }
 
   errors: SyntaxError[] = [];
+  url: string | null = null;
   encoding: string | null = null;
   private _doc: LibXmlDocument | null = null;
   private _root: XmlNode | null = null;
 
   static parse(
-    stringOrIo: string | Readable | null,
+    stringOrIo: string | Readable | Pathname | null,
     url: string | null = null,
     encoding: string | null = null,
     options: ParseOptions | number = ParseOptions.DEFAULT_XML,
@@ -57,10 +59,18 @@ export class XmlDocument {
       }
     }
 
-    const doc =
-      typeof stringOrIo === "object" && stringOrIo !== null && "read" in stringOrIo
-        ? XmlDocument.readIo(stringOrIo, url, encoding, options.toI())
-        : XmlDocument.readMemory(stringOrIo as string, url, encoding, options.toI());
+    let doc: XmlDocument;
+    if (typeof stringOrIo === "object" && stringOrIo !== null && "read" in stringOrIo) {
+      if (stringOrIo instanceof Pathname) {
+        const file = stringOrIo.expandPath().open();
+        stringOrIo = file as unknown as Readable;
+        url ??= file.path();
+      }
+
+      doc = XmlDocument.readIo(stringOrIo, url, encoding, options.toI());
+    } else {
+      doc = XmlDocument.readMemory(stringOrIo as string, url, encoding, options.toI());
+    }
 
     if (options.isXinclude()) doc.doXinclude(options);
 
@@ -68,13 +78,16 @@ export class XmlDocument {
   }
 
   /** @internal */
-  private static isEmptyDoc(stringOrIo: string | Readable | null): boolean {
+  private static isEmptyDoc(stringOrIo: string | Readable | Pathname | null): boolean {
     return (
       stringOrIo == null ||
       (typeof stringOrIo === "string"
         ? stringOrIo === ""
-        : stringOrIo.isEmpty !== undefined && stringOrIo.isEmpty()) ||
-      (typeof stringOrIo === "object" && stringOrIo.isEof !== undefined && stringOrIo.isEof())
+        : stringOrIo.isEmpty !== undefined && stringOrIo.isEmpty() === true) ||
+      (typeof stringOrIo === "object" &&
+        "isEof" in stringOrIo &&
+        stringOrIo.isEof !== undefined &&
+        stringOrIo.isEof())
     );
   }
 
@@ -90,21 +103,40 @@ export class XmlDocument {
 
   static readMemory(
     string: string,
-    _url: string | null,
-    _encoding: string | null,
+    url: string | null,
+    encoding: string | null,
     options: number,
   ): XmlDocument {
-    const document = new XmlDocument();
+    const libxml = Nokogiri.LibXml2!;
+    const ctxt = libxml.xmlNewParserCtxt();
+    const errIndex = libxml.error.storage.allocate([]);
+    let cDocument: number;
+    let rbErrors: SyntaxError[];
     try {
-      document._doc = Nokogiri.LibXml2!.XmlDocument.fromString(string);
-      document._root = new XmlNode(document._doc.root, document);
-    } catch (e) {
-      if (!(e instanceof Nokogiri.LibXml2!.XmlParseError)) throw e;
-      for (const detail of e.details) {
-        document.errors.push(new SyntaxError(detail.message, 3, detail.line, detail.col));
-      }
-      if (new ParseOptions(options).isStrict()) throw document.errors[0];
+      libxml.xmlCtxtSetErrorHandler(ctxt, libxml.error.errorCollector, errIndex);
+      cDocument = libxml.xmlReadString(ctxt, string, url, encoding, options);
+      rbErrors = libxml.error.storage
+        .get(errIndex)
+        .map((detail) => new SyntaxError(detail.message, 3, detail.line, detail.col));
+    } finally {
+      libxml.error.storage.free(errIndex);
+      libxml.xmlFreeParserCtxt(ctxt);
     }
+
+    if (!cDocument) {
+      const exception = SyntaxError.aggregate(rbErrors);
+      if (exception !== null) {
+        throw exception;
+      } else {
+        throw new RuntimeError("Could not parse document");
+      }
+    }
+
+    const document = new XmlDocument();
+    document._doc = libxml.XmlDocument.getInstance(cDocument);
+    document._root = new XmlNode(document._doc.root, document);
+    document.url = url;
+    document.errors = rbErrors;
     return document;
   }
 
@@ -146,6 +178,10 @@ export class XmlDocument {
   get root(): XmlNode {
     if (this._root === null) throw new Error("Document has no root (parse failed or disposed)");
     return this._root;
+  }
+
+  fragment(tags: string | null = null): DocumentFragment {
+    return new XML.DocumentFragment(this, tags, this._root);
   }
 
   xpathDoctype(): XPathVisitor["doctype"] {

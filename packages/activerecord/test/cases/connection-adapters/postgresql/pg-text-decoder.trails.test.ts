@@ -132,7 +132,7 @@ describe("PGConnection#typeMapForResults", () => {
     });
     expect(client.typeMapForResults._lookupOid(0, OID_INT8)).toBeNull();
     client.typeMapForResults = map;
-    await client.asyncExec("SELECT 1");
+    await client.execParams("SELECT 1", []);
     const { getTypeParser } = queries[0].types;
     expect((getTypeParser(OID_INT8, "text") as (v: string) => unknown)("3")).toBe(3);
     expect((getTypeParser(OID_INT8, "binary") as (v: string) => unknown)("3")).toBe("3");

@@ -24,7 +24,7 @@ export const PlainTextConversion = {
   /** @internal */
   plainTextForNodeChildren(node: PlainTextNode): string {
     const texts: string[] = [];
-    node.children.forEach((child, index) => {
+    node.children.toA().forEach((child, index) => {
       texts.push(this.plainTextForNode(child, index));
     });
     return texts.join("");

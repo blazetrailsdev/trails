@@ -1,3 +1,4 @@
+import "../../constants.sqlite3-database-statements.generated.js";
 import * as Arel from "@blazetrails/arel";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { b, rbRegMatchP, StandardError } from "@blazetrails/ruby-compat";

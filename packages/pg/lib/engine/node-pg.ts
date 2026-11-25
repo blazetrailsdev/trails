@@ -76,8 +76,12 @@ export async function execute(
   return result(await submit(conn, config));
 }
 
-export function emptyResult(error: unknown = null): Result {
-  return new Result({ command: "", rowCount: null, oid: 0, fields: [], rows: [] }, error as never);
+export function emptyResult(error: unknown = null, status: number | null = null): Result {
+  return new Result(
+    { command: "", rowCount: null, oid: 0, fields: [], rows: [] },
+    error as never,
+    status,
+  );
 }
 
 export function listen(conn: Connection, client: Client): void {
@@ -304,7 +308,10 @@ export function dispatch(conn: Connection, write: ProtocolWrite, cmds: ("query" 
         return;
       }
       deliver(emptyResult(error));
-      if (!pipelined()) return;
+      if (!pipelined()) {
+        reseat();
+        return;
+      }
       conn._pipelineStatus = Constants.PQ_PIPELINE_ABORTED;
       endCommand();
       while (conn._cmdQueue[0] === "query") {

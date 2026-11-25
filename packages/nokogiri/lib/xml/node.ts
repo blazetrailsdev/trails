@@ -91,24 +91,24 @@ export class XmlNode {
     return this.content;
   }
 
-  get children(): XmlNode[] {
-    if (!(this._node instanceof Nokogiri.LibXml2!.XmlElement)) return [];
+  get children(): NodeSet {
+    if (!(this._node instanceof Nokogiri.LibXml2!.XmlElement)) return new NodeSet(this.document);
     const result: XmlNode[] = [];
     let child = this._node.firstChild;
     while (child !== null) {
       result.push(new XmlNode(child, this.document));
       child = child.next;
     }
-    return result;
+    return new NodeSet(this.document, result as Node[]);
   }
 
   get elementChildren(): XmlNode[] {
-    return this.children.filter((child) => child.isElement());
+    return this.children.toA().filter((child) => child.isElement());
   }
 
   set children(nodeOrTags: XmlNode | NodeSet | DocumentFragment | string) {
     const coerced = this.coerce(nodeOrTags);
-    new NodeSet(this.document, this.children as unknown as Node[]).unlink();
+    this.children.unlink();
     if (coerced instanceof NodeSet) {
       coerced.each((n) => this.addChildNodeAndReparentAttrs(n));
     } else {
@@ -234,9 +234,9 @@ export class XmlNode {
     if (data instanceof NodeSet) {
       return data;
     } else if (data instanceof XML.DocumentFragment) {
-      return new NodeSet(this.document, data.children as unknown as Node[]);
+      return data.children;
     } else if (typeof data === "string") {
-      return new NodeSet(this.document, this.fragment(data).children as unknown as Node[]);
+      return this.fragment(data).children;
     } else if (!(data instanceof XML.Document) && data instanceof XmlNode) {
       return data;
     }

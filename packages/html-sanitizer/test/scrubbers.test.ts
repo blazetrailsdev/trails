@@ -18,7 +18,7 @@ function assertScrubbed(html: string, expected = html): void {
 }
 
 function toNode(text: string): Html5Node {
-  return Loofah.html5Fragment(text).children[0];
+  return Loofah.html5Fragment(text).children.toA()[0];
 }
 
 function assertNodeSkipped(text: string): void {

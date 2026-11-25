@@ -1,3 +1,4 @@
+import "../../constants.sqlite3-quoting.generated.js";
 /**
  * SQLite3 quoting — SQLite-specific value and identifier quoting.
  *

@@ -34,8 +34,7 @@ describe("PG::Connection", () => {
   it("#get_result should send remaining data before waiting", async () => {
     const str = "abcd".repeat(2000) + "\n";
     await conn.exec("CREATE TEMP TABLE copytable2 (col1 TEXT)");
-    conn.sendQuery("COPY copytable2 FROM STDOUT");
-    await conn.getLastResult();
+    await conn.exec("COPY copytable2 FROM STDOUT");
 
     for (let i = 0; i < 1000; i++) {
       conn.syncPutCopyData(str);
@@ -146,6 +145,16 @@ describe("PG::Connection", () => {
 
     expect(await conn.waitForNotify(10)).toBe("woo");
     await conn.exec("UNLISTEN woo");
+  });
+
+  it("can return the default connection options", () => {
+    expect(PG.Connection.conndefaults()).toBeInstanceOf(Array);
+    for (const h of PG.Connection.conndefaults()) expect(h).toBeInstanceOf(Object);
+    expect(PG.Connection.conndefaults()[0]).toHaveProperty("keyword");
+    expect(PG.Connection.conndefaults()[0]).toHaveProperty("label");
+    expect(PG.Connection.conndefaults()[0]).toHaveProperty("dispchar");
+    expect(PG.Connection.conndefaults()[0]).toHaveProperty("dispsize");
+    expect(conn.conndefaults()).toEqual(PG.Connection.conndefaults());
   });
 
   it("described_class#block should allow a timeout", async () => {

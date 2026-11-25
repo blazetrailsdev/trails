@@ -303,7 +303,6 @@ import {
   isTriggerTransactionalCallbacks as _isTriggerTransactionalCallbacks,
   addToTransaction as _addToTransaction,
   hasTransactionalCallbacks as _hasTransactionalCallbacks,
-  _newRecordBeforeLastCommit as _txNewRecordBeforeLastCommit,
   _triggerDestroyCallback as _txTriggerDestroyCallback,
   clearTransactionRecordState as _clearTransactionRecordState,
   _committedAlreadyCalled as _txCommittedAlreadyCalled,
@@ -364,6 +363,10 @@ export type PrimaryKeyValue = PrimaryKeyScalar | PrimaryKeyScalar[];
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Base extends Model {
+  /** @internal */
+  declare _newRecordBeforeLastCommit: boolean | null;
+  /** @internal */
+  declare _lastTransactionReturnStatus: unknown;
   /** @noRailsEquivalent PERMANENT */
   static readonly [shadowsIncluded] = ["initInternals"];
 
@@ -1800,11 +1803,7 @@ export interface Base
   /** @internal */
   _startTransactionState?: _Transactions.TransactionRecordState | null;
   /** @internal */
-  _lastTransactionReturnStatus?: unknown;
-  /** @internal */
   _committedAlreadyCalled?: boolean | null;
-  /** @internal */
-  _newRecordBeforeLastCommit?: boolean | null;
   /** @internal */
   _deferTouchAttrs?: readonly string[] | null;
   /** @internal */
@@ -2289,7 +2288,6 @@ include(Base, {
   withTransactionReturningStatus: _withTransactionReturningStatus,
   addToTransaction: _addToTransaction,
   hasTransactionalCallbacks: _hasTransactionalCallbacks,
-  _newRecordBeforeLastCommit: _txNewRecordBeforeLastCommit,
   _committedAlreadyCalled: _txCommittedAlreadyCalled,
   _triggerUpdateCallback: _txTriggerUpdateCallback,
   _triggerDestroyCallback: _txTriggerDestroyCallback,

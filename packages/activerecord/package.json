@@ -64,14 +64,14 @@
     "@blazetrails/date": "workspace:*",
     "@blazetrails/did-you-mean": "workspace:*",
     "@blazetrails/globalid": "workspace:*",
-    "@blazetrails/i18n": "workspace:*",
-    "@blazetrails/sqlite3": "workspace:*"
+    "@blazetrails/i18n": "workspace:*"
   },
   "peerDependencies": {
     "@blazetrails/activejob": "workspace:*",
     "@blazetrails/msgpack": "workspace:*",
     "@blazetrails/mysql2": "workspace:*",
     "@blazetrails/pg": "workspace:*",
+    "@blazetrails/sqlite3": "workspace:*",
     "better-sqlite3": "^13.0.3",
     "expo-sqlite": "^15.0.0 || ^16.0.0 || ^58.0.0",
     "libsql": "^0.5.29",
@@ -88,6 +88,9 @@
       "optional": true
     },
     "@blazetrails/pg": {
+      "optional": true
+    },
+    "@blazetrails/sqlite3": {
       "optional": true
     },
     "better-sqlite3": {
@@ -287,10 +290,13 @@
     "./dist/constants.sqlite-database-tasks.generated.js",
     "./dist/constants.sqlite3-adapter.generated.js",
     "./dist/constants.sqlite3-column.generated.js",
+    "./dist/constants.sqlite3-database-statements.generated.js",
     "./dist/constants.sqlite3-explain-pretty-printer.generated.js",
+    "./dist/constants.sqlite3-quoting.generated.js",
     "./dist/constants.sqlite3-schema-creation.generated.js",
     "./dist/constants.sqlite3-schema-definitions.generated.js",
     "./dist/constants.sqlite3-schema-dumper.generated.js",
+    "./dist/constants.sqlite3-schema-statements.generated.js",
     "./dist/constants.test-databases.generated.js",
     "./dist/constants.testing-query-assertions.generated.js",
     "./dist/core.js",
@@ -417,6 +423,7 @@
     "@blazetrails/mysql2": "workspace:*",
     "@blazetrails/pg": "workspace:*",
     "@blazetrails/rack": "workspace:*",
+    "@blazetrails/sqlite3": "workspace:*",
     "@blazetrails/vitest-matchers": "workspace:*",
     "pg": "^8.19.0",
     "typescript": "7.1.0-dev.20260920.1"

@@ -39,6 +39,8 @@ export const HTML5 = {
   Document: Html5Document,
   DocumentFragment: Html5DocumentFragment,
   Node: Html5Node,
+  parse: NokogiriNamespace.HTML5.parse,
+  fragment: NokogiriNamespace.HTML5.fragment,
 };
 export type { Html5Document, Html5DocumentFragment, Html5Node };
 export type { NodeSet };
@@ -52,3 +54,4 @@ export const CSS = {
   xpathFor,
 };
 export { Nokogiri } from "./namespaces.js";
+import { Nokogiri as NokogiriNamespace } from "./namespaces.js";

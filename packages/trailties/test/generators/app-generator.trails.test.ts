@@ -130,6 +130,22 @@ describe("AppGenerator (trails-only)", () => {
     expect(pkg.dependencies["@blazetrails/solid-queue"]).toBeDefined();
   });
 
+  it("adds @blazetrails/sqlite3 only for a sqlite3 database", async () => {
+    for (const [database, expected] of [
+      ["sqlite3", true],
+      ["postgresql", false],
+    ] as const) {
+      const root = path.join(tmpDir, database);
+      await new AppGenerator(
+        ["my-app"],
+        { skipInstall: true, database },
+        { destinationRoot: root },
+      ).invokeAll();
+      const pkg = JSON.parse(fs.readFileSync(path.join(root, "my-app/package.json"), "utf-8"));
+      expect(pkg.dependencies["@blazetrails/sqlite3"] !== undefined).toBe(expected);
+    }
+  });
+
   it("writes environment files with no node: import and no process reference", async () => {
     await new AppGenerator(
       ["my-app"],
@@ -235,7 +251,7 @@ describe("AppGenerator (trails-only)", () => {
     ).invokeAll();
 
     const pkg = JSON.parse(File.read(File.join(tmpDir, "my-app", "package.json")));
-    expect(pkg.scripts.build).toBe("trails-tsc --schema db/schema.ts");
+    expect(pkg.scripts.build).toBe("trails-tsc --schema db/schema.ts && trails build");
     expect(pkg.devDependencies["@blazetrails/activerecord-cli"]).toBeDefined();
     expect(File.isExist(File.join(tmpDir, "my-app", "db", "schema.ts"))).toBe(false);
   });

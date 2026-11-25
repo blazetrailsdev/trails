@@ -18,7 +18,7 @@
     "db:seed": "trails db:seed",
     "db:setup": "trails db:setup",
     "db:reset": "trails db:reset",
-    "build:views": "trails-tsc-views build --views app/views",
+    "build:views": "trails build",
     "build:assets": "vite build",
     "test": "vitest run"
   },

@@ -519,4 +519,48 @@ describe("buildAutoload", () => {
       FileUtils.rmRf(tmp);
     }
   });
+  it("compiles the application's views before writing the boot map", async () => {
+    const tmp = Dir.mktmpdir("build-autoload");
+    const elsewhere = Dir.mktmpdir("build-autoload-cwd");
+    try {
+      FileUtils.mkdirP(`${tmp}/app/views/posts`);
+      FileUtils.mkdirP(`${tmp}/config`);
+      File.write(`${tmp}/config/application.ts`, "export {};\n");
+      File.write(`${tmp}/config/environment.ts`, "export default null;\n");
+      File.write(`${tmp}/app/views/posts/index.html.tse`, "<h1>Posts</h1>");
+      const root = File.realpath(tmp);
+      seats.Trails = {
+        application: {
+          config: { root },
+          paths: () => ({
+            get: (key: string) => ({
+              toAry: () => [key],
+              extensions: () => undefined,
+              existent: () => {
+                const full = File.expandPath(key, root);
+                return File.isExist(full) ? [full] : [];
+              },
+            }),
+          }),
+          initializers: { tsort: () => [] },
+          initialized: () => true,
+          reloadRoutesUnlessLoaded: async () => true,
+          routes: () => ({ namedRoutes: { helperNames: () => [] } }),
+        },
+      };
+      Dir.chdir(elsewhere);
+
+      await buildAutoload({ cwd: root, views: true });
+
+      expect(File.isExist(`${root}/.trails/views/posts/index.html.tse.js`)).toBe(true);
+      expect(File.isExist(`${elsewhere}/.trails`)).toBe(false);
+      expect(File.read(`${root}/.trails/boot.generated.js`)).toContain(
+        '"app/views/posts/index.html.tse": async () => ({ ...(await import("./views/posts/index.html.tse.js")), source: ',
+      );
+    } finally {
+      Dir.chdir(pwd);
+      FileUtils.rmRf(tmp);
+      FileUtils.rmRf(elsewhere);
+    }
+  });
 });

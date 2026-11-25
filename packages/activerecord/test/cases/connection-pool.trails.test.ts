@@ -1,3 +1,4 @@
+import { snapshotReaperState } from "../support/reaper-state.js";
 import { mkdtemp, writeFile, readFile, rm } from "fs/promises";
 import { rbObjInspect, RuntimeError, Thread, ThreadPoolExecutor } from "@blazetrails/ruby-compat";
 import { tmpdir } from "os";
@@ -387,6 +388,7 @@ it("full pool async checkout timeout", async () => {
 });
 
 it("reaper flushes idle connections after idle_timeout", async () => {
+  const restoreReaperState = snapshotReaperState();
   try {
     vi.useFakeTimers();
     const pool = makeAmbientPool({ idleTimeout: 1, reapingFrequency: 10 });
@@ -400,8 +402,7 @@ it("reaper flushes idle connections after idle_timeout", async () => {
     await vi.advanceTimersByTimeAsync(10_000);
     expect(pool.stat().connections).toBe(0);
   } finally {
-    (Reaper as any).threads.clear();
-    (Reaper as any).pools.clear();
+    await restoreReaperState();
     vi.useRealTimers();
   }
 });

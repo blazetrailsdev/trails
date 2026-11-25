@@ -224,8 +224,7 @@ describe("AtomFeedTest", () => {
     });
   });
 
-  // BLOCKED: nokogiri-xml-read-memory-honours-recover
-  it.skip("feed should allow overriding ids", async () => {
+  it("feed should allow overriding ids", async () => {
     await tc.withRestfulRouting("scrolls", async () => {
       await tc.get("index", { params: { id: "feed_with_overridden_ids" } });
       tc.assertSelect("id", { text: "tag:test.rubyonrails.org,2008:test/" });
@@ -252,8 +251,7 @@ describe("AtomFeedTest", () => {
     });
   });
 
-  // BLOCKED: nokogiri-xml-read-memory-honours-recover
-  it.skip("feed xhtml", async () => {
+  it("feed xhtml", async () => {
     await tc.withRestfulRouting("scrolls", async () => {
       await tc.get("index", { params: { id: "feed_with_xhtml_content" } });
       expect(tc.response.body).toMatch(/xmlns="http:\/\/www\.w3\.org\/1999\/xhtml"/);
