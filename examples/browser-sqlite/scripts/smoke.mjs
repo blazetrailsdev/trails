@@ -1,9 +1,18 @@
 import { chromium } from "playwright";
-import { createServer } from "vite";
+import { createServer, preview } from "vite";
 
 let server;
 let url = process.argv[2];
-if (!url) {
+const dist = process.env.DIST;
+if (dist) {
+  const base = process.env.BASE ?? "/";
+  server = await preview({
+    base,
+    build: { outDir: dist },
+    preview: { port: 4179, strictPort: true },
+  });
+  url = `http://localhost:4179${base}`;
+} else if (!url) {
   server = await createServer({ server: { port: 4179, strictPort: true } });
   await server.listen();
   url = "http://localhost:4179/";
