@@ -9,7 +9,8 @@ class SourceMapsApp extends Application {
     this.config.loadDefaults("8.0");
   }
 }
-const app = Trails.application ?? new SourceMapsApp();
+Application.register(SourceMapsApp);
+const app = Trails.application;
 app.config.setRoot(root);
 await app.initializeBang();
 const template = new LookupContext([`${root}/app/views`]).findTemplate(

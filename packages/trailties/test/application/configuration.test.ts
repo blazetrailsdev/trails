@@ -379,13 +379,13 @@ describe("ConfigurationTest", () => {
 
   it("the application root is set correctly", async () => {
     await app("development");
-    expect(Trails.application!.root()).toBe(appPath);
+    expect(Trails.application!.root()).toEqual(new Pathname(appPath));
   });
 
   it("the application root can be seen from the application singleton", async () => {
     const application = await app("development");
     const AppTemplate = application.constructor as unknown as Pick<Application, "root">;
-    expect(AppTemplate.root()).toBe(appPath);
+    expect(AppTemplate.root()).toEqual(new Pathname(appPath));
   });
 
   it("filter_parameters should be able to set via config.filter_parameters", async () => {

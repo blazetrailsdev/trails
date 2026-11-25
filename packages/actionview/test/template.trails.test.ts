@@ -1,3 +1,4 @@
+import { Pathname } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { TopLevel } from "@blazetrails/activesupport";
 import { Base } from "../lib/base.js";
@@ -103,7 +104,7 @@ describe("Template#shortIdentifier under a defined Trails.root", () => {
   const originalAnnotate = Base.annotateRenderedViewWithFilenames;
 
   beforeEach(() => {
-    TopLevel.Trails = { root: () => "/srv/app" } as unknown as typeof TopLevel.Trails;
+    TopLevel.Trails = { root: () => new Pathname("/srv/app") } as unknown as typeof TopLevel.Trails;
   });
 
   afterEach(() => {

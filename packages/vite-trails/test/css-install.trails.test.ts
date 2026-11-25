@@ -25,7 +25,7 @@ describe("css.rake", () => {
       "export default defineConfig({\n  plugins: [\n    RubyPlugin(),\n  ],\n})\n",
     );
     savedTrails = TopLevel.Trails;
-    (TopLevel as Record<string, unknown>).Trails = { root: () => rootDir.toString() };
+    (TopLevel as Record<string, unknown>).Trails = { root: () => rootDir };
     await import("../lib/tasks/css.rake.js");
   });
 
