@@ -4,6 +4,7 @@ import { PG } from "./namespaces.js";
 /** @noRailsEquivalent PERMANENT */
 export const Constants = {
   CONNECTION_OK: 0,
+  INVALID_OID: 0,
   CONNECTION_BAD: 1,
   CONNECTION_STARTED: 2,
   CONNECTION_MADE: 3,

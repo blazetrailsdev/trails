@@ -84,6 +84,24 @@ describe("PG::Result", () => {
     expect(res.fmod(0)).toBe(33 + 4);
   });
 
+  it("doesn't raise an exception when a valid index is passed to PG::Result#fmod for a column with no typemod", async () => {
+    await conn.exec("CREATE TABLE fmodtest ( foo text )");
+    const res = await conn.exec("SELECT * FROM fmodtest");
+    expect(res.fmod(0)).toBe(-1);
+  });
+
+  it("doesn't raise an exception when a valid index is passed to PG::Result#ftable for a column with no corresponding table", async () => {
+    await conn.exec("CREATE TABLE ftabletest ( foo text )");
+    const res = await conn.exec("SELECT foo, LENGTH(foo) as length FROM ftabletest");
+    expect(res.ftable(1)).toBe(PG.INVALID_OID);
+  });
+
+  it("doesnn't raise an exception when a valid index is passed to PG::Result#ftablecol for a column with no corresponding table", async () => {
+    await conn.exec("CREATE TABLE ftablecoltest ( foo text )");
+    const res = await conn.exec("SELECT foo, LENGTH(foo) as length FROM ftablecoltest");
+    expect(res.ftablecol(1)).toBe(0);
+  });
+
   it("raises a ServerError for an unknown SQLSTATE class", async () => {
     const oldError1 = PG.ERROR_CLASSES["42P01"];
     delete PG.ERROR_CLASSES["42P01"];

@@ -1046,8 +1046,6 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
       "fnumber",
       "freeze",
       "fsize",
-      "ftable",
-      "ftablecol",
       "getisnull",
       "getlength",
       "nfields",
