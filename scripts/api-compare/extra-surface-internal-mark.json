@@ -27,7 +27,7 @@
   "rack-test": 31,
   "rackup": 8,
   "rails-dom-testing": 5,
-  "ruby-compat": 789,
+  "ruby-compat": 795,
   "thor": 42,
   "zeitwerk": 0
 }
