@@ -1,4 +1,10 @@
-import { dasherize, deepMergeBang, mattrAccessor, underscore } from "@blazetrails/activesupport";
+import {
+  camelize,
+  dasherize,
+  deepMergeBang,
+  mattrAccessor,
+  underscore,
+} from "@blazetrails/activesupport";
 import "@blazetrails/activesupport/core-ext/string/inflections";
 import {
   Dir,
@@ -276,12 +282,34 @@ export class Generators {
   }
 
   static hiddenNamespaces(): string[] {
-    return (_hiddenNamespaces ??= [
-      "trails",
-      "resource-route",
-      "action-mailbox:install",
-      "devcontainer",
-    ]);
+    if (_hiddenNamespaces === undefined) {
+      const orm = Generators.options().trails.orm;
+      const test = Generators.options().trails.testFramework;
+      const template = Generators.options().trails.templateEngine;
+
+      _hiddenNamespaces = [
+        "trails",
+        "resource-route",
+        `${orm}:migration`,
+        `${orm}:model`,
+        `${test}:controller`,
+        `${test}:helper`,
+        `${test}:integration`,
+        `${test}:system`,
+        `${test}:mailer`,
+        `${test}:model`,
+        `${test}:scaffold`,
+        `${test}:view`,
+        `${test}:job`,
+        `${template}:controller`,
+        `${template}:scaffold`,
+        `${template}:mailer`,
+        "action-text:install",
+        "action-mailbox:install",
+        "devcontainer",
+      ];
+    }
+    return _hiddenNamespaces;
   }
 
   static hideNamespaces(...namespaces: string[]): void {
@@ -384,7 +412,7 @@ export class Generators {
   private static printList(base: string, namespaces: string[]): void {
     namespaces = namespaces.filter((n) => !Generators.hiddenNamespaces().includes(n));
     if (namespaces.length === 0) return;
-    STDOUT.puts(`${base.charAt(0).toUpperCase()}${base.slice(1)}:`);
+    STDOUT.puts(`${camelize(underscore(base))}:`);
     for (const n of namespaces) STDOUT.puts(`  ${n}`);
     STDOUT.puts();
   }
