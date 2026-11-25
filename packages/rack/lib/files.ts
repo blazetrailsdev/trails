@@ -69,20 +69,16 @@ export class BaseIterator {
     );
   }
 
-  /**
-   * @internal
-   * @missingRailsArgs read — CONVERGEABLE io-read-length-answers-a-binary-string-where-the-ascii-8bit-seat-is-uint8array
-   */
+  /** @internal */
   private eachRangePart(file: IO, range: Range<number>, cb: (chunk: Uint8Array) => void): void {
     file.seek(range.begin!);
     let remainingLen = range.end! - range.begin! + 1;
     while (remainingLen > 0) {
-      const outbuf = new Uint8Array(Math.min(8192, remainingLen));
-      const part = file.read(outbuf.length, outbuf);
+      const part = file.read(Math.min(8192, remainingLen));
       if (part === null) break;
       remainingLen -= part.length;
 
-      cb(outbuf.subarray(0, part.length));
+      cb(part);
     }
   }
 }
