@@ -14,6 +14,7 @@ export interface SolidQueueConfig extends OrderedOptions {
   appExecutor?: (typeof SolidQueue)["appExecutor"];
   onThreadError?: (typeof SolidQueue)["onThreadError"];
   connectsTo?: (typeof SolidQueue)["connectsTo"];
+  shutdownTimeout?: (typeof SolidQueue)["shutdownTimeout"];
 }
 
 declare module "@blazetrails/trailties/trailtie/configuration" {
