@@ -78,6 +78,24 @@ describe("walkedClassPaths placement", () => {
     });
   });
 
+  it("writes a lazy-dir self-namespace module into its own table", async () => {
+    const key = "connection-adapters/sqlite3/quoting.ts::Quoting";
+    const row = (
+      await walkedClassPaths("activerecord", {
+        ...empty,
+        residue: { [key]: "ActiveRecord::ConnectionAdapters::SQLite3::Quoting" },
+      })
+    ).find((e) => `${e.file}::${e.tsName}` === key);
+    expect(row).toEqual({
+      file: "connection-adapters/sqlite3/quoting.ts",
+      tsName: "Quoting",
+      fqn: "ActiveRecord::ConnectionAdapters::SQLite3::Quoting",
+      namespace: true,
+      excluded: true,
+      table: "constants.sqlite3-quoting.generated.ts",
+    });
+  });
+
   it("drops a row in a tsconfig-excluded directory", async () => {
     const byKey = keyed(
       await walkedClassPaths("actionview", { ...empty, residue: { "test-helpers/x.ts::X": "X" } }),

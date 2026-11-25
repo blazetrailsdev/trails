@@ -76,154 +76,151 @@ import * as m73 from "./connection-adapters/pool-manager.js";
 import * as m74 from "./connection-adapters/postgresql/oid/range.js";
 import * as m75 from "./connection-adapters/schema-cache.js";
 import * as m76 from "./connection-adapters/sql-type-metadata.js";
-import * as m77 from "./connection-adapters/sqlite3/database-statements.js";
-import * as m78 from "./connection-adapters/sqlite3/quoting.js";
-import * as m79 from "./connection-adapters/sqlite3/schema-statements.js";
-import * as m80 from "./connection-adapters/statement-pool.js";
-import * as m81 from "./connection-handling.js";
-import * as m82 from "./core.js";
-import * as m83 from "./counter-cache.js";
-import * as m84 from "./database-configurations.js";
-import * as m85 from "./database-configurations/connection-url-resolver.js";
-import * as m86 from "./database-configurations/database-config.js";
-import * as m87 from "./database-configurations/hash-config.js";
-import * as m88 from "./database-configurations/url-config.js";
-import * as m89 from "./disable-joins-association-relation.js";
-import * as m90 from "./dynamic-matchers.js";
-import * as m91 from "./encryption.js";
-import * as m92 from "./encryption/auto-filtered-parameters.js";
-import * as m93 from "./encryption/cipher.js";
-import * as m94 from "./encryption/cipher/aes256-gcm.js";
-import * as m95 from "./encryption/config.js";
-import * as m96 from "./encryption/configurable.js";
-import * as m97 from "./encryption/context.js";
-import * as m98 from "./encryption/contexts.js";
-import * as m99 from "./encryption/derived-secret-key-provider.js";
-import * as m100 from "./encryption/deterministic-key-provider.js";
-import * as m101 from "./encryption/encryptable-record.js";
-import * as m102 from "./encryption/encrypted-attribute-type.js";
-import * as m103 from "./encryption/encrypting-only-encryptor.js";
-import * as m104 from "./encryption/encryptor.js";
-import * as m105 from "./encryption/errors.js";
-import * as m106 from "./encryption/extended-deterministic-uniqueness-validator.js";
-import * as m107 from "./encryption/key-generator.js";
-import * as m108 from "./encryption/key-provider.js";
-import * as m109 from "./encryption/key.js";
-import * as m110 from "./encryption/message-serializer.js";
-import * as m111 from "./encryption/message.js";
-import * as m112 from "./encryption/null-encryptor.js";
-import * as m113 from "./encryption/properties.js";
-import * as m114 from "./encryption/scheme.js";
-import * as m115 from "./enum.js";
-import * as m116 from "./errors.js";
-import * as m117 from "./explain-registry.js";
-import * as m118 from "./explain-subscriber.js";
-import * as m119 from "./explain.js";
-import * as m120 from "./future-result.js";
-import * as m121 from "./gem-version.js";
-import * as m122 from "./inheritance.js";
-import * as m123 from "./insert-all.js";
-import * as m124 from "./integration.js";
-import * as m125 from "./internal-metadata.js";
-import * as m126 from "./legacy-yaml-adapter.js";
-import * as m127 from "./locking/optimistic.js";
-import * as m128 from "./locking/pessimistic.js";
-import * as m129 from "./log-subscriber.js";
-import * as m130 from "./marshalling.js";
-import * as m131 from "./middleware/database-selector.js";
-import * as m132 from "./middleware/database-selector/resolver.js";
-import * as m133 from "./middleware/database-selector/resolver/session.js";
-import * as m134 from "./middleware/shard-selector.js";
-import * as m135 from "./migration.js";
-import * as m136 from "./migration/command-recorder.js";
-import * as m137 from "./migration/compatibility.js";
-import * as m138 from "./migration/default-strategy.js";
-import * as m139 from "./migration/execution-strategy.js";
-import * as m140 from "./migration/pending-migration-connection.js";
-import * as m141 from "./model-schema.js";
-import * as m142 from "./nested-attributes.js";
-import * as m143 from "./no-touching.js";
-import * as m144 from "./normalization.js";
-import * as m145 from "./persistence.js";
-import * as m146 from "./query-cache.js";
-import * as m147 from "./query-logs-formatter.js";
-import * as m148 from "./query-logs.js";
-import * as m149 from "./querying.js";
-import * as m150 from "./readonly-attributes.js";
-import * as m151 from "./reflection.js";
-import * as m152 from "./relation.js";
-import * as m153 from "./relation/batches.js";
-import * as m154 from "./relation/batches/batch-enumerator.js";
-import * as m155 from "./relation/calculations.js";
-import * as m156 from "./relation/delegation.js";
-import * as m157 from "./relation/finder-methods.js";
-import * as m158 from "./relation/from-clause.js";
-import * as m159 from "./relation/merger.js";
-import * as m160 from "./relation/predicate-builder.js";
-import * as m161 from "./relation/predicate-builder/array-handler.js";
-import * as m162 from "./relation/predicate-builder/association-query-value.js";
-import * as m163 from "./relation/predicate-builder/basic-object-handler.js";
-import * as m164 from "./relation/predicate-builder/polymorphic-array-value.js";
-import * as m165 from "./relation/predicate-builder/range-handler.js";
-import * as m166 from "./relation/predicate-builder/relation-handler.js";
-import * as m167 from "./relation/query-attribute.js";
-import * as m168 from "./relation/query-methods.js";
-import * as m169 from "./relation/spawn-methods.js";
-import * as m170 from "./relation/where-clause.js";
-import * as m171 from "./result.js";
-import * as m172 from "./runtime-registry.js";
-import * as m173 from "./sanitization.js";
-import * as m174 from "./schema-dumper.js";
-import * as m175 from "./schema-migration.js";
-import * as m176 from "./schema.js";
-import * as m177 from "./scoping.js";
-import * as m178 from "./scoping/default.js";
-import * as m179 from "./scoping/named.js";
-import * as m180 from "./secure-password.js";
-import * as m181 from "./secure-token.js";
-import * as m182 from "./serialization.js";
-import * as m183 from "./signed-id.js";
-import * as m184 from "./statement-cache.js";
-import * as m185 from "./store.js";
-import * as m186 from "./suppressor.js";
-import * as m187 from "./table-metadata.js";
-import * as m188 from "./timestamp.js";
-import * as m189 from "./token-for.js";
-import * as m190 from "./touch-later.js";
-import * as m191 from "./trailties/controller-runtime.js";
-import * as m192 from "./trailties/job-runtime.js";
-import * as m193 from "./transaction.js";
-import * as m194 from "./transactions.js";
-import * as m195 from "./translation.js";
-import * as m196 from "./type-caster/connection.js";
-import * as m197 from "./type-caster/map.js";
-import * as m198 from "./type.js";
-import * as m199 from "./type/adapter-specific-registry.js";
-import * as m200 from "./type/date-time.js";
-import * as m201 from "./type/date.js";
-import * as m202 from "./type/decimal-without-scale.js";
-import * as m203 from "./type/hash-lookup-type-map.js";
-import * as m204 from "./type/internal/timezone.js";
-import * as m205 from "./type/json.js";
-import * as m206 from "./type/serialized.js";
-import * as m207 from "./type/text.js";
-import * as m208 from "./type/time.js";
-import * as m209 from "./type/type-map.js";
-import * as m210 from "./type/unsigned-integer.js";
-import * as m211 from "./validations.js";
-import * as m212 from "./validations/absence.js";
-import * as m213 from "./validations/associated.js";
-import * as m214 from "./validations/length.js";
-import * as m215 from "./validations/numericality.js";
-import * as m216 from "./validations/presence.js";
-import * as m217 from "./validations/uniqueness.js";
+import * as m77 from "./connection-adapters/statement-pool.js";
+import * as m78 from "./connection-handling.js";
+import * as m79 from "./core.js";
+import * as m80 from "./counter-cache.js";
+import * as m81 from "./database-configurations.js";
+import * as m82 from "./database-configurations/connection-url-resolver.js";
+import * as m83 from "./database-configurations/database-config.js";
+import * as m84 from "./database-configurations/hash-config.js";
+import * as m85 from "./database-configurations/url-config.js";
+import * as m86 from "./disable-joins-association-relation.js";
+import * as m87 from "./dynamic-matchers.js";
+import * as m88 from "./encryption.js";
+import * as m89 from "./encryption/auto-filtered-parameters.js";
+import * as m90 from "./encryption/cipher.js";
+import * as m91 from "./encryption/cipher/aes256-gcm.js";
+import * as m92 from "./encryption/config.js";
+import * as m93 from "./encryption/configurable.js";
+import * as m94 from "./encryption/context.js";
+import * as m95 from "./encryption/contexts.js";
+import * as m96 from "./encryption/derived-secret-key-provider.js";
+import * as m97 from "./encryption/deterministic-key-provider.js";
+import * as m98 from "./encryption/encryptable-record.js";
+import * as m99 from "./encryption/encrypted-attribute-type.js";
+import * as m100 from "./encryption/encrypting-only-encryptor.js";
+import * as m101 from "./encryption/encryptor.js";
+import * as m102 from "./encryption/errors.js";
+import * as m103 from "./encryption/extended-deterministic-uniqueness-validator.js";
+import * as m104 from "./encryption/key-generator.js";
+import * as m105 from "./encryption/key-provider.js";
+import * as m106 from "./encryption/key.js";
+import * as m107 from "./encryption/message-serializer.js";
+import * as m108 from "./encryption/message.js";
+import * as m109 from "./encryption/null-encryptor.js";
+import * as m110 from "./encryption/properties.js";
+import * as m111 from "./encryption/scheme.js";
+import * as m112 from "./enum.js";
+import * as m113 from "./errors.js";
+import * as m114 from "./explain-registry.js";
+import * as m115 from "./explain-subscriber.js";
+import * as m116 from "./explain.js";
+import * as m117 from "./future-result.js";
+import * as m118 from "./gem-version.js";
+import * as m119 from "./inheritance.js";
+import * as m120 from "./insert-all.js";
+import * as m121 from "./integration.js";
+import * as m122 from "./internal-metadata.js";
+import * as m123 from "./legacy-yaml-adapter.js";
+import * as m124 from "./locking/optimistic.js";
+import * as m125 from "./locking/pessimistic.js";
+import * as m126 from "./log-subscriber.js";
+import * as m127 from "./marshalling.js";
+import * as m128 from "./middleware/database-selector.js";
+import * as m129 from "./middleware/database-selector/resolver.js";
+import * as m130 from "./middleware/database-selector/resolver/session.js";
+import * as m131 from "./middleware/shard-selector.js";
+import * as m132 from "./migration.js";
+import * as m133 from "./migration/command-recorder.js";
+import * as m134 from "./migration/compatibility.js";
+import * as m135 from "./migration/default-strategy.js";
+import * as m136 from "./migration/execution-strategy.js";
+import * as m137 from "./migration/pending-migration-connection.js";
+import * as m138 from "./model-schema.js";
+import * as m139 from "./nested-attributes.js";
+import * as m140 from "./no-touching.js";
+import * as m141 from "./normalization.js";
+import * as m142 from "./persistence.js";
+import * as m143 from "./query-cache.js";
+import * as m144 from "./query-logs-formatter.js";
+import * as m145 from "./query-logs.js";
+import * as m146 from "./querying.js";
+import * as m147 from "./readonly-attributes.js";
+import * as m148 from "./reflection.js";
+import * as m149 from "./relation.js";
+import * as m150 from "./relation/batches.js";
+import * as m151 from "./relation/batches/batch-enumerator.js";
+import * as m152 from "./relation/calculations.js";
+import * as m153 from "./relation/delegation.js";
+import * as m154 from "./relation/finder-methods.js";
+import * as m155 from "./relation/from-clause.js";
+import * as m156 from "./relation/merger.js";
+import * as m157 from "./relation/predicate-builder.js";
+import * as m158 from "./relation/predicate-builder/array-handler.js";
+import * as m159 from "./relation/predicate-builder/association-query-value.js";
+import * as m160 from "./relation/predicate-builder/basic-object-handler.js";
+import * as m161 from "./relation/predicate-builder/polymorphic-array-value.js";
+import * as m162 from "./relation/predicate-builder/range-handler.js";
+import * as m163 from "./relation/predicate-builder/relation-handler.js";
+import * as m164 from "./relation/query-attribute.js";
+import * as m165 from "./relation/query-methods.js";
+import * as m166 from "./relation/spawn-methods.js";
+import * as m167 from "./relation/where-clause.js";
+import * as m168 from "./result.js";
+import * as m169 from "./runtime-registry.js";
+import * as m170 from "./sanitization.js";
+import * as m171 from "./schema-dumper.js";
+import * as m172 from "./schema-migration.js";
+import * as m173 from "./schema.js";
+import * as m174 from "./scoping.js";
+import * as m175 from "./scoping/default.js";
+import * as m176 from "./scoping/named.js";
+import * as m177 from "./secure-password.js";
+import * as m178 from "./secure-token.js";
+import * as m179 from "./serialization.js";
+import * as m180 from "./signed-id.js";
+import * as m181 from "./statement-cache.js";
+import * as m182 from "./store.js";
+import * as m183 from "./suppressor.js";
+import * as m184 from "./table-metadata.js";
+import * as m185 from "./timestamp.js";
+import * as m186 from "./token-for.js";
+import * as m187 from "./touch-later.js";
+import * as m188 from "./trailties/controller-runtime.js";
+import * as m189 from "./trailties/job-runtime.js";
+import * as m190 from "./transaction.js";
+import * as m191 from "./transactions.js";
+import * as m192 from "./translation.js";
+import * as m193 from "./type-caster/connection.js";
+import * as m194 from "./type-caster/map.js";
+import * as m195 from "./type.js";
+import * as m196 from "./type/adapter-specific-registry.js";
+import * as m197 from "./type/date-time.js";
+import * as m198 from "./type/date.js";
+import * as m199 from "./type/decimal-without-scale.js";
+import * as m200 from "./type/hash-lookup-type-map.js";
+import * as m201 from "./type/internal/timezone.js";
+import * as m202 from "./type/json.js";
+import * as m203 from "./type/serialized.js";
+import * as m204 from "./type/text.js";
+import * as m205 from "./type/time.js";
+import * as m206 from "./type/type-map.js";
+import * as m207 from "./type/unsigned-integer.js";
+import * as m208 from "./validations.js";
+import * as m209 from "./validations/absence.js";
+import * as m210 from "./validations/associated.js";
+import * as m211 from "./validations/length.js";
+import * as m212 from "./validations/numericality.js";
+import * as m213 from "./validations/presence.js";
+import * as m214 from "./validations/uniqueness.js";
 
 defineConstants([
-  [() => m116, "ActiveRecordError", "ActiveRecord::ActiveRecordError"],
-  [() => m116, "AdapterError", "ActiveRecord::AdapterError"],
-  [() => m116, "AdapterNotFound", "ActiveRecord::AdapterNotFound"],
-  [() => m116, "AdapterNotSpecified", "ActiveRecord::AdapterNotSpecified"],
-  [() => m116, "AdapterTimeout", "ActiveRecord::AdapterTimeout"],
+  [() => m113, "ActiveRecordError", "ActiveRecord::ActiveRecordError"],
+  [() => m113, "AdapterError", "ActiveRecord::AdapterError"],
+  [() => m113, "AdapterNotFound", "ActiveRecord::AdapterNotFound"],
+  [() => m113, "AdapterNotSpecified", "ActiveRecord::AdapterNotSpecified"],
+  [() => m113, "AdapterTimeout", "ActiveRecord::AdapterTimeout"],
   [() => m0, "Aggregations", "ActiveRecord::Aggregations"],
   [() => m0, "ClassMethods", "ActiveRecord::Aggregations::ClassMethods"],
   [
@@ -284,16 +281,16 @@ defineConstants([
   [() => m33, "ThroughAssociation", "ActiveRecord::Associations::Preloader::ThroughAssociation"],
   [() => m34, "SingularAssociation", "ActiveRecord::Associations::SingularAssociation"],
   [() => m35, "ThroughAssociation", "ActiveRecord::Associations::ThroughAssociation"],
-  [() => m116, "AssociationTypeMismatch", "ActiveRecord::AssociationTypeMismatch"],
+  [() => m113, "AssociationTypeMismatch", "ActiveRecord::AssociationTypeMismatch"],
   [() => m36, "AsynchronousQueriesTracker", "ActiveRecord::AsynchronousQueriesTracker"],
   [() => m36, "Session", "ActiveRecord::AsynchronousQueriesTracker::Session"],
   [
-    () => m116,
+    () => m113,
     "AsynchronousQueryInsideTransactionError",
     "ActiveRecord::AsynchronousQueryInsideTransactionError",
   ],
   [() => m37, "AttributeAssignment", "ActiveRecord::AttributeAssignment"],
-  [() => m116, "AttributeAssignmentError", "ActiveRecord::AttributeAssignmentError"],
+  [() => m113, "AttributeAssignmentError", "ActiveRecord::AttributeAssignmentError"],
   [() => m38, "AttributeMethods", "ActiveRecord::AttributeMethods"],
   [() => m39, "BeforeTypeCast", "ActiveRecord::AttributeMethods::BeforeTypeCast"],
   [() => m38, "ClassMethods", "ActiveRecord::AttributeMethods::ClassMethods"],
@@ -324,18 +321,18 @@ defineConstants([
   [() => m48, "Attributes", "ActiveRecord::Attributes"],
   [() => m49, "AutosaveAssociation", "ActiveRecord::AutosaveAssociation"],
   [() => m50, "Base", "ActiveRecord::Base"],
-  [() => m153, "Batches", "ActiveRecord::Batches"],
-  [() => m154, "BatchEnumerator", "ActiveRecord::Batches::BatchEnumerator"],
-  [() => m155, "Calculations", "ActiveRecord::Calculations"],
-  [() => m155, "ColumnAliasTracker", "ActiveRecord::Calculations::ColumnAliasTracker"],
+  [() => m150, "Batches", "ActiveRecord::Batches"],
+  [() => m151, "BatchEnumerator", "ActiveRecord::Batches::BatchEnumerator"],
+  [() => m152, "Calculations", "ActiveRecord::Calculations"],
+  [() => m152, "ColumnAliasTracker", "ActiveRecord::Calculations::ColumnAliasTracker"],
   [() => m51, "Callbacks", "ActiveRecord::Callbacks"],
   [() => m51, "ClassMethods", "ActiveRecord::Callbacks::ClassMethods"],
   [() => m52, "ColumnSerializer", "ActiveRecord::Coders::ColumnSerializer"],
   [() => m53, "JSON", "ActiveRecord::Coders::JSON"],
   [() => m54, "YAMLColumn", "ActiveRecord::Coders::YAMLColumn"],
   [() => m18, "CompositePrimaryKeyMismatchError", "ActiveRecord::CompositePrimaryKeyMismatchError"],
-  [() => m135, "ConcurrentMigrationError", "ActiveRecord::ConcurrentMigrationError"],
-  [() => m116, "ConfigurationError", "ActiveRecord::ConfigurationError"],
+  [() => m132, "ConcurrentMigrationError", "ActiveRecord::ConcurrentMigrationError"],
+  [() => m113, "ConfigurationError", "ActiveRecord::ConfigurationError"],
   [() => m55, "ConnectionAdapters", "ActiveRecord::ConnectionAdapters"],
   [() => m56, "AbstractAdapter", "ActiveRecord::ConnectionAdapters::AbstractAdapter"],
   [() => m56, "Version", "ActiveRecord::ConnectionAdapters::AbstractAdapter::Version"],
@@ -428,11 +425,8 @@ defineConstants([
   [() => m67, "SchemaDumper", "ActiveRecord::ConnectionAdapters::SchemaDumper"],
   [() => m75, "SchemaReflection", "ActiveRecord::ConnectionAdapters::SchemaReflection"],
   [() => m68, "SchemaStatements", "ActiveRecord::ConnectionAdapters::SchemaStatements"],
-  [() => m77, null, "ActiveRecord::ConnectionAdapters::SQLite3::DatabaseStatements"],
-  [() => m78, null, "ActiveRecord::ConnectionAdapters::SQLite3::Quoting"],
-  [() => m79, null, "ActiveRecord::ConnectionAdapters::SQLite3::SchemaStatements"],
   [() => m76, "SqlTypeMetadata", "ActiveRecord::ConnectionAdapters::SqlTypeMetadata"],
-  [() => m80, "StatementPool", "ActiveRecord::ConnectionAdapters::StatementPool"],
+  [() => m77, "StatementPool", "ActiveRecord::ConnectionAdapters::StatementPool"],
   [() => m66, "Table", "ActiveRecord::ConnectionAdapters::Table"],
   [() => m66, "TableDefinition", "ActiveRecord::ConnectionAdapters::TableDefinition"],
   [() => m69, "Transaction", "ActiveRecord::ConnectionAdapters::Transaction"],
@@ -454,107 +448,107 @@ defineConstants([
   ],
   [() => m69, "TransactionManager", "ActiveRecord::ConnectionAdapters::TransactionManager"],
   [() => m69, "TransactionState", "ActiveRecord::ConnectionAdapters::TransactionState"],
-  [() => m116, "ConnectionFailed", "ActiveRecord::ConnectionFailed"],
-  [() => m81, "ConnectionHandling", "ActiveRecord::ConnectionHandling"],
-  [() => m116, "ConnectionNotDefined", "ActiveRecord::ConnectionNotDefined"],
-  [() => m116, "ConnectionNotEstablished", "ActiveRecord::ConnectionNotEstablished"],
-  [() => m116, "ConnectionTimeoutError", "ActiveRecord::ConnectionTimeoutError"],
-  [() => m82, "Core", "ActiveRecord::Core"],
-  [() => m82, "ClassMethods", "ActiveRecord::Core::ClassMethods"],
-  [() => m82, "InspectionMask", "ActiveRecord::Core::InspectionMask"],
-  [() => m83, "CounterCache", "ActiveRecord::CounterCache"],
-  [() => m83, "ClassMethods", "ActiveRecord::CounterCache::ClassMethods"],
-  [() => m116, "DangerousAttributeError", "ActiveRecord::DangerousAttributeError"],
-  [() => m116, "DatabaseAlreadyExists", "ActiveRecord::DatabaseAlreadyExists"],
-  [() => m84, "DatabaseConfigurations", "ActiveRecord::DatabaseConfigurations"],
+  [() => m113, "ConnectionFailed", "ActiveRecord::ConnectionFailed"],
+  [() => m78, "ConnectionHandling", "ActiveRecord::ConnectionHandling"],
+  [() => m113, "ConnectionNotDefined", "ActiveRecord::ConnectionNotDefined"],
+  [() => m113, "ConnectionNotEstablished", "ActiveRecord::ConnectionNotEstablished"],
+  [() => m113, "ConnectionTimeoutError", "ActiveRecord::ConnectionTimeoutError"],
+  [() => m79, "Core", "ActiveRecord::Core"],
+  [() => m79, "ClassMethods", "ActiveRecord::Core::ClassMethods"],
+  [() => m79, "InspectionMask", "ActiveRecord::Core::InspectionMask"],
+  [() => m80, "CounterCache", "ActiveRecord::CounterCache"],
+  [() => m80, "ClassMethods", "ActiveRecord::CounterCache::ClassMethods"],
+  [() => m113, "DangerousAttributeError", "ActiveRecord::DangerousAttributeError"],
+  [() => m113, "DatabaseAlreadyExists", "ActiveRecord::DatabaseAlreadyExists"],
+  [() => m81, "DatabaseConfigurations", "ActiveRecord::DatabaseConfigurations"],
   [
-    () => m85,
+    () => m82,
     "ConnectionUrlResolver",
     "ActiveRecord::DatabaseConfigurations::ConnectionUrlResolver",
   ],
-  [() => m86, "DatabaseConfig", "ActiveRecord::DatabaseConfigurations::DatabaseConfig"],
-  [() => m87, "HashConfig", "ActiveRecord::DatabaseConfigurations::HashConfig"],
+  [() => m83, "DatabaseConfig", "ActiveRecord::DatabaseConfigurations::DatabaseConfig"],
+  [() => m84, "HashConfig", "ActiveRecord::DatabaseConfigurations::HashConfig"],
   [
-    () => m84,
+    () => m81,
     "InvalidConfigurationError",
     "ActiveRecord::DatabaseConfigurations::InvalidConfigurationError",
   ],
-  [() => m88, "UrlConfig", "ActiveRecord::DatabaseConfigurations::UrlConfig"],
-  [() => m116, "DatabaseConnectionError", "ActiveRecord::DatabaseConnectionError"],
-  [() => m116, "DatabaseVersionError", "ActiveRecord::DatabaseVersionError"],
-  [() => m116, "Deadlocked", "ActiveRecord::Deadlocked"],
-  [() => m156, "Delegation", "ActiveRecord::Delegation"],
-  [() => m156, "ClassSpecificRelation", "ActiveRecord::Delegation::ClassSpecificRelation"],
-  [() => m156, "DelegateCache", "ActiveRecord::Delegation::DelegateCache"],
-  [() => m156, "GeneratedRelationMethods", "ActiveRecord::Delegation::GeneratedRelationMethods"],
+  [() => m85, "UrlConfig", "ActiveRecord::DatabaseConfigurations::UrlConfig"],
+  [() => m113, "DatabaseConnectionError", "ActiveRecord::DatabaseConnectionError"],
+  [() => m113, "DatabaseVersionError", "ActiveRecord::DatabaseVersionError"],
+  [() => m113, "Deadlocked", "ActiveRecord::Deadlocked"],
+  [() => m153, "Delegation", "ActiveRecord::Delegation"],
+  [() => m153, "ClassSpecificRelation", "ActiveRecord::Delegation::ClassSpecificRelation"],
+  [() => m153, "DelegateCache", "ActiveRecord::Delegation::DelegateCache"],
+  [() => m153, "GeneratedRelationMethods", "ActiveRecord::Delegation::GeneratedRelationMethods"],
   [() => m18, "DeleteRestrictionError", "ActiveRecord::DeleteRestrictionError"],
-  [() => m89, "DisableJoinsAssociationRelation", "ActiveRecord::DisableJoinsAssociationRelation"],
-  [() => m135, "DuplicateMigrationNameError", "ActiveRecord::DuplicateMigrationNameError"],
-  [() => m135, "DuplicateMigrationVersionError", "ActiveRecord::DuplicateMigrationVersionError"],
-  [() => m90, "DynamicMatchers", "ActiveRecord::DynamicMatchers"],
-  [() => m90, "FindBy", "ActiveRecord::DynamicMatchers::FindBy"],
-  [() => m90, "FindByBang", "ActiveRecord::DynamicMatchers::FindByBang"],
-  [() => m90, "Method", "ActiveRecord::DynamicMatchers::Method"],
+  [() => m86, "DisableJoinsAssociationRelation", "ActiveRecord::DisableJoinsAssociationRelation"],
+  [() => m132, "DuplicateMigrationNameError", "ActiveRecord::DuplicateMigrationNameError"],
+  [() => m132, "DuplicateMigrationVersionError", "ActiveRecord::DuplicateMigrationVersionError"],
+  [() => m87, "DynamicMatchers", "ActiveRecord::DynamicMatchers"],
+  [() => m87, "FindBy", "ActiveRecord::DynamicMatchers::FindBy"],
+  [() => m87, "FindByBang", "ActiveRecord::DynamicMatchers::FindByBang"],
+  [() => m87, "Method", "ActiveRecord::DynamicMatchers::Method"],
   [() => m18, "EagerLoadPolymorphicError", "ActiveRecord::EagerLoadPolymorphicError"],
-  [() => m91, "Encryption", "ActiveRecord::Encryption"],
-  [() => m92, "AutoFilteredParameters", "ActiveRecord::Encryption::AutoFilteredParameters"],
-  [() => m93, "Cipher", "ActiveRecord::Encryption::Cipher"],
-  [() => m94, "Aes256Gcm", "ActiveRecord::Encryption::Cipher::Aes256Gcm"],
-  [() => m95, "Config", "ActiveRecord::Encryption::Config"],
-  [() => m96, "Configurable", "ActiveRecord::Encryption::Configurable"],
-  [() => m97, "Context", "ActiveRecord::Encryption::Context"],
-  [() => m98, "Contexts", "ActiveRecord::Encryption::Contexts"],
-  [() => m99, "DerivedSecretKeyProvider", "ActiveRecord::Encryption::DerivedSecretKeyProvider"],
-  [() => m100, "DeterministicKeyProvider", "ActiveRecord::Encryption::DeterministicKeyProvider"],
-  [() => m101, "EncryptableRecord", "ActiveRecord::Encryption::EncryptableRecord"],
-  [() => m102, "EncryptedAttributeType", "ActiveRecord::Encryption::EncryptedAttributeType"],
-  [() => m103, "EncryptingOnlyEncryptor", "ActiveRecord::Encryption::EncryptingOnlyEncryptor"],
-  [() => m104, "Encryptor", "ActiveRecord::Encryption::Encryptor"],
-  [() => m105, null, "ActiveRecord::Encryption::Errors"],
-  [() => m105, "Base", "ActiveRecord::Encryption::Errors::Base"],
-  [() => m105, "Configuration", "ActiveRecord::Encryption::Errors::Configuration"],
-  [() => m105, "Decryption", "ActiveRecord::Encryption::Errors::Decryption"],
-  [() => m105, "Encoding", "ActiveRecord::Encryption::Errors::Encoding"],
+  [() => m88, "Encryption", "ActiveRecord::Encryption"],
+  [() => m89, "AutoFilteredParameters", "ActiveRecord::Encryption::AutoFilteredParameters"],
+  [() => m90, "Cipher", "ActiveRecord::Encryption::Cipher"],
+  [() => m91, "Aes256Gcm", "ActiveRecord::Encryption::Cipher::Aes256Gcm"],
+  [() => m92, "Config", "ActiveRecord::Encryption::Config"],
+  [() => m93, "Configurable", "ActiveRecord::Encryption::Configurable"],
+  [() => m94, "Context", "ActiveRecord::Encryption::Context"],
+  [() => m95, "Contexts", "ActiveRecord::Encryption::Contexts"],
+  [() => m96, "DerivedSecretKeyProvider", "ActiveRecord::Encryption::DerivedSecretKeyProvider"],
+  [() => m97, "DeterministicKeyProvider", "ActiveRecord::Encryption::DeterministicKeyProvider"],
+  [() => m98, "EncryptableRecord", "ActiveRecord::Encryption::EncryptableRecord"],
+  [() => m99, "EncryptedAttributeType", "ActiveRecord::Encryption::EncryptedAttributeType"],
+  [() => m100, "EncryptingOnlyEncryptor", "ActiveRecord::Encryption::EncryptingOnlyEncryptor"],
+  [() => m101, "Encryptor", "ActiveRecord::Encryption::Encryptor"],
+  [() => m102, null, "ActiveRecord::Encryption::Errors"],
+  [() => m102, "Base", "ActiveRecord::Encryption::Errors::Base"],
+  [() => m102, "Configuration", "ActiveRecord::Encryption::Errors::Configuration"],
+  [() => m102, "Decryption", "ActiveRecord::Encryption::Errors::Decryption"],
+  [() => m102, "Encoding", "ActiveRecord::Encryption::Errors::Encoding"],
   [
-    () => m105,
+    () => m102,
     "EncryptedContentIntegrity",
     "ActiveRecord::Encryption::Errors::EncryptedContentIntegrity",
   ],
-  [() => m105, "Encryption", "ActiveRecord::Encryption::Errors::Encryption"],
-  [() => m105, "ForbiddenClass", "ActiveRecord::Encryption::Errors::ForbiddenClass"],
+  [() => m102, "Encryption", "ActiveRecord::Encryption::Errors::Encryption"],
+  [() => m102, "ForbiddenClass", "ActiveRecord::Encryption::Errors::ForbiddenClass"],
   [
-    () => m106,
+    () => m103,
     "ExtendedDeterministicUniquenessValidator",
     "ActiveRecord::Encryption::ExtendedDeterministicUniquenessValidator",
   ],
   [
-    () => m106,
+    () => m103,
     "EncryptedUniquenessValidator",
     "ActiveRecord::Encryption::ExtendedDeterministicUniquenessValidator::EncryptedUniquenessValidator",
   ],
-  [() => m109, "Key", "ActiveRecord::Encryption::Key"],
-  [() => m107, "KeyGenerator", "ActiveRecord::Encryption::KeyGenerator"],
-  [() => m108, "KeyProvider", "ActiveRecord::Encryption::KeyProvider"],
-  [() => m111, "Message", "ActiveRecord::Encryption::Message"],
-  [() => m110, "MessageSerializer", "ActiveRecord::Encryption::MessageSerializer"],
-  [() => m112, "NullEncryptor", "ActiveRecord::Encryption::NullEncryptor"],
-  [() => m113, "Properties", "ActiveRecord::Encryption::Properties"],
-  [() => m114, "Scheme", "ActiveRecord::Encryption::Scheme"],
-  [() => m115, "Enum", "ActiveRecord::Enum"],
-  [() => m115, "EnumMethods", "ActiveRecord::Enum::EnumMethods"],
-  [() => m115, "EnumType", "ActiveRecord::Enum::EnumType"],
-  [() => m135, "EnvironmentMismatchError", "ActiveRecord::EnvironmentMismatchError"],
-  [() => m135, "EnvironmentStorageError", "ActiveRecord::EnvironmentStorageError"],
-  [() => m116, "ExclusiveConnectionTimeoutError", "ActiveRecord::ExclusiveConnectionTimeoutError"],
-  [() => m119, "Explain", "ActiveRecord::Explain"],
-  [() => m117, "ExplainRegistry", "ActiveRecord::ExplainRegistry"],
-  [() => m118, "ExplainSubscriber", "ActiveRecord::ExplainSubscriber"],
-  [() => m157, "FinderMethods", "ActiveRecord::FinderMethods"],
-  [() => m120, "FutureResult", "ActiveRecord::FutureResult"],
-  [() => m120, "Canceled", "ActiveRecord::FutureResult::Canceled"],
-  [() => m120, "Complete", "ActiveRecord::FutureResult::Complete"],
-  [() => m120, "EventBuffer", "ActiveRecord::FutureResult::EventBuffer"],
-  [() => m120, "SelectAll", "ActiveRecord::FutureResult::SelectAll"],
+  [() => m106, "Key", "ActiveRecord::Encryption::Key"],
+  [() => m104, "KeyGenerator", "ActiveRecord::Encryption::KeyGenerator"],
+  [() => m105, "KeyProvider", "ActiveRecord::Encryption::KeyProvider"],
+  [() => m108, "Message", "ActiveRecord::Encryption::Message"],
+  [() => m107, "MessageSerializer", "ActiveRecord::Encryption::MessageSerializer"],
+  [() => m109, "NullEncryptor", "ActiveRecord::Encryption::NullEncryptor"],
+  [() => m110, "Properties", "ActiveRecord::Encryption::Properties"],
+  [() => m111, "Scheme", "ActiveRecord::Encryption::Scheme"],
+  [() => m112, "Enum", "ActiveRecord::Enum"],
+  [() => m112, "EnumMethods", "ActiveRecord::Enum::EnumMethods"],
+  [() => m112, "EnumType", "ActiveRecord::Enum::EnumType"],
+  [() => m132, "EnvironmentMismatchError", "ActiveRecord::EnvironmentMismatchError"],
+  [() => m132, "EnvironmentStorageError", "ActiveRecord::EnvironmentStorageError"],
+  [() => m113, "ExclusiveConnectionTimeoutError", "ActiveRecord::ExclusiveConnectionTimeoutError"],
+  [() => m116, "Explain", "ActiveRecord::Explain"],
+  [() => m114, "ExplainRegistry", "ActiveRecord::ExplainRegistry"],
+  [() => m115, "ExplainSubscriber", "ActiveRecord::ExplainSubscriber"],
+  [() => m154, "FinderMethods", "ActiveRecord::FinderMethods"],
+  [() => m117, "FutureResult", "ActiveRecord::FutureResult"],
+  [() => m117, "Canceled", "ActiveRecord::FutureResult::Canceled"],
+  [() => m117, "Complete", "ActiveRecord::FutureResult::Complete"],
+  [() => m117, "EventBuffer", "ActiveRecord::FutureResult::EventBuffer"],
+  [() => m117, "SelectAll", "ActiveRecord::FutureResult::SelectAll"],
   [
     () => m18,
     "HasManyThroughAssociationNotFoundError",
@@ -611,17 +605,17 @@ defineConstants([
     "HasOneThroughNestedAssociationsAreReadonly",
     "ActiveRecord::HasOneThroughNestedAssociationsAreReadonly",
   ],
-  [() => m135, "IllegalMigrationNameError", "ActiveRecord::IllegalMigrationNameError"],
-  [() => m122, "Inheritance", "ActiveRecord::Inheritance"],
-  [() => m122, "ClassMethods", "ActiveRecord::Inheritance::ClassMethods"],
-  [() => m123, "InsertAll", "ActiveRecord::InsertAll"],
-  [() => m123, "Builder", "ActiveRecord::InsertAll::Builder"],
-  [() => m124, "Integration", "ActiveRecord::Integration"],
-  [() => m124, "ClassMethods", "ActiveRecord::Integration::ClassMethods"],
-  [() => m125, "InternalMetadata", "ActiveRecord::InternalMetadata"],
-  [() => m125, "NullInternalMetadata", "ActiveRecord::InternalMetadata::NullInternalMetadata"],
-  [() => m116, "InvalidForeignKey", "ActiveRecord::InvalidForeignKey"],
-  [() => m135, "InvalidMigrationTimestampError", "ActiveRecord::InvalidMigrationTimestampError"],
+  [() => m132, "IllegalMigrationNameError", "ActiveRecord::IllegalMigrationNameError"],
+  [() => m119, "Inheritance", "ActiveRecord::Inheritance"],
+  [() => m119, "ClassMethods", "ActiveRecord::Inheritance::ClassMethods"],
+  [() => m120, "InsertAll", "ActiveRecord::InsertAll"],
+  [() => m120, "Builder", "ActiveRecord::InsertAll::Builder"],
+  [() => m121, "Integration", "ActiveRecord::Integration"],
+  [() => m121, "ClassMethods", "ActiveRecord::Integration::ClassMethods"],
+  [() => m122, "InternalMetadata", "ActiveRecord::InternalMetadata"],
+  [() => m122, "NullInternalMetadata", "ActiveRecord::InternalMetadata::NullInternalMetadata"],
+  [() => m113, "InvalidForeignKey", "ActiveRecord::InvalidForeignKey"],
+  [() => m132, "InvalidMigrationTimestampError", "ActiveRecord::InvalidMigrationTimestampError"],
   [
     () => m18,
     "InverseOfAssociationNotFoundError",
@@ -632,191 +626,191 @@ defineConstants([
     "InverseOfAssociationRecursiveError",
     "ActiveRecord::InverseOfAssociationRecursiveError",
   ],
-  [() => m135, "IrreversibleMigration", "ActiveRecord::IrreversibleMigration"],
-  [() => m116, "IrreversibleOrderError", "ActiveRecord::IrreversibleOrderError"],
-  [() => m126, "LegacyYamlAdapter", "ActiveRecord::LegacyYamlAdapter"],
-  [() => m127, "LockingType", "ActiveRecord::Locking::LockingType"],
-  [() => m127, "Optimistic", "ActiveRecord::Locking::Optimistic"],
-  [() => m127, "ClassMethods", "ActiveRecord::Locking::Optimistic::ClassMethods"],
-  [() => m128, "Pessimistic", "ActiveRecord::Locking::Pessimistic"],
-  [() => m116, "LockWaitTimeout", "ActiveRecord::LockWaitTimeout"],
-  [() => m129, "LogSubscriber", "ActiveRecord::LogSubscriber"],
-  [() => m130, null, "ActiveRecord::Marshalling"],
-  [() => m130, "Methods", "ActiveRecord::Marshalling::Methods"],
-  [() => m131, "DatabaseSelector", "ActiveRecord::Middleware::DatabaseSelector"],
-  [() => m132, "Resolver", "ActiveRecord::Middleware::DatabaseSelector::Resolver"],
-  [() => m133, "Session", "ActiveRecord::Middleware::DatabaseSelector::Resolver::Session"],
-  [() => m134, "ShardSelector", "ActiveRecord::Middleware::ShardSelector"],
-  [() => m135, "Migration", "ActiveRecord::Migration"],
-  [() => m135, "CheckPending", "ActiveRecord::Migration::CheckPending"],
-  [() => m136, "CommandRecorder", "ActiveRecord::Migration::CommandRecorder"],
-  [() => m137, null, "ActiveRecord::Migration::Compatibility"],
-  [() => m137, "V4_2", "ActiveRecord::Migration::Compatibility::V4_2"],
-  [() => m137, "V5_0", "ActiveRecord::Migration::Compatibility::V5_0"],
-  [() => m137, "V5_1", "ActiveRecord::Migration::Compatibility::V5_1"],
-  [() => m137, "V5_2", "ActiveRecord::Migration::Compatibility::V5_2"],
+  [() => m132, "IrreversibleMigration", "ActiveRecord::IrreversibleMigration"],
+  [() => m113, "IrreversibleOrderError", "ActiveRecord::IrreversibleOrderError"],
+  [() => m123, "LegacyYamlAdapter", "ActiveRecord::LegacyYamlAdapter"],
+  [() => m124, "LockingType", "ActiveRecord::Locking::LockingType"],
+  [() => m124, "Optimistic", "ActiveRecord::Locking::Optimistic"],
+  [() => m124, "ClassMethods", "ActiveRecord::Locking::Optimistic::ClassMethods"],
+  [() => m125, "Pessimistic", "ActiveRecord::Locking::Pessimistic"],
+  [() => m113, "LockWaitTimeout", "ActiveRecord::LockWaitTimeout"],
+  [() => m126, "LogSubscriber", "ActiveRecord::LogSubscriber"],
+  [() => m127, null, "ActiveRecord::Marshalling"],
+  [() => m127, "Methods", "ActiveRecord::Marshalling::Methods"],
+  [() => m128, "DatabaseSelector", "ActiveRecord::Middleware::DatabaseSelector"],
+  [() => m129, "Resolver", "ActiveRecord::Middleware::DatabaseSelector::Resolver"],
+  [() => m130, "Session", "ActiveRecord::Middleware::DatabaseSelector::Resolver::Session"],
+  [() => m131, "ShardSelector", "ActiveRecord::Middleware::ShardSelector"],
+  [() => m132, "Migration", "ActiveRecord::Migration"],
+  [() => m132, "CheckPending", "ActiveRecord::Migration::CheckPending"],
+  [() => m133, "CommandRecorder", "ActiveRecord::Migration::CommandRecorder"],
+  [() => m134, null, "ActiveRecord::Migration::Compatibility"],
+  [() => m134, "V4_2", "ActiveRecord::Migration::Compatibility::V4_2"],
+  [() => m134, "V5_0", "ActiveRecord::Migration::Compatibility::V5_0"],
+  [() => m134, "V5_1", "ActiveRecord::Migration::Compatibility::V5_1"],
+  [() => m134, "V5_2", "ActiveRecord::Migration::Compatibility::V5_2"],
   [
-    () => m137,
+    () => m134,
     "V5_2.CommandRecorder",
     "ActiveRecord::Migration::Compatibility::V5_2::CommandRecorder",
   ],
-  [() => m137, "V6_0", "ActiveRecord::Migration::Compatibility::V6_0"],
+  [() => m134, "V6_0", "ActiveRecord::Migration::Compatibility::V6_0"],
   [
-    () => m137,
+    () => m134,
     "V6_0.ReferenceDefinition",
     "ActiveRecord::Migration::Compatibility::V6_0::ReferenceDefinition",
   ],
-  [() => m137, "V6_1", "ActiveRecord::Migration::Compatibility::V6_1"],
+  [() => m134, "V6_1", "ActiveRecord::Migration::Compatibility::V6_1"],
   [
-    () => m137,
+    () => m134,
     "V6_1.PostgreSQLCompat",
     "ActiveRecord::Migration::Compatibility::V6_1::PostgreSQLCompat",
   ],
-  [() => m137, "V7_0", "ActiveRecord::Migration::Compatibility::V7_0"],
+  [() => m134, "V7_0", "ActiveRecord::Migration::Compatibility::V7_0"],
   [
-    () => m137,
+    () => m134,
     "V7_0.LegacyIndexName",
     "ActiveRecord::Migration::Compatibility::V7_0::LegacyIndexName",
   ],
-  [() => m137, "V7_1", "ActiveRecord::Migration::Compatibility::V7_1"],
-  [() => m137, "V7_2", "ActiveRecord::Migration::Compatibility::V7_2"],
-  [() => m135, "Current", "ActiveRecord::Migration::Current"],
-  [() => m138, "DefaultStrategy", "ActiveRecord::Migration::DefaultStrategy"],
-  [() => m139, "ExecutionStrategy", "ActiveRecord::Migration::ExecutionStrategy"],
-  [() => m135, "ReversibleBlockHelper", "ActiveRecord::Migration::ReversibleBlockHelper"],
-  [() => m135, "MigrationContext", "ActiveRecord::MigrationContext"],
-  [() => m135, "MigrationError", "ActiveRecord::MigrationError"],
-  [() => m135, "MigrationProxy", "ActiveRecord::MigrationProxy"],
-  [() => m135, "Migrator", "ActiveRecord::Migrator"],
-  [() => m116, "MismatchedForeignKey", "ActiveRecord::MismatchedForeignKey"],
-  [() => m141, "ModelSchema", "ActiveRecord::ModelSchema"],
-  [() => m141, "ClassMethods", "ActiveRecord::ModelSchema::ClassMethods"],
-  [() => m116, "MultiparameterAssignmentErrors", "ActiveRecord::MultiparameterAssignmentErrors"],
-  [() => m142, "NestedAttributes", "ActiveRecord::NestedAttributes"],
-  [() => m142, "TooManyRecords", "ActiveRecord::NestedAttributes::TooManyRecords"],
-  [() => m116, "NoDatabaseError", "ActiveRecord::NoDatabaseError"],
-  [() => m135, "NoEnvironmentInSchemaError", "ActiveRecord::NoEnvironmentInSchemaError"],
-  [() => m144, "Normalization", "ActiveRecord::Normalization"],
-  [() => m144, "ClassMethods", "ActiveRecord::Normalization::ClassMethods"],
-  [() => m144, "NormalizedValueType", "ActiveRecord::Normalization::NormalizedValueType"],
-  [() => m116, "NotNullViolation", "ActiveRecord::NotNullViolation"],
-  [() => m143, "NoTouching", "ActiveRecord::NoTouching"],
-  [() => m140, "PendingMigrationConnection", "ActiveRecord::PendingMigrationConnection"],
-  [() => m135, "PendingMigrationError", "ActiveRecord::PendingMigrationError"],
-  [() => m145, "Persistence", "ActiveRecord::Persistence"],
-  [() => m145, "ClassMethods", "ActiveRecord::Persistence::ClassMethods"],
-  [() => m160, "PredicateBuilder", "ActiveRecord::PredicateBuilder"],
-  [() => m161, "ArrayHandler", "ActiveRecord::PredicateBuilder::ArrayHandler"],
-  [() => m161, "NullPredicate", "ActiveRecord::PredicateBuilder::ArrayHandler::NullPredicate"],
-  [() => m162, "AssociationQueryValue", "ActiveRecord::PredicateBuilder::AssociationQueryValue"],
-  [() => m163, "BasicObjectHandler", "ActiveRecord::PredicateBuilder::BasicObjectHandler"],
-  [() => m164, "PolymorphicArrayValue", "ActiveRecord::PredicateBuilder::PolymorphicArrayValue"],
-  [() => m165, "RangeHandler", "ActiveRecord::PredicateBuilder::RangeHandler"],
-  [() => m165, "RangeWithBinds", "ActiveRecord::PredicateBuilder::RangeHandler::RangeWithBinds"],
-  [() => m166, "RelationHandler", "ActiveRecord::PredicateBuilder::RelationHandler"],
-  [() => m116, "PreparedStatementCacheExpired", "ActiveRecord::PreparedStatementCacheExpired"],
-  [() => m116, "PreparedStatementInvalid", "ActiveRecord::PreparedStatementInvalid"],
-  [() => m135, "ProtectedEnvironmentError", "ActiveRecord::ProtectedEnvironmentError"],
-  [() => m116, "QueryAborted", "ActiveRecord::QueryAborted"],
-  [() => m146, "QueryCache", "ActiveRecord::QueryCache"],
-  [() => m146, "ClassMethods", "ActiveRecord::QueryCache::ClassMethods"],
-  [() => m116, "QueryCanceled", "ActiveRecord::QueryCanceled"],
-  [() => m149, null, "ActiveRecord::Querying"],
-  [() => m148, "QueryLogs", "ActiveRecord::QueryLogs"],
-  [() => m148, "GetKeyHandler", "ActiveRecord::QueryLogs::GetKeyHandler"],
-  [() => m148, "IdentityHandler", "ActiveRecord::QueryLogs::IdentityHandler"],
-  [() => m147, "LegacyFormatter", "ActiveRecord::QueryLogs::LegacyFormatter"],
-  [() => m147, "SQLCommenter", "ActiveRecord::QueryLogs::SQLCommenter"],
-  [() => m148, "ZeroArityHandler", "ActiveRecord::QueryLogs::ZeroArityHandler"],
-  [() => m168, "QueryMethods", "ActiveRecord::QueryMethods"],
-  [() => m168, "CTEJoin", "ActiveRecord::QueryMethods::CTEJoin"],
-  [() => m168, "WhereChain", "ActiveRecord::QueryMethods::WhereChain"],
-  [() => m116, "RangeError", "ActiveRecord::RangeError"],
-  [() => m150, "ReadonlyAttributeError", "ActiveRecord::ReadonlyAttributeError"],
-  [() => m150, "ReadonlyAttributes", "ActiveRecord::ReadonlyAttributes"],
-  [() => m150, "ClassMethods", "ActiveRecord::ReadonlyAttributes::ClassMethods"],
-  [() => m150, "HasReadonlyAttributes", "ActiveRecord::ReadonlyAttributes::HasReadonlyAttributes"],
-  [() => m116, "ReadOnlyError", "ActiveRecord::ReadOnlyError"],
-  [() => m116, "ReadOnlyRecord", "ActiveRecord::ReadOnlyRecord"],
-  [() => m211, "RecordInvalid", "ActiveRecord::RecordInvalid"],
-  [() => m116, "RecordNotDestroyed", "ActiveRecord::RecordNotDestroyed"],
-  [() => m116, "RecordNotFound", "ActiveRecord::RecordNotFound"],
-  [() => m116, "RecordNotSaved", "ActiveRecord::RecordNotSaved"],
-  [() => m116, "RecordNotUnique", "ActiveRecord::RecordNotUnique"],
-  [() => m151, "Reflection", "ActiveRecord::Reflection"],
-  [() => m151, "AbstractReflection", "ActiveRecord::Reflection::AbstractReflection"],
-  [() => m151, "AggregateReflection", "ActiveRecord::Reflection::AggregateReflection"],
-  [() => m151, "AssociationReflection", "ActiveRecord::Reflection::AssociationReflection"],
-  [() => m151, "BelongsToReflection", "ActiveRecord::Reflection::BelongsToReflection"],
-  [() => m151, "ClassMethods", "ActiveRecord::Reflection::ClassMethods"],
+  [() => m134, "V7_1", "ActiveRecord::Migration::Compatibility::V7_1"],
+  [() => m134, "V7_2", "ActiveRecord::Migration::Compatibility::V7_2"],
+  [() => m132, "Current", "ActiveRecord::Migration::Current"],
+  [() => m135, "DefaultStrategy", "ActiveRecord::Migration::DefaultStrategy"],
+  [() => m136, "ExecutionStrategy", "ActiveRecord::Migration::ExecutionStrategy"],
+  [() => m132, "ReversibleBlockHelper", "ActiveRecord::Migration::ReversibleBlockHelper"],
+  [() => m132, "MigrationContext", "ActiveRecord::MigrationContext"],
+  [() => m132, "MigrationError", "ActiveRecord::MigrationError"],
+  [() => m132, "MigrationProxy", "ActiveRecord::MigrationProxy"],
+  [() => m132, "Migrator", "ActiveRecord::Migrator"],
+  [() => m113, "MismatchedForeignKey", "ActiveRecord::MismatchedForeignKey"],
+  [() => m138, "ModelSchema", "ActiveRecord::ModelSchema"],
+  [() => m138, "ClassMethods", "ActiveRecord::ModelSchema::ClassMethods"],
+  [() => m113, "MultiparameterAssignmentErrors", "ActiveRecord::MultiparameterAssignmentErrors"],
+  [() => m139, "NestedAttributes", "ActiveRecord::NestedAttributes"],
+  [() => m139, "TooManyRecords", "ActiveRecord::NestedAttributes::TooManyRecords"],
+  [() => m113, "NoDatabaseError", "ActiveRecord::NoDatabaseError"],
+  [() => m132, "NoEnvironmentInSchemaError", "ActiveRecord::NoEnvironmentInSchemaError"],
+  [() => m141, "Normalization", "ActiveRecord::Normalization"],
+  [() => m141, "ClassMethods", "ActiveRecord::Normalization::ClassMethods"],
+  [() => m141, "NormalizedValueType", "ActiveRecord::Normalization::NormalizedValueType"],
+  [() => m113, "NotNullViolation", "ActiveRecord::NotNullViolation"],
+  [() => m140, "NoTouching", "ActiveRecord::NoTouching"],
+  [() => m137, "PendingMigrationConnection", "ActiveRecord::PendingMigrationConnection"],
+  [() => m132, "PendingMigrationError", "ActiveRecord::PendingMigrationError"],
+  [() => m142, "Persistence", "ActiveRecord::Persistence"],
+  [() => m142, "ClassMethods", "ActiveRecord::Persistence::ClassMethods"],
+  [() => m157, "PredicateBuilder", "ActiveRecord::PredicateBuilder"],
+  [() => m158, "ArrayHandler", "ActiveRecord::PredicateBuilder::ArrayHandler"],
+  [() => m158, "NullPredicate", "ActiveRecord::PredicateBuilder::ArrayHandler::NullPredicate"],
+  [() => m159, "AssociationQueryValue", "ActiveRecord::PredicateBuilder::AssociationQueryValue"],
+  [() => m160, "BasicObjectHandler", "ActiveRecord::PredicateBuilder::BasicObjectHandler"],
+  [() => m161, "PolymorphicArrayValue", "ActiveRecord::PredicateBuilder::PolymorphicArrayValue"],
+  [() => m162, "RangeHandler", "ActiveRecord::PredicateBuilder::RangeHandler"],
+  [() => m162, "RangeWithBinds", "ActiveRecord::PredicateBuilder::RangeHandler::RangeWithBinds"],
+  [() => m163, "RelationHandler", "ActiveRecord::PredicateBuilder::RelationHandler"],
+  [() => m113, "PreparedStatementCacheExpired", "ActiveRecord::PreparedStatementCacheExpired"],
+  [() => m113, "PreparedStatementInvalid", "ActiveRecord::PreparedStatementInvalid"],
+  [() => m132, "ProtectedEnvironmentError", "ActiveRecord::ProtectedEnvironmentError"],
+  [() => m113, "QueryAborted", "ActiveRecord::QueryAborted"],
+  [() => m143, "QueryCache", "ActiveRecord::QueryCache"],
+  [() => m143, "ClassMethods", "ActiveRecord::QueryCache::ClassMethods"],
+  [() => m113, "QueryCanceled", "ActiveRecord::QueryCanceled"],
+  [() => m146, null, "ActiveRecord::Querying"],
+  [() => m145, "QueryLogs", "ActiveRecord::QueryLogs"],
+  [() => m145, "GetKeyHandler", "ActiveRecord::QueryLogs::GetKeyHandler"],
+  [() => m145, "IdentityHandler", "ActiveRecord::QueryLogs::IdentityHandler"],
+  [() => m144, "LegacyFormatter", "ActiveRecord::QueryLogs::LegacyFormatter"],
+  [() => m144, "SQLCommenter", "ActiveRecord::QueryLogs::SQLCommenter"],
+  [() => m145, "ZeroArityHandler", "ActiveRecord::QueryLogs::ZeroArityHandler"],
+  [() => m165, "QueryMethods", "ActiveRecord::QueryMethods"],
+  [() => m165, "CTEJoin", "ActiveRecord::QueryMethods::CTEJoin"],
+  [() => m165, "WhereChain", "ActiveRecord::QueryMethods::WhereChain"],
+  [() => m113, "RangeError", "ActiveRecord::RangeError"],
+  [() => m147, "ReadonlyAttributeError", "ActiveRecord::ReadonlyAttributeError"],
+  [() => m147, "ReadonlyAttributes", "ActiveRecord::ReadonlyAttributes"],
+  [() => m147, "ClassMethods", "ActiveRecord::ReadonlyAttributes::ClassMethods"],
+  [() => m147, "HasReadonlyAttributes", "ActiveRecord::ReadonlyAttributes::HasReadonlyAttributes"],
+  [() => m113, "ReadOnlyError", "ActiveRecord::ReadOnlyError"],
+  [() => m113, "ReadOnlyRecord", "ActiveRecord::ReadOnlyRecord"],
+  [() => m208, "RecordInvalid", "ActiveRecord::RecordInvalid"],
+  [() => m113, "RecordNotDestroyed", "ActiveRecord::RecordNotDestroyed"],
+  [() => m113, "RecordNotFound", "ActiveRecord::RecordNotFound"],
+  [() => m113, "RecordNotSaved", "ActiveRecord::RecordNotSaved"],
+  [() => m113, "RecordNotUnique", "ActiveRecord::RecordNotUnique"],
+  [() => m148, "Reflection", "ActiveRecord::Reflection"],
+  [() => m148, "AbstractReflection", "ActiveRecord::Reflection::AbstractReflection"],
+  [() => m148, "AggregateReflection", "ActiveRecord::Reflection::AggregateReflection"],
+  [() => m148, "AssociationReflection", "ActiveRecord::Reflection::AssociationReflection"],
+  [() => m148, "BelongsToReflection", "ActiveRecord::Reflection::BelongsToReflection"],
+  [() => m148, "ClassMethods", "ActiveRecord::Reflection::ClassMethods"],
   [
-    () => m151,
+    () => m148,
     "HasAndBelongsToManyReflection",
     "ActiveRecord::Reflection::HasAndBelongsToManyReflection",
   ],
-  [() => m151, "HasManyReflection", "ActiveRecord::Reflection::HasManyReflection"],
-  [() => m151, "HasOneReflection", "ActiveRecord::Reflection::HasOneReflection"],
-  [() => m151, "MacroReflection", "ActiveRecord::Reflection::MacroReflection"],
-  [() => m151, "PolymorphicReflection", "ActiveRecord::Reflection::PolymorphicReflection"],
-  [() => m151, "RuntimeReflection", "ActiveRecord::Reflection::RuntimeReflection"],
-  [() => m151, "ThroughReflection", "ActiveRecord::Reflection::ThroughReflection"],
-  [() => m152, "Relation", "ActiveRecord::Relation"],
-  [() => m152, "ExplainProxy", "ActiveRecord::Relation::ExplainProxy"],
-  [() => m158, "FromClause", "ActiveRecord::Relation::FromClause"],
-  [() => m159, "HashMerger", "ActiveRecord::Relation::HashMerger"],
-  [() => m159, "Merger", "ActiveRecord::Relation::Merger"],
-  [() => m167, "QueryAttribute", "ActiveRecord::Relation::QueryAttribute"],
-  [() => m152, "Relation.StrictLoadingScope", "ActiveRecord::Relation::StrictLoadingScope"],
-  [() => m170, "WhereClause", "ActiveRecord::Relation::WhereClause"],
-  [() => m171, "Result", "ActiveRecord::Result"],
-  [() => m171, "IndexedRow", "ActiveRecord::Result::IndexedRow"],
-  [() => m116, "Rollback", "ActiveRecord::Rollback"],
-  [() => m172, null, "ActiveRecord::RuntimeRegistry"],
-  [() => m173, null, "ActiveRecord::Sanitization"],
-  [() => m173, "ClassMethods", "ActiveRecord::Sanitization::ClassMethods"],
-  [() => m176, "Schema", "ActiveRecord::Schema"],
-  [() => m176, "Definition", "ActiveRecord::Schema::Definition"],
-  [() => m174, "SchemaDumper", "ActiveRecord::SchemaDumper"],
-  [() => m175, "SchemaMigration", "ActiveRecord::SchemaMigration"],
-  [() => m175, "NullSchemaMigration", "ActiveRecord::SchemaMigration::NullSchemaMigration"],
-  [() => m178, "Default", "ActiveRecord::Scoping::Default"],
-  [() => m178, "DefaultScope", "ActiveRecord::Scoping::DefaultScope"],
-  [() => m179, null, "ActiveRecord::Scoping::Named"],
-  [() => m179, "ClassMethods", "ActiveRecord::Scoping::Named::ClassMethods"],
-  [() => m177, "ScopeRegistry", "ActiveRecord::Scoping::ScopeRegistry"],
-  [() => m180, null, "ActiveRecord::SecurePassword"],
-  [() => m181, null, "ActiveRecord::SecureToken"],
-  [() => m181, "MinimumLengthError", "ActiveRecord::SecureToken::MinimumLengthError"],
-  [() => m182, null, "ActiveRecord::Serialization"],
-  [() => m116, "SerializationFailure", "ActiveRecord::SerializationFailure"],
-  [() => m116, "SerializationTypeMismatch", "ActiveRecord::SerializationTypeMismatch"],
-  [() => m183, "SignedId", "ActiveRecord::SignedId"],
-  [() => m183, "ClassMethods", "ActiveRecord::SignedId::ClassMethods"],
-  [() => m183, "RelationMethods", "ActiveRecord::SignedId::RelationMethods"],
-  [() => m116, "SoleRecordExceeded", "ActiveRecord::SoleRecordExceeded"],
-  [() => m169, "SpawnMethods", "ActiveRecord::SpawnMethods"],
-  [() => m116, "SQLWarning", "ActiveRecord::SQLWarning"],
-  [() => m116, "StaleObjectError", "ActiveRecord::StaleObjectError"],
-  [() => m184, "StatementCache", "ActiveRecord::StatementCache"],
-  [() => m184, "BindMap", "ActiveRecord::StatementCache::BindMap"],
-  [() => m184, "Params", "ActiveRecord::StatementCache::Params"],
-  [() => m184, "PartialQuery", "ActiveRecord::StatementCache::PartialQuery"],
-  [() => m184, "PartialQueryCollector", "ActiveRecord::StatementCache::PartialQueryCollector"],
-  [() => m184, "Query", "ActiveRecord::StatementCache::Query"],
-  [() => m184, "Substitute", "ActiveRecord::StatementCache::Substitute"],
-  [() => m116, "StatementInvalid", "ActiveRecord::StatementInvalid"],
-  [() => m116, "StatementTimeout", "ActiveRecord::StatementTimeout"],
-  [() => m185, null, "ActiveRecord::Store"],
-  [() => m185, "ClassMethods", "ActiveRecord::Store::ClassMethods"],
-  [() => m185, "HashAccessor", "ActiveRecord::Store::HashAccessor"],
-  [() => m185, "IndifferentCoder", "ActiveRecord::Store::IndifferentCoder"],
-  [() => m185, "IndifferentHashAccessor", "ActiveRecord::Store::IndifferentHashAccessor"],
-  [() => m185, "StringKeyedHashAccessor", "ActiveRecord::Store::StringKeyedHashAccessor"],
-  [() => m116, "StrictLoadingViolationError", "ActiveRecord::StrictLoadingViolationError"],
-  [() => m116, "SubclassNotFound", "ActiveRecord::SubclassNotFound"],
-  [() => m186, null, "ActiveRecord::Suppressor"],
-  [() => m187, "TableMetadata", "ActiveRecord::TableMetadata"],
-  [() => m116, "TableNotSpecified", "ActiveRecord::TableNotSpecified"],
+  [() => m148, "HasManyReflection", "ActiveRecord::Reflection::HasManyReflection"],
+  [() => m148, "HasOneReflection", "ActiveRecord::Reflection::HasOneReflection"],
+  [() => m148, "MacroReflection", "ActiveRecord::Reflection::MacroReflection"],
+  [() => m148, "PolymorphicReflection", "ActiveRecord::Reflection::PolymorphicReflection"],
+  [() => m148, "RuntimeReflection", "ActiveRecord::Reflection::RuntimeReflection"],
+  [() => m148, "ThroughReflection", "ActiveRecord::Reflection::ThroughReflection"],
+  [() => m149, "Relation", "ActiveRecord::Relation"],
+  [() => m149, "ExplainProxy", "ActiveRecord::Relation::ExplainProxy"],
+  [() => m155, "FromClause", "ActiveRecord::Relation::FromClause"],
+  [() => m156, "HashMerger", "ActiveRecord::Relation::HashMerger"],
+  [() => m156, "Merger", "ActiveRecord::Relation::Merger"],
+  [() => m164, "QueryAttribute", "ActiveRecord::Relation::QueryAttribute"],
+  [() => m149, "Relation.StrictLoadingScope", "ActiveRecord::Relation::StrictLoadingScope"],
+  [() => m167, "WhereClause", "ActiveRecord::Relation::WhereClause"],
+  [() => m168, "Result", "ActiveRecord::Result"],
+  [() => m168, "IndexedRow", "ActiveRecord::Result::IndexedRow"],
+  [() => m113, "Rollback", "ActiveRecord::Rollback"],
+  [() => m169, null, "ActiveRecord::RuntimeRegistry"],
+  [() => m170, null, "ActiveRecord::Sanitization"],
+  [() => m170, "ClassMethods", "ActiveRecord::Sanitization::ClassMethods"],
+  [() => m173, "Schema", "ActiveRecord::Schema"],
+  [() => m173, "Definition", "ActiveRecord::Schema::Definition"],
+  [() => m171, "SchemaDumper", "ActiveRecord::SchemaDumper"],
+  [() => m172, "SchemaMigration", "ActiveRecord::SchemaMigration"],
+  [() => m172, "NullSchemaMigration", "ActiveRecord::SchemaMigration::NullSchemaMigration"],
+  [() => m175, "Default", "ActiveRecord::Scoping::Default"],
+  [() => m175, "DefaultScope", "ActiveRecord::Scoping::DefaultScope"],
+  [() => m176, null, "ActiveRecord::Scoping::Named"],
+  [() => m176, "ClassMethods", "ActiveRecord::Scoping::Named::ClassMethods"],
+  [() => m174, "ScopeRegistry", "ActiveRecord::Scoping::ScopeRegistry"],
+  [() => m177, null, "ActiveRecord::SecurePassword"],
+  [() => m178, null, "ActiveRecord::SecureToken"],
+  [() => m178, "MinimumLengthError", "ActiveRecord::SecureToken::MinimumLengthError"],
+  [() => m179, null, "ActiveRecord::Serialization"],
+  [() => m113, "SerializationFailure", "ActiveRecord::SerializationFailure"],
+  [() => m113, "SerializationTypeMismatch", "ActiveRecord::SerializationTypeMismatch"],
+  [() => m180, "SignedId", "ActiveRecord::SignedId"],
+  [() => m180, "ClassMethods", "ActiveRecord::SignedId::ClassMethods"],
+  [() => m180, "RelationMethods", "ActiveRecord::SignedId::RelationMethods"],
+  [() => m113, "SoleRecordExceeded", "ActiveRecord::SoleRecordExceeded"],
+  [() => m166, "SpawnMethods", "ActiveRecord::SpawnMethods"],
+  [() => m113, "SQLWarning", "ActiveRecord::SQLWarning"],
+  [() => m113, "StaleObjectError", "ActiveRecord::StaleObjectError"],
+  [() => m181, "StatementCache", "ActiveRecord::StatementCache"],
+  [() => m181, "BindMap", "ActiveRecord::StatementCache::BindMap"],
+  [() => m181, "Params", "ActiveRecord::StatementCache::Params"],
+  [() => m181, "PartialQuery", "ActiveRecord::StatementCache::PartialQuery"],
+  [() => m181, "PartialQueryCollector", "ActiveRecord::StatementCache::PartialQueryCollector"],
+  [() => m181, "Query", "ActiveRecord::StatementCache::Query"],
+  [() => m181, "Substitute", "ActiveRecord::StatementCache::Substitute"],
+  [() => m113, "StatementInvalid", "ActiveRecord::StatementInvalid"],
+  [() => m113, "StatementTimeout", "ActiveRecord::StatementTimeout"],
+  [() => m182, null, "ActiveRecord::Store"],
+  [() => m182, "ClassMethods", "ActiveRecord::Store::ClassMethods"],
+  [() => m182, "HashAccessor", "ActiveRecord::Store::HashAccessor"],
+  [() => m182, "IndifferentCoder", "ActiveRecord::Store::IndifferentCoder"],
+  [() => m182, "IndifferentHashAccessor", "ActiveRecord::Store::IndifferentHashAccessor"],
+  [() => m182, "StringKeyedHashAccessor", "ActiveRecord::Store::StringKeyedHashAccessor"],
+  [() => m113, "StrictLoadingViolationError", "ActiveRecord::StrictLoadingViolationError"],
+  [() => m113, "SubclassNotFound", "ActiveRecord::SubclassNotFound"],
+  [() => m183, null, "ActiveRecord::Suppressor"],
+  [() => m184, "TableMetadata", "ActiveRecord::TableMetadata"],
+  [() => m113, "TableNotSpecified", "ActiveRecord::TableNotSpecified"],
   [
     () => m18,
     "ThroughCantAssociateThroughHasOneOrManyReflection",
@@ -827,51 +821,51 @@ defineConstants([
     "ThroughNestedAssociationsAreReadonly",
     "ActiveRecord::ThroughNestedAssociationsAreReadonly",
   ],
-  [() => m188, "Timestamp", "ActiveRecord::Timestamp"],
-  [() => m189, "TokenFor", "ActiveRecord::TokenFor"],
-  [() => m189, "RelationMethods", "ActiveRecord::TokenFor::RelationMethods"],
-  [() => m189, "TokenDefinition", "ActiveRecord::TokenFor::TokenDefinition"],
-  [() => m190, "TouchLater", "ActiveRecord::TouchLater"],
-  [() => m191, "ControllerRuntime", "ActiveRecord::Trailties::ControllerRuntime"],
-  [() => m191, "ClassMethods", "ActiveRecord::Trailties::ControllerRuntime::ClassMethods"],
-  [() => m192, "JobRuntime", "ActiveRecord::Trailties::JobRuntime"],
-  [() => m193, "Transaction", "ActiveRecord::Transaction"],
-  [() => m116, "TransactionIsolationError", "ActiveRecord::TransactionIsolationError"],
-  [() => m116, "TransactionRollbackError", "ActiveRecord::TransactionRollbackError"],
-  [() => m194, "Transactions", "ActiveRecord::Transactions"],
-  [() => m195, "Translation", "ActiveRecord::Translation"],
-  [() => m198, null, "ActiveRecord::Type"],
-  [() => m199, "AdapterSpecificRegistry", "ActiveRecord::Type::AdapterSpecificRegistry"],
-  [() => m201, "Date", "ActiveRecord::Type::Date"],
-  [() => m200, "DateTime", "ActiveRecord::Type::DateTime"],
-  [() => m202, "DecimalWithoutScale", "ActiveRecord::Type::DecimalWithoutScale"],
-  [() => m199, "DecorationRegistration", "ActiveRecord::Type::DecorationRegistration"],
-  [() => m203, "HashLookupTypeMap", "ActiveRecord::Type::HashLookupTypeMap"],
-  [() => m204, "Timezone", "ActiveRecord::Type::Internal::Timezone"],
-  [() => m205, "Json", "ActiveRecord::Type::Json"],
-  [() => m199, "Registration", "ActiveRecord::Type::Registration"],
-  [() => m206, "Serialized", "ActiveRecord::Type::Serialized"],
-  [() => m207, "Text", "ActiveRecord::Type::Text"],
-  [() => m208, "Time", "ActiveRecord::Type::Time"],
-  [() => m208, "Value", "ActiveRecord::Type::Time::Value"],
-  [() => m209, "TypeMap", "ActiveRecord::Type::TypeMap"],
-  [() => m210, "UnsignedInteger", "ActiveRecord::Type::UnsignedInteger"],
-  [() => m196, "Connection", "ActiveRecord::TypeCaster::Connection"],
-  [() => m197, "Map", "ActiveRecord::TypeCaster::Map"],
-  [() => m199, "TypeConflictError", "ActiveRecord::TypeConflictError"],
-  [() => m116, "UnknownAttributeReference", "ActiveRecord::UnknownAttributeReference"],
-  [() => m135, "UnknownMigrationVersionError", "ActiveRecord::UnknownMigrationVersionError"],
-  [() => m116, "UnknownPrimaryKey", "ActiveRecord::UnknownPrimaryKey"],
-  [() => m116, "UnmodifiableRelation", "ActiveRecord::UnmodifiableRelation"],
-  [() => m211, "Validations", "ActiveRecord::Validations"],
-  [() => m212, "AbsenceValidator", "ActiveRecord::Validations::AbsenceValidator"],
-  [() => m213, "AssociatedValidator", "ActiveRecord::Validations::AssociatedValidator"],
-  [() => m212, "ClassMethods", "ActiveRecord::Validations::ClassMethods"],
-  [() => m214, "LengthValidator", "ActiveRecord::Validations::LengthValidator"],
-  [() => m215, "NumericalityValidator", "ActiveRecord::Validations::NumericalityValidator"],
-  [() => m216, "PresenceValidator", "ActiveRecord::Validations::PresenceValidator"],
-  [() => m217, "UniquenessValidator", "ActiveRecord::Validations::UniquenessValidator"],
-  [() => m116, "ValueTooLong", "ActiveRecord::ValueTooLong"],
-  [() => m121, "VERSION", "ActiveRecord::VERSION"],
-  [() => m116, "WrappedDatabaseException", "ActiveRecord::WrappedDatabaseException"],
+  [() => m185, "Timestamp", "ActiveRecord::Timestamp"],
+  [() => m186, "TokenFor", "ActiveRecord::TokenFor"],
+  [() => m186, "RelationMethods", "ActiveRecord::TokenFor::RelationMethods"],
+  [() => m186, "TokenDefinition", "ActiveRecord::TokenFor::TokenDefinition"],
+  [() => m187, "TouchLater", "ActiveRecord::TouchLater"],
+  [() => m188, "ControllerRuntime", "ActiveRecord::Trailties::ControllerRuntime"],
+  [() => m188, "ClassMethods", "ActiveRecord::Trailties::ControllerRuntime::ClassMethods"],
+  [() => m189, "JobRuntime", "ActiveRecord::Trailties::JobRuntime"],
+  [() => m190, "Transaction", "ActiveRecord::Transaction"],
+  [() => m113, "TransactionIsolationError", "ActiveRecord::TransactionIsolationError"],
+  [() => m113, "TransactionRollbackError", "ActiveRecord::TransactionRollbackError"],
+  [() => m191, "Transactions", "ActiveRecord::Transactions"],
+  [() => m192, "Translation", "ActiveRecord::Translation"],
+  [() => m195, null, "ActiveRecord::Type"],
+  [() => m196, "AdapterSpecificRegistry", "ActiveRecord::Type::AdapterSpecificRegistry"],
+  [() => m198, "Date", "ActiveRecord::Type::Date"],
+  [() => m197, "DateTime", "ActiveRecord::Type::DateTime"],
+  [() => m199, "DecimalWithoutScale", "ActiveRecord::Type::DecimalWithoutScale"],
+  [() => m196, "DecorationRegistration", "ActiveRecord::Type::DecorationRegistration"],
+  [() => m200, "HashLookupTypeMap", "ActiveRecord::Type::HashLookupTypeMap"],
+  [() => m201, "Timezone", "ActiveRecord::Type::Internal::Timezone"],
+  [() => m202, "Json", "ActiveRecord::Type::Json"],
+  [() => m196, "Registration", "ActiveRecord::Type::Registration"],
+  [() => m203, "Serialized", "ActiveRecord::Type::Serialized"],
+  [() => m204, "Text", "ActiveRecord::Type::Text"],
+  [() => m205, "Time", "ActiveRecord::Type::Time"],
+  [() => m205, "Value", "ActiveRecord::Type::Time::Value"],
+  [() => m206, "TypeMap", "ActiveRecord::Type::TypeMap"],
+  [() => m207, "UnsignedInteger", "ActiveRecord::Type::UnsignedInteger"],
+  [() => m193, "Connection", "ActiveRecord::TypeCaster::Connection"],
+  [() => m194, "Map", "ActiveRecord::TypeCaster::Map"],
+  [() => m196, "TypeConflictError", "ActiveRecord::TypeConflictError"],
+  [() => m113, "UnknownAttributeReference", "ActiveRecord::UnknownAttributeReference"],
+  [() => m132, "UnknownMigrationVersionError", "ActiveRecord::UnknownMigrationVersionError"],
+  [() => m113, "UnknownPrimaryKey", "ActiveRecord::UnknownPrimaryKey"],
+  [() => m113, "UnmodifiableRelation", "ActiveRecord::UnmodifiableRelation"],
+  [() => m208, "Validations", "ActiveRecord::Validations"],
+  [() => m209, "AbsenceValidator", "ActiveRecord::Validations::AbsenceValidator"],
+  [() => m210, "AssociatedValidator", "ActiveRecord::Validations::AssociatedValidator"],
+  [() => m209, "ClassMethods", "ActiveRecord::Validations::ClassMethods"],
+  [() => m211, "LengthValidator", "ActiveRecord::Validations::LengthValidator"],
+  [() => m212, "NumericalityValidator", "ActiveRecord::Validations::NumericalityValidator"],
+  [() => m213, "PresenceValidator", "ActiveRecord::Validations::PresenceValidator"],
+  [() => m214, "UniquenessValidator", "ActiveRecord::Validations::UniquenessValidator"],
+  [() => m113, "ValueTooLong", "ActiveRecord::ValueTooLong"],
+  [() => m118, "VERSION", "ActiveRecord::VERSION"],
+  [() => m113, "WrappedDatabaseException", "ActiveRecord::WrappedDatabaseException"],
 ]);
