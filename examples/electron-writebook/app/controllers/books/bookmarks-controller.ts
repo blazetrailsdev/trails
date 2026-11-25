@@ -10,7 +10,7 @@ export interface BookmarksController extends Included<typeof BookScoped> {}
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class BookmarksController extends ApplicationController {
   declare book: Book;
-  declare leaf: Leaf | null;
+  leaf: Leaf | null = null;
 
   static {
     this.allowUnauthenticatedAccess();

@@ -81,6 +81,8 @@ export async function fixture<T>(set: keyof typeof FIXTURE_CLASSES, label: strin
   )) as T;
 }
 
+const { expect } = await import("vitest");
+const { isPresent } = await import("@blazetrails/activesupport");
 const { IntegrationTest } = await import("@blazetrails/actionpack/testing");
 const { ActionDispatch } = await import("@blazetrails/actionpack");
 
@@ -91,6 +93,15 @@ const { ActionDispatch } = await import("@blazetrails/actionpack");
 export class ApplicationIntegrationTest extends IntegrationTest {
   override get app() {
     return ActionDispatch.testApp as never;
+  }
+
+  /** Writebook's `SessionTestHelper#sign_in`. */
+  async signIn(user: string | InstanceType<typeof User>): Promise<void> {
+    if (!(user instanceof User)) user = await fixture<InstanceType<typeof User>>("users", user);
+    await this.post("/session", {
+      params: { email_address: user.email_address, password: "secret123456" },
+    });
+    expect(isPresent(this.cookies.get("session_token"))).toBe(true);
   }
 
   /** Runs the first-run setup and signs in as the administrator it creates. */
