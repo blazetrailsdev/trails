@@ -448,6 +448,10 @@ const alias = {
     __dirname,
     "packages/sqlite3/lib/engine/libsql.ts",
   ),
+  "@blazetrails/sqlite3/engine/bun-sqlite": path.resolve(
+    __dirname,
+    "packages/sqlite3/lib/engine/bun-sqlite.ts",
+  ),
   "@blazetrails/sqlite3/engine/node-sqlite": path.resolve(
     __dirname,
     "packages/sqlite3/lib/engine/node-sqlite.ts",
