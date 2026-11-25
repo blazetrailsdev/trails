@@ -43,9 +43,12 @@ function error(attribute: string, type: string, options: Record<string, unknown>
   return [{ attribute, type, options }];
 }
 
+const RUBY_BLANK = /^[\t\n\v\f\r \u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]*$/;
+const HEXADECIMAL = /^\s*[+-]?0[xX]/;
+
 export function isBlank(value: unknown): boolean {
   if (value == null || value === false) return true;
-  if (typeof value === "string") return value.trim() === "";
+  if (typeof value === "string") return RUBY_BLANK.test(value);
   return Array.isArray(value) && value.length === 0;
 }
 
@@ -55,7 +58,11 @@ const presence: Check = (value, _record, attribute) =>
 function length({ minimum, maximum, is }: NonNullable<ValidatesOptions["length"]>): Check {
   return (value, _record, attribute) => {
     const size =
-      value == null ? 0 : typeof value === "string" ? value.length : String(value).length;
+      value == null
+        ? 0
+        : typeof value === "string" || Array.isArray(value)
+          ? value.length
+          : String(value).length;
     const errors: ValidationError[] = [];
     if (minimum !== undefined && size < minimum) {
       errors.push(...error(attribute, ":too_short", { count: minimum }));
@@ -85,11 +92,17 @@ function numericality(options: NumericalityOptions): Check {
   const comparisons = COMPARISONS.filter(([key]) => options[key] !== undefined);
   return (_value, record, attribute) => {
     const raw = record.readAttributeBeforeTypeCast(attribute);
-    const number = typeof raw === "number" ? raw : typeof raw === "string" ? Number(raw) : NaN;
-    if (Number.isNaN(number) || (typeof raw === "string" && raw.trim() === "")) {
+    const number =
+      typeof raw === "number"
+        ? raw
+        : typeof raw === "string" && !HEXADECIMAL.test(raw) && !isBlank(raw)
+          ? Number(raw.replace(/(?<=\d)_(?=\d)/g, ""))
+          : NaN;
+    if (Number.isNaN(number)) {
       return error(attribute, ":not_a_number", { value: raw });
     }
-    if (options.onlyInteger === true && !Number.isInteger(number)) {
+    const integer = typeof raw === "string" ? /^[+-]?\d+$/.test(raw) : Number.isInteger(number);
+    if (options.onlyInteger === true && !integer) {
       return error(attribute, ":not_an_integer", { value: raw });
     }
     const errors: ValidationError[] = [];

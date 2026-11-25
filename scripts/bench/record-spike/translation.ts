@@ -10,6 +10,7 @@ export type Translate = (key: string, options: Record<string, unknown>) => strin
 type Message = string | { one: string; other: string };
 
 const MESSAGES: Readonly<Record<string, Message>> = {
+  invalid: "is invalid",
   blank: "can't be blank",
   inclusion: "is not included in the list",
   taken: "has already been taken",
@@ -50,7 +51,9 @@ export function humanAttributeName(
   attribute: string,
   translate: Translate | null,
 ): string {
-  const translated = translate?.(`activerecord.attributes.${i18nKey(modelName)}.${attribute}`, {});
+  const translated =
+    translate?.(`activerecord.attributes.${i18nKey(modelName)}.${attribute}`, {}) ??
+    translate?.(`attributes.${attribute}`, {});
   if (translated !== undefined) return translated;
   const words = attribute.replace(/_id$/, "").replaceAll("_", " ");
   return words.charAt(0).toUpperCase() + words.slice(1);

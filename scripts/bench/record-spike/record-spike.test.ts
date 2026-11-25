@@ -378,6 +378,16 @@ describe("record spike", () => {
         const article = new Article({ title: "a", body: "a", tags_count: "many" });
         return [await article.isValid(), report(article)];
       },
+      "numbers written with an underscore, and in hexadecimal": async ({ Article }) => {
+        const underscored = new Article({ title: "a", body: "a", tags_count: "1_000" });
+        const hexadecimal = new Article({ title: "b", body: "a", tags_count: "0x10" });
+        return [
+          await underscored.isValid(),
+          report(underscored),
+          await hexadecimal.isValid(),
+          report(hexadecimal),
+        ];
+      },
       "a valid record, then a duplicate": async ({ Article }) => {
         const first = await Article.create({ title: "ok", body: "a", tags_count: 2 });
         const second = await Article.create({ title: "ok", body: "b" });
@@ -405,6 +415,7 @@ describe("record spike", () => {
         article.errors.add("base", "is odd");
         article.errors.add("title", "looks wrong");
         article.errors.add("body", ":blank");
+        article.errors.add("tags_count");
         return report(article);
       },
     };
@@ -418,6 +429,7 @@ describe("record spike", () => {
 
     it("takes an application's translations through a function, with no i18n import", async () => {
       I18n.backend().storeTranslations("en", {
+        attributes: { body: "Text" },
         errors: { messages: { inclusion: "is not on the list" } },
         activerecord: {
           attributes: { article: { tags_count: "Tag total" } },
@@ -439,7 +451,7 @@ describe("record spike", () => {
         expect(ours).toEqual([
           "Title is needed",
           "Tag total has to be over 0",
-          "Body is not on the list",
+          "Text is not on the list",
         ]);
       } finally {
         Base.i18n = null;
