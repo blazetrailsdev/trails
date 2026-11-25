@@ -381,7 +381,10 @@ describe("record spike", () => {
       "numbers written with an underscore, and in hexadecimal": async ({ Article }) => {
         const underscored = new Article({ title: "a", body: "a", tags_count: "1_000" });
         const hexadecimal = new Article({ title: "b", body: "a", tags_count: "0x10" });
+        const infinite = new Article({ title: "c", body: "a", tags_count: "Infinity" });
         return [
+          await infinite.isValid(),
+          report(infinite),
           await underscored.isValid(),
           report(underscored),
           await hexadecimal.isValid(),

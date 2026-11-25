@@ -98,7 +98,7 @@ function numericality(options: NumericalityOptions): Check {
         : typeof raw === "string" && !HEXADECIMAL.test(raw) && !isBlank(raw)
           ? Number(raw.replace(/(?<=\d)_(?=\d)/g, ""))
           : NaN;
-    if (Number.isNaN(number)) {
+    if (Number.isNaN(number) || (typeof raw === "string" && !Number.isFinite(number))) {
       return error(attribute, ":not_a_number", { value: raw });
     }
     const integer = typeof raw === "string" ? /^[+-]?\d+$/.test(raw) : Number.isInteger(number);
