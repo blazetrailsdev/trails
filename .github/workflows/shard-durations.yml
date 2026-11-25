@@ -1,7 +1,3 @@
-# Weekly refresh of scripts/ci/ar-shard-durations.json, the per-file timings
-# scripts/ci/duration-sequencer.ts balances the AR adapter and Trailties
-# shards with. Takes the median over the latest green main runs and opens a PR
-# when the table changed.
 name: Shard durations
 
 on:
