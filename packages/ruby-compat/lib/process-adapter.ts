@@ -762,7 +762,8 @@ function tryAutoRegisterNode(): boolean {
   nodeAttempted = true;
   const proc = (globalThis as { process?: NodeProcessLike }).process;
   if (!proc?.versions?.node) return false;
-  const adapter = runtime() === "bun" ? buildBunAdapter(proc) : buildNodeAdapter(proc);
+  const adapter = buildNodeAdapter(proc);
+  if (runtime() === "bun") delete adapter.registerHooks;
   nodeAutoRegistered = adapter;
   registerProcessAdapter(adapter);
   return true;
@@ -772,11 +773,6 @@ function tryAutoRegisterNode(): boolean {
 export function runtime(): "node" | "bun" {
   const proc = (globalThis as { process?: NodeProcessLike }).process;
   return proc?.versions?.bun ? "bun" : "node";
-}
-
-function buildBunAdapter(proc: NodeProcessLike): ProcessAdapter {
-  const { registerHooks: _registerHooks, ...node } = buildNodeAdapter(proc);
-  return node;
 }
 
 /**
