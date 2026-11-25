@@ -1048,3 +1048,9 @@ export function __INTERNAL_resetProcessAdapter_TEST_ONLY(): void {
 }
 
 tryAutoRegisterNode();
+
+if (runtime() === "bun" && (globalThis as { Temporal?: unknown }).Temporal === undefined) {
+  (globalThis as { Temporal?: unknown }).Temporal = (
+    await import("@js-temporal/polyfill")
+  ).Temporal;
+}

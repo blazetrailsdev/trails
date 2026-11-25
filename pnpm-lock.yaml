@@ -1563,6 +1563,10 @@ importers:
         version: link:../vitest-matchers
 
   packages/ruby-compat:
+    dependencies:
+      '@js-temporal/polyfill':
+        specifier: ^0.5.1
+        version: 0.5.1
     optionalDependencies:
       yaml:
         specifier: ^2.8.3
