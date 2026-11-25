@@ -302,14 +302,14 @@ export function destroy<T>(this: Base, superFn: () => Promise<T>): Promise<T> {
 
 /**
  * @inventedArm ensureSchemaLoaded — PERMANENT
- * @inventedArm if — CONVERGEABLE save-chain-cold-record-detector-misses-tables-without-primary-key
+ * @inventedArm if — PERMANENT
  * @inventedArm reverseMergeBang — PERMANENT
  */
 export async function save<T>(this: Base, superFn: () => Promise<T>): Promise<T> {
   const klass = this.constructor;
   await klass.ensureSchemaLoaded();
-  const primaryKey = [klass.primaryKey].flat()[0];
-  if (this.isNewRecord() && primaryKey != null && !this._attributes.isKey(primaryKey)) {
+  if (this.isNewRecord() && this._builtBeforeSchemaLoad === true) {
+    this._builtBeforeSchemaLoad = false;
     this._attributes.reverseMergeBang(klass._defaultAttributes().deepDup());
   }
   return withTransactionReturningStatus.call(this, superFn) as Promise<T>;
@@ -317,14 +317,14 @@ export async function save<T>(this: Base, superFn: () => Promise<T>): Promise<T>
 
 /**
  * @inventedArm ensureSchemaLoaded — PERMANENT
- * @inventedArm if — CONVERGEABLE save-chain-cold-record-detector-misses-tables-without-primary-key
+ * @inventedArm if — PERMANENT
  * @inventedArm reverseMergeBang — PERMANENT
  */
 export async function saveBang<T>(this: Base, superFn: () => Promise<T>): Promise<T> {
   const klass = this.constructor;
   await klass.ensureSchemaLoaded();
-  const primaryKey = [klass.primaryKey].flat()[0];
-  if (this.isNewRecord() && primaryKey != null && !this._attributes.isKey(primaryKey)) {
+  if (this.isNewRecord() && this._builtBeforeSchemaLoad === true) {
+    this._builtBeforeSchemaLoad = false;
     this._attributes.reverseMergeBang(klass._defaultAttributes().deepDup());
   }
   return withTransactionReturningStatus.call(this, superFn) as Promise<T>;
