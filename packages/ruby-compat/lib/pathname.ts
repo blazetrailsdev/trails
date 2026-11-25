@@ -251,9 +251,16 @@ export class Pathname {
       [path] = r;
       if (path.length === 0) break;
       const d = this.chopBasename(path);
-      yield new (this.constructor as typeof Pathname)(
-        d ? d[0] + d[1] : path.replace(/\/+$/, "") + /\/*$/.exec(File.dirname(path))![0],
-      );
+      let delTrailingSeparator: string;
+      if (d) {
+        const [pre, basename] = d;
+        delTrailingSeparator = pre + basename;
+      } else if (/\/+$/.test(path)) {
+        delTrailingSeparator = path.replace(/\/+$/, "") + /\/*$/.exec(File.dirname(path))![0];
+      } else {
+        delTrailingSeparator = path;
+      }
+      yield new (this.constructor as typeof Pathname)(delTrailingSeparator);
     }
   }
 

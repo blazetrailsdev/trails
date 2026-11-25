@@ -17,21 +17,15 @@ import { transformKeysBang } from "./hash-utils.js";
 
 export class EventedFileUpdateChecker<R = unknown> {
   private _block: () => R;
-  private _core: EventedFileUpdateChecker.Core;
+  private _core!: EventedFileUpdateChecker.Core;
 
   /** @internal */
-  protected constructor(
-    files: string[],
-    dirs: Record<string, string | string[]> = {},
-    block?: () => R,
-  ) {
+  protected constructor(block?: () => R) {
     if (!block) {
       throw new ArgumentError("A block is required to initialize an EventedFileUpdateChecker");
     }
 
     this._block = block;
-    this._core = rbClassNewInstance(EventedFileUpdateChecker.Core, files, dirs);
-    ObjectSpace.defineFinalizer(this, this._core.finalizer());
   }
 
   static async new<R>(
@@ -39,8 +33,9 @@ export class EventedFileUpdateChecker<R = unknown> {
     dirs: Record<string, string | string[]> = {},
     block?: () => R,
   ): Promise<EventedFileUpdateChecker<R>> {
-    const checker = rbClassNewInstance(this, files, dirs, block) as EventedFileUpdateChecker<R>;
-    await checker._core.start();
+    const checker = rbClassNewInstance(this, block) as EventedFileUpdateChecker<R>;
+    checker._core = await EventedFileUpdateChecker.Core.new(files, dirs);
+    ObjectSpace.defineFinalizer(checker, checker._core.finalizer());
     return checker;
   }
 
@@ -82,7 +77,7 @@ export namespace EventedFileUpdateChecker {
     private _missing: string[];
     private _mutex: Mutex;
     private _listener: Listener | null = null;
-    private afterFork: () => unknown;
+    private afterFork!: () => unknown;
 
     /** @internal */
     protected constructor(files: string[], dirs: Record<string, string | string[]>) {
@@ -103,8 +98,13 @@ export namespace EventedFileUpdateChecker {
 
       this.updated = new AtomicBoolean(false);
       this._mutex = new Mutex();
+    }
 
-      this.afterFork = ForkTracker.afterFork(() => new Thread(() => this.start()));
+    static async new(files: string[], dirs: Record<string, string | string[]>): Promise<Core> {
+      const core = rbClassNewInstance(this, files, dirs) as Core;
+      await core.start();
+      core.afterFork = ForkTracker.afterFork(() => new Thread(() => core.start()));
+      return core;
     }
 
     finalizer(): () => void {

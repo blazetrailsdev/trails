@@ -1,11 +1,13 @@
-import { StringIO, include } from "@blazetrails/ruby-compat";
+import { StringIO, include, rbObjRespondTo, type Included } from "@blazetrails/ruby-compat";
+import type { IO } from "@blazetrails/libxml-ruby";
 import { LibXML } from "@blazetrails/libxml-ruby";
 import { isBlank } from "../core-ext/object/blank.js";
 
 type XmlHash = Record<string, unknown>;
+type ReadableIO = IO & { isEof(): boolean };
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type
-export interface HashBuilder extends Omit<typeof LibXML.XML.SaxParser.Callbacks, "onCdataBlock"> {}
+/* eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include LibXML::XML::SaxParser::Callbacks` (`libxmlsax.rb:12`); the class/interface merge is how a mixin surfaces on the type side. */
+export interface HashBuilder extends Included<typeof LibXML.XML.SaxParser.Callbacks> {}
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class HashBuilder {
@@ -63,11 +65,8 @@ export class HashBuilder {
   onCharacters(string: string): void {
     (this.currentHash[HashBuilder.CONTENT_KEY] as string) += string;
   }
-
-  onCdataBlock(string: string): void {
-    this.onCharacters(string);
-  }
 }
+HashBuilder.prototype.onCdataBlock = HashBuilder.prototype.onCharacters;
 include(HashBuilder, LibXML.XML.SaxParser.Callbacks);
 
 let _documentClass: new () => HashBuilder = HashBuilder;
@@ -80,16 +79,16 @@ export function setDocumentClass(klass: new () => HashBuilder): void {
   _documentClass = klass;
 }
 
-export function parse(data: string | StringIO | null | undefined): XmlHash {
-  if (!(data instanceof StringIO)) {
-    data = new StringIO(data ?? "");
+export function parse(data: string | ReadableIO | null | undefined): XmlHash {
+  if (!rbObjRespondTo(data, "read")) {
+    data = new StringIO((data as string | null | undefined) ?? "");
   }
 
-  if (data.isEof()) {
+  if ((data as ReadableIO).isEof()) {
     return {};
   } else {
     LibXML.XML.Error.setHandler(LibXML.XML.Error.QUIET_HANDLER);
-    const parser = LibXML.XML.SaxParser.io(data);
+    const parser = LibXML.XML.SaxParser.io(data as ReadableIO);
     const document = new (documentClass())();
 
     parser.callbacks = document;
