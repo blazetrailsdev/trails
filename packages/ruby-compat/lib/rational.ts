@@ -8,6 +8,7 @@ import { ArgumentError } from "./argument-error.js";
 import { classpaths } from "./classpath.js";
 import { FloatDomainError } from "./float-domain-error.js";
 import { FrozenError } from "./frozen-error.js";
+import { warn } from "./kernel-warn.js";
 import { rbIntegerTypeP } from "./numeric.js";
 import {
   rbBuiltinClassName,
@@ -530,7 +531,10 @@ function fExpt10(n: bigint): bigint | number {
  * over `rb_big_pow`'s `BIGLEN_LIMIT` check (`bignum.c:6297-6309`). */
 function bigPow(x: bigint, yy: bigint, z: bigint): bigint | number {
   const xbits = BigInt(x.toString(2).length);
-  if (xbits * yy > 32n * 1024n * 1024n) return Infinity;
+  if (xbits * yy > 32n * 1024n * 1024n) {
+    warn("in a**b, b may be too big", { uplevel: 0 });
+    return Infinity;
+  }
   const v = x ** yy;
   return z !== 1n ? z * v : v;
 }
