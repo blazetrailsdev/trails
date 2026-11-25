@@ -84,7 +84,7 @@ export async function fixture<T>(set: keyof typeof FIXTURE_CLASSES, label: strin
 const { expect } = await import("vitest");
 const { isPresent } = await import("@blazetrails/activesupport");
 const { IntegrationTest } = await import("@blazetrails/actionpack/testing");
-const { ActionDispatch } = await import("@blazetrails/actionpack");
+const { ActionDispatch, CookieJar } = await import("@blazetrails/actionpack");
 
 /**
  * `app` is overridden because `IntegrationTest#app` recurses without it (story
@@ -93,6 +93,11 @@ const { ActionDispatch } = await import("@blazetrails/actionpack");
 export class ApplicationIntegrationTest extends IntegrationTest {
   override get app() {
     return ActionDispatch.testApp as never;
+  }
+
+  /** Writebook's `SessionTestHelper#parsed_cookies`. */
+  parsedCookies() {
+    return CookieJar.build(this.request as never, this.cookies.toHash() as Record<string, string>);
   }
 
   /** Writebook's `SessionTestHelper#sign_in`. */

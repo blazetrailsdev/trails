@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { ApplicationIntegrationTest, fixture, loadFixtures } from "../test-helper.ts";
+import { isPresent } from "@blazetrails/activesupport";
 import { Session } from "../../app/models/session.ts";
 import { User } from "../../app/models/user.ts";
 
@@ -47,7 +48,7 @@ describe("SessionsControllerTest", () => {
     expect(await Session.count()).toBe(before + 1);
 
     t.assertRedirectedTo("http://www.example.com/");
-    expect(t.cookies.get("session_token")).toBeTruthy();
+    expect(t.parsedCookies().signed.get("session_token")).toBeTruthy();
   });
 
   it("create records the proxy's client IP over a client-sent Forwarded header", async () => {
@@ -64,7 +65,7 @@ describe("SessionsControllerTest", () => {
     await t.post("/session", { params: { email_address: "david@example.com", password: "wrong" } });
 
     t.assertResponse(":unauthorized");
-    expect(t.cookies.get("session_token")).toBeFalsy();
+    expect(t.parsedCookies().signed.get("session_token") == null).toBe(true);
   });
 
   it("destroy", async () => {
@@ -76,7 +77,7 @@ describe("SessionsControllerTest", () => {
     expect(await Session.count()).toBe(before - 1);
 
     t.assertRedirectedTo("http://www.example.com/");
-    expect(t.cookies.get("session_token")).toBeFalsy();
+    expect(isPresent(t.cookies.get("session_token"))).toBe(false);
     expect(await Session.findBy({ id: session.id })).toBeNull();
   });
 });
