@@ -552,9 +552,6 @@ function appendIndex(map: Map<string, number[]>, key: string, idx: number): void
 }
 
 /** Consume the first unconsumed index from a queue, returning it or -1. */
-// `prefer` picks among same-path candidates, as two included behaviors that
-// define one test name (failure_raising / failure_safety) do; the first
-// unconsumed candidate is the fallback.
 function consumeIndex(
   queue: number[] | undefined,
   consumed: Set<number>,

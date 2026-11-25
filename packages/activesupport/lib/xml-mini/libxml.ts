@@ -1,13 +1,6 @@
-import { StringIO, warn } from "@blazetrails/ruby-compat";
+import { StringIO } from "@blazetrails/ruby-compat";
+import { LibXML } from "@blazetrails/libxml-ruby";
 import { isBlank } from "../core-ext/object/blank.js";
-
-let LibXML: typeof import("@blazetrails/libxml-ruby").LibXML;
-try {
-  ({ LibXML } = await import("@blazetrails/libxml-ruby"));
-} catch (e) {
-  warn("cannot load such file -- libxml");
-  throw e;
-}
 
 type XmlHash = Record<string, unknown>;
 type LibXMLDocument = InstanceType<typeof LibXML.XML.Document>;

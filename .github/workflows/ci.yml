@@ -1908,8 +1908,6 @@ jobs:
       - run: pnpm vitest run packages/actioncable/test/subscription-adapter/redis.test.ts
         env:
           REDIS_URL: redis://localhost:6379/1
-      # Active Support's RedisCacheStore (activesupport/test/cache/stores/redis_cache_store_test.rb),
-      # excluded from the main lane the same way.
       - run: pnpm vitest run packages/activesupport/test/cache/stores/redis-cache-store.test.ts
         env:
           REDIS_URL: redis://localhost:6379/0
