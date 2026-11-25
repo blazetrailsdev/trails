@@ -38,20 +38,20 @@ describe.skipIf(!SERVICE_CONFIGURATIONS.s3_public)(
       expect(String(response.status)).toBe("200");
     });
 
-    it("public URL generation (virtual host enabled)", async () => {
-      const url = await ctx.service.url(ctx.key, {
-        filename: new Filename("avatar.png"),
-        virtualHost: true,
-      });
+    it.skipIf(SERVICE_CONFIGURATIONS.s3_public?.endpoint !== undefined)(
+      "public URL generation (virtual host enabled)",
+      async () => {
+        const url = await ctx.service.url(ctx.key, {
+          filename: new Filename("avatar.png"),
+          virtualHost: true,
+        });
 
-      expect(url).toMatch(new RegExp(`${ctx.service.bucket}/${ctx.key}`));
+        expect(url).toMatch(new RegExp(`${ctx.service.bucket}/${ctx.key}`));
 
-      const { host, pathname } = new URL(url);
-      const response = await fetch(
-        `${String(SERVICE_CONFIGURATIONS.s3_public.endpoint)}/${host}${pathname}`,
-      );
-      expect(String(response.status)).toBe("200");
-    });
+        const response = await fetch(url);
+        expect(String(response.status)).toBe("200");
+      },
+    );
 
     it("direct upload", async () => {
       const key = base58(24);

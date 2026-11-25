@@ -99,3 +99,29 @@ describe.skipIf(!SERVICE_CONFIGURATIONS.s3)("S3Service (trails)", () => {
     },
   );
 });
+
+describe("S3Service public URLs (trails)", () => {
+  const configure = (bucket: string) =>
+    Service.configure("s3_public", {
+      s3_public: {
+        service: "S3",
+        accessKeyId: "trails",
+        secretAccessKey: "trails-secret",
+        region: "us-east-1",
+        bucket: bucket,
+        public: true,
+      },
+    }) as S3Service;
+
+  it("a dotted bucket's public URL is path-style", async () => {
+    expect(await configure("public.example.dev").url("a/b.png")).toBe(
+      "https://s3.us-east-1.amazonaws.com/public.example.dev/a/b.png",
+    );
+  });
+
+  it("an undotted bucket's public URL is virtual-host style", async () => {
+    expect(await configure("trails-public").url("a/b.png")).toBe(
+      "https://trails-public.s3.us-east-1.amazonaws.com/a/b.png",
+    );
+  });
+});

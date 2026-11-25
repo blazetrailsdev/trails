@@ -2,6 +2,7 @@ import { env as ENV, File, OpenSSL } from "@blazetrails/ruby-compat";
 
 const s3Endpoint = ENV["ACTIVE_STORAGE_S3_ENDPOINT"];
 const gcsEndpoint = ENV["ACTIVE_STORAGE_GCS_ENDPOINT"];
+const s3PublicBucket = ENV["ACTIVE_STORAGE_S3_PUBLIC_BUCKET"];
 
 export function s3Configuration(bucket: string, endpoint?: string): Record<string, unknown> {
   return {
@@ -39,6 +40,16 @@ export const SERVICE_CONFIGURATIONS: Record<string, Record<string, unknown>> = {
     : {
         s3: s3Configuration("trails-private", s3Endpoint),
         s3_public: { ...s3Configuration("trails-public", s3Endpoint), public: true },
+      }),
+  ...(s3PublicBucket === undefined
+    ? {}
+    : {
+        s3_public: {
+          service: "S3",
+          region: ENV["ACTIVE_STORAGE_S3_PUBLIC_REGION"],
+          bucket: s3PublicBucket,
+          public: true,
+        },
       }),
   ...(gcsEndpoint === undefined
     ? {}

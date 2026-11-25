@@ -415,7 +415,9 @@ export class S3Service extends Service {
     if (virtualHost) return `https://${this.bucket}/${path}`;
     if (this.client.config.endpoint === undefined) {
       const region = await this.client.config.region();
-      return `https://${this.bucket}.s3.${region}.amazonaws.com/${path}`;
+      return this.client.config.forcePathStyle || this.bucket.includes(".")
+        ? `https://s3.${region}.amazonaws.com/${this.bucket}/${path}`
+        : `https://${this.bucket}.s3.${region}.amazonaws.com/${path}`;
     }
     const endpoint = await this.client.config.endpoint();
     const port = endpoint.port == null ? "" : `:${endpoint.port}`;
