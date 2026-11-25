@@ -53,7 +53,11 @@ export async function buildAutoload({
   if (views && application != null) {
     for (const dir of application.paths?.().get("app/views")?.existent() ?? []) {
       if ((await File.isDirectoryAsync(dir)) && `${dir}/`.includes("/app/views/")) {
-        await buildViews({ cwd: application.config.root ?? cwd, viewsDir: dir, inPlace: true });
+        await buildViews({
+          cwd: application.config.root?.toString() ?? cwd,
+          viewsDir: dir,
+          inPlace: true,
+        });
       }
     }
   }
