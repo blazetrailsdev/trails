@@ -22,6 +22,7 @@ import {
   STDOUT,
   rbModGt,
   rbModName,
+  resolveTsThenJs,
 } from "@blazetrails/ruby-compat";
 import { prepend } from "@blazetrails/ruby-compat/include";
 import { Callbacks, type ActionController } from "@blazetrails/actionpack";
@@ -391,7 +392,10 @@ export class Trailtie extends BaseTrailtie {
 
     this.initializer("active_record.add_watchable_files", async (app) => {
       const path = await app.paths().get("db")!.first();
-      this.config.watchableFiles.push(`${path}/schema.ts`, `${path}/structure.sql`);
+      this.config.watchableFiles.push(
+        resolveTsThenJs(`${path}/schema.ts`),
+        `${path}/structure.sql`,
+      );
     });
 
     this.initializer("active_record.clear_active_connections", () => {

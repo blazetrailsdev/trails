@@ -36,6 +36,7 @@ import {
   constGet,
   constSet,
   RuntimeError,
+  resolveTsThenJs,
 } from "@blazetrails/ruby-compat";
 import { Base } from "../base.js";
 import { dumpSchemaAfterMigration } from "../active-record.js";
@@ -505,6 +506,7 @@ export class DatabaseTasks {
     return structureLoadFlags;
   }
 
+  /** @inventedArm resolveTsThenJs — PERMANENT */
   static schemaDumpPath(
     dbConfig: HashConfig,
     format: SchemaFormat = dbConfig.schemaFormat(),
@@ -515,8 +517,8 @@ export class DatabaseTasks {
     const filename = dbConfig.schemaDump(format);
     if (filename == null) return null;
 
-    if (File.dirname(filename) === this.dbDir) return filename;
-    return File.join(this.dbDir, filename);
+    const path = File.dirname(filename) === this.dbDir ? filename : File.join(this.dbDir, filename);
+    return format === "ts" ? resolveTsThenJs(path) : path;
   }
 
   /** @missingRailsArgs dump — PERMANENT */

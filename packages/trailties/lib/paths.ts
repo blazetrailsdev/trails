@@ -1,4 +1,11 @@
-import { Dir, File, Pathname, rbInspect, RuntimeError } from "@blazetrails/ruby-compat";
+import {
+  Dir,
+  File,
+  Pathname,
+  rbInspect,
+  resolveTsThenJs,
+  RuntimeError,
+} from "@blazetrails/ruby-compat";
 
 export interface PathOptions {
   with?: string | string[];
@@ -208,6 +215,7 @@ export class Path {
     return this.glob?.match(/\{([\S]+)\}/)?.[1].split(",");
   }
 
+  /** @inventedArm resolveTsThenJs — PERMANENT */
   expanded(): string[] {
     if (this._root.path === null) throw new Error("You need to set a path root");
     const result: string[] = [];
@@ -216,7 +224,7 @@ export class Path {
       if (this.glob && File.isDirectory(path)) {
         result.push(...this.filesIn(path));
       } else {
-        result.push(path);
+        result.push(resolveTsThenJs(path));
       }
     }
     return Array.from(new Set(result));

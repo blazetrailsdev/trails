@@ -5,6 +5,7 @@ import {
   Dir,
   loadIseqEval,
   rbFLoad,
+  resolveTsThenJs,
   RuntimeError,
 } from "@blazetrails/ruby-compat";
 import type { DrawCallback } from "@blazetrails/actionpack";
@@ -102,7 +103,9 @@ export class RoutesReloader {
       for (const routes of this.routeSets) {
         for (const dir of routes.drawPaths) {
           const files = new Set([
-            ...(await Dir.globAsync(`${dir}/**/*.ts`)),
+            ...(await Dir.globAsync(`${dir}/**/*.{ts,js}`))
+              .filter((f) => !f.endsWith(".d.ts"))
+              .map((f) => resolveTsThenJs(f.replace(/\.js$/, ".ts"))),
             ...compiledFilesIn(`${dir}`),
           ]);
           for (const file of files) await loadIseqEval(file, true);
