@@ -398,9 +398,7 @@ describe("DurationTest", () => {
   it("since and ago anchored to time zone now when time zone is set", () => {
     const oldZone = zone();
     setZone(TimeZone.find("Eastern Time (US & Canada)"));
-    const now = vi
-      .spyOn(clock, "now")
-      .mockReturnValue(Temporal.Instant.fromEpochMilliseconds(Date.UTC(2000, 0, 1, 5)));
+    const now = vi.spyOn(RubyTime, "now").mockReturnValue(RubyTime.utc(2000, 1, 1, 5));
     try {
       expect(Duration.seconds(5).since()).toBeInstanceOf(TimeWithZone);
       expect((Duration.seconds(5).since() as TimeWithZone).time).toEqual(
