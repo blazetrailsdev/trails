@@ -20,7 +20,8 @@ if (dist) {
 const shots = process.env.SCREENSHOTS;
 const browser = await chromium.launch();
 const colorScheme = process.env.COLOR_SCHEME === "dark" ? "dark" : "light";
-const page = await browser.newPage({ viewport: { width: 1600, height: 900 }, colorScheme });
+const context = await browser.newContext({ viewport: { width: 1600, height: 900 }, colorScheme });
+const page = await context.newPage();
 page.on("pageerror", (e) => console.log("[pageerror]", e.message));
 if (process.env.VERBOSE) page.on("console", (m) => console.log(`[${m.type()}]`, m.text()));
 const frame = page.frameLocator("#preview");
@@ -37,7 +38,10 @@ const see = (selector, hasText) =>
   frame.locator(selector, { hasText }).first().waitFor({ timeout: 30_000 });
 try {
   await page.goto(url);
-  await page.evaluate(() => localStorage.clear());
+  await page.evaluate(() => {
+    localStorage.clear();
+    localStorage.setItem("trails-browser:hint-seen", "1");
+  });
   await page.reload();
   const status = page.locator("#status");
   await page.waitForFunction(
@@ -105,6 +109,53 @@ try {
   await see("h1", "Edited posts");
   await see("article", "Hello from the smoke test");
   console.log("an edit to a view restarted the app, and the post survived the restart");
+
+  const consoleHas = (text) =>
+    page.locator("#console", { hasText: text }).waitFor({ timeout: 30_000 });
+  await page.locator("#repl-input").fill("await Post.count()");
+  await page.locator("#repl-input").press("Enter");
+  await consoleHas(/› await Post\.count\(\)\s[\s\S]*\b7\b/);
+  console.log("the console ran a query against the app's models");
+
+  await page.locator("#tab-database").click();
+  await page.locator("#database .tables button", { hasText: "posts (7)" }).click();
+  await page.locator("#database td", { hasText: "Hello from the smoke test" }).waitFor();
+  await page.locator("#tab-console").click();
+  console.log("the database tab lists the tables and their rows");
+
+  await page.locator("#tree .file", { hasText: "post.ts" }).click();
+  const model = await editor.inputValue();
+  await editor.fill(model.replace("export class Post", "export clas Post"));
+  await page
+    .locator("#overlay", { hasText: "/app/models/post.ts:6:" })
+    .waitFor({ timeout: 30_000 });
+  if ((await status.getAttribute("data-state")) !== "error") throw new Error("status is not red");
+  await page.locator("#problems", { hasText: "Line 6" }).waitFor();
+  await editor.fill(model);
+  await page.locator("#overlay").waitFor({ state: "hidden", timeout: 30_000 });
+  await see("h1", "Edited posts");
+  console.log("a syntax error names its file and line over the preview, and fixing it recovers");
+
+  const cdp = await context.newCDPSession(page);
+  await cdp.send("ServiceWorker.enable");
+  await cdp.send("ServiceWorker.stopAllWorkers");
+  await page.locator("#reload").click();
+  await see("h1", "Edited posts");
+  console.log("the preview survives the browser stopping the service worker");
+
+  const other = await context.newPage();
+  await other.goto(url);
+  await other.locator("#status", { hasText: "Running" }).waitFor({ timeout: 120_000 });
+  await other.close();
+  await page.locator("#reload").click();
+  await see("h1", "Edited posts");
+  console.log("a second tab runs its own app and leaves this one serving");
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.locator("#phone-note").waitFor({ state: "visible" });
+  if (await page.locator("#editor").isVisible()) throw new Error("the editor shows at phone width");
+  await see("h1", "Edited posts");
+  console.log("at phone width the page is the running app alone");
 } finally {
   console.log("--- console ---\n" + (await page.locator("#console").innerText()));
   await browser.close();

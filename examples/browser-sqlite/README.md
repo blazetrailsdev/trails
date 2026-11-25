@@ -5,6 +5,22 @@ A trails application that runs entirely in a browser tab, on SQLite compiled to 
 trails serves the app's pages, and a console showing the app's output, the Rails log included.
 Edit a file and the app restarts with the change.
 
+Around that loop the page has:
+
+- **Files**: create, rename and delete files. A new model, controller or migration starts from a
+  skeleton, and a migration waits for Restart, so a half-written one never runs
+- **Errors where you look**: a syntax error names its file and line over the preview, in the file
+  tree and in the editor's gutter; a template that does not compile says which one
+- **A console line**: `await Post.count()` runs in the booted app with every model in scope, as
+  `trails console` does
+- **A database tab**: each table and its rows, read from the same SQLite database
+- **Routes**: the preview's Routes button opens `/trails/info/routes`
+- **Share and Download**: a link that carries the files changed from the example (in the URL
+  fragment, never sent to a server), and the app as a `.zip`
+- **One app per tab**: each tab runs its own runtime, and a preview keeps working after the
+  browser stops the service worker
+- **A phone** shows the running app alone; the editor needs a wider screen
+
 ```bash
 pnpm dev     # Vite dev server; open the printed URL
 pnpm build && pnpm preview   # a static bundle in dist/, served by vite preview
@@ -52,15 +68,15 @@ The editor in dark mode:
 
 ## How it fits together
 
-| Piece                                                  | What it does                                                                                                                                                                                                                                                                                                                              |
-| ------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Editor (`index.html`, `src/host/`)                     | Highlights the source with Shiki (the website's `github-dark` theme, plus a small `.tse` grammar: HTML with TypeScript inside `<% %>`) behind a transparent textarea. Holds the files and the database bytes (both kept in `localStorage`), and recreates the runtime iframe on every restart, so each run evaluates a fresh module graph |
-| Runtime iframe (`runtime.html`, `src/runtime/main.ts`) | Loads the framework packages, registers the browser host adapters, boots the app, runs pending migrations, and answers requests                                                                                                                                                                                                           |
-| Virtual filesystem (`src/runtime/vfs.ts`)              | An in-memory ruby-compat `FsAdapter`. Zeitwerk, the template resolver and the migrator read the app's files from it; the app's `log/development.log` is written to it and tailed into the console                                                                                                                                         |
-| Service worker (`public/sw.js`)                        | Sends the preview's `/preview/*` requests to the runtime, which hands them to the Rack app with `SCRIPT_NAME=/preview`, and serves the app's modules: `pathToFileURL("/app/models/post.ts")` is a `/rt/<run>/vfs/...` URL the worker answers                                                                                              |
-| Module loading (`src/runtime/modules.ts`)              | Transpiles an app file with TypeScript's `transpileModule`, and points its `@blazetrails/*` imports at shims that `export *` from the URL each package is served at (by the dev server, or as its own chunk in a build), so app code shares the framework's module instances and live bindings                                            |
-| Templates (`src/runtime/template-compiler.ts`)         | A trails app precompiles `.tse` with `trails-tsc-views build`; here the source is in the editor, so `setTemplateCompiler` builds the same stand-in module from it at first render                                                                                                                                                         |
-| SQLite (`src/runtime/expo-sqlite-sqljs.ts`)            | The app's `database.ts` says `adapter: "expo-sqlite"`; the runtime answers expo-sqlite's async API with sql.js, so the stock `SQLite3Adapter` runs unchanged                                                                                                                                                                              |
+| Piece                                                  | What it does                                                                                                                                                                                                                                                                                                                               |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Editor (`index.html`, `src/host/`)                     | Highlights the source with Shiki (the website's `github-dark` theme, plus a small `.tse` grammar: HTML with TypeScript inside `<% %>`) behind a transparent textarea. Holds the files and the database bytes (both kept in `localStorage`), and recreates the runtime iframe on every restart, so each run evaluates a fresh module graph  |
+| Runtime iframe (`runtime.html`, `src/runtime/main.ts`) | Loads the framework packages, registers the browser host adapters, boots the app, runs pending migrations, and answers requests                                                                                                                                                                                                            |
+| Virtual filesystem (`src/runtime/vfs.ts`)              | An in-memory ruby-compat `FsAdapter`. Zeitwerk, the template resolver and the migrator read the app's files from it; the app's `log/development.log` is written to it and tailed into the console                                                                                                                                          |
+| Service worker (`public/sw.js`)                        | Sends a tab's `/preview/<tab>/*` requests to that tab's runtime, which hands them to the Rack app with `SCRIPT_NAME=/preview/<tab>`, and serves the app's modules: `pathToFileURL("/app/models/post.ts")` is a `/rt/<tab>/<run>/vfs/...` URL the worker answers. It keeps no state: it finds the runtime frame by its URL on every request |
+| Module loading (`src/runtime/modules.ts`)              | Transpiles an app file with TypeScript's `transpileModule`, and points its `@blazetrails/*` imports at shims that `export *` from the URL each package is served at (by the dev server, or as its own chunk in a build), so app code shares the framework's module instances and live bindings                                             |
+| Templates (`src/runtime/template-compiler.ts`)         | A trails app precompiles `.tse` with `trails-tsc-views build`; here the source is in the editor, so `setTemplateCompiler` builds the same stand-in module from it at first render                                                                                                                                                          |
+| SQLite (`src/runtime/expo-sqlite-sqljs.ts`)            | The app's `database.ts` says `adapter: "expo-sqlite"`; the runtime answers expo-sqlite's async API with sql.js, so the stock `SQLite3Adapter` runs unchanged                                                                                                                                                                               |
 
 ## What a browser needs that Node does not
 

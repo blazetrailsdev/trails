@@ -1,52 +1,70 @@
-let runtimeId = null;
 const base = new URL("./", self.location.href).pathname;
-const previewPath = `${base}preview`;
+const previewRoot = `${base}preview/`;
+const moduleRoot = `${base}rt/`;
+const runtimePage = `${base}runtime.html`;
+const ANSWER_TIMEOUT = 30_000;
 
 self.addEventListener("install", () => self.skipWaiting());
 self.addEventListener("activate", (event) => event.waitUntil(self.clients.claim()));
 
-self.addEventListener("message", (event) => {
-  if (event.data?.type === "runtime:hello") {
-    runtimeId = event.source.id;
-    event.ports[0]?.postMessage({ type: "sw:ok" });
-  }
-});
+function tabUnder(root, url) {
+  if (!url.pathname.startsWith(root)) return null;
+  return url.pathname.slice(root.length).split("/")[0] || null;
+}
 
-function underPreview(url) {
-  return url.pathname === previewPath || url.pathname.startsWith(`${previewPath}/`);
+/**
+ * The newest runtime frame a tab holds. Nothing is remembered between events:
+ * a browser stops an idle worker and starts a fresh one, and each tab runs
+ * its own runtime, so the frame is looked up by the `tab` in its URL.
+ */
+async function runtimeFor(tab) {
+  let found = null;
+  let newest = -1;
+  for (const client of await self.clients.matchAll({ type: "window", includeUncontrolled: true })) {
+    const url = new URL(client.url);
+    if (url.pathname !== runtimePage || url.searchParams.get("tab") !== tab) continue;
+    const session = Number(url.searchParams.get("session"));
+    if (session > newest) [found, newest] = [client, session];
+  }
+  return found;
 }
 
 self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
   if (url.origin !== self.location.origin) return;
-  if (underPreview(url) || url.pathname.startsWith(`${base}rt/`)) {
-    event.respondWith(forward(event.request, url));
+  const tab = tabUnder(previewRoot, url) ?? tabUnder(moduleRoot, url);
+  if (tab) {
+    event.respondWith(forward(event.request, url, tab));
     return;
   }
   const referrer = event.request.referrer ? new URL(event.request.referrer) : null;
-  if (referrer && referrer.origin === url.origin && underPreview(referrer)) {
-    const moved = new URL(`${previewPath}${url.pathname}${url.search}`, url.origin);
+  const from = referrer && referrer.origin === url.origin ? tabUnder(previewRoot, referrer) : null;
+  if (from) {
+    const moved = new URL(`${previewRoot}${from}${url.pathname}${url.search}`, url.origin);
     event.respondWith(
       event.request.mode === "navigate"
         ? Response.redirect(moved.href, 302)
-        : forward(event.request, moved),
+        : forward(event.request, moved, from),
     );
   }
 });
 
-async function forward(request, url) {
-  const client = runtimeId && (await self.clients.get(runtimeId));
-  if (!client) {
-    return new Response(
-      "<p style='font-family:system-ui'>The trails runtime is not running yet…</p>",
-      { status: 503, headers: { "content-type": "text/html; charset=utf-8" } },
-    );
-  }
+function page(status, text) {
+  return new Response(`<p style="font-family:system-ui">${text}</p>`, {
+    status,
+    headers: { "content-type": "text/html; charset=utf-8" },
+  });
+}
+
+async function forward(request, url, tab) {
+  const client = await runtimeFor(tab);
+  if (!client) return page(503, "The trails runtime is not running. Press Restart in the editor.");
   const body =
     request.method === "GET" || request.method === "HEAD" ? null : await request.arrayBuffer();
   const channel = new MessageChannel();
   const reply = new Promise((resolve) => {
     channel.port1.onmessage = (event) => resolve(event.data);
+    setTimeout(() => resolve(null), ANSWER_TIMEOUT);
   });
   client.postMessage(
     {
@@ -58,6 +76,7 @@ async function forward(request, url) {
     },
     [channel.port2],
   );
-  const { status, headers, body: responseBody } = await reply;
-  return new Response(responseBody, { status, headers });
+  const answer = await reply;
+  if (!answer) return page(504, "The trails runtime did not answer. Press Restart in the editor.");
+  return new Response(answer.body, { status: answer.status, headers: answer.headers });
 }

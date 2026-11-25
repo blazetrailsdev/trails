@@ -40,3 +40,41 @@ export function transpile(source: string, fileName: string, pkgBase: string): st
   }
   return out;
 }
+
+export type Problem = { path: string; line: number; column: number; message: string };
+
+/**
+ * The first syntax error TypeScript reports for an app file, which would
+ * otherwise surface as a bare `SyntaxError` at import. Only the first: the
+ * parser's later reports for the same file are mostly its recovery from that one.
+ */
+export function syntaxErrors(source: string, fileName: string): Problem[] {
+  const { diagnostics = [] } = ts.transpileModule(source, {
+    fileName,
+    reportDiagnostics: true,
+    compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext },
+  });
+  return diagnostics.slice(0, 1).map((d) => {
+    const at = d.file?.getLineAndCharacterOfPosition(d.start ?? 0);
+    return {
+      path: fileName,
+      line: (at?.line ?? 0) + 1,
+      column: (at?.character ?? 0) + 1,
+      message: ts.flattenDiagnosticMessageText(d.messageText, " "),
+    };
+  });
+}
+
+function asyncCall(body: string): { js: string; ok: boolean } {
+  const { outputText, diagnostics = [] } = ts.transpileModule(`(async () => ${body})()`, {
+    reportDiagnostics: true,
+    compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None },
+  });
+  return { js: outputText.trim().replace(/;$/, ""), ok: diagnostics.length === 0 };
+}
+
+/** A console line as the JavaScript of an async call: an expression when it parses as one, else statements. */
+export function consoleLine(code: string): string {
+  const expression = asyncCall(`(\n${code}\n)`);
+  return expression.ok ? expression.js : asyncCall(`{\n${code}\n}`).js;
+}

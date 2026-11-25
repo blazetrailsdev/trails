@@ -14,6 +14,32 @@ export function seedDatabase(name: string, bytes: Uint8Array | null): void {
   databases.set(key(name), bytes ? new SQL.Database(bytes) : new SQL.Database());
 }
 
+const quoted = (identifier: string) => `"${identifier.replaceAll('"', '""')}"`;
+
+/** Each table of a database with its row count, for the editor's database tab. */
+export function tables(name: string): { name: string; count: number }[] {
+  const db = databases.get(key(name));
+  if (!db) return [];
+  const found = db.exec(
+    "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name",
+  )[0];
+  return (found?.values ?? []).map(([table]) => ({
+    name: String(table),
+    count: Number(db.exec(`SELECT COUNT(*) FROM ${quoted(String(table))}`)[0].values[0][0]),
+  }));
+}
+
+/** The first `limit` rows of a table, as column names and value rows. */
+export function rows(
+  name: string,
+  table: string,
+  limit: number,
+): { columns: string[]; values: unknown[][] } {
+  const db = databases.get(key(name));
+  const found = db?.exec(`SELECT * FROM ${quoted(table)} LIMIT ${Math.trunc(limit)}`)[0];
+  return { columns: found?.columns ?? [], values: found?.values ?? [] };
+}
+
 export function exportDatabase(name: string): Uint8Array | null {
   return databases.get(key(name))?.export() ?? null;
 }

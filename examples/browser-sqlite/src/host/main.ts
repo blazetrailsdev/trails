@@ -2,7 +2,10 @@ import "@fontsource-variable/bricolage-grotesque";
 import "@fontsource-variable/instrument-sans";
 import "@fontsource-variable/fira-code";
 import { latin1 } from "../runtime/latin1.ts";
+import { goToLine, installEditing } from "./editing.ts";
 import { highlight } from "./highlight.ts";
+import { applyChanges, changesFrom, decodeChanges, encodeChanges } from "./share.ts";
+import { zip } from "./zip.ts";
 
 const TEMPLATE = import.meta.glob<string>("../../template/**/*", {
   query: "?raw",
@@ -14,6 +17,16 @@ const FILES_KEY = "trails-browser:files";
 const DB_KEY = "trails-browser:db";
 const COOKIES_KEY = "trails-browser:cookies";
 const TMP_KEY = "trails-browser:tmp";
+const CURRENT_KEY = "trails-browser:current";
+const LAYOUT_KEY = "trails-browser:layout";
+const HINT_KEY = "trails-browser:hint-seen";
+const SHARE_PREFIX = "#code=";
+const LONG_LINE = 600;
+const MAX_LINES = 3000;
+
+type Problem = { path: string; line: number; column: number; message: string };
+type Table = { name: string; count: number };
+type Rows = { columns: string[]; values: unknown[][] };
 
 function templateFiles(): Record<string, string> {
   return Object.fromEntries(
@@ -24,59 +37,129 @@ function templateFiles(): Record<string, string> {
   );
 }
 
-let files: Record<string, string> =
-  JSON.parse(localStorage.getItem(FILES_KEY) ?? "null") ?? templateFiles();
+let storageFull = false;
+function store(key: string, value: string | null): void {
+  try {
+    if (value === null) localStorage.removeItem(key);
+    else localStorage.setItem(key, value);
+  } catch {
+    if (storageFull) return;
+    storageFull = true;
+    log("warn", "This page's browser storage is full: changes from here on are not kept.");
+  }
+}
+
+function stored<T>(key: string, fallback: T): T {
+  try {
+    return (JSON.parse(localStorage.getItem(key) ?? "null") as T | null) ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+const tabId = crypto.randomUUID().slice(0, 8);
+let files: Record<string, string> = stored(FILES_KEY, templateFiles());
 let db: Uint8Array | null = loadDb();
-let tmp: Record<string, string> = JSON.parse(localStorage.getItem(TMP_KEY) ?? "{}");
-let cookies: Record<string, string> = JSON.parse(localStorage.getItem(COOKIES_KEY) ?? "{}");
-let current = "/app/controllers/posts-controller.ts";
+let tmp: Record<string, string> = stored(TMP_KEY, {});
+let cookies: Record<string, string> = stored(COOKIES_KEY, {});
+let current = localStorage.getItem(CURRENT_KEY) ?? "/app/controllers/posts-controller.ts";
 let session = 0;
 let runtime: HTMLIFrameElement | null = null;
+let problems: Problem[] = [];
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const tree = $<HTMLElement>("tree");
 const editor = $<HTMLTextAreaElement>("editor");
 const backdrop = $("highlight");
+const gutter = $("gutter");
+const preview = $<HTMLIFrameElement>("preview");
+const consoleEl = $<HTMLElement>("console");
+const urlInput = $<HTMLInputElement>("url");
+const statusEl = $<HTMLElement>("status");
+const filter = $<HTMLSelectElement>("filter");
+const overlay = $("overlay");
 
 let painted = 0;
+let paintQueued = false;
 function paint(): void {
-  const run = ++painted;
-  const source = editor.value;
-  highlight(source.endsWith("\n") ? `${source} ` : source, current).then(
-    (html) => {
-      if (run !== painted) return;
-      backdrop.innerHTML = html;
-      editor.classList.add("highlighted");
-      syncScroll();
-    },
-    (e: unknown) => {
-      if (run !== painted) return;
-      backdrop.replaceChildren();
-      editor.classList.remove("highlighted");
-      console.error("highlighting failed:", e);
-    },
-  );
+  if (paintQueued) return;
+  paintQueued = true;
+  requestAnimationFrame(() => {
+    paintQueued = false;
+    const run = ++painted;
+    const source = editor.value;
+    highlight(source.endsWith("\n") ? `${source} ` : source, current).then(
+      (html) => {
+        if (run !== painted) return;
+        backdrop.innerHTML = html;
+        editor.classList.add("highlighted");
+        syncScroll();
+      },
+      (e: unknown) => {
+        if (run !== painted) return;
+        backdrop.replaceChildren();
+        editor.classList.remove("highlighted");
+        console.error("highlighting failed:", e);
+      },
+    );
+  });
 }
 function syncScroll(): void {
   backdrop.scrollTop = editor.scrollTop;
   backdrop.scrollLeft = editor.scrollLeft;
+  gutter.scrollTop = editor.scrollTop;
 }
 editor.addEventListener("scroll", syncScroll);
-const preview = $<HTMLIFrameElement>("preview");
-const consoleEl = $<HTMLPreElement>("console");
-const urlInput = $<HTMLInputElement>("url");
-const statusEl = $<HTMLElement>("status");
+
+function renderGutter(): void {
+  const marked = new Map(problems.filter((p) => p.path === current).map((p) => [p.line, p]));
+  const count = editor.value.split("\n").length;
+  if (gutter.childElementCount !== count) {
+    gutter.replaceChildren(
+      ...Array.from({ length: count }, (_, i) => {
+        const line = document.createElement("div");
+        line.textContent = String(i + 1);
+        return line;
+      }),
+    );
+  }
+  for (const [i, line] of [...gutter.children].entries()) {
+    const problem = marked.get(i + 1);
+    line.classList.toggle("problem", problem !== undefined);
+    (line as HTMLElement).title = problem?.message ?? "";
+  }
+}
+
+function renderProblems(): void {
+  const list = $("problems");
+  const mine = problems.filter((p) => p.path === current);
+  list.hidden = mine.length === 0;
+  list.replaceChildren(
+    ...mine.map((p) => {
+      const item = document.createElement("li");
+      const jump = document.createElement("button");
+      jump.textContent = `Line ${p.line}: ${p.message}`;
+      jump.onclick = () => goToLine(editor, p.line);
+      item.append(jump);
+      return item;
+    }),
+  );
+  renderGutter();
+}
 
 function loadDb(): Uint8Array | null {
-  const stored = localStorage.getItem(DB_KEY);
-  if (!stored) return null;
-  return Uint8Array.from(atob(stored), (c) => c.charCodeAt(0));
+  const text = localStorage.getItem(DB_KEY);
+  if (!text) return null;
+  try {
+    return Uint8Array.from(atob(text), (c) => c.charCodeAt(0));
+  } catch {
+    return null;
+  }
 }
 
 function saveDb(bytes: Uint8Array | null): void {
   db = bytes;
-  if (!bytes) return localStorage.removeItem(DB_KEY);
-  localStorage.setItem(DB_KEY, btoa(latin1(bytes)));
+  store(DB_KEY, bytes ? btoa(latin1(bytes)) : null);
 }
 
 function appendAnsi(parent: HTMLElement, text: string): void {
@@ -102,16 +185,64 @@ function appendAnsi(parent: HTMLElement, text: string): void {
   }
 }
 
+const SQL = /\b(SELECT|INSERT INTO|UPDATE|DELETE FROM|CREATE (TABLE|INDEX)|TRANSACTION)\b/;
+const ALWAYS = new Set(["system", "input", "result"]);
+
+function shown(level: string, text: string): boolean {
+  if (ALWAYS.has(level)) return true;
+  switch (filter.value) {
+    case "requests":
+      return level === "request";
+    case "sql":
+      return SQL.test(text);
+    case "problems":
+      return level === "warn" || level === "error";
+    default:
+      return true;
+  }
+}
+
 function log(level: string, text: string): void {
+  const stick = consoleEl.scrollHeight - consoleEl.scrollTop - consoleEl.clientHeight < 40;
   const line = document.createElement("div");
   line.className = level;
-  appendAnsi(line, text);
+  line.dataset.level = level;
+  line.dataset.text = text;
+  if (text.length > LONG_LINE) {
+    appendAnsi(line, text.slice(0, LONG_LINE));
+    const more = document.createElement("button");
+    more.className = "more";
+    more.textContent = `… ${text.length - LONG_LINE} more characters`;
+    more.onclick = () => {
+      line.replaceChildren();
+      appendAnsi(line, text);
+    };
+    line.append(more);
+  } else {
+    appendAnsi(line, text);
+  }
+  line.hidden = !shown(level, text);
   consoleEl.append(line);
+  while (consoleEl.childElementCount > MAX_LINES) consoleEl.firstElementChild!.remove();
+  if (stick) consoleEl.scrollTop = consoleEl.scrollHeight;
+}
+
+filter.addEventListener("change", () => {
+  for (const line of consoleEl.children as HTMLCollectionOf<HTMLElement>) {
+    line.hidden = !shown(line.dataset.level!, line.dataset.text!);
+  }
   consoleEl.scrollTop = consoleEl.scrollHeight;
+});
+
+function setStatus(text: string): void {
+  statusEl.textContent = text;
+  statusEl.dataset.state =
+    text === "Running" ? "ok" : /failed|could not/i.test(text) ? "error" : "busy";
 }
 
 function renderTree(): void {
   tree.replaceChildren();
+  const broken = new Set(problems.map((p) => p.path));
   let lastDirs: string[] = [];
   for (const path of Object.keys(files).sort()) {
     const parts = path.slice(1).split("/");
@@ -126,59 +257,164 @@ function renderTree(): void {
       tree.append(el);
     });
     lastDirs = dirs;
-    const el = document.createElement("div");
-    el.className = `file${path === current ? " active" : ""}`;
+    const el = document.createElement("button");
+    el.className = "file";
+    el.classList.toggle("active", path === current);
+    el.classList.toggle("broken", broken.has(path));
+    el.setAttribute("role", "treeitem");
+    el.setAttribute("aria-selected", String(path === current));
     el.style.paddingLeft = `${0.75 + dirs.length}rem`;
     el.textContent = parts.at(-1)!;
+    el.title = path;
     el.onclick = () => open(path);
     tree.append(el);
   }
 }
 
+tree.addEventListener("keydown", (e) => {
+  if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+  const items = [...tree.querySelectorAll<HTMLElement>(".file")];
+  const at = items.indexOf(document.activeElement as HTMLElement);
+  const next = items[at + (e.key === "ArrowDown" ? 1 : -1)];
+  if (!next) return;
+  e.preventDefault();
+  next.focus();
+});
+
 function open(path: string): void {
   current = path;
+  store(CURRENT_KEY, path);
   editor.value = files[path] ?? "";
-  $("editor-title").textContent = path;
+  $("editor-path").textContent = path;
   renderTree();
+  renderProblems();
   paint();
 }
 
+function saveFiles(): void {
+  store(FILES_KEY, JSON.stringify(files));
+}
+
+const hinted = new Set<string>();
 let restartTimer: ReturnType<typeof setTimeout> | undefined;
 editor.addEventListener("input", () => {
   paint();
+  renderGutter();
   files[current] = editor.value;
-  localStorage.setItem(FILES_KEY, JSON.stringify(files));
+  saveFiles();
   clearTimeout(restartTimer);
+  if (current.startsWith("/db/migrate/")) {
+    if (hinted.has(current)) return;
+    hinted.add(current);
+    log(
+      "system",
+      "Edits to a migration wait for Restart (Ctrl+S), so a half-written one never runs. One that already ran needs Reset database to run again.",
+    );
+    return;
+  }
   if ($<HTMLInputElement>("autorun").checked) restartTimer = setTimeout(restart, 800);
 });
-editor.addEventListener("keydown", (e) => {
-  if (e.key === "Tab") {
-    e.preventDefault();
-    editor.setRangeText("  ", editor.selectionStart, editor.selectionEnd, "end");
-    editor.dispatchEvent(new Event("input"));
-  }
-  if ((e.ctrlKey || e.metaKey) && e.key === "s") {
-    e.preventDefault();
-    clearTimeout(restartTimer);
-    restart();
-  }
+installEditing(editor, () => {
+  clearTimeout(restartTimer);
+  restart();
 });
 
-const previewPath = `${import.meta.env.BASE_URL}preview`;
+function className(path: string): string {
+  const base = path.split("/").at(-1)!.replace(/\.ts$/, "").replace(/^\d+_/, "");
+  return base
+    .split(/[-_]/)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join("");
+}
+
+function starter(path: string): string {
+  const name = className(path);
+  if (path.startsWith("/app/models/")) {
+    return `import { ApplicationRecord } from "./application-record.ts";\n\nexport class ${name} extends ApplicationRecord {}\n`;
+  }
+  if (path.startsWith("/app/controllers/")) {
+    return `import { ApplicationController } from "./application-controller.ts";\n\nexport class ${name} extends ApplicationController {\n  async index(): Promise<void> {}\n}\n`;
+  }
+  if (path.startsWith("/db/migrate/")) {
+    return `import { Migration } from "@blazetrails/activerecord";\n\nexport class ${name} extends Migration.get(8.0) {\n  async change(): Promise<void> {}\n}\n`;
+  }
+  return "";
+}
+
+function askPath(message: string, suggestion: string): string | null {
+  const answer = prompt(message, suggestion)?.trim();
+  if (!answer) return null;
+  const path = answer.startsWith("/") ? answer : `/${answer}`;
+  if (path.endsWith("/") || path.split("/").some((part) => part === "..")) {
+    alert("That is not a file path.");
+    return null;
+  }
+  if (path in files) {
+    alert(`${path} already exists.`);
+    return null;
+  }
+  return path;
+}
+
+$("new-file").onclick = () => {
+  const dir = current.slice(0, current.lastIndexOf("/") + 1);
+  const version = new Date().toISOString().replace(/\D/g, "").slice(0, 14);
+  const path = askPath(
+    "Path of the new file",
+    dir === "/db/migrate/" ? `${dir}${version}_create_things.ts` : dir,
+  );
+  if (!path) return;
+  files[path] = starter(path);
+  saveFiles();
+  open(path);
+  editor.focus();
+  if (!path.startsWith("/db/migrate/")) restart();
+};
+$("rename-file").onclick = () => {
+  const path = askPath(`New path for ${current}`, current);
+  if (!path) return;
+  files[path] = files[current];
+  delete files[current];
+  saveFiles();
+  open(path);
+  restart();
+};
+$("delete-file").onclick = () => {
+  if (!confirm(`Delete ${current}?`)) return;
+  delete files[current];
+  saveFiles();
+  open(Object.keys(files).sort()[0]);
+  restart();
+};
+
+const previewPath = `${import.meta.env.BASE_URL}preview/${tabId}`;
 
 function navigate(path: string): void {
+  if (/^[a-z][a-z0-9+.-]*:/i.test(path)) {
+    log("system", `The preview serves this app only. Opening ${path} in a new tab.`);
+    window.open(path, "_blank", "noopener");
+    urlInput.value = previewLocation() ?? "/";
+    return;
+  }
   const target = path.startsWith("/") ? path : `/${path}`;
   preview.src = `${previewPath}${target}`;
 }
 
-preview.addEventListener("load", () => {
+function previewLocation(): string | null {
   try {
     const loc = preview.contentWindow!.location;
     if (loc.pathname === previewPath || loc.pathname.startsWith(`${previewPath}/`))
-      urlInput.value = loc.pathname.slice(previewPath.length) + loc.search || "/";
+      return loc.pathname.slice(previewPath.length) + loc.search || "/";
   } catch {
     /* cross-origin */
   }
+  return null;
+}
+
+preview.addEventListener("load", () => {
+  const path = previewLocation();
+  if (path) urlInput.value = path;
+  if (!$("database").hidden) showDatabase();
 });
 $<HTMLFormElement>("address").addEventListener("submit", (e) => {
   e.preventDefault();
@@ -186,31 +422,214 @@ $<HTMLFormElement>("address").addEventListener("submit", (e) => {
 });
 $("reload").onclick = () => preview.contentWindow?.location.reload();
 $("back").onclick = () => preview.contentWindow?.history.back();
+$("forward").onclick = () => preview.contentWindow?.history.forward();
+$("routes").onclick = () => navigate("/trails/info/routes");
+$("popout").onclick = () => window.open(`${previewPath}${previewLocation() ?? "/"}`, "_blank");
 $("clear").onclick = () => consoleEl.replaceChildren();
 $("run").onclick = () => restart();
 $("reset-db").onclick = () => {
+  if (!confirm("Delete the database and seed it again? Every post and comment you made is lost."))
+    return;
   saveDb(null);
   cookies = {};
-  localStorage.removeItem(COOKIES_KEY);
+  store(COOKIES_KEY, null);
+  hinted.clear();
   restart();
 };
 $("reset-files").onclick = () => {
   if (!confirm("Replace every file with the example app's original?")) return;
   files = templateFiles();
-  localStorage.removeItem(FILES_KEY);
+  store(FILES_KEY, null);
   open(current in files ? current : Object.keys(files)[0]);
   restart();
+};
+
+$("share").onclick = async () => {
+  const code = await encodeChanges(changesFrom(templateFiles(), files));
+  const link = `${location.origin}${location.pathname}${SHARE_PREFIX}${code}`;
+  try {
+    await navigator.clipboard.writeText(link);
+    log("system", `Copied a link to these files (${link.length} characters).`);
+  } catch {
+    log("system", `A link to these files:\n${link}`);
+  }
+};
+$("download").onclick = () => {
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(zip(files, "trails-playground"));
+  link.download = "trails-playground.zip";
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+};
+
+let asked = 0;
+const answers = new Map<number, (data: Record<string, unknown>) => void>();
+function ask<T>(type: string, extra: Record<string, unknown> = {}): Promise<T> {
+  return new Promise((resolve, reject) => {
+    if (!runtime?.contentWindow) return reject(new Error("the app is not running"));
+    const id = ++asked;
+    answers.set(id, (data) => {
+      if (typeof data.error === "string") reject(new Error(data.error));
+      else resolve(data as T);
+    });
+    runtime.contentWindow.postMessage({ type, id, ...extra }, location.origin);
+  });
+}
+
+const history: string[] = [];
+let recalled = 0;
+const replInput = $<HTMLInputElement>("repl-input");
+$<HTMLFormElement>("repl").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const code = replInput.value.trim();
+  if (!code) return;
+  history.push(code);
+  recalled = history.length;
+  replInput.value = "";
+  log("input", `› ${code}`);
+  consoleEl.scrollTop = consoleEl.scrollHeight;
+  try {
+    log("result", (await ask<{ text: string }>("host:eval", { code })).text);
+  } catch (error) {
+    log("error", error instanceof Error ? error.message : String(error));
+  }
+  if (!$("database").hidden) showDatabase();
+});
+replInput.addEventListener("keydown", (e) => {
+  if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
+  e.preventDefault();
+  recalled = Math.max(0, Math.min(history.length, recalled + (e.key === "ArrowUp" ? -1 : 1)));
+  replInput.value = history[recalled] ?? "";
+});
+
+const INTERNAL_TABLES = new Set(["ar_internal_metadata", "schema_migrations"]);
+let table: string | null = null;
+function showDatabase(): void {
+  refreshDatabase().catch((e: unknown) => log("error", `The database tab failed: ${String(e)}`));
+}
+
+async function refreshDatabase(): Promise<void> {
+  const view = $("database");
+  let tables: Table[];
+  try {
+    ({ tables } = await ask<{ tables: Table[] }>("host:tables"));
+  } catch {
+    view.textContent = "The app is not running.";
+    return;
+  }
+  if (!tables.some((t) => t.name === table)) {
+    const own = tables.find((t) => !INTERNAL_TABLES.has(t.name)) ?? tables[0];
+    table = own?.name ?? null;
+  }
+  const list = document.createElement("div");
+  list.className = "tables";
+  for (const t of tables) {
+    const pick = document.createElement("button");
+    pick.textContent = `${t.name} (${t.count})`;
+    pick.setAttribute("aria-pressed", String(t.name === table));
+    pick.onclick = () => {
+      table = t.name;
+      showDatabase();
+    };
+    list.append(pick);
+  }
+  const grid = document.createElement("table");
+  if (table) {
+    const { rows } = await ask<{ rows: Rows }>("host:rows", { table });
+    const head = grid.createTHead().insertRow();
+    for (const column of rows.columns) {
+      const cell = document.createElement("th");
+      cell.textContent = column;
+      head.append(cell);
+    }
+    const body = grid.createTBody();
+    for (const values of rows.values) {
+      const row = body.insertRow();
+      for (const value of values) {
+        const cell = row.insertCell();
+        const text = value === null ? "NULL" : String(value);
+        cell.textContent = text.length > 80 ? `${text.slice(0, 80)}…` : text;
+        cell.title = text;
+        cell.classList.toggle("null", value === null);
+      }
+    }
+  }
+  view.replaceChildren(list, grid);
+}
+
+function showTab(name: "console" | "database"): void {
+  $("console-view").hidden = name !== "console";
+  $("database").hidden = name !== "database";
+  $("tab-console").setAttribute("aria-selected", String(name === "console"));
+  $("tab-database").setAttribute("aria-selected", String(name === "database"));
+  filter.hidden = $("clear").hidden = name !== "console";
+  if (name === "database") showDatabase();
+}
+$("tab-console").onclick = () => showTab("console");
+$("tab-database").onclick = () => showTab("database");
+
+const main = document.querySelector("main")!;
+const layout: Record<string, number> = stored(LAYOUT_KEY, {});
+function applyLayout(): void {
+  for (const [name, px] of Object.entries(layout)) main.style.setProperty(`--${name}`, `${px}px`);
+}
+applyLayout();
+const clamp = (n: number, low: number, high: number) => Math.max(low, Math.min(high, n));
+function resized(name: string, x: number, y: number): number {
+  const box = main.getBoundingClientRect();
+  if (name === "tree") return clamp(x - box.left, 120, 420);
+  if (name === "right") return clamp(box.right - x, 260, box.width - 360);
+  return clamp(box.bottom - y, 90, box.height - 140);
+}
+for (const handle of document.querySelectorAll<HTMLElement>(".resizer")) {
+  const name = handle.dataset.resize!;
+  handle.tabIndex = 0;
+  handle.addEventListener("pointerdown", (e) => {
+    handle.setPointerCapture(e.pointerId);
+    document.body.classList.add("resizing");
+    const move = (m: PointerEvent) => {
+      layout[name] = resized(name, m.clientX, m.clientY);
+      applyLayout();
+    };
+    handle.addEventListener("pointermove", move);
+    handle.addEventListener(
+      "pointerup",
+      () => {
+        handle.removeEventListener("pointermove", move);
+        document.body.classList.remove("resizing");
+        store(LAYOUT_KEY, JSON.stringify(layout));
+      },
+      { once: true },
+    );
+  });
+  handle.addEventListener("keydown", (e) => {
+    const step = { ArrowLeft: -16, ArrowUp: -16, ArrowRight: 16, ArrowDown: 16 }[e.key];
+    if (!step) return;
+    e.preventDefault();
+    const box = handle.getBoundingClientRect();
+    layout[name] = resized(name, box.left + step, box.top + step);
+    applyLayout();
+    store(LAYOUT_KEY, JSON.stringify(layout));
+  });
+}
+
+if (!localStorage.getItem(HINT_KEY)) $("hint").hidden = false;
+$("hint-close").onclick = () => {
+  $("hint").hidden = true;
+  store(HINT_KEY, "1");
 };
 
 addEventListener("message", (event: MessageEvent) => {
   if (event.origin !== location.origin || event.source !== runtime?.contentWindow) return;
   const data = event.data as {
     type: string;
+    id?: number;
     level?: string;
     text?: string;
     bytes?: Uint8Array;
     cookies?: Record<string, string>;
     path?: string;
+    problems?: Problem[];
   };
   switch (data.type) {
     case "runtime:waiting":
@@ -226,21 +645,35 @@ addEventListener("message", (event: MessageEvent) => {
       log("request", data.text!);
       break;
     case "status":
-      statusEl.textContent = data.text!;
+      setStatus(data.text!);
       break;
     case "db":
       saveDb(data.bytes!);
       break;
     case "tmp":
       tmp = { ...tmp, [data.path!]: data.text! };
-      localStorage.setItem(TMP_KEY, JSON.stringify(tmp));
+      store(TMP_KEY, JSON.stringify(tmp));
       break;
     case "cookies":
       cookies = data.cookies!;
-      localStorage.setItem(COOKIES_KEY, JSON.stringify(cookies));
+      store(COOKIES_KEY, JSON.stringify(cookies));
+      break;
+    case "problems":
+      problems = data.problems!;
+      renderTree();
+      renderProblems();
+      break;
+    case "reply":
+      answers.get(data.id!)?.(data);
+      answers.delete(data.id!);
+      break;
+    case "boot-failed":
+      $("overlay-text").textContent = data.text ?? "";
+      overlay.hidden = false;
       break;
     case "booted":
-      navigate(urlInput.value || "/");
+      overlay.hidden = true;
+      navigate(previewLocation() ?? (urlInput.value || "/"));
       break;
   }
 });
@@ -248,13 +681,40 @@ addEventListener("message", (event: MessageEvent) => {
 function restart(): void {
   session += 1;
   log("system", `— starting trails (run ${session}) —`);
+  setStatus("Starting…");
+  for (const [, fail] of answers) fail({ error: "the app restarted" });
+  answers.clear();
   runtime?.remove();
   runtime = document.createElement("iframe");
-  runtime.src = `${import.meta.env.BASE_URL}runtime.html?session=${session}`;
+  runtime.src = `${import.meta.env.BASE_URL}runtime.html?tab=${tabId}&session=${session}`;
   $("runtime-holder").append(runtime);
 }
 
+async function loadShared(): Promise<void> {
+  if (!location.hash.startsWith(SHARE_PREFIX)) return;
+  const code = location.hash.slice(SHARE_PREFIX.length);
+  window.history.replaceState(null, "", location.pathname + location.search);
+  try {
+    const changes = await decodeChanges(code);
+    const count = Object.keys(changes).length;
+    const ok = confirm(
+      `Load the shared app from this link (${count} changed file${count === 1 ? "" : "s"})? It replaces the files you have here, and its code runs in this tab.`,
+    );
+    if (!ok) return;
+    files = applyChanges(templateFiles(), changes);
+    saveFiles();
+    saveDb(null);
+  } catch {
+    log("warn", "The link's shared files could not be read; showing your own files.");
+  }
+}
+
 async function start(): Promise<void> {
+  if (!("serviceWorker" in navigator)) {
+    throw new Error(
+      "this browser has no service workers here (a private window, perhaps), and the playground needs one to serve the app",
+    );
+  }
   const ready = await Promise.race([
     navigator.serviceWorker
       .register(`${import.meta.env.BASE_URL}sw.js`, { scope: import.meta.env.BASE_URL })
@@ -279,11 +739,14 @@ async function start(): Promise<void> {
       return;
     }
   }
-  open(current in files ? current : Object.keys(files)[0]);
+  await loadShared();
+  open(current in files ? current : Object.keys(files).sort()[0]);
   restart();
 }
 
 start().catch((e: unknown) => {
-  statusEl.textContent = "Could not start";
+  setStatus("Could not start");
+  $("overlay-text").textContent = e instanceof Error ? e.message : String(e);
+  overlay.hidden = false;
   log("error", String(e));
 });
