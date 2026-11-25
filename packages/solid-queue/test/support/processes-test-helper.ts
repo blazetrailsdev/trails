@@ -59,7 +59,7 @@ export async function runSupervisorAsForkWithCapturedIo(
   const pid = forkSupervisor(options, true, [outWriter, errWriter]);
   outWriter.close();
   errWriter.close();
-  await waitForRegisteredProcesses(4, { timeout: 10 });
+  await waitForRegisteredProcesses(4, { timeout: 10, whileAlive: pid });
   const [out, err] = [outReader, errReader].map((reader) => {
     const bytes = reader.readNonblock(1 << 20, null, { exception: false });
     return bytes instanceof Uint8Array ? new TextDecoder().decode(bytes) : "";
@@ -177,8 +177,16 @@ export async function waitFor(
   throw new Timeout.Error("execution expired");
 }
 
-export async function waitForRegisteredProcesses(count: number, { timeout = 1 } = {}) {
-  await waitWhileWithTimeout(timeout, async () => (await Process.count()) !== count);
+export async function waitForRegisteredProcesses(
+  count: number,
+  { timeout = 1, whileAlive }: { timeout?: number; whileAlive?: number } = {},
+) {
+  await waitWhileWithTimeout(
+    timeout,
+    async () =>
+      (await Process.count()) !== count &&
+      (whileAlive === undefined || isProcessExists(whileAlive)),
+  );
 }
 
 export async function assertNoRegisteredProcesses() {

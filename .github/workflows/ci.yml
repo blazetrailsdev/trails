@@ -468,9 +468,52 @@ jobs:
               --ignore-pattern packages/actionpack/**
               --ignore-pattern packages/trailties/**
               --ignore-pattern scripts/**
+          # EXPERIMENT (CI timing): `rest-full` is the control, the `rest`
+          # paths linted whole; `rest-a/b/c/root` are the same paths split.
+          - shard: rest-full
+            force: true
+            paths: >-
+              . --ignore-pattern packages/activerecord/**
+              --ignore-pattern packages/activemodel/**
+              --ignore-pattern packages/actionpack/**
+              --ignore-pattern packages/trailties/**
+              --ignore-pattern scripts/**
+          - shard: rest-a
+            force: true
+            paths: >-
+              packages/actiontext packages/activejob packages/activerecord-cli
+              packages/builder packages/chronic packages/et-orbi packages/listen
+              packages/mysql2 packages/pg packages/rack packages/rack-proxy
+              packages/rack-session packages/rack-test packages/rake
+              packages/ruby-compat packages/solid-cache packages/sqlite3
+              packages/vitest-matchers packages/website
+          - shard: rest-b
+            force: true
+            paths: >-
+              packages/actioncable packages/actionmailbox packages/actionmailer
+              packages/actionview packages/bcrypt packages/date
+              packages/did-you-mean packages/fugit packages/i18n
+              packages/image-processing packages/libxml-ruby packages/mini-magick
+              packages/raabro packages/rack-cache packages/rack-cors
+              packages/solid-queue packages/turbo packages/tzinfo
+              packages/vite-trails
+          - shard: rest-c
+            force: true
+            paths: >-
+              packages/activestorage packages/activesupport packages/arel
+              packages/globalid packages/html-sanitizer packages/mail
+              packages/marcel packages/mini-mime packages/msgpack
+              packages/net-smtp packages/nokogiri packages/rackup
+              packages/solid-cable packages/stimulus packages/thor
+              packages/trails packages/trails-tsc packages/tse-compiler
+              packages/vite-assets packages/zeitwerk
+          - shard: rest-root
+            force: true
+            paths: >-
+              . --ignore-pattern packages/** --ignore-pattern scripts/**
     env:
-      LINT_FILES: ${{ needs.changes.outputs.lint_files }}
-      ACTIVE: ${{ matrix.shard == 'rest' || needs.changes.outputs.lint_files == '__ALL__' }}
+      LINT_FILES: ${{ matrix.force && '__ALL__' || needs.changes.outputs.lint_files }}
+      ACTIVE: ${{ matrix.force || matrix.shard == 'rest' || needs.changes.outputs.lint_files == '__ALL__' }}
     steps:
       - uses: actions/checkout@v5
         if: env.ACTIVE == 'true'
@@ -1455,9 +1498,18 @@ jobs:
         run: pnpm vitest run scripts/test-deps scripts/parity/pipeline/query/node scripts/mixin-declaration-drift.test.ts
       - if: needs.changes.outputs.ar_scope == '' || contains(needs.changes.outputs.ar_scope, 'packages/activestorage')
         uses: ./.github/actions/activestorage-media-binaries
+      # EXPERIMENT (CI timing): Active Record's own cases run in non-isolated
+      # forks; everything else in the lane stays isolated.
+      - if: needs.changes.outputs.ar_scope == ''
+        run: pnpm vitest run packages/activerecord/ --project activerecord --shard=${{ matrix.shard }}/${{ strategy.job-total }}
+        continue-on-error: true
+        env:
+          AR_SPLIT: cases
+          VITEST_SHARD_DURATIONS: sqlite3
       - if: needs.changes.outputs.ar_scope == ''
         run: pnpm vitest run packages/activerecord/ packages/solid-queue/ packages/solid-cable/ packages/solid-cache/ packages/activestorage/ packages/actionmailbox/ packages/actiontext/ packages/turbo/ --project '!system' --shard=${{ matrix.shard }}/${{ strategy.job-total }}
         env:
+          AR_SPLIT: rest
           VITEST_SHARD_DURATIONS: sqlite3
           VITEST_SHARD_ONE_EXTRA_MS: "110000"
       - if: needs.changes.outputs.ar_scope != ''
@@ -1811,6 +1863,8 @@ jobs:
       - if: needs.changes.outputs.ar_scope == ''
         run: pnpm vitest run packages/activerecord/ packages/solid-queue/ packages/solid-cable/ packages/solid-cache/ packages/activestorage/ packages/actionmailbox/ packages/actiontext/ packages/turbo/ --project '!system' --shard=${{ matrix.shard }}/${{ strategy.job-total }}
         env:
+          # EXPERIMENT (CI timing): load the framework from built dist.
+          AR_DIST: "1"
           VITEST_SHARD_DURATIONS: postgresql
           VITEST_SHARD_ONE_EXTRA_MS: "110000"
           ARCONN: postgresql

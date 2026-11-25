@@ -613,6 +613,71 @@ const otherSetupFiles = [
   "./packages/mail/test/support/setup-unicode-tables.ts",
 ];
 
+const AR_SPLIT = process.env.AR_SPLIT;
+const AR_ISOLATED_CASES = [
+  "packages/activerecord/test/cases/adapters/sqlite3/explain.test.ts",
+  "packages/activerecord/test/cases/associations/association-extensions.trails.test.ts",
+  "packages/activerecord/test/cases/associations/association-scope-cache.trails.test.ts",
+  "packages/activerecord/test/cases/associations/belongs-to-associations.test.ts",
+  "packages/activerecord/test/cases/associations/builder/association.trails.test.ts",
+  "packages/activerecord/test/cases/associations/collection-association-through-delete-not-found.trails.test.ts",
+  "packages/activerecord/test/cases/associations/constructor-form-and-hmt-insert.trails.test.ts",
+  "packages/activerecord/test/cases/associations/eager-load-unjoinable-raises.trails.test.ts",
+  "packages/activerecord/test/cases/associations/habtm-join-owner-fk-new-owner.trails.test.ts",
+  "packages/activerecord/test/cases/associations/has-one-associations.trails.test.ts",
+  "packages/activerecord/test/cases/associations/join-association-references-eager-load.trails.test.ts",
+  "packages/activerecord/test/cases/associations/join-dependency-quoting.trails.test.ts",
+  "packages/activerecord/test/cases/associations/join-dependency-reflections.trails.test.ts",
+  "packages/activerecord/test/cases/associations/preloader-bigint-number-key-match.trails.test.ts",
+  "packages/activerecord/test/cases/associations/preloader/association-loader-query.trails.test.ts",
+  "packages/activerecord/test/cases/associations/sti-owner-through-foreign-key.trails.test.ts",
+  "packages/activerecord/test/cases/attribute-methods/dirty-after-timestamp.trails.test.ts",
+  "packages/activerecord/test/cases/base-prevent-writes.test.ts",
+  "packages/activerecord/test/cases/base.trails.test.ts",
+  "packages/activerecord/test/cases/canonical-model-seats.trails.test.ts",
+  "packages/activerecord/test/cases/cold-model-construction.trails.test.ts",
+  "packages/activerecord/test/cases/collection-renderer-integration.trails.test.ts",
+  "packages/activerecord/test/cases/connection-adapters/abstract-adapter.disconnect-bang.trails.test.ts",
+  "packages/activerecord/test/cases/connection-adapters/pool-manager.trails.test.ts",
+  "packages/activerecord/test/cases/connection-adapters/postgresql-adapter-initialize-type-map.trails.test.ts",
+  "packages/activerecord/test/cases/connection-adapters/postgresql-adapter.check-version.trails.test.ts",
+  "packages/activerecord/test/cases/connection-adapters/registration.test.ts",
+  "packages/activerecord/test/cases/connection-adapters/sqlite3-adapter.bigint-narrowing.trails.test.ts",
+  "packages/activerecord/test/cases/counter-cache.test.ts",
+  "packages/activerecord/test/cases/date.test.ts",
+  "packages/activerecord/test/cases/encryption/auto-filtered-parameters.trails.test.ts",
+  "packages/activerecord/test/cases/encryption/encrypting-only-encryptor.test.ts",
+  "packages/activerecord/test/cases/encryption/encryption-schemes.test.ts",
+  "packages/activerecord/test/cases/encryption/message-pack-message-serializer.trails.test.ts",
+  "packages/activerecord/test/cases/enum-cold-schema.trails.test.ts",
+  "packages/activerecord/test/cases/establish-connection.trails.test.ts",
+  "packages/activerecord/test/cases/excluding.test.ts",
+  "packages/activerecord/test/cases/explain.test.ts",
+  "packages/activerecord/test/cases/insert-all.test.ts",
+  "packages/activerecord/test/cases/log-subscriber.test.ts",
+  "packages/activerecord/test/cases/migrator-record-environment.trails.test.ts",
+  "packages/activerecord/test/cases/null-relation.test.ts",
+  "packages/activerecord/test/cases/persistence-save-block.trails.test.ts",
+  "packages/activerecord/test/cases/persistence/reload-association-cache.test.ts",
+  "packages/activerecord/test/cases/relation-skip-preloading.trails.test.ts",
+  "packages/activerecord/test/cases/relation/limit-offset-value-string-reads.trails.test.ts",
+  "packages/activerecord/test/cases/relation/mutation.trails.test.ts",
+  "packages/activerecord/test/cases/relation/symbol-references-eager-load.trails.test.ts",
+  "packages/activerecord/test/cases/relation/update-all.trails.test.ts",
+  "packages/activerecord/test/cases/relation/where.trails.test.ts",
+  "packages/activerecord/test/cases/runtime-registry.trails.test.ts",
+  "packages/activerecord/test/cases/support/canonical-schema.trails.test.ts",
+  "packages/activerecord/test/cases/support/drop-all-tables.trails.test.ts",
+  "packages/activerecord/test/cases/support/template-stamp.trails.test.ts",
+  "packages/activerecord/test/cases/tasks/database-not-supported.trails.test.ts",
+  "packages/activerecord/test/cases/tasks/sqlite-database-tasks-establish-connection.trails.test.ts",
+  "packages/activerecord/test/cases/transaction.trails.test.ts",
+  "packages/activerecord/test/cases/type/json.trails.test.ts",
+  "packages/activerecord/test/cases/types.test.ts",
+  "packages/activerecord/test/cases/validations/association-validation.trails.test.ts",
+  "packages/activerecord/test/cases/version.trails.test.ts",
+];
+
 export default defineConfig({
   resolve: { alias: aliasEntries },
   test: {
@@ -624,7 +689,7 @@ export default defineConfig({
     // silent no-op and the cap falls back to `numCpus - 1`, which on a
     // many-core host forks every file at once and exhausts the AR_DB
     // advisory-slot pool: "all N GET_LOCK slots are held").
-    poolOptions: { forks: { maxForks: TEST_FORKS } },
+    poolOptions: { forks: { maxForks: TEST_FORKS, isolate: AR_SPLIT !== "cases" } },
     // In the isolated trails-tsc coverage run, the build-views/watch tests are
     // CPU-pegged in tsc under v8 instrumentation long enough to starve vitest's
     // reporter heartbeat, surfacing a `Timeout calling "onTaskUpdate"` worker
@@ -665,21 +730,36 @@ export default defineConfig({
         // SQLite is file-backed too: globalSetup builds one on-disk template and
         // each fork restores it into its own private `.sqlite` clone stamped into
         // AR_TEST_WORKER_DB (see support/sqlite-template.ts).
+        plugins: process.env.AR_DIST === "1" ? [isolationDistResolver()] : [],
         resolve: { alias: aliasEntries },
         test: {
           name: "activerecord",
-          include: [
-            "packages/activerecord/test/**/*.test.ts",
-            "packages/activerecord/scripts/**/*.test.ts",
-            "packages/solid-queue/test/**/*.test.ts",
-            "packages/solid-cable/test/**/*.test.ts",
-            "packages/solid-cache/test/**/*.test.ts",
-            "packages/activestorage/test/**/*.test.ts",
-            "packages/actionmailbox/test/**/*.test.ts",
-            "packages/actiontext/test/**/*.test.ts",
-            "packages/turbo/test/**/*.test.ts",
-          ],
+          server:
+            process.env.AR_DIST === "1"
+              ? { deps: { external: [/\/packages\/[^/]+\/dist\//] } }
+              : undefined,
+          include:
+            AR_SPLIT === "cases"
+              ? ["packages/activerecord/test/cases/**/*.test.ts"]
+              : [
+                  ...(AR_SPLIT === "rest"
+                    ? [
+                        "packages/activerecord/test/!(cases)/**/*.test.ts",
+                        "packages/activerecord/test/*.test.ts",
+                        ...AR_ISOLATED_CASES,
+                      ]
+                    : ["packages/activerecord/test/**/*.test.ts"]),
+                  "packages/activerecord/scripts/**/*.test.ts",
+                  "packages/solid-queue/test/**/*.test.ts",
+                  "packages/solid-cable/test/**/*.test.ts",
+                  "packages/solid-cache/test/**/*.test.ts",
+                  "packages/activestorage/test/**/*.test.ts",
+                  "packages/actionmailbox/test/**/*.test.ts",
+                  "packages/actiontext/test/**/*.test.ts",
+                  "packages/turbo/test/**/*.test.ts",
+                ],
           exclude: [
+            ...(AR_SPLIT === "cases" ? AR_ISOLATED_CASES : []),
             ...SHARED_EXCLUDE,
             ...ADAPTER_SPECIFIC_EXCLUDE,
             ...SQLITE_DRIVER_TESTS,
@@ -719,7 +799,9 @@ export default defineConfig({
             ...(process.env.DDL_PROFILE === "1"
               ? ["./packages/activerecord/test/support/test-setup-ddl-profile.ts"]
               : []),
-          ],
+          ].map((file) =>
+            process.env.AR_DIST === "1" ? isolationDistPath(path.resolve(__dirname, file)) : file,
+          ),
           retry: 0,
           // Large-schema beforeAll(defineSchema(...)) calls on MySQL issue
           // hundreds of CREATE TABLE statements (e.g. has-many-associations.test.ts

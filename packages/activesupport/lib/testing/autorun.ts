@@ -77,13 +77,25 @@ function create(sclas: SpecClass, name: string, desc: string): SpecClass {
   return cls;
 }
 
-const described = new WeakMap<object, SpecClass>();
-let fileClass: SpecClass | undefined;
+const shared = ((globalThis as Record<string, unknown>).__asAutorunState ??= {
+  described: new WeakMap<object, SpecClass>(),
+  executions: new WeakMap<TestCase, CompletableExecution>(),
+  capturing: new WeakSet<object>(),
+  captured: new WeakMap<TestCase, { from: number; at: number; count: number }>(),
+}) as {
+  described: WeakMap<object, SpecClass>;
+  executions: WeakMap<TestCase, CompletableExecution>;
+  capturing: WeakSet<object>;
+  captured: WeakMap<TestCase, { from: number; at: number; count: number }>;
+  fileClass?: SpecClass;
+};
+shared.fileClass = undefined;
+const described = shared.described;
 
 /** @noRailsEquivalent PERMANENT */
 export function describe(suite: DescribedSuite | undefined): SpecClass {
   if (suite === undefined || suite.file === suite) {
-    return (fileClass ??= create(specType(""), "", ""));
+    return (shared.fileClass ??= create(specType(""), "", ""));
   }
   let cls = described.get(suite);
   if (cls === undefined) {
@@ -93,7 +105,7 @@ export function describe(suite: DescribedSuite | undefined): SpecClass {
     } else {
       const parent =
         suite.suite === undefined || suite.suite.file === suite.suite ? undefined : suite.suite;
-      const stackLast = parent === undefined ? fileClass : describe(parent);
+      const stackLast = parent === undefined ? shared.fileClass : describe(parent);
       const name = [stackLast?.name, suite.name].filter((n) => n != null && n !== "").join("::");
       const sclas = stackLast || specType(suite.name);
       cls = create(sclas, name, suite.name);
@@ -103,10 +115,10 @@ export function describe(suite: DescribedSuite | undefined): SpecClass {
   return cls;
 }
 
-const executions = new WeakMap<TestCase, CompletableExecution>();
+const executions = shared.executions;
 
-const capturing = new WeakSet<object>();
-const captured = new WeakMap<TestCase, { from: number; at: number; count: number }>();
+const capturing = shared.capturing;
+const captured = shared.captured;
 
 beforeEach(async (context: TestContext) => {
   _takeAssertions();

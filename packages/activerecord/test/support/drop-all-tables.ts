@@ -11,7 +11,10 @@ export const BOOKKEEPING_TABLE_NAMES: ReadonlySet<string> = new Set([
 
 const CANONICAL_TABLE_NAMES: ReadonlySet<string> = new Set(Object.keys(TEST_SCHEMA));
 
-let _bootLaidTableNames: ReadonlySet<string> | null = null;
+const bootLaid = globalThis as typeof globalThis & {
+  __arBootLaidTableNames?: ReadonlySet<string> | null;
+};
+bootLaid.__arBootLaidTableNames ??= null;
 let _adapterSpecificSchemaLoaded = false;
 
 export function noteAdapterSpecificSchemaLoaded(): void {
@@ -20,14 +23,14 @@ export function noteAdapterSpecificSchemaLoaded(): void {
 
 export async function recordBootLaidTables(adapter: DatabaseAdapter): Promise<void> {
   const laid = (await adapter.tables()).filter((name) => !BOOKKEEPING_TABLE_NAMES.has(name));
-  _bootLaidTableNames = new Set(laid);
+  bootLaid.__arBootLaidTableNames = new Set(laid);
 }
 
 export async function purgeToCanonicalTables(
   adapter: DatabaseAdapter,
   alsoProtect: readonly string[] = [],
 ): Promise<void> {
-  if (_bootLaidTableNames !== null) {
+  if (bootLaid.__arBootLaidTableNames !== null) {
     throw new ActiveRecordError(
       "purgeToCanonicalTables ran after recordBootLaidTables — the boot-laid " +
         "snapshot is the protected set once it exists; call resetTestTables.",
@@ -48,7 +51,7 @@ export async function purgeToCanonicalTables(
 }
 
 function bootLaidTableNames(): ReadonlySet<string> {
-  if (_bootLaidTableNames === null) {
+  if (bootLaid.__arBootLaidTableNames == null) {
     throw new ActiveRecordError(
       "resetTestTables ran before recordBootLaidTables — with no snapshot there " +
         "is no set to protect. A deliberate pre-snapshot purge wants " +
@@ -56,7 +59,7 @@ function bootLaidTableNames(): ReadonlySet<string> {
         "expects its caller to re-lay them.",
     );
   }
-  return _bootLaidTableNames;
+  return bootLaid.__arBootLaidTableNames;
 }
 
 export async function dropAllTables(adapter: DatabaseAdapter): Promise<void> {
