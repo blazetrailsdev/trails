@@ -38,7 +38,6 @@ describeIfPg("PG::Error#result (trails)", () => {
     expect(error).toBeInstanceOf(StatementInvalid);
     const cause = error.cause as PG.Error;
     expect(cause).toBeInstanceOf(PG.ServerError);
-    expect(cause.cause).toBeInstanceOf(pg.DatabaseError);
     expect(cause.result?.errorField(PG.PG_DIAG_SQLSTATE)).toBe("42P01");
     expect(cause.connection).not.toBeNull();
     expect(cause).not.toBeInstanceOf(PG.ConnectionBad);

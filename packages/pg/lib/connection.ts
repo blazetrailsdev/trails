@@ -233,9 +233,7 @@ export class Connection {
     return hostString === "" || hostString.startsWith("/") || hostString.startsWith("@");
   }
 
-  static conninfoParse(
-    conninfo: string,
-  ): { keyword: string; compiled: string | null; val: string | null }[] {
+  static conninfoParse(conninfo: string): ConninfoOption[] {
     const vals: Record<string, string> = {};
     const uri = /^postgres(?:ql)?:\/\//.test(conninfo);
     const set = (key: string, val: string): void => {
@@ -324,8 +322,12 @@ export class Connection {
     }
     return CONNINFO_KEYWORDS.map((keyword) => ({
       keyword,
+      envvar: CONNINFO_OPTIONS[keyword].envvar,
       compiled: COMPILED_DEFAULTS[keyword] ?? null,
       val: vals[keyword] ?? null,
+      label: CONNINFO_OPTIONS[keyword].label,
+      dispchar: CONNINFO_OPTIONS[keyword].dispchar,
+      dispsize: CONNINFO_OPTIONS[keyword].dispsize,
     }));
   }
 
@@ -828,11 +830,19 @@ export class Connection {
     return stream?.remoteAddress ?? null;
   }
 
-  conninfo(): { keyword: string; compiled: string | null; val: string | null }[] {
+  conndefaults(): ConninfoOption[] {
+    return Connection.conndefaults();
+  }
+
+  conninfo(): ConninfoOption[] {
     return CONNINFO_KEYWORDS.map((keyword) => ({
       keyword,
+      envvar: CONNINFO_OPTIONS[keyword].envvar,
       compiled: COMPILED_DEFAULTS[keyword] ?? null,
       val: this.connParams[keyword] == null ? null : String(this.connParams[keyword]),
+      label: CONNINFO_OPTIONS[keyword].label,
+      dispchar: CONNINFO_OPTIONS[keyword].dispchar,
+      dispsize: CONNINFO_OPTIONS[keyword].dispsize,
     }));
   }
 
@@ -985,7 +995,9 @@ export class Connection {
   }
 
   transactionStatus(): number {
-    if (this.client._activeQuery != null) return PG.PQTRANS_ACTIVE;
+    if (this.client._activeQuery != null || this._cmdQueue.length > 0 || this._results.length > 0) {
+      return PG.PQTRANS_ACTIVE;
+    }
     switch (this.readyForQuery) {
       case "T":
         return PG.PQTRANS_INTRANS;
@@ -1091,8 +1103,47 @@ export class Connection {
     return engine!.execute(this, this.prepared.get(stmtName), params, stmtName);
   }
 
-  asyncExec(sql: string | null): Promise<Result> {
-    return engine!.execute(this, sql);
+  /**
+   * @missingRailsCall get_copy_data — CONVERGEABLE pg-copy-out-get-copy-data-and-discard-arm
+   * @missingRailsCall close_socket_io — PERMANENT
+   */
+  discardResults(): Promise<boolean> | null {
+    switch (this.transactionStatus()) {
+      case PG.PQTRANS_IDLE:
+      case PG.PQTRANS_INTRANS:
+      case PG.PQTRANS_INERROR:
+        return null;
+      default:
+    }
+
+    return (async () => {
+      for (;;) {
+        try {
+          await this.block();
+        } catch (error) {
+          if (!(error instanceof ConnectionBad)) throw error;
+          this.bad = true;
+          return false;
+        }
+        const cur = this.syncGetResult();
+        if (cur == null) break;
+
+        const status = cur.resultStatus();
+        if (status == PG.PGRES_COPY_IN) {
+          while (!this.syncPutCopyEnd("COPY terminated by new query or discard_results")) {
+            this.flush();
+          }
+        }
+      }
+      return true;
+    })();
+  }
+
+  async asyncExec(sql: string | null): Promise<Result> {
+    const discarding = this.discardResults();
+    if (discarding != null) await discarding;
+    this.sendQuery(sql as string);
+    return (await this.getLastResult())!;
   }
 
   isFinished(): boolean {
@@ -1149,6 +1200,7 @@ export class Connection {
     if (this.client._ending === true) {
       throw new ConnectionBad("connection is closed", { connection: this });
     }
+    const command = stringValue(sql);
     if (this.bad) {
       throw new UnableToSend("PQsendQuery no connection to the server\n", { connection: this });
     }
@@ -1157,7 +1209,7 @@ export class Connection {
         connection: this,
       });
     }
-    engine!.dispatch(this, (connection) => connection.query(sql), ["query"]);
+    engine!.dispatch(this, (connection) => connection.query(command), ["query"]);
   }
 
   sendQueryParams(
@@ -1195,6 +1247,9 @@ export class Connection {
   }
 
   syncGetResult(): Result | null {
+    if (this._results.length === 0 && this._copyIn) {
+      return engine!.emptyResult(null, PG.PGRES_COPY_IN);
+    }
     const result = this._results.shift() ?? null;
     if (result?.resultStatus() === PG.PGRES_PIPELINE_SYNC) {
       this._pipelineStatus = PG.PQ_PIPELINE_ON;
@@ -1263,7 +1318,10 @@ export class Connection {
 
   async block(timeout: number | null = null): Promise<boolean> {
     const ready = (): boolean =>
-      this._results.length > 0 || this._cmdQueue.length === 0 || this._sendError != null;
+      this._results.length > 0 ||
+      this._cmdQueue.length === 0 ||
+      this._sendError != null ||
+      this._copyIn;
     if (!ready()) {
       const ret = await new Promise<boolean>((resolve) => {
         const waiter = (): void => {
@@ -1402,49 +1460,139 @@ function getHex(c: string): number {
   return /^[0-9a-fA-F]$/.test(c) ? parseInt(c, 16) : -1;
 }
 
-const CONNINFO_KEYWORDS = [
-  "service",
-  "user",
-  "password",
-  "passfile",
-  "channelBinding",
-  "connectTimeout",
-  "dbname",
-  "host",
-  "hostaddr",
-  "port",
-  "clientEncoding",
-  "options",
-  "applicationName",
-  "fallbackApplicationName",
-  "keepalives",
-  "keepalivesIdle",
-  "keepalivesInterval",
-  "keepalivesCount",
-  "tcpUserTimeout",
-  "sslmode",
-  "sslnegotiation",
-  "sslcompression",
-  "sslcert",
-  "sslkey",
-  "sslcertmode",
-  "sslpassword",
-  "sslrootcert",
-  "sslcrl",
-  "sslcrldir",
-  "sslsni",
-  "requirepeer",
-  "requireAuth",
-  "sslMinProtocolVersion",
-  "sslMaxProtocolVersion",
-  "gssencmode",
-  "krbsrvname",
-  "gsslib",
-  "gssdelegation",
-  "replication",
-  "targetSessionAttrs",
-  "loadBalanceHosts",
-];
+type ConninfoOption = {
+  keyword: string;
+  envvar: string | null;
+  compiled: string | null;
+  val: string | null;
+  label: string;
+  dispchar: string;
+  dispsize: number;
+};
+
+const CONNINFO_OPTIONS: Record<
+  string,
+  { envvar: string | null; label: string; dispchar: string; dispsize: number }
+> = {
+  service: { envvar: "PGSERVICE", label: "Database-Service", dispchar: "", dispsize: 20 },
+  user: { envvar: "PGUSER", label: "Database-User", dispchar: "", dispsize: 20 },
+  password: { envvar: "PGPASSWORD", label: "Database-Password", dispchar: "*", dispsize: 20 },
+  passfile: { envvar: "PGPASSFILE", label: "Database-Password-File", dispchar: "", dispsize: 64 },
+  channelBinding: {
+    envvar: "PGCHANNELBINDING",
+    label: "Channel-Binding",
+    dispchar: "",
+    dispsize: 8,
+  },
+  connectTimeout: {
+    envvar: "PGCONNECT_TIMEOUT",
+    label: "Connect-timeout",
+    dispchar: "",
+    dispsize: 10,
+  },
+  dbname: { envvar: "PGDATABASE", label: "Database-Name", dispchar: "", dispsize: 20 },
+  host: { envvar: "PGHOST", label: "Database-Host", dispchar: "", dispsize: 40 },
+  hostaddr: { envvar: "PGHOSTADDR", label: "Database-Host-IP-Address", dispchar: "", dispsize: 45 },
+  port: { envvar: "PGPORT", label: "Database-Port", dispchar: "", dispsize: 6 },
+  clientEncoding: {
+    envvar: "PGCLIENTENCODING",
+    label: "Client-Encoding",
+    dispchar: "",
+    dispsize: 10,
+  },
+  options: { envvar: "PGOPTIONS", label: "Backend-Options", dispchar: "", dispsize: 40 },
+  applicationName: { envvar: "PGAPPNAME", label: "Application-Name", dispchar: "", dispsize: 64 },
+  fallbackApplicationName: {
+    envvar: null,
+    label: "Fallback-Application-Name",
+    dispchar: "",
+    dispsize: 64,
+  },
+  keepalives: { envvar: null, label: "TCP-Keepalives", dispchar: "", dispsize: 1 },
+  keepalivesIdle: { envvar: null, label: "TCP-Keepalives-Idle", dispchar: "", dispsize: 10 },
+  keepalivesInterval: {
+    envvar: null,
+    label: "TCP-Keepalives-Interval",
+    dispchar: "",
+    dispsize: 10,
+  },
+  keepalivesCount: { envvar: null, label: "TCP-Keepalives-Count", dispchar: "", dispsize: 10 },
+  tcpUserTimeout: { envvar: null, label: "TCP-User-Timeout", dispchar: "", dispsize: 10 },
+  sslmode: { envvar: "PGSSLMODE", label: "SSL-Mode", dispchar: "", dispsize: 12 },
+  sslnegotiation: {
+    envvar: "PGSSLNEGOTIATION",
+    label: "SSL-Negotiation",
+    dispchar: "",
+    dispsize: 9,
+  },
+  sslcompression: {
+    envvar: "PGSSLCOMPRESSION",
+    label: "SSL-Compression",
+    dispchar: "",
+    dispsize: 1,
+  },
+  sslcert: { envvar: "PGSSLCERT", label: "SSL-Client-Cert", dispchar: "", dispsize: 64 },
+  sslkey: { envvar: "PGSSLKEY", label: "SSL-Client-Key", dispchar: "", dispsize: 64 },
+  sslcertmode: {
+    envvar: "PGSSLCERTMODE",
+    label: "SSL-Client-Cert-Mode",
+    dispchar: "",
+    dispsize: 8,
+  },
+  sslpassword: { envvar: null, label: "SSL-Client-Key-Password", dispchar: "*", dispsize: 20 },
+  sslrootcert: {
+    envvar: "PGSSLROOTCERT",
+    label: "SSL-Root-Certificate",
+    dispchar: "",
+    dispsize: 64,
+  },
+  sslcrl: { envvar: "PGSSLCRL", label: "SSL-Revocation-List", dispchar: "", dispsize: 64 },
+  sslcrldir: {
+    envvar: "PGSSLCRLDIR",
+    label: "SSL-Revocation-List-Dir",
+    dispchar: "",
+    dispsize: 64,
+  },
+  sslsni: { envvar: "PGSSLSNI", label: "SSL-SNI", dispchar: "", dispsize: 1 },
+  requirepeer: { envvar: "PGREQUIREPEER", label: "Require-Peer", dispchar: "", dispsize: 10 },
+  requireAuth: { envvar: "PGREQUIREAUTH", label: "Require-Auth", dispchar: "", dispsize: 14 },
+  sslMinProtocolVersion: {
+    envvar: "PGSSLMINPROTOCOLVERSION",
+    label: "SSL-Minimum-Protocol-Version",
+    dispchar: "",
+    dispsize: 8,
+  },
+  sslMaxProtocolVersion: {
+    envvar: "PGSSLMAXPROTOCOLVERSION",
+    label: "SSL-Maximum-Protocol-Version",
+    dispchar: "",
+    dispsize: 8,
+  },
+  gssencmode: { envvar: "PGGSSENCMODE", label: "GSSENC-Mode", dispchar: "", dispsize: 8 },
+  krbsrvname: {
+    envvar: "PGKRBSRVNAME",
+    label: "Kerberos-service-name",
+    dispchar: "",
+    dispsize: 20,
+  },
+  gsslib: { envvar: "PGGSSLIB", label: "GSS-library", dispchar: "", dispsize: 7 },
+  gssdelegation: { envvar: "PGGSSDELEGATION", label: "GSS-delegation", dispchar: "", dispsize: 1 },
+  replication: { envvar: null, label: "Replication", dispchar: "D", dispsize: 5 },
+  targetSessionAttrs: {
+    envvar: "PGTARGETSESSIONATTRS",
+    label: "Target-Session-Attrs",
+    dispchar: "",
+    dispsize: 15,
+  },
+  loadBalanceHosts: {
+    envvar: "PGLOADBALANCEHOSTS",
+    label: "Load-Balance-Hosts",
+    dispchar: "",
+    dispsize: 8,
+  },
+};
+
+const CONNINFO_KEYWORDS = Object.keys(CONNINFO_OPTIONS);
 
 const CONNECT_ARGUMENT_ORDER = ["host", "port", "options", "tty", "dbname", "user", "password"];
 
@@ -1465,11 +1613,15 @@ const COMPILED_DEFAULTS: Record<string, string> = {
   loadBalanceHosts: "disable",
 };
 
-function conndefaults(): { keyword: string; compiled: string | null; val: string | null }[] {
+function conndefaults(): ConninfoOption[] {
   return CONNINFO_KEYWORDS.map((keyword) => ({
     keyword,
+    envvar: CONNINFO_OPTIONS[keyword].envvar,
     compiled: COMPILED_DEFAULTS[keyword] ?? null,
     val: COMPILED_DEFAULTS[keyword] ?? null,
+    label: CONNINFO_OPTIONS[keyword].label,
+    dispchar: CONNINFO_OPTIONS[keyword].dispchar,
+    dispsize: CONNINFO_OPTIONS[keyword].dispsize,
   }));
 }
 

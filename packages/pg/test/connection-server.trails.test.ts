@@ -23,6 +23,12 @@ describe("PG::Connection against a server", () => {
     if (!conn.isFinished()) await conn.finish();
   });
 
+  it("exec after an unfinished COPY FROM STDIN discards it and runs the next query", async () => {
+    await conn.exec("CREATE TEMP TABLE copytable3 (col1 TEXT)");
+    expect((await conn.exec("COPY copytable3 FROM STDIN")).resultStatus()).toBe(PG.PGRES_COPY_IN);
+    expect((await conn.exec("SELECT 1")).getvalue(0, 0)).toBe("1");
+  });
+
   it("type_map_for_results is TypeMapAllStrings until a map is assigned", async () => {
     expect(conn.typeMapForResults).toBeInstanceOf(PG.TypeMapAllStrings);
     expect((await conn.exec("SELECT 1, true")).values()).toEqual([["1", "t"]]);
@@ -99,8 +105,8 @@ describe("PG::Connection against a server", () => {
     expect(conn.status()).toBe(PG.CONNECTION_BAD);
 
     const second = await conn.exec("SELECT 1").catch((e: unknown) => e);
-    expect(second).toBeInstanceOf(PG.ConnectionBad);
-    expect((second as Error).message).toBe("no connection to the server\n");
+    expect(second).toBeInstanceOf(PG.UnableToSend);
+    expect((second as Error).message).toBe("PQsendQuery no connection to the server\n");
     expect(conn.status()).toBe(PG.CONNECTION_BAD);
   });
 
