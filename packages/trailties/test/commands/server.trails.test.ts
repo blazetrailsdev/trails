@@ -204,3 +204,32 @@ describe("trails server environment (trails)", () => {
     });
   });
 });
+
+describe("trails server --config default (trails)", () => {
+  let tmpDir: string;
+  let origCwd: string;
+  const serverOptions = (args: string[] = []) => new ServerCommand([], args).serverOptions();
+
+  beforeEach(() => {
+    origCwd = process.cwd();
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-server-config-"));
+    process.chdir(tmpDir);
+  });
+
+  afterEach(() => {
+    process.chdir(origCwd);
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it("defaults to config.js in a compiled tree and to config.ts when both exist", () => {
+    fs.writeFileSync(path.join(tmpDir, "config.js"), "");
+    expect(serverOptions().config).toBe("config.js");
+    fs.writeFileSync(path.join(tmpDir, "config.ts"), "");
+    expect(serverOptions().config).toBe("config.ts");
+  });
+
+  it("takes an explicit --config as given", () => {
+    fs.writeFileSync(path.join(tmpDir, "config.js"), "");
+    expect(serverOptions(["--config", "config.ts"]).config).toBe("config.ts");
+  });
+});

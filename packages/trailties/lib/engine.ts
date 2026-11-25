@@ -166,7 +166,10 @@ export class Engine extends Trailtie {
     return undefined;
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm resolveTsThenJs — PERMANENT
+   */
   static findRootWithFlag(
     flag: string,
     rootPath: string | undefined,

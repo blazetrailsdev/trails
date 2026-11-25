@@ -5,7 +5,10 @@ import { Engine } from "../engine.js";
 import { Generators } from "../generators.js";
 import { Trails } from "../trails.js";
 
-/** @missingRailsArgs expand_path — PERMANENT */
+/**
+ * @missingRailsArgs expand_path — PERMANENT
+ * @inventedArm resolveTsThenJs — PERMANENT
+ */
 export function setApplicationDirectoryBang(): void {
   if (!File.isExist(resolveTsThenJs(File.expandPath("config.ts"))))
     Dir.chdir(File.expandPath("../..", APP_PATH));
