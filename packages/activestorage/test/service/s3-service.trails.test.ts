@@ -99,3 +99,92 @@ describe.skipIf(!SERVICE_CONFIGURATIONS.s3)("S3Service (trails)", () => {
     },
   );
 });
+
+describe("S3Service public URLs (trails)", () => {
+  const configure = (bucket: string) =>
+    Service.configure("s3_public", {
+      s3_public: {
+        service: "S3",
+        accessKeyId: "trails",
+        secretAccessKey: "trails-secret",
+        region: "us-east-1",
+        bucket: bucket,
+        public: true,
+      },
+    }) as S3Service;
+
+  it("a dotted bucket's public URL is path-style", async () => {
+    expect(await configure("public.example.dev").url("a/b.png")).toBe(
+      "https://s3.us-east-1.amazonaws.com/public.example.dev/a/b.png",
+    );
+  });
+
+  it("an undotted bucket's public URL is virtual-host style", async () => {
+    expect(await configure("trails-public").url("a/b.png")).toBe(
+      "https://trails-public.s3.us-east-1.amazonaws.com/a/b.png",
+    );
+  });
+});
+
+describe("S3Service public URLs on an endpoint (trails)", () => {
+  const configure = (bucket: string, endpoint: string) =>
+    Service.configure("s3_public", {
+      s3_public: {
+        service: "S3",
+        accessKeyId: "trails",
+        secretAccessKey: "trails-secret",
+        region: "us-east-1",
+        bucket: bucket,
+        endpoint: endpoint,
+        public: true,
+      },
+    }) as S3Service;
+
+  it("a dotted bucket on an https endpoint is path-style", async () => {
+    expect(await configure("public.example.dev", "https://s3.example.test").url("k")).toBe(
+      "https://s3.example.test/public.example.dev/k",
+    );
+  });
+
+  it("a dotted bucket on an http endpoint is virtual-host style", async () => {
+    expect(await configure("public.example.dev", "http://s3.example.test").url("k")).toBe(
+      "http://public.example.dev.s3.example.test/k",
+    );
+  });
+});
+
+describe("S3Service public URLs for a non-DNS bucket name (trails)", () => {
+  const configure = (bucket: string) =>
+    Service.configure("s3_public", {
+      s3_public: {
+        service: "S3",
+        accessKeyId: "trails",
+        secretAccessKey: "trails-secret",
+        region: "us-east-1",
+        bucket: bucket,
+        public: true,
+      },
+    }) as S3Service;
+
+  it("an uppercase or underscored bucket is path-style", async () => {
+    expect(await configure("My_Bucket").url("k")).toBe(
+      "https://s3.us-east-1.amazonaws.com/My_Bucket/k",
+    );
+  });
+
+  it("an IPv4-shaped bucket is path-style", async () => {
+    expect(await configure("192.168.1.1").url("k")).toBe(
+      "https://s3.us-east-1.amazonaws.com/192.168.1.1/k",
+    );
+  });
+
+  it("a bucket with adjacent dots or dashes is path-style", async () => {
+    expect(await configure("a-.b").url("k")).toBe("https://s3.us-east-1.amazonaws.com/a-.b/k");
+  });
+
+  it("a virtual-host URL is https://<bucket>/<key>", async () => {
+    expect(await configure("public.example.dev").url("a/b.png", { virtualHost: true })).toBe(
+      "https://public.example.dev/a/b.png",
+    );
+  });
+});

@@ -1888,6 +1888,41 @@ jobs:
           rm packages/activestorage/node_modules/@aws-sdk/client-s3 packages/activestorage/node_modules/@google-cloud/storage
           node packages/activestorage/test/support/missing-cloud-sdk/boot.ts
 
+  # S3PublicServiceTest against a real bucket, as Rails runs it
+  # (activestorage/test/service/s3_public_service_test.rb). The virtual-host
+  # test GETs https://<bucket>/<key>, which no emulator answers (RFC 0215).
+  # The bucket, CloudFront and the OIDC role live in blazetrailsdev/platform
+  # (ci-storage). Fork PRs get no OIDC token, so this is not in the ci
+  # aggregator's needs: an AWS outage cannot red a merge.
+  activestorage-s3-public-tests:
+    name: Active Storage S3 Public Tests
+    needs: changes
+    if: >-
+      vars.AWS_S3_PUBLIC_ROLE_ARN != '' &&
+      (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) &&
+      needs.changes.outputs.docs_only != 'true' &&
+      needs.changes.outputs.activerecord_affected == 'true' &&
+      (needs.changes.outputs.ar_scope == '' || contains(needs.changes.outputs.ar_scope, 'packages/activestorage'))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v5
+      - uses: aws-actions/configure-aws-credentials@v5
+        with:
+          role-to-assume: ${{ vars.AWS_S3_PUBLIC_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_S3_PUBLIC_REGION }}
+      - uses: ./.github/actions/setup-pnpm
+      - run: pnpm install --frozen-lockfile --prefer-offline
+      - uses: ./.github/actions/cache-build
+      - run: pnpm build
+      - run: pnpm vitest run packages/activestorage/test/service/s3-public-service.test.ts --project '!system'
+        env:
+          ACTIVE_STORAGE_S3_PUBLIC_BUCKET: ${{ vars.AWS_S3_PUBLIC_BUCKET }}
+          ACTIVE_STORAGE_S3_PUBLIC_REGION: ${{ vars.AWS_S3_PUBLIC_REGION }}
+
   actioncable-redis-tests:
     name: Action Cable Redis Tests
     needs: changes

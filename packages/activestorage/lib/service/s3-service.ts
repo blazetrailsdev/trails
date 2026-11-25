@@ -21,6 +21,20 @@ import { Service } from "../service.js";
 
 const UPLOAD_OPTION_KEYS: Record<string, string> = { acl: "ACL", sseKmsKeyId: "SSEKMSKeyId" };
 
+/** @noRailsEquivalent PERMANENT */
+function dnsCompatible(bucketName: string, ssl: boolean): boolean {
+  if (
+    bucketName.length < 64 &&
+    /^[a-z0-9][a-z0-9.-]+[a-z0-9]$/.test(bucketName) &&
+    !/(\d+\.){3}\d+/.test(bucketName) &&
+    !/[.-]{2}/.test(bucketName)
+  ) {
+    return bucketName.includes(".") && ssl ? false : true;
+  } else {
+    return false;
+  }
+}
+
 type UploadableIO = { size(): number; read(length?: number): string | Uint8Array | null };
 
 const MAXIMUM_UPLOAD_PARTS_COUNT = 10000;
@@ -415,12 +429,15 @@ export class S3Service extends Service {
     if (virtualHost) return `https://${this.bucket}/${path}`;
     if (this.client.config.endpoint === undefined) {
       const region = await this.client.config.region();
-      return `https://${this.bucket}.s3.${region}.amazonaws.com/${path}`;
+      return this.client.config.forcePathStyle || !dnsCompatible(this.bucket, true)
+        ? `https://s3.${region}.amazonaws.com/${this.bucket}/${path}`
+        : `https://${this.bucket}.s3.${region}.amazonaws.com/${path}`;
     }
     const endpoint = await this.client.config.endpoint();
     const port = endpoint.port == null ? "" : `:${endpoint.port}`;
     const base = `${endpoint.protocol}//${endpoint.hostname}${port}${endpoint.path.endsWith("/") ? endpoint.path.slice(0, -1) : endpoint.path}`;
-    return this.client.config.forcePathStyle
+    return this.client.config.forcePathStyle ||
+      !dnsCompatible(this.bucket, endpoint.protocol === "https:")
       ? `${base}/${this.bucket}/${path}`
       : `${endpoint.protocol}//${this.bucket}.${endpoint.hostname}${port}/${path}`;
   }
