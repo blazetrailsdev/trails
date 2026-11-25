@@ -1795,10 +1795,10 @@ AND query LIKE '%${lockId}%'`;
           write(_text = ""): void {}
 
           async change() {
-            await this.changeTable("testings", { bulk: true }, (t) => {
-              t.column("foo", "string");
-              t.column("bar", "string");
-              t.index("foo");
+            await this.changeTable("testings", { bulk: true }, async (t) => {
+              await t.column("foo", "string");
+              await t.column("bar", "string");
+              await t.index("foo");
             });
           }
         }
