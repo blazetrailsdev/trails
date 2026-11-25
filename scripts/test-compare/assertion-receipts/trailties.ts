@@ -16,7 +16,7 @@ export const trailties: Record<string, AssertionReceipt[]> = {
       {
         kind: "assert_equal",
         value: "s:0",
-        as: "assert_equal",
+        as: null,
         reason:
           'dbs_test.rb:558 asserts an empty schema cache after the expired dump is ignored; a booted trails app warms the cache from the database before user code runs (activerecord CLAUDE.md, "Schema reflection peeks at a warm cache")',
       },

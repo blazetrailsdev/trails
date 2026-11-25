@@ -40,7 +40,7 @@ const schema = (version: string | number, body: string) =>
   `import { Schema } from "@blazetrails/activerecord";\nawait Schema.define({ version: ${JSON.stringify(version)} }, async (t) => {\n${body}\n});\n`;
 
 const databaseTs = (body: string) =>
-  `import { env as ENV } from "@blazetrails/ruby-compat";\nimport { Trails } from "@blazetrails/trailties";\nvoid ENV;\nvoid Trails;\n${body}\n`;
+  `import { env as ENV } from "@blazetrails/ruby-compat";\nimport { Trails } from "@blazetrails/trailties";\n${body}\n`;
 
 const developmentConfig = (body: string) =>
   `import { Trails } from "@blazetrails/trailties";\nTrails.application!.configure(function () {\n${body}\n});\n`;
@@ -82,14 +82,14 @@ describe("RakeDbsTest", { timeout: 600_000 }, () => {
   ): Promise<void> {
     let output = await t.trails("db:create");
     expect(output).toMatch(/Created database/);
-    expect(await exists(expectedDatabase)).toBe(true);
+    expect(await exists(expectedDatabase)).toBeTruthy();
     if (block) await block();
     if (environmentLoaded) {
       expect(Base.connectionDbConfig().database).toBe(expectedDatabase);
     }
     output = await t.trails("db:drop");
     expect(output).toMatch(/Dropped database/);
-    expect(await exists(expectedDatabase)).toBe(false);
+    expect(await exists(expectedDatabase)).toBeFalsy();
   }
 
   async function developmentDatabase(database: string): Promise<void> {
@@ -131,8 +131,8 @@ describe("RakeDbsTest", { timeout: 600_000 }, () => {
 
     await t.withTrailsEnv("development", () =>
       dbCreateAndDrop(databaseUrlDbName(), {}, async () => {
-        expect(await exists("storage/test.sqlite3")).toBe(false);
-        expect(await exists("storage/development.sqlite3")).toBe(false);
+        expect(await exists("storage/test.sqlite3")).toBeFalsy();
+        expect(await exists("storage/development.sqlite3")).toBeFalsy();
       }),
     );
   });
@@ -419,7 +419,7 @@ export class AMigration extends Migration.Current {
 
     await t.trails("db:migrate:reset");
 
-    expect((await read("db/schema.ts")).includes("title")).toBe(true);
+    expect((await read("db/schema.ts")).includes("title")).toBeTruthy();
   });
 
   async function dbSchemaDump(): Promise<void> {
@@ -747,9 +747,9 @@ await Book.createBang({ title: "Ruby Under a Microscope" });
     expect(await execute(schemaMigrationsSql())).toEqual(schemaMigrations);
     expect(await execute(internalMetadataSql())).toEqual(internalMetadata);
     expect(await Book.count()).toBe(2);
-    expect(await Book.where({ title: "Remote" }).isExists()).toBe(false);
-    expect(await Book.where({ title: "Rework" }).isExists()).toBe(true);
-    expect(await Book.where({ title: "Ruby Under a Microscope" }).isExists()).toBe(true);
+    expect(await Book.where({ title: "Remote" }).isExists()).toBeFalsy();
+    expect(await Book.where({ title: "Rework" }).isExists()).toBeTruthy();
+    expect(await Book.where({ title: "Ruby Under a Microscope" }).isExists()).toBeTruthy();
   });
 
   it("db:seed:replant does not truncate any tables and does not load the seeds when environment is protected", async () => {
@@ -777,7 +777,7 @@ const Book = constGet(TopLevel, "Book") as { createBang(a: object): Promise<unkn
       expect(await execute(internalMetadataSql())).toEqual(internalMetadata);
       expect(await Book.count()).toBe(1);
       expect(await execute(`SELECT * from "books"`)).toEqual(books);
-      expect(await Book.where({ title: "Rework" }).isExists()).toBe(false);
+      expect(await Book.where({ title: "Rework" }).isExists()).toBeFalsy();
     });
   });
 
@@ -821,7 +821,7 @@ const Book = constGet(TopLevel, "Book") as { createBang(a: object): Promise<unkn
     await t.trails("generate", "model", "book", "title:string");
     await t.trails("db:create", "db:migrate");
 
-    await t.appFile("db/schema.ts", "// Not touched");
+    await t.appFile("db/schema.ts", "# Not touched");
     await t.appFile(
       "config/initializers/disable-dumping-schema.ts",
       `import { Trails } from "@blazetrails/trailties";\nTrails.application!.config.activeRecord.dumpSchemaAfterMigration = false;\n`,
@@ -829,7 +829,7 @@ const Book = constGet(TopLevel, "Book") as { createBang(a: object): Promise<unkn
 
     await t.trails("db:prepare");
 
-    expect((await read("db/schema.ts")).trim()).toBe("// Not touched");
+    expect((await read("db/schema.ts")).trim()).toBe("# Not touched");
   });
 
   it.skipIf(ENV.ARCONN !== "postgresql")(

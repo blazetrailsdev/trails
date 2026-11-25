@@ -37,7 +37,6 @@ async function clearLogFile(file: string): Promise<void> {
   f.close();
 }
 
-/** @inventedArm filter — PERMANENT */
 async function allEnvironments(): Promise<string[]> {
   return [
     ...new Set(
