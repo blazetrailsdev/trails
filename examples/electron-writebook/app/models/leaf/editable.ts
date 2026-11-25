@@ -1,5 +1,6 @@
 import { defineModule, included, isPresent, minutes } from "@blazetrails/activesupport";
 import { Parameters } from "@blazetrails/actionpack";
+import type { One } from "@blazetrails/activestorage";
 import type { Base } from "@blazetrails/activerecord";
 import { hasKey, merge } from "@blazetrails/ruby-compat";
 import type { Leaf } from "../leaf.ts";
@@ -98,10 +99,12 @@ export const Editable = defineModule(
         attachmentReflections: Record<string, unknown>;
       };
       for (const name of Object.keys(klass.attachmentReflections ?? {})) {
-        const source = (leafable as unknown as Record<string, { blob: Promise<unknown> }>)[name];
-        await (copy as unknown as Record<string, { attach(b: unknown): Promise<void> }>)[
-          name
-        ].attach(await source.blob);
+        const source = (leafable as unknown as Record<string, One>)[name];
+        await source.load();
+        const attachment = await source.attachment;
+        await (copy as unknown as Record<string, One>)[name].attach(
+          attachment ? await attachment.blob : null,
+        );
       }
       return copy;
     },

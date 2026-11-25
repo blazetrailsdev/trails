@@ -41,9 +41,15 @@ export async function resetDatabase(): Promise<void> {
 }
 
 const { FixtureSet } = await import("@blazetrails/activerecord/fixtures.js");
+const { File: FixtureFile } = await import("@blazetrails/activerecord/fixture-set/file.js");
+const { FixtureSet: ActiveStorageFixtureSet } =
+  await import("@blazetrails/activestorage/testing/fixture-set");
 const { fileURLToPath } = await import("node:url");
 
 const FIXTURES = fileURLToPath(new URL("fixtures", import.meta.url));
+// The `active_support_test_case` load hook seats this in Rails
+// (activestorage/lib/active_storage/engine.rb); vitest runs no TestCase load.
+ActiveStorageFixtureSet.fileFixturePath = `${FIXTURES}/files`;
 const FIXTURE_SETS = [
   "accounts",
   "users",
@@ -54,12 +60,19 @@ const FIXTURE_SETS = [
   "pictures",
   "leaves",
   "action_text/markdowns",
+  "active_storage/blobs",
+  "active_storage/attachments",
 ];
 
 /** Writebook's `fixtures :all`, loaded onto a blank database. */
 export async function loadFixtures(): Promise<void> {
   await resetDatabase();
   FixtureSet.resetCache();
+  FixtureFile.registerModule(`${FIXTURES}/active_storage/blobs.ts`, {
+    handbook_reading_image_blob: JSON.parse(
+      await ActiveStorageFixtureSet.blob({ filename: "reading.webp", service_name: "test" }),
+    ),
+  });
   await FixtureSet.createFixtures(FIXTURES, FIXTURE_SETS);
 }
 
@@ -73,6 +86,21 @@ const FIXTURE_CLASSES = {
   pictures: Picture,
   leaves: Leaf,
 };
+
+/** Writebook's `leafable_path(leaf)` direct route: the leafable's resource under its book, by the leaf's id. */
+export function leafablePath(leaf: {
+  book_id: unknown;
+  id: unknown;
+  leafable_type: string;
+}): string {
+  return `/books/${leaf.book_id}/${leaf.leafable_type.toLowerCase()}s/${leaf.id}`;
+}
+
+/** Writebook's `fixture_file_upload(name, type)`. */
+export async function fixtureFileUpload(name: string, type: string): Promise<unknown> {
+  const { UploadedFile } = await import("@blazetrails/rack-test");
+  return new UploadedFile(fileURLToPath(new URL(`fixtures/files/${name}`, import.meta.url)), type);
+}
 
 /** The record a fixture label names, as Rails' `books(:handbook)` reads it. */
 export async function fixture<T>(set: keyof typeof FIXTURE_CLASSES, label: string): Promise<T> {
@@ -107,6 +135,12 @@ export class ApplicationIntegrationTest extends IntegrationTest {
       params: { email_address: user.email_address, password: "secret123456" },
     });
     expect(isPresent(this.cookies.get("session_token"))).toBe(true);
+  }
+
+  /** Writebook's `SessionTestHelper#sign_out`. */
+  async signOut(): Promise<void> {
+    await this.delete("/session");
+    expect(isPresent(this.cookies.get("session_token"))).toBe(false);
   }
 
   /** Runs the first-run setup and signs in as the administrator it creates. */

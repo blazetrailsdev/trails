@@ -10,6 +10,7 @@
 <% const leafItems = await render({ partial: "leaves/leaf", collection: leaves, as: "leaf" }); %>
 
 <% contentFor("head", () => { %>
+  <%= tag().link({ rel: "alternate", type: "text/markdown", href: bookSlugPath(book, { format: "md" }) }) %>
   <%= tag().meta({ property: "og:title", content: book.title }) %>
   <%= tag().meta({ property: "og:description", content: book.subtitle }) %>
   <%= tag().meta({ property: "og:image", content: book.cover.isAttached() ? `${rootUrl()}${urlFor(book.cover)}` : assetUrl(`covers/cover-${book.theme}-og.png`) }) %>

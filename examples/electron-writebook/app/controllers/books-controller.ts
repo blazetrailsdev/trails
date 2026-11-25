@@ -38,6 +38,11 @@ export class BooksController extends ApplicationController {
   async show(): Promise<void> {
     this.leaves = await this.book.leaves.active().withLeafables().positioned().toArray();
     for (const leaf of this.leaves) leaf.association("book").target = this.book;
+
+    await this.respondTo((format: Record<string, (block?: () => unknown) => void>) => {
+      format.html();
+      format.md();
+    });
   }
 
   async edit(): Promise<void> {}
