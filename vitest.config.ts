@@ -2,6 +2,7 @@ import { defineConfig } from "vitest/config";
 import path from "path";
 import os from "os";
 import { DurationSequencer } from "./scripts/ci/duration-sequencer.js";
+import { isolationDistPath, isolationDistResolver } from "./scripts/ci/isolation-dist-resolver.js";
 import { resolveForkCount } from "./packages/activerecord/test/support/ar-db-forks-default.js";
 
 // AR_DB_FORKS (read in test-setup-worker-db.ts) requests a vitest worker
@@ -35,6 +36,8 @@ import { resolveForkCount } from "./packages/activerecord/test/support/ar-db-for
 // outgoing process has exited and released its lock. Decoupling the slot pool
 // from the worker count (ar-db-slots.ts) gives every fork count that headroom,
 // so sub-8 fork counts are now viable too.
+
+const ISOLATION_DIST = process.env.ISOLATION_TEST != null && process.env.ISOLATION_DIST === "1";
 
 const SHARED_EXCLUDE = [
   "**/node_modules/**",
@@ -839,9 +842,13 @@ export default defineConfig({
       },
       {
         resolve: otherResolve,
+        plugins: ISOLATION_DIST ? [isolationDistResolver()] : [],
         test: {
           name: "trailties",
           globals: true,
+          server: ISOLATION_DIST
+            ? { deps: { external: [/\/packages\/[^/]+\/dist\//] } }
+            : undefined,
           include: [
             "packages/trailties/test/**/*.test.ts",
             "packages/solid-cable/test/generators/**/*.test.ts",
@@ -865,7 +872,9 @@ export default defineConfig({
             "./packages/actiontext/test/support/build-templates.ts",
             "./packages/stimulus/test/support/build-templates.ts",
           ],
-          setupFiles: otherSetupFiles,
+          setupFiles: ISOLATION_DIST
+            ? otherSetupFiles.map((file) => isolationDistPath(path.resolve(__dirname, file)))
+            : otherSetupFiles,
         },
       },
       {
