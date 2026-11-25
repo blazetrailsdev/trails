@@ -47,6 +47,7 @@ export interface ProcessAdapter {
   umask?(): number;
   pid(): number;
   ppid?(): number;
+  uid?(): number;
   kill?(pid: number, signal: number | string): void;
   signo?(name: string): number;
   hostname?(): string;
@@ -741,6 +742,7 @@ interface NodeProcessLike {
   umask(): number;
   pid: number;
   ppid: number;
+  getuid?(): number;
   kill(pid: number, signal: number | string): boolean;
   exit(code?: number): never;
   exitCode: number | string | undefined;
@@ -922,6 +924,7 @@ function buildNodeAdapter(proc: NodeProcessLike): ProcessAdapter {
     umask: () => proc.umask(),
     pid: () => proc.pid,
     ppid: () => proc.ppid,
+    uid: proc.getuid === undefined ? undefined : () => proc.getuid!(),
     kill: (pid, signal) => {
       proc.kill(pid, signal);
     },

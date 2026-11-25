@@ -251,7 +251,7 @@ export default { development };`,
     await FileUtils.chmodAsync("+w", `${appPath}/db`);
   }
 
-  it("db:create failure because bad permissions", async () => {
+  it.skipIf(Process.uid === 0)("db:create failure because bad permissions", async () => {
     await withBadPermissions(async () => {
       const output = await t.trails("db:create", { allowFailure: true });
       expect(output).toMatch(
@@ -261,7 +261,7 @@ export default { development };`,
     });
   });
 
-  it("db:drop failure because bad permissions", async () => {
+  it.skipIf(Process.uid === 0)("db:drop failure because bad permissions", async () => {
     await withDatabaseExisting(async () => {
       await withBadPermissions(async () => {
         const output = await t.trails("db:drop", { allowFailure: true });
