@@ -7,6 +7,6 @@ vi.mock("@blazetrails/trails-tsc", () => ({ buildAutoload }));
 describe("BuildCommand", () => {
   it("runs the build-autoload step", async () => {
     await BuildCommand.prototype.perform.call(Object.create(BuildCommand.prototype));
-    expect(buildAutoload).toHaveBeenCalledOnce();
+    expect(buildAutoload).toHaveBeenCalledExactlyOnceWith({ views: true });
   });
 });

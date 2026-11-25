@@ -1,6 +1,7 @@
 import ts from "typescript-5";
 import { Dir, File, TopLevel, getFs, getPath } from "@blazetrails/ruby-compat";
 import { Registry, writeArtifacts } from "@blazetrails/zeitwerk";
+import { buildViews } from "./build-views.js";
 
 interface BootInitializer {
   name: string;
@@ -32,7 +33,10 @@ interface BootApplication extends BootEngine {
 }
 
 /** @noRailsEquivalent PERMANENT */
-export async function buildAutoload({ cwd = Dir.pwd() }: { cwd?: string } = {}): Promise<string[]> {
+export async function buildAutoload({
+  cwd = Dir.pwd(),
+  views = false,
+}: { cwd?: string; views?: boolean } = {}): Promise<string[]> {
   let applicationFile: string | undefined;
   for (const ext of ["ts", "js"]) {
     const application = File.expandPath(`config/application.${ext}`, cwd);
@@ -84,7 +88,7 @@ export async function buildAutoload({ cwd = Dir.pwd() }: { cwd?: string } = {}):
     );
     if (await File.isExistAsync(environmentFile)) {
       const trailsDir = File.expandPath(".trails", root);
-      await writeBoot(trailsDir, root, application, environmentFile);
+      await writeBoot(trailsDir, root, application, environmentFile, views);
       await writeEntry(trailsDir, root, applicationFile, environmentFile, tagged);
     }
   }
@@ -341,6 +345,7 @@ async function writeBoot(
   root: string,
   application: BootApplication,
   environmentFile?: string,
+  views = false,
 ): Promise<void> {
   const path = getPath();
   const engines = [application, ...(application.railties?.() ?? [])].filter(
@@ -348,7 +353,7 @@ async function writeBoot(
   );
   const files = new Set<string>();
   const loaded = new Set<string>();
-  const views: [string, string][] = [];
+  const viewImports: [string, string][] = [];
   for (const engine of engines) {
     const engineRoot = engine.config.root ?? root;
     for (const key of BOOT_PATHS) {
@@ -362,7 +367,9 @@ async function writeBoot(
       }
       if (key === "app/views") {
         for (const dir of node.existent()) {
-          if (await File.isDirectoryAsync(dir)) await viewEntries(trailsDir, root, dir, views);
+          if (!(await File.isDirectoryAsync(dir))) continue;
+          if (views) await buildViews({ viewsDir: dir, inPlace: true });
+          await viewEntries(trailsDir, root, dir, viewImports);
         }
         continue;
       }
@@ -412,20 +419,20 @@ async function writeBoot(
     );
   }
   const boot = [
-    `import { ${views.length === 0 ? "" : "loadIseqEval, "}registerCompiledFiles } from "@blazetrails/ruby-compat";`,
+    `import { ${viewImports.length === 0 ? "" : "loadIseqEval, "}registerCompiledFiles } from "@blazetrails/ruby-compat";`,
     'import { Application } from "@blazetrails/trailties";',
     "",
     "const root = Application.findRoot(import.meta.dirname);",
     "registerCompiledFiles(root, {",
     ...entries,
-    ...views.map(([, entry]) => entry),
+    ...viewImports.map(([, entry]) => entry),
     "});",
     "",
-    ...(views.length === 0
+    ...(viewImports.length === 0
       ? []
       : [
           "await Promise.all(",
-          `  ${JSON.stringify(views.map(([rel]) => rel))}.map((view) =>`,
+          `  ${JSON.stringify(viewImports.map(([rel]) => rel))}.map((view) =>`,
           "    loadIseqEval(`${root}/${view}`),",
           "  ),",
           ");",
