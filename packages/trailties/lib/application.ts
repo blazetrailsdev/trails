@@ -501,8 +501,8 @@ export class Application extends Engine {
   }
 
   async encrypted(
-    path: string,
-    opts: { keyPath?: string; envKey?: string } = {},
+    path: string | Pathname,
+    opts: { keyPath?: string | Pathname; envKey?: string } = {},
   ): Promise<EncryptedConfiguration> {
     const root = this.root()!;
     return new EncryptedConfiguration({

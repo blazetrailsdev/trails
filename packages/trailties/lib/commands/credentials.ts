@@ -222,9 +222,8 @@ export class CredentialsCommand extends Base {
   }
 
   /** @internal */
-  private relativePath(path: string): string {
-    const root = Trails.root()!;
-    return new Pathname(root).join(path).relativePathFrom(root).toString();
+  private relativePath(path: string | Pathname): string {
+    return Trails.root()!.join(path).relativePathFrom(Trails.root()!).toString();
   }
 
   /** @internal */

@@ -28,5 +28,5 @@ try {
   setExitCode(error.status);
 }
 
-/** @inventedArm if — PERMANENT */
+/** @inventedArm if — CONVERGEABLE node-handler-run-blocks-while-serving */
 if (Handler.Node?.server == null) exit();

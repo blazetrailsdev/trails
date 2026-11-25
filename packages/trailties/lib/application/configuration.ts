@@ -122,8 +122,8 @@ export class Configuration extends EngineConfiguration {
   requireMasterKey = false;
   private _secretKeyBase: string | null = null;
   credentials = new InheritableOptions(this.credentialsDefaults()) as InheritableOptions & {
-    contentPath: string;
-    keyPath: string;
+    contentPath: Pathname;
+    keyPath: Pathname;
   };
   console: { start(): unknown } | null = null;
   disableSandbox = false;
