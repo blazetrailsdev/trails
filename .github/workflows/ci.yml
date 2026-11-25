@@ -1222,6 +1222,7 @@ jobs:
       - name: Boot the browser playground (examples/browser-sqlite)
         run: |
           pnpm exec tsc --build tsconfig.json
+          pnpm --filter @blazetrails/example-browser-sqlite exec playwright install chromium
           pnpm --filter @blazetrails/example-browser-sqlite smoke
 
   trailties-tests:
