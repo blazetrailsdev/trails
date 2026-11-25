@@ -31,7 +31,7 @@ export class ImageMagick extends ImageAnalyzer<ReadImage> {
     }
 
     await ActiveStorage.loadPath["active_storage/image_magick"]();
-    ActiveStorage.requireSecurableMiniMagick();
+    ActiveStorage.requireSecurableMiniMagickBang();
 
     return await this.downloadBlobToTempfile(async (file) => {
       try {

@@ -23,7 +23,7 @@ async function sendBlobByteRangeData(
   const ranges = Utils.getByteRanges(rangeHeader, blob.byte_size!);
 
   if (!rangesValid.call(this, ranges)) return this.head(":range_not_satisfiable");
-  if (ranges!.length > ActiveStorage.streamingMaxRanges) {
+  if (ranges!.length > ActiveStorage.streamingMaxRanges()) {
     return this.head(":range_not_satisfiable");
   }
 

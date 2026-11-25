@@ -8,7 +8,7 @@ import {
   type Logger,
 } from "@blazetrails/activesupport";
 import { Numeric } from "@blazetrails/activesupport/core-ext/numeric/bytes";
-import { TopLevel, constSet } from "@blazetrails/ruby-compat";
+import { Digest, OpenSSL, TopLevel, constSet } from "@blazetrails/ruby-compat";
 import type { Deprecation } from "@blazetrails/activesupport";
 import type { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import type { Analyzer } from "./analyzer.js";
@@ -32,6 +32,25 @@ const loadPath: Record<string, () => Promise<unknown>> = {
   "active_storage/image_magick": () => import("./image-magick.js"),
   "active_storage/vips": () => import("./vips.js"),
 };
+
+let _checksumImplementation: unknown;
+let _streamingMaxRanges: number;
+
+export function checksumImplementation(): unknown {
+  return _checksumImplementation;
+}
+
+export function setChecksumImplementation(checksumImplementation: unknown): void {
+  _checksumImplementation = checksumImplementation;
+}
+
+export function streamingMaxRanges(): number {
+  return _streamingMaxRanges;
+}
+
+export function setStreamingMaxRanges(streamingMaxRanges: number): void {
+  _streamingMaxRanges = streamingMaxRanges;
+}
 
 export const ActiveStorage = {
   name: "ActiveStorage",
@@ -91,13 +110,16 @@ export const ActiveStorage = {
   trackVariants: boolean;
   videoPreviewArguments: string;
   streamingChunkMaxSize: number;
-  streamingMaxRanges: number;
+  streamingMaxRanges(): number;
+  setStreamingMaxRanges(streamingMaxRanges: number): void;
+  checksumImplementation(): unknown;
+  setChecksumImplementation(checksumImplementation: unknown): void;
   ffmpegAllowedFormats: string[] | null;
   ffmpegFormatWhitelistArguments(): string[] | null;
   ImageMagick?: typeof import("./image-magick.js").ImageMagick;
   MINIMAGICK_AVAILABLE?: boolean;
   MINIMAGICK_UNSECURABLE?: boolean;
-  requireSecurableMiniMagick(): void;
+  requireSecurableMiniMagickBang(): void;
   VIPS_AVAILABLE?: boolean;
 };
 extend(ActiveStorage, Autoload);
@@ -429,7 +451,18 @@ mattrAccessor.call(ActiveStorage, "resolveModelToRoute", { default: "trails_stor
 
 mattrAccessor.call(ActiveStorage, "trackVariants", { default: false });
 
-ActiveStorage.streamingMaxRanges = 1;
+ActiveStorage.checksumImplementation = checksumImplementation;
+ActiveStorage.setChecksumImplementation = setChecksumImplementation;
+_checksumImplementation = OpenSSL.Digest.MD5;
+try {
+  (_checksumImplementation as typeof OpenSSL.Digest.MD5).hexdigest("test");
+} catch {
+  _checksumImplementation = Digest.MD5;
+}
+
+ActiveStorage.streamingMaxRanges = streamingMaxRanges;
+ActiveStorage.setStreamingMaxRanges = setStreamingMaxRanges;
+_streamingMaxRanges = 1;
 
 mattrAccessor.call(ActiveStorage, "videoPreviewArguments", { default: "-y -vframes 1 -f image2" });
 
@@ -452,11 +485,12 @@ mattrAccessor.call(ActiveStorage, "ffmpegAllowedFormats", {
   ]),
 });
 
-ActiveStorage.ffmpegFormatWhitelistArguments = function ffmpegFormatWhitelistArguments() {
+export function ffmpegFormatWhitelistArguments(this: typeof ActiveStorage): string[] | null {
   return this.ffmpegAllowedFormats != null
     ? ["-format_whitelist", Array.from(this.ffmpegAllowedFormats).join(",")]
     : null;
-};
+}
+ActiveStorage.ffmpegFormatWhitelistArguments = ffmpegFormatWhitelistArguments;
 
 export const Transformers = {
   name: "ActiveStorage::Transformers",
