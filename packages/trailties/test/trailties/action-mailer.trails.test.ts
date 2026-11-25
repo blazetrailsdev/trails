@@ -18,6 +18,7 @@ describe("ActionMailer::Railtie class body", () => {
 
   it("declares the action_mailer initializers in Rails order", () => {
     expect([...Trailtie.initializers].map((i) => i.name)).toEqual([
+      "action_mailer.require_mail_unicode_tables",
       "action_mailer.deprecator",
       "action_mailer.logger",
       "action_mailer.set_configs",

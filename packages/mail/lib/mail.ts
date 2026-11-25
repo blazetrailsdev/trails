@@ -102,6 +102,8 @@ export interface MailConstants {
   informInterceptors(mail: Message): void;
   _deliveryNotificationObservers: DeliveryObserver[];
   _deliveryInterceptors: DeliveryInterceptor[];
+  /** @noRailsEquivalent PERMANENT */
+  loadPath: Record<string, () => Promise<unknown>>;
   registerAutoload(name: string, path: string): void;
   eagerAutoloadBang(): Promise<void>;
 }
@@ -120,6 +122,10 @@ if (!LOAD_PATH.includes(LIB)) LOAD_PATH.push(LIB);
 const autoloads: Record<string, string> = {};
 
 export const Mail: MailConstants = {
+  loadPath: {
+    "mail/multibyte/unicode_tables": () => import("./multibyte/unicode-tables.js"),
+  },
+
   registerAutoload(name: string, path: string) {
     autoloads[name] = path;
     rbAutoloadStr(Mail, name, path);

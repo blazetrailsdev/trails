@@ -619,6 +619,7 @@ const otherSetupFiles = [
   "./packages/actionview/test/support/setup-compile-template.ts",
   "./packages/ruby-compat/test-setup/class-paths.ts",
   "./packages/nokogiri/test/support/setup-extension.ts",
+  "./packages/mail/test/support/setup-unicode-tables.ts",
 ];
 
 export default defineConfig({

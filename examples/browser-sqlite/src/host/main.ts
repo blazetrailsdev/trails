@@ -255,10 +255,18 @@ function restart(): void {
 }
 
 async function start(): Promise<void> {
-  await navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`, {
-    scope: import.meta.env.BASE_URL,
-  });
-  await navigator.serviceWorker.ready;
+  const ready = await Promise.race([
+    navigator.serviceWorker
+      .register(`${import.meta.env.BASE_URL}sw.js`, { scope: import.meta.env.BASE_URL })
+      .then(() => navigator.serviceWorker.ready)
+      .then(() => true),
+    new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 10_000)),
+  ]);
+  if (!ready) {
+    throw new Error(
+      "the playground's service worker did not install; close this tab and open the playground in a new one",
+    );
+  }
   if (!navigator.serviceWorker.controller) {
     const claimed = await new Promise<boolean>((resolve) => {
       navigator.serviceWorker.addEventListener("controllerchange", () => resolve(true), {
