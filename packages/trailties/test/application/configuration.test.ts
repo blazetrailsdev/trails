@@ -720,13 +720,14 @@ Trails.application!.config.filterParameters.push("password", "foo", "bar");
 
   // PERMANENT-SKIP: packages/trailties/CLAUDE.md, "Config files are TypeScript modules (`config_for`, `ActiveSupport::ConfigurationFile`)"
   it.skip("config_for containing ERB tags should evaluate", async () => {
-    await setCustomConfig(`development:\n  key: <%= 'custom key' %>\n`);
-    expect(((await app("development")).config as any).myCustomConfig.key).toBe("custom key");
+    await appFile("config/custom.yml", `development:\n  key: <%= 'custom key' %>\n`);
+    const myCustomConfig = (await (await app("development")).configFor("custom")) as OrderedOptions;
+    expect(myCustomConfig.get("key")).toBe("custom key");
   });
 
   // PERMANENT-SKIP: packages/trailties/CLAUDE.md, "Config files are TypeScript modules (`config_for`, `ActiveSupport::ConfigurationFile`)"
   it.skip("config_for with syntax error show a more descriptive exception", async () => {
-    await setCustomConfig(`development:\n  key: foo:\n`);
+    await appFile("config/custom.yml", `development:\n  key: foo:\n`);
     await expect(app("development")).rejects.toThrow("YAML syntax error occurred while parsing");
   });
 
@@ -742,7 +743,7 @@ Trails.application!.config.filterParameters.push("password", "foo", "bar");
 
   // PERMANENT-SKIP: packages/trailties/CLAUDE.md, "Config files are TypeScript modules (`config_for`, `ActiveSupport::ConfigurationFile`)"
   it.skip("config_for handles YAML patches (like safe_yaml) that disable the symbolize_names option", async () => {
-    await setCustomConfig(`development:\n  key: value\n`);
+    await appFile("config/custom.yml", `development:\n  key: value\n`);
     expect(await (await app("development")).configFor("custom")).toEqual({ key: "value" });
   });
 
