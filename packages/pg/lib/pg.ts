@@ -50,6 +50,7 @@ export const Constants = {
   PG_DIAG_COLUMN_NAME: 99,
   PG_DIAG_DATATYPE_NAME: 100,
   PG_DIAG_CONSTRAINT_NAME: 110,
+  INVALID_OID: 0,
 };
 
 PG.Constants = Constants;

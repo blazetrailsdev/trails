@@ -130,7 +130,7 @@ describe("PG::Connection", () => {
     await conn.exec("UNLISTEN woo");
   });
 
-  it("returns notifications which are already in the queue before wait_for_notify is called ", async () => {
+  it("returns notifications which are already in the queue before wait_for_notify is called without waiting for the socket to become readable", async () => {
     await conn.exec("ROLLBACK");
     await conn.exec("LISTEN woo");
 
@@ -239,6 +239,100 @@ describe("PG::Connection", () => {
     expect(r.nfields()).toBe(0);
     await conn.exec("DECLARE cörsör5 CURSOR FOR VALUES(1,2,3)");
     await conn.closePortal("cörsör5");
+  });
+
+  it("calls the block supplied to wait_for_notify with the notify payload if it accepts any number of arguments", async () => {
+    await conn.exec("ROLLBACK");
+    await conn.exec("LISTEN knees");
+
+    const other = await PG.connect(conninfo);
+    await other.exec("NOTIFY knees, 'skirt and boots'");
+    await other.finish();
+
+    let event: string | null = null;
+    let pid: number | null = null;
+    let msg: string | null = null;
+    await conn.waitForNotify(10, (...args) => {
+      [event, pid, msg] = args;
+    });
+    await conn.exec("UNLISTEN knees");
+
+    expect(event).toBe("knees");
+    expect(pid).toBeTypeOf("number");
+    expect(msg).toBe("skirt and boots");
+  });
+
+  it("calls the block supplied to wait_for_notify with the notify payload if it accepts two arguments", async () => {
+    await conn.exec("ROLLBACK");
+    await conn.exec("LISTEN knees");
+
+    const other = await PG.connect(conninfo);
+    await other.exec("NOTIFY knees, 'skirt and boots'");
+    await other.finish();
+
+    let event: string | null = null;
+    let pid: number | null = null;
+    const msg: string | null = null;
+    await conn.waitForNotify(10, (arg1, arg2) => {
+      [event, pid] = [arg1, arg2];
+    });
+    await conn.exec("UNLISTEN knees");
+
+    expect(event).toBe("knees");
+    expect(pid).toBeTypeOf("number");
+    expect(msg).toBeNull();
+  });
+
+  it("calls the block supplied to wait_for_notify with the notify payload if it doesn't accept arguments", async () => {
+    await conn.exec("ROLLBACK");
+    await conn.exec("LISTEN knees");
+
+    const other = await PG.connect(conninfo);
+    await other.exec("NOTIFY knees, 'skirt and boots'");
+    await other.finish();
+
+    let notificationReceived = false;
+    await conn.waitForNotify(10, () => {
+      notificationReceived = true;
+    });
+    await conn.exec("UNLISTEN knees");
+
+    expect(notificationReceived).toBeTruthy();
+  });
+
+  it("calls the block supplied to wait_for_notify with the notify payload if it accepts three arguments", async () => {
+    await conn.exec("ROLLBACK");
+    await conn.exec("LISTEN knees");
+
+    const other = await PG.connect(conninfo);
+    await other.exec("NOTIFY knees, 'skirt and boots'");
+    await other.finish();
+
+    let event: string | null = null;
+    let pid: number | null = null;
+    let msg: string | null = null;
+    await conn.waitForNotify(10, (arg1, arg2, arg3) => {
+      [event, pid, msg] = [arg1, arg2, arg3];
+    });
+    await conn.exec("UNLISTEN knees");
+
+    expect(event).toBe("knees");
+    expect(pid).toBeTypeOf("number");
+    expect(msg).toBe("skirt and boots");
+  });
+
+  describe("multinationalization support", () => {
+    describe("rubyforge #22925: m17n support", () => {
+      // PERMANENT-SKIP: CLAUDE.md, "A String has no encoding tag either" — node-pg decodes each value to a JS string before `Result` sees it, so a result records no fetch-time encoding.
+      it.skip("returns the results in the correct encoding even if the client_encoding has changed since the results were fetched", async () => {
+        await conn.setClientEncoding("EUC-JP");
+        const stmt = "VALUES ('世界線航跡蔵')";
+        const res = await conn.execParams(stmt, []);
+        await conn.setClientEncoding("utf-8");
+        const outString = res.get(0)["column1"];
+        expect(outString).toBe("世界線航跡蔵");
+      });
+    });
   });
 
   describe("server_version", () => {

@@ -1,5 +1,5 @@
 import "@blazetrails/vitest-matchers";
-import { Enumerator, TopLevel } from "@blazetrails/ruby-compat";
+import { ArgumentError, Enumerator, TopLevel } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { PG } from "../lib/index.js";
 import type { Connection } from "../lib/connection.js";
@@ -82,6 +82,61 @@ describe("PG::Result", () => {
     await conn.exec("CREATE TABLE fmodtest ( foo varchar(33) )");
     const res = await conn.exec("SELECT * FROM fmodtest");
     expect(res.fmod(0)).toBe(33 + 4);
+  });
+
+  it("doesn't raise an exception when a valid index is passed to PG::Result#fmod for a column with no typemod", async () => {
+    await conn.exec("CREATE TABLE fmodtest ( foo text )");
+    const res = await conn.exec("SELECT * FROM fmodtest");
+    expect(res.fmod(0)).toBe(-1);
+  });
+
+  it("can return the oid of the table from which a result column was fetched", async () => {
+    await conn.exec("CREATE TABLE ftabletest ( foo text )");
+    const res = await conn.exec("SELECT * FROM ftabletest");
+    expect(res.ftable(0)).not.toBe(0);
+  });
+
+  it("raises an exception when an invalid index is passed to PG::Result#ftable", async () => {
+    await conn.exec("CREATE TABLE ftabletest ( foo text )");
+    const res = await conn.exec("SELECT * FROM ftabletest");
+    expect(() => res.ftable(18)).toThrow(ArgumentError);
+  });
+
+  it("raises an exception when an invalid (negative) index is passed to PG::Result#ftable", async () => {
+    await conn.exec("CREATE TABLE ftabletest ( foo text )");
+    const res = await conn.exec("SELECT * FROM ftabletest");
+    expect(() => res.ftable(-2)).toThrow(ArgumentError);
+  });
+
+  it("doesn't raise an exception when a valid index is passed to PG::Result#ftable for a column with no corresponding table", async () => {
+    await conn.exec("CREATE TABLE ftabletest ( foo text )");
+    const res = await conn.exec("SELECT foo, LENGTH(foo) as length FROM ftabletest");
+    expect(res.ftable(1)).toBe(PG.INVALID_OID);
+  });
+
+  it("can return the column number (within its table) of a column in a result", async () => {
+    await conn.exec("CREATE TABLE ftablecoltest ( foo text, bar numeric )");
+    const res = await conn.exec("SELECT * FROM ftablecoltest");
+    expect(res.ftablecol(0)).toBe(1);
+    expect(res.ftablecol(1)).toBe(2);
+  });
+
+  it("raises an exception when an invalid index is passed to PG::Result#ftablecol", async () => {
+    await conn.exec("CREATE TABLE ftablecoltest ( foo text, bar numeric )");
+    const res = await conn.exec("SELECT * FROM ftablecoltest");
+    expect(() => res.ftablecol(32)).toThrow(ArgumentError);
+  });
+
+  it("raises an exception when an invalid (negative) index is passed to PG::Result#ftablecol", async () => {
+    await conn.exec("CREATE TABLE ftablecoltest ( foo text, bar numeric )");
+    const res = await conn.exec("SELECT * FROM ftablecoltest");
+    expect(() => res.ftablecol(-1)).toThrow(ArgumentError);
+  });
+
+  it("doesnn't raise an exception when a valid index is passed to PG::Result#ftablecol for a column with no corresponding table", async () => {
+    await conn.exec("CREATE TABLE ftablecoltest ( foo text )");
+    const res = await conn.exec("SELECT foo, LENGTH(foo) as length FROM ftablecoltest");
+    expect(res.ftablecol(1)).toBe(0);
   });
 
   it("raises a ServerError for an unknown SQLSTATE class", async () => {

@@ -199,6 +199,22 @@ export class Result {
     return this._pgresultGet().fields[columnNumber].dataTypeModifier;
   }
 
+  ftable(columnNumber: number): number {
+    const colNumber = rbNum2Int(columnNumber);
+    if (colNumber < 0 || colNumber >= this.nfields()) {
+      throw new ArgumentError(`Invalid column index: ${colNumber}`);
+    }
+    return this._pgresultGet().fields[colNumber].tableID;
+  }
+
+  ftablecol(columnNumber: number): number {
+    const colNumber = rbNum2Int(columnNumber);
+    if (colNumber < 0 || colNumber >= this.nfields()) {
+      throw new ArgumentError(`Invalid column index: ${colNumber}`);
+    }
+    return this._pgresultGet().fields[colNumber].columnID;
+  }
+
   getvalue(tupNum: number, fieldNum: number): unknown {
     if (tupNum < 0 || tupNum >= this.ntuples()) {
       throw new ArgumentError(`invalid tuple number ${tupNum}`);
