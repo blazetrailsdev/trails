@@ -60,6 +60,7 @@ describe("WorkerTest", () => {
 
   afterEach(async () => {
     await worker.stop();
+    if (worker.pool.isShutdown()) await worker.pool.waitForTermination(null);
     vi.restoreAllMocks();
     JobBuffer.clear();
   });
