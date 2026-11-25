@@ -29,6 +29,7 @@ import { LOOFAH_UNPORTED_FILES } from "./loofah.js";
 import { CRASS_UNPORTED_FILES } from "./crass.js";
 import { LISTEN_UNPORTED_FILES } from "./listen.js";
 import { PG_UNPORTED_FILES } from "./pg.js";
+import { LIBXML_RUBY_UNPORTED_FILES } from "./libxml-ruby.js";
 import { MYSQL2_UNPORTED_FILES } from "./mysql2.js";
 import { IMAGE_PROCESSING_UNPORTED_FILES } from "./image-processing.js";
 import { RACK_CACHE_UNPORTED_FILES } from "./rack-cache.js";
@@ -65,6 +66,7 @@ export const UNPORTED_FILES: UnportedFile[] = [
   ...CRASS_UNPORTED_FILES,
   ...LISTEN_UNPORTED_FILES,
   ...PG_UNPORTED_FILES,
+  ...LIBXML_RUBY_UNPORTED_FILES,
   ...MYSQL2_UNPORTED_FILES,
   ...IMAGE_PROCESSING_UNPORTED_FILES,
   ...RACK_CACHE_UNPORTED_FILES,
