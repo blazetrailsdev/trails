@@ -6,12 +6,15 @@
 //   node scripts/ci/ar-shard-durations.mjs --latest <n>
 //
 // Each <run-id> is a green `CI` run on main; `--latest <n>` takes the n most
-// recent ones. A file's time is its median across the runs, so one slow
-// hosted runner (about ±25% between jobs, trails#10272) does not skew it. Every leg of the SQLite, PostgreSQL,
+// recent ones, newest first. A table holds only the files the newest run
+// reports, so a deleted or renamed file drops out. A file's time is the
+// median of its timed samples, so one slow hosted runner (about ±25% between
+// jobs, trails#10272) does not skew it. Every leg of the SQLite, PostgreSQL,
 // MariaDB and numbered Trailties lanes is read, so each table covers every
 // file once.
-// A file vitest reports with no time (a skipped file) is recorded as 0; the
-// sequencer adds its per-file overhead to every file either way.
+// A file vitest reports with no time (a skipped file) is recorded as 0, and
+// a 0 sample counts only when every sample is 0; the sequencer adds its
+// per-file overhead to every file either way.
 import { execFile } from "node:child_process";
 import { writeFile } from "node:fs/promises";
 import { promisify } from "node:util";
@@ -70,17 +73,24 @@ const median = (xs) => {
 };
 
 const samples = {};
+const newest = {};
 for (const runId of runIds) {
   const { jobs } = JSON.parse(await gh(["run", "view", runId, "--json", "jobs"]));
   for (const [adapter, table] of Object.entries(await readRun(runId, jobs))) {
     samples[adapter] ??= {};
+    newest[adapter] ??= new Set(Object.keys(table));
     for (const [file, ms] of Object.entries(table)) (samples[adapter][file] ??= []).push(ms);
   }
 }
 const out = {};
 for (const adapter of Object.keys(LANES)) {
   const table = Object.fromEntries(
-    Object.entries(samples[adapter]).map(([file, times]) => [file, median(times)]),
+    Object.entries(samples[adapter])
+      .filter(([file]) => newest[adapter].has(file))
+      .map(([file, times]) => {
+        const timed = times.filter((ms) => ms > 0);
+        return [file, timed.length > 0 ? median(timed) : 0];
+      }),
   );
   out[adapter] = Object.fromEntries(Object.entries(table).sort(([a], [b]) => (a < b ? -1 : 1)));
   console.log(`${adapter}: ${Object.keys(table).length} files from ${runIds.length} runs`);
