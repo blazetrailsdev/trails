@@ -730,14 +730,9 @@ export default defineConfig({
         // SQLite is file-backed too: globalSetup builds one on-disk template and
         // each fork restores it into its own private `.sqlite` clone stamped into
         // AR_TEST_WORKER_DB (see support/sqlite-template.ts).
-        plugins: process.env.AR_DIST === "1" ? [isolationDistResolver()] : [],
         resolve: { alias: aliasEntries },
         test: {
           name: "activerecord",
-          server:
-            process.env.AR_DIST === "1"
-              ? { deps: { external: [/\/packages\/[^/]+\/dist\//] } }
-              : undefined,
           include:
             AR_SPLIT === "cases"
               ? ["packages/activerecord/test/cases/**/*.test.ts"]
@@ -799,9 +794,7 @@ export default defineConfig({
             ...(process.env.DDL_PROFILE === "1"
               ? ["./packages/activerecord/test/support/test-setup-ddl-profile.ts"]
               : []),
-          ].map((file) =>
-            process.env.AR_DIST === "1" ? isolationDistPath(path.resolve(__dirname, file)) : file,
-          ),
+          ],
           retry: 0,
           // Large-schema beforeAll(defineSchema(...)) calls on MySQL issue
           // hundreds of CREATE TABLE statements (e.g. has-many-associations.test.ts
