@@ -33,7 +33,6 @@ import {
 import type { DateParts } from "@blazetrails/date";
 import { YAML } from "@blazetrails/ruby-compat/yaml";
 import { instantFrom } from "../temporal.js";
-import { currentTimeInstant } from "../time-travel.js";
 import { utcToLocalReturnsUtcOffsetTimes } from "../core-ext/date-and-time/compatibility.js";
 
 const MAPPING: Record<string, string> = {
@@ -752,7 +751,7 @@ export class TimeZone {
   }
 
   private timeNow(): Time {
-    return Time.at(new Rational(currentTimeInstant().epochNanoseconds, 1_000_000_000n));
+    return Time.now();
   }
 
   toString(): string {

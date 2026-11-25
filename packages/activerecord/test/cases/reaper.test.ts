@@ -1,3 +1,4 @@
+import { snapshotReaperState } from "../support/stop-reaper-threads.js";
 import { describe, it, expect, afterEach, vi, beforeEach } from "vitest";
 import { Reaper } from "../../lib/connection-adapters/abstract/connection-pool/reaper.js";
 import { assertNothingRaised } from "@blazetrails/activesupport/testing/assertions";
@@ -62,18 +63,16 @@ async function waitForConnIdle(conn: AbstractAdapter, timeout = 5): Promise<void
   }
 }
 
-function clearReaperState() {
-  (Reaper as any).threads.clear();
-  (Reaper as any).pools.clear();
-}
-
 describe("ReaperTest", () => {
+  let restoreReaperState: () => Promise<void>;
+
   beforeEach(() => {
+    restoreReaperState = snapshotReaperState();
     vi.useFakeTimers();
   });
 
-  afterEach(() => {
-    clearReaperState();
+  afterEach(async () => {
+    await restoreReaperState();
     vi.useRealTimers();
   });
 
