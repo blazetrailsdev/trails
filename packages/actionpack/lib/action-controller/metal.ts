@@ -300,8 +300,7 @@ export class Metal extends AbstractControllerBase {
 
   override async setResponseBody(body: unknown): Promise<void> {
     if (body != null && body !== false) {
-      if (typeof body === "string") body = [body];
-      else if (body instanceof SafeBuffer) body = [body.toStr()];
+      if (typeof body === "string" || body instanceof SafeBuffer) body = [String(body)];
       await this.response.setBody(body);
       super.setResponseBody(body);
     } else {
