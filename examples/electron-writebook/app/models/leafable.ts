@@ -14,7 +14,7 @@ export interface Leafable extends Base {
   title(): Promise<string>;
   owningBook(): Promise<Book | null>;
   searchableContent(): Promise<string | null>;
-  markable(): Promise<string>;
+  markable(): Promise<string | null>;
   leafableName(): string;
 }
 

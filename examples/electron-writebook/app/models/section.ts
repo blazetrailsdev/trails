@@ -18,7 +18,7 @@ export class Section extends ApplicationRecord {
     return this.body;
   }
 
-  async markable(): Promise<string> {
-    return this.body ?? "";
+  async markable(): Promise<string | null> {
+    return this.body;
   }
 }
