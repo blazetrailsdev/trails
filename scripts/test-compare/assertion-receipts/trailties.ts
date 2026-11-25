@@ -11,6 +11,16 @@ export const trailties: Record<string, AssertionReceipt[]> = {
           'configuration_test.rb:2991 `assert_nothing_raised { add_index :posts, :non_existent }` passes only where SQLite re-enables double-quoted string literals; better-sqlite3 compiles SQLITE_DQS=0 (CLAUDE.md, "Runtime facts Node does not expose")',
       },
     ],
+  "trailties:application/rake/dbs_test.rb › RakeDbsTest › db:prepare does not dump schema when dumping is disabled":
+    [
+      {
+        kind: "assert_equal",
+        value: "s:# Not touched",
+        as: "assert_equal",
+        reason:
+          "dbs_test.rb:828 writes a Ruby comment as db/schema.rb; db:prepare loads that file into the new test database, and a TypeScript db/schema.ts cannot hold a `#` comment",
+      },
+    ],
   "trailties:application/rake/dbs_test.rb › RakeDbsTest › db:schema:cache:dump ignores expired version":
     [
       {

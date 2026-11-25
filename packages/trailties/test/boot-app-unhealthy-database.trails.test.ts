@@ -24,6 +24,7 @@ describe("a booted app against an unhealthy database", () => {
     savedUrl = env.DATABASE_URL;
     setEnv("TRAILS_ENV", "development");
     setEnv("DATABASE_URL", `sqlite3:${dir}/development.sqlite3`);
+    await getFs().writeFile!(`${dir}/development.sqlite3`, "");
     _resetTrailsEnv();
     vi.spyOn(SchemaReflection.prototype, "loadAllBang").mockRejectedValue(
       new ConnectionNotEstablished("down"),

@@ -821,7 +821,7 @@ const Book = constGet(TopLevel, "Book") as { createBang(a: object): Promise<unkn
     await t.trails("generate", "model", "book", "title:string");
     await t.trails("db:create", "db:migrate");
 
-    await t.appFile("db/schema.ts", "# Not touched");
+    await t.appFile("db/schema.ts", "// Not touched");
     await t.appFile(
       "config/initializers/disable-dumping-schema.ts",
       `import { Trails } from "@blazetrails/trailties";\nTrails.application!.config.activeRecord.dumpSchemaAfterMigration = false;\n`,
@@ -829,7 +829,7 @@ const Book = constGet(TopLevel, "Book") as { createBang(a: object): Promise<unkn
 
     await t.trails("db:prepare");
 
-    expect((await read("db/schema.ts")).trim()).toBe("# Not touched");
+    expect((await read("db/schema.ts")).trim()).toBe("// Not touched");
   });
 
   it.skipIf(ENV.ARCONN !== "postgresql")(
