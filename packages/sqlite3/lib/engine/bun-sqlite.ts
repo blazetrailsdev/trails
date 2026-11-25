@@ -29,6 +29,7 @@ interface BunStatement {
 /** @internal */
 interface BunDatabase {
   prepare(sql: string): BunStatement;
+  query(sql: string): BunStatement;
   close(): void;
   serialize(): Uint8Array;
   loadExtension(file: string): void;
@@ -180,7 +181,6 @@ export const engine: SyncEngineOpenV2 = Object.assign((file: string, mode: numbe
   let closed = false;
   let liveStatements = 0;
   const closeRaw = () => {
-    changesStmt?.finalize();
     raw.close();
     closed = true;
   };
@@ -197,18 +197,18 @@ export const engine: SyncEngineOpenV2 = Object.assign((file: string, mode: numbe
       else zombie = true;
     },
     changes: () => {
-      changesStmt ??= raw.prepare("SELECT changes()");
+      changesStmt ??= raw.query("SELECT changes()");
       return Number(changesStmt.values()[0][0]);
     },
     disableQuirkMode: () => {},
     loadExtensionInternal: (file) => raw.loadExtension(file),
     enableLoadExtension: () => {},
     libversion: () =>
-      libversionNumber(raw.prepare("select sqlite_version()").values()[0][0] as string),
+      libversionNumber(raw.query("select sqlite_version()").values()[0][0] as string),
     dbFilename: (dbName) =>
       databaseListFilename(
         raw
-          .prepare("PRAGMA database_list")
+          .query("PRAGMA database_list")
           .values()
           .map(([, name, file]) => ({ name: name as string, file: file as string })),
         dbName,
@@ -233,19 +233,29 @@ export const engine: SyncEngineOpenV2 = Object.assign((file: string, mode: numbe
             )) as BunStatement;
             const names = stmt.columnNames;
             if (names.length === 0) {
-              yield withBusyHandler(
-                errors,
-                () => handler,
-                () => stmt.run(),
-              );
+              try {
+                yield withBusyHandler(
+                  errors,
+                  () => handler,
+                  () => stmt.run(),
+                );
+              } finally {
+                stmt.finalize();
+              }
               continue;
             }
             stmt.safeIntegers(true);
-            for (const row of (yield withBusyHandler(
-              errors,
-              () => handler,
-              () => stmt.values(),
-            )) as unknown[][]) {
+            let rows: unknown[][];
+            try {
+              rows = (yield withBusyHandler(
+                errors,
+                () => handler,
+                () => stmt.values(),
+              )) as unknown[][];
+            } finally {
+              stmt.finalize();
+            }
+            for (const row of rows) {
               const vals = row.map(columnText);
               results.push(
                 resultsAsHash ? Object.fromEntries(names.map((name, i) => [name, vals[i]])) : vals,

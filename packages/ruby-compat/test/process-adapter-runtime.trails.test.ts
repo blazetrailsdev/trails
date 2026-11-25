@@ -41,4 +41,13 @@ describe("runtime", () => {
     expect(adapter.cwd()).toBe(realProcess.cwd());
     expect(adapter.pid()).toBe(realProcess.pid);
   });
+
+  it.skipIf(realProcess.versions.bun === undefined)(
+    "real Bun sets process.versions.node, which auto-registration reads",
+    () => {
+      expect(realProcess.versions.node).toBeTypeOf("string");
+      getProcessAdapter();
+      expect(processAdapterConfig.adapter).toBe("bun");
+    },
+  );
 });
