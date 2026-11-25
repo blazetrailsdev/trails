@@ -1,9 +1,10 @@
-import { vi } from "vitest";
+import { expect, vi } from "vitest";
 import { Reaper } from "../../lib/connection-adapters/abstract/connection-pool/reaper.js";
 
 interface ReaperThread {
   isAlive(): boolean;
   join(): unknown;
+  kill(): unknown;
 }
 
 interface ReaperRegistries {
@@ -11,25 +12,29 @@ interface ReaperRegistries {
   threads: Map<number, ReaperThread>;
 }
 
-const registries = () => Reaper as unknown as ReaperRegistries;
-
 export function snapshotReaperState(): () => Promise<void> {
-  const reaper = registries();
-  const poolsBefore = new Map(reaper.pools);
+  const reaper = Reaper as unknown as ReaperRegistries;
+  const lengthsBefore = new Map([...reaper.pools].map(([f, pools]) => [f, pools.length]));
   const threadsBefore = new Map(reaper.threads);
-  for (const frequency of poolsBefore.keys()) reaper.pools.set(frequency, []);
   reaper.threads.clear();
 
   return async () => {
-    for (const pools of reaper.pools.values()) pools.length = 0;
     for (const [frequency, thread] of [...reaper.threads]) {
-      if (!thread.isAlive()) continue;
+      const pools = reaper.pools.get(frequency);
+      if (lengthsBefore.has(frequency) || !thread.isAlive()) {
+        thread.kill();
+        continue;
+      }
+      expect(vi.isFakeTimers() || frequency < 1).toBe(true);
+      if (pools) pools.length = 0;
       if (vi.isFakeTimers()) await vi.advanceTimersByTimeAsync(frequency * 1000 + 1);
       await thread.join();
     }
     reaper.threads.clear();
-    reaper.pools.clear();
-    for (const [frequency, pools] of poolsBefore) reaper.pools.set(frequency, pools);
+    for (const frequency of [...reaper.pools.keys()]) {
+      if (!lengthsBefore.has(frequency)) reaper.pools.delete(frequency);
+    }
+    for (const [frequency, length] of lengthsBefore) reaper.pools.get(frequency)?.splice(length);
     for (const [frequency, thread] of threadsBefore) reaper.threads.set(frequency, thread);
   };
 }
