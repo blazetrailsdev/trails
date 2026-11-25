@@ -20,13 +20,14 @@ import {
   rbObjRespondTo,
   StandardError,
   STDERR,
+  type Pathname,
 } from "@blazetrails/ruby-compat";
 import type { Autoloaders } from "../autoloaders.js";
 import { Initializable, type InitializableClass } from "../initializable.js";
 import { _registerAutoloaded } from "./finisher.js";
 
 export interface BootstrapConfig {
-  root: string | null;
+  root: Pathname | null;
   logger?: Logger | null;
   logLevel: LogLevel | number | string;
   logFormatter: Logger["formatter"];
@@ -137,7 +138,7 @@ Bootstrap.initializer<BootstrapHost & { credentials(): Promise<unknown> }>(
   async function () {
     await this.credentials();
     const autoloader = this.autoloaders.once;
-    autoloader.manifestRoot ??= this.config.root;
+    autoloader.manifestRoot ??= this.config.root?.toString() ?? null;
 
     const alreadyConfiguredDirs = new Set(autoloader.dirs() as readonly string[]);
 

@@ -1,3 +1,4 @@
+import { Pathname } from "@blazetrails/ruby-compat";
 import { afterAll } from "vitest";
 import { Base as ActiveJobBase } from "@blazetrails/activejob";
 import {
@@ -46,7 +47,7 @@ const configuration = new Configuration();
 TopLevel.Trails = {
   ...TopLevel.Trails,
   env: TopLevel.Trails?.env ?? new EnvironmentInquirer(envName),
-  root: () => File.expandPath("..", import.meta.dirname),
+  root: () => new Pathname(File.expandPath("..", import.meta.dirname)),
   application: {
     routes: () => app.routes(),
     envConfig: () => ({}),

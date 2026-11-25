@@ -65,8 +65,8 @@ describe("trails server environment (trails)", () => {
       return app;
     }) as never);
     vi.spyOn(Trails, "application", "get").mockReturnValue({
-      root: () => tmpDir,
-      config: { root: tmpDir },
+      root: () => new Pathname(tmpDir),
+      config: { root: new Pathname(tmpDir) },
     } as never);
     vi.spyOn(console, "log").mockImplementation(() => {});
     vi.spyOn(ServerCommand.prototype, "say").mockImplementation(((message: string) => {

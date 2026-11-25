@@ -83,6 +83,11 @@ export class Engine extends TrailsEngine {
         ActionMailbox.storageService = app.config.actionMailbox.storageService ?? null;
       });
     });
+
+    /** @noRailsEquivalent CONVERGEABLE engine-models-seated-without-invented-initializers */
+    this.initializer("action_mailbox.app", { before: "setup_main_autoloader" }, async () => {
+      await import("./app/models/action-mailbox/inbound-email.js");
+    });
   }
 }
 
