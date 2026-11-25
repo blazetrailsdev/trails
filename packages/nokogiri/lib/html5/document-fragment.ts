@@ -21,7 +21,7 @@ export class DocumentFragment extends XmlDocumentFragment {
   /** @missingRailsCall fragment — CONVERGEABLE nokogiri-html5-document-fragment-gumbo-fragment */
   constructor(
     document: Document,
-    input: string | null = null,
+    input: unknown = null,
     context: Node | string | null = null,
     _options: Record<string, unknown> = {},
   ) {
@@ -30,24 +30,27 @@ export class DocumentFragment extends XmlDocumentFragment {
     this.errors = [];
     if (input == null) return;
 
+    const string = HTML5.readAndEncode(input, null);
+
     if (typeof context === "string") {
       context = new Node(defaultTreeAdapter.createElement(context, html.NS.HTML, []), document);
     }
     (this as { _node: Parse5Parent })._node =
       context !== null && context.isElement()
-        ? parseFragment(context._node as DefaultTreeAdapterMap["element"], input, {})
-        : parseFragment(input);
+        ? parseFragment(context._node as DefaultTreeAdapterMap["element"], string, {})
+        : parseFragment(string);
   }
 
   static parse(
-    input: string,
-    _encoding: string | null = null,
+    input: unknown,
+    encoding: string | null = null,
     options: { context?: Node | string | null } = {},
   ): DocumentFragment {
     const { context = null, ...rest } = options;
 
     const document = new Document();
     document.encoding = "UTF-8";
+    input = HTML5.readAndEncode(input, encoding);
 
     return new DocumentFragment(document, input, context, rest);
   }

@@ -416,6 +416,13 @@ export class Trailtie extends BaseTrailtie {
       });
     });
 
+    this.initializer("active_record.set_signed_id_verifier_secret", () => {
+      onLoad("active_record", function (this: typeof ActiveRecord.Base) {
+        this.signedIdVerifierSecret ??= () =>
+          Trails.application!.keyGenerator().generateKey("active_record/signed_id");
+      });
+    });
+
     this.initializer("active_record.generated_token_verifier", () => {
       this.config.afterInitialize((app: Application) => {
         onLoad("active_record", function (this: typeof ActiveRecord.Base) {

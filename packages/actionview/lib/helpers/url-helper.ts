@@ -175,7 +175,7 @@ export async function buttonTo(
 
   let button: SafeBuffer;
   if (block) {
-    button = this.contentTag("button", htmlOptions, undefined, undefined, block);
+    button = await this.contentTag("button", htmlOptions, undefined, undefined, block);
   } else if (buttonToGeneratesButtonTag) {
     button = this.contentTag("button", rtest(name) ? name : url, htmlOptions);
   } else {

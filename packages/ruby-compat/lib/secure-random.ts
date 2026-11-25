@@ -1,7 +1,14 @@
 import { getCrypto } from "./crypto-adapter.js";
+import { intDigits } from "./numeric.js";
 import type { Bytes } from "./fs-adapter.js";
 import { NotImplementedError } from "./not-implemented-error.js";
 import { strDelete, trTrans } from "./string/tr.js";
+
+const ALPHANUMERIC: readonly string[] = [
+  ..."ABCDEFGHIJKLMNOPQRSTUVWXYZ",
+  ..."abcdefghijklmnopqrstuvwxyz",
+  ..."0123456789",
+];
 
 /**
  * `SecureRandom` (`vendor/ruby/v3.3.11/lib/securerandom.rb:41`), extended with
@@ -62,6 +69,64 @@ export const SecureRandom = {
     s = trTrans(s, "+/", "-_", false);
     if (!padding) s = strDelete(s, ["="]);
     return s;
+  },
+
+  /** @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/lib/random/formatter.rb:344 */
+  ALPHANUMERIC: ALPHANUMERIC,
+
+  /** @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/lib/random/formatter.rb:369 */
+  alphanumeric(
+    n: number | null = null,
+    { chars = ALPHANUMERIC }: { chars?: readonly string[] } = {},
+  ): string {
+    if (n == null) n = 16;
+    return SecureRandom._choose(chars, n);
+  },
+
+  /** @internal */
+  _choose(source: readonly string[], n: number): string {
+    const size = source.length;
+    let m = 1;
+    let limit = size;
+    while (limit * size <= 0x100000000) {
+      limit *= size;
+      m += 1;
+    }
+    let result = "";
+    while (m <= n) {
+      const is = intDigits(SecureRandom.randomNumber(limit), size);
+      while (is.length < m) is.push(0);
+      result += is.map((i) => source[i]).join("");
+      n -= m;
+    }
+    if (0 < n) {
+      const is = intDigits(SecureRandom.randomNumber(limit), size);
+      if (is.length < n) {
+        while (is.length < n) is.push(0);
+      } else {
+        while (n < is.length) is.pop();
+      }
+      result += is.map((i) => source[i]).join("");
+    }
+    return result;
+  },
+
+  /**
+   * `Random::Formatter#random_number` for an Integer limit of at most 2**32
+   * (`rand_random_number` → `rand_int`, `vendor/ruby/v3.3.11/random.c:1375`),
+   * drawn from `gen_random` bytes and retried over the biased tail the way
+   * `random_ulong_limited` retries (`vendor/ruby/v3.3.11/random.c:1190`).
+   *
+   * @noRailsEquivalent CONVERGEABLE secure-random-random-number-remaining-arms
+   */
+  randomNumber(limit: number): number {
+    const range = 0x100000000;
+    const cutoff = range - (range % limit);
+    for (;;) {
+      const bytes = SecureRandom.genRandom(4);
+      const value = new DataView(bytes.buffer, bytes.byteOffset, 4).getUint32(0);
+      if (value < cutoff) return value % limit;
+    }
   },
 
   /** @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/lib/random/formatter.rb:170 */

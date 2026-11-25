@@ -1,7 +1,7 @@
 import { defaultTreeAdapter, html, parse, type DefaultTreeAdapterMap } from "parse5";
 import { ArgumentError, rbObjRespondTo } from "@blazetrails/ruby-compat";
 
-import { readSource, type Readable } from "../readable.js";
+import type { Readable } from "../readable.js";
 import { childNodes, Node } from "./node.js";
 import { DocumentFragment } from "./document-fragment.js";
 import { HTML5 } from "../namespaces.js";
@@ -34,14 +34,9 @@ export class Document extends Node {
     options: Record<string, unknown> = {},
     block?: (options: Record<string, unknown>) => void,
   ): Document {
-    ({
-      url = url,
-      encoding = encoding,
-      ...options
-    } = options as {
-      url?: string | null;
-      encoding?: string | null;
-    });
+    const kwargs: { url?: string | null; encoding?: string | null } & Record<string, unknown> =
+      options;
+    ({ url = url, encoding = encoding, ...options } = kwargs);
     if (block) block(options);
     if (stringOrIo == null) stringOrIo = "";
 
@@ -61,10 +56,10 @@ export class Document extends Node {
   private static doParse(
     stringOrIo: string | Readable,
     url: string | null,
-    _encoding: string | null,
+    encoding: string | null,
     _options: Record<string, unknown>,
   ): Document {
-    const string = readSource(stringOrIo);
+    const string = HTML5.readAndEncode(stringOrIo, encoding);
 
     const doc = new Document(parse(string));
     doc.url = url;

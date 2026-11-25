@@ -218,6 +218,17 @@ describe("RailtieTest", () => {
     }
   });
 
+  it("runInitializers seats a signed id verifier secret derived from the app's key generator", async () => {
+    const saved = Object.getOwnPropertyDescriptor(Base, "signedIdVerifierSecret");
+    Base.signedIdVerifierSecret = null;
+    try {
+      await runTrailtieInitializers(Trailtie, blogApp());
+      expect(typeof Base.signedIdVerifierSecret).toBe("function");
+    } finally {
+      if (saved) Object.defineProperty(Base, "signedIdVerifierSecret", saved);
+    }
+  });
+
   it("runInitializers forwards config.encryption to Encryption.Configurable", async () => {
     const cfg = Trailtie.config.get("activeRecord") as ActiveRecordConfig;
     cfg.encryption = { supportUnencryptedData: true };

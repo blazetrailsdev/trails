@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { BinaryData } from "@blazetrails/activemodel";
-import { Chars } from "@blazetrails/activesupport";
+import { Chars, htmlSafe } from "@blazetrails/activesupport";
 import { Time as RubyTime } from "@blazetrails/date";
 import { quotingHost } from "../support/quoting-host.js";
 import {
@@ -10,6 +10,7 @@ import {
   unquotedTrue,
   unquotedFalse,
   quotedBinary,
+  quote,
   typeCast,
   castBoundValue,
   sanitizeAsSqlComment,
@@ -20,6 +21,14 @@ import { NotImplementedError } from "../../lib/errors.js";
 const HOST = quotingHost();
 
 describe("QuotingTest (trails)", () => {
+  it("quotes an ActiveSupport::SafeBuffer as the String it is", () => {
+    expect(quote.call(HOST, htmlSafe("it's"))).toBe("'it''s'");
+  });
+
+  it("type casts an ActiveSupport::SafeBuffer to its string", () => {
+    expect(typeCast.call(HOST, htmlSafe("<b>"))).toBe("<b>");
+  });
+
   it("quote table name for assignment", () => {
     expect(() => quoteTableNameForAssignment.call(HOST, "users", "name")).toThrow(
       NotImplementedError,

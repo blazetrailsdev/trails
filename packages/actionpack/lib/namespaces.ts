@@ -16,6 +16,7 @@ import { Base, DetailsKey, Template } from "@blazetrails/actionview";
 import { Mime, MimeType } from "./action-dispatch/http/mime-type.js";
 import * as Journey from "./action-dispatch/journey/index.js";
 import * as Cache from "./action-dispatch/http/cache.js";
+import { UploadedFile } from "./action-dispatch/http/upload.js";
 import type * as PageDumpHelper from "./action-dispatch/testing/test-helpers/page-dump-helper.js";
 import * as ActionPackGemVersion from "./action-pack/gem-version.js";
 import type { Base as ControllerBase } from "./action-controller/base.js";
@@ -166,8 +167,10 @@ export const Http = { name: "ActionDispatch::Http" } as {
   FilterParameters: typeof import("./action-dispatch/http/filter-parameters.js");
   Parameters: typeof HttpParameters;
   Cache: typeof Cache;
+  UploadedFile: typeof UploadedFile;
 };
 Http.Cache = Cache;
+Http.UploadedFile = UploadedFile;
 ActionDispatch.Http = Http;
 ActionDispatch.Journey = Journey;
 ActionDispatch.Constants = Constants;

@@ -1,4 +1,4 @@
-import { TopLevel, constSet } from "@blazetrails/ruby-compat";
+import { TopLevel, constSet, rbObjAsString, rbObjRespondTo } from "@blazetrails/ruby-compat";
 
 import type { Node } from "./html5/node.js";
 import type { Document as Html5Document } from "./html5/document.js";
@@ -39,6 +39,16 @@ export const HTML5 = { name: "Nokogiri::HTML5" } as {
   Node: typeof Node;
   DocumentFragment: typeof Html5DocumentFragment;
   Document: typeof Html5Document;
+  readAndEncode(string: unknown, encoding: string | null): string;
+};
+
+HTML5.readAndEncode = function readAndEncode(string: unknown, encoding: string | null): string {
+  if (rbObjRespondTo(string, "read")) {
+    const io = string as { read(options?: { encoding: string }): string };
+    return encoding == null ? io.read() : io.read({ encoding });
+  } else {
+    return rbObjAsString(string);
+  }
 };
 
 export const XPath = { name: "Nokogiri::XML::XPath" } as { name: string; [name: string]: unknown };

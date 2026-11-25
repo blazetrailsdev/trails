@@ -6,6 +6,7 @@ import { NilClass } from "./nil-class.js";
 import { NoMethodError } from "./no-method-error.js";
 import { rbBuiltinClassName, rbInspect, rbObjClassname, toS } from "./object.js";
 import { Rational, ZeroDivisionError } from "./rational.js";
+import { StandardError } from "./standard-error.js";
 import { TypeError } from "./type-error.js";
 import { rbStrToF, rbStrToI } from "./string/convert.js";
 import { isSymbol } from "./symbol.js";
@@ -766,3 +767,31 @@ export function rubyNumIntervalStepSize(
   }
   return rubyFloatStepSize(Number(from), Number(to), 1, excl);
 }
+
+/**
+ * `Integer#digits` (`rb_int_digits` / `rb_fix_digits`, `vendor/ruby/v3.3.11/numeric.c:5435-5556`)
+ * for a Fixnum receiver and radix.
+ * @noRailsEquivalent PERMANENT
+ */
+export function intDigits(num: number, base: number = 10): number[] {
+  if (num < 0) throw new MathDomainError("out of domain");
+  if (base < 0) throw new ArgumentError("negative radix");
+  else if (base < 2) throw new ArgumentError(`invalid radix ${base}`);
+
+  if (num === 0) return [0];
+
+  const digits: number[] = [];
+  while (num > 0) {
+    digits.push(num % base);
+    num = Math.floor(num / base);
+  }
+  return digits;
+}
+
+/**
+ * Ruby's core `Math::DomainError` (`vendor/ruby/v3.3.11/math.c:1094`
+ * `rb_define_class_under(rb_mMath, "DomainError", rb_eStandardError)`).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export class MathDomainError extends StandardError {}

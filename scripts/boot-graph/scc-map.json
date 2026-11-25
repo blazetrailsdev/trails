@@ -735,6 +735,10 @@
       "module": "include.js",
       "scc": 2
     },
+    "intDigits": {
+      "module": "numeric.js",
+      "scc": 0
+    },
     "Interrupt": {
       "module": "signal-exception.js",
       "scc": null
@@ -1009,6 +1013,10 @@
     },
     "matchOperator": {
       "module": "string/method-table.js",
+      "scc": 0
+    },
+    "MathDomainError": {
+      "module": "numeric.js",
       "scc": 0
     },
     "max": {

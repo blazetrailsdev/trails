@@ -4,7 +4,10 @@ import { FloatDomainError } from "../lib/float-domain-error.js";
 import { NoMethodError } from "../lib/no-method-error.js";
 import { NameError } from "../lib/name-error.js";
 import { TypeError } from "../lib/type-error.js";
+import { ArgumentError } from "../lib/argument-error.js";
 import {
+  intDigits,
+  MathDomainError,
   intXor,
   anybits,
   fixDiv,
@@ -374,5 +377,28 @@ describe("round with positive ndigits", () => {
     expect(round(5, 2)).toBe(5);
     expect(round(0, 2)).toBe(0);
     expect(round(new Number(0) as number, 2)).toEqual(new Number(0));
+  });
+});
+
+describe("Integer#digits", () => {
+  it("digits", () => {
+    expect(intDigits(0)).toEqual([0]);
+    expect(intDigits(1)).toEqual([1]);
+    expect(intDigits(1234567890)).toEqual([0, 9, 8, 7, 6, 5, 4, 3, 2, 1]);
+    expect(intDigits(1234567890, 100)).toEqual([90, 78, 56, 34, 12]);
+    expect(intDigits(1234567890, 13)).toEqual([10, 5, 6, 8, 0, 10, 8, 6, 1]);
+  });
+
+  it("digits for negative numbers", () => {
+    expect(() => intDigits(-1)).toThrow(MathDomainError);
+    expect(() => intDigits(-1234567890)).toThrow(MathDomainError);
+    expect(() => intDigits(-1234567890, 100)).toThrow(MathDomainError);
+    expect(() => intDigits(-1234567890, 13)).toThrow(MathDomainError);
+  });
+
+  it("digits for invalid base numbers", () => {
+    expect(() => intDigits(10, -1)).toThrow(ArgumentError);
+    expect(() => intDigits(10, 0)).toThrow(ArgumentError);
+    expect(() => intDigits(10, 1)).toThrow(ArgumentError);
   });
 });

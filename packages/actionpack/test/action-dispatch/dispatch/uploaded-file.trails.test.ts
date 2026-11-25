@@ -2,6 +2,7 @@ import { b, Tempfile } from "@blazetrails/ruby-compat";
 import { describe, expect, it } from "vitest";
 
 import { UploadedFile } from "../../../lib/action-dispatch/http/upload.js";
+import { ActionDispatch } from "../../../lib/index.js";
 
 describe("ActionDispatch::Http::UploadedFile", () => {
   it("read answers null at EOF and rewind starts the stream over", () => {
@@ -27,5 +28,9 @@ describe("ActionDispatch::Http::UploadedFile", () => {
 
     expect(file.read(5, buffer)).toEqual(b("hello"));
     expect(String.fromCharCode(...buffer)).toBe("hello");
+  });
+
+  it("is seated on the ActionDispatch::Http namespace", () => {
+    expect(ActionDispatch.Http.UploadedFile).toBe(UploadedFile);
   });
 });

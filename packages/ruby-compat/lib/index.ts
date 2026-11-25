@@ -368,6 +368,8 @@ export {
   anybits,
   fixDiv,
   fixMod,
+  intDigits,
+  MathDomainError,
   isFinite,
   isNan,
   numStep,

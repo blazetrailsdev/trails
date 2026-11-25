@@ -13,7 +13,12 @@ import { UnknownPrimaryKey } from "./errors.js";
 import { ArgumentError, toS } from "@blazetrails/ruby-compat";
 
 export interface SignedId {
-  readonly signedIdVerifierSecret: string | (() => string | null | undefined) | null | undefined;
+  readonly signedIdVerifierSecret:
+    | string
+    | Uint8Array
+    | (() => string | Uint8Array | null | undefined)
+    | null
+    | undefined;
 }
 
 export const SignedId = {
@@ -31,7 +36,8 @@ export class ClassMethods {
     return (this._signedIdVerifier = (() => {
       let secret = (this as any).signedIdVerifierSecret as
         | string
-        | (() => string | null | undefined)
+        | Uint8Array
+        | (() => string | Uint8Array | null | undefined)
         | null
         | undefined;
       if (typeof secret === "function") secret = secret();
