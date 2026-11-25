@@ -1277,6 +1277,8 @@ jobs:
         run: >
           pnpm vitest related --run --passWithNoTests --project trailties
           $(git ls-files 'packages/thor/lib/*.ts')
+      - if: always()
+        run: df -h tmp && du -sh tmp
 
   generated-app-tests:
     name: Generated App Tests
