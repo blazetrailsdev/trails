@@ -52,7 +52,26 @@ export function registerCompiledFiles(
  * @noRailsEquivalent PERMANENT
  */
 export function isCompiledFile(fname: string): boolean {
-  return compiledFiles.has(File.expandPath(fname));
+  return compiledFile(File.expandPath(fname)) !== undefined;
+}
+
+/** @noRailsEquivalent PERMANENT */
+function compiledFile(full: string): (() => Promise<unknown>) | undefined {
+  const load = compiledFiles.get(full);
+  if (load !== undefined || !full.endsWith(".ts")) return load;
+  return compiledFiles.get(`${full.slice(0, -3)}.js`);
+}
+
+/**
+ * `rb_file_exist_p` (`vendor/ruby/v3.3.11/file.c:1806`) of `fname`, else of
+ * its `.js` sibling a compiled tree ships in its place.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function resolveTsThenJs(fname: string): string {
+  if (!fname.endsWith(".ts") || isCompiledFile(fname) || File.isExist(fname)) return fname;
+  const js = `${fname.slice(0, -3)}.js`;
+  return isCompiledFile(js) || File.isExist(js) ? js : fname;
 }
 
 /**
@@ -151,7 +170,7 @@ export async function loadIseqEval(fname: string, fresh = false): Promise<Record
   const compiled =
     fresh && loadedFiles.has(full) && (await File.isExistAsync(full))
       ? undefined
-      : compiledFiles.get(full);
+      : compiledFile(full);
   let exports: Record<string, unknown>;
   try {
     if (compiled !== undefined) {

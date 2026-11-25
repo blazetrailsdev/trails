@@ -1,3 +1,7 @@
+import { realpathSync } from "node:fs";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { MockRequest } from "@blazetrails/rack";
 import { Model } from "@blazetrails/activemodel";
@@ -105,6 +109,22 @@ describe("Engine.findRoot", () => {
   it("stops at a package root that has a package.json and no lib", () => {
     const src = new URL("../lib/", import.meta.url).pathname;
     expect(Engine.findRoot(src)).toBe(new URL("../", import.meta.url).pathname.replace(/\/$/, ""));
+  });
+});
+
+describe("Application.findRoot", () => {
+  it("finds a root a compiled tree marks with config.js, and prefers config.ts", async () => {
+    const root = await mkdtemp(join(realpathSync(tmpdir()), "trails-find-root-"));
+    try {
+      await mkdir(join(root, "config"));
+      await writeFile(join(root, "config.js"), "");
+      expect(Application.findRoot(join(root, "config"))).toBe(root);
+      await mkdir(join(root, "config", "inner"));
+      await writeFile(join(root, "config", "config.ts"), "");
+      expect(Application.findRoot(join(root, "config", "inner"))).toBe(join(root, "config"));
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
   });
 });
 

@@ -41,6 +41,10 @@
       "types": "./dist/test-unit/trailtie.d.ts",
       "default": "./dist/test-unit/trailtie.js"
     },
+    "./esbuild": {
+      "types": "./dist/esbuild.d.ts",
+      "default": "./dist/esbuild.js"
+    },
     "./app-path": {
       "types": "./dist/app-path.d.ts",
       "default": "./dist/app-path.js"

@@ -19,6 +19,7 @@ import {
   STDOUT,
   toI,
   type Included,
+  resolveTsThenJs,
 } from "@blazetrails/ruby-compat";
 import {
   Server as RackupServer,
@@ -290,6 +291,7 @@ export class ServerCommand extends Base {
     }
   }
 
+  /** @inventedArm resolveTsThenJs — PERMANENT */
   serverOptions(): ServerOptions {
     return {
       userSuppliedOptions: this.userSuppliedOptions(),
@@ -298,7 +300,9 @@ export class ServerCommand extends Base {
       Port: this.port(),
       Host: this.host(),
       DoNotReverseLookup: true,
-      config: this.options.config,
+      config: this.userSuppliedOptions().includes("config")
+        ? this.options.config
+        : this.options.config && resolveTsThenJs(this.options.config),
       environment: this.environment(),
       daemonize: this.options.daemon,
       pid: this.pid(),
