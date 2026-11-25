@@ -195,7 +195,7 @@ export function safeConstantize<K extends keyof ConstantTable>(
 export function safeConstantize(camelCasedWord: string): unknown;
 export function safeConstantize(camelCasedWord: string): unknown {
   try {
-    return constantize(camelCasedWord);
+    return ActiveSupport.Inflector.constantize(camelCasedWord);
   } catch (e) {
     if (e instanceof NameError) {
       const name = e.constantName;
@@ -232,4 +232,4 @@ export function ordinalize(number: number): string {
 
 export { parameterize } from "./transliterate.js";
 
-ActiveSupport.Inflector = Inflector;
+ActiveSupport.Inflector = { ...Inflector };

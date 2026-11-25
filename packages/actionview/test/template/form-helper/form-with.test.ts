@@ -1763,11 +1763,7 @@ describe("FormWithActsLikeFormForTest", () => {
   });
 
   it("form with label namespace", async () => {
-    const post = new Post();
-    post.persisted = false;
-    Object.assign(post, { toKey: () => null });
-
-    await formWith({ model: post, namespace: "namespace" }, (f) => {
+    await formWith({ model: new Post(), namespace: "namespace" }, (f) => {
       concat(f.label("title", null, { for: "my_title" }));
       concat(f.textField("title", { id: "my_title" }));
     });
