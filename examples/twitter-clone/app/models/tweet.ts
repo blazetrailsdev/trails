@@ -1,6 +1,7 @@
-import { Base, Relation, type ScopeMethod, type ScopeOn } from "@blazetrails/activerecord";
+import type { Base, Relation, ScopeMethod, ScopeOn } from "@blazetrails/activerecord";
+import { ApplicationRecord } from "./application-record.ts";
 
-export class Tweet extends Base {
+export class Tweet extends ApplicationRecord {
   declare static recent: ScopeMethod<Tweet>;
 
   static {

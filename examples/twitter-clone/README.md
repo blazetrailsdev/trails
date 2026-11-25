@@ -1,111 +1,65 @@
-# Twitter clone — Express + ActiveRecord
+# Twitter clone — an API-only trails app
 
-A minimal Twitter/X clone showing how to use
-[`@blazetrails/activerecord`](../../packages/activerecord) — the TypeScript
-port of Rails' ActiveRecord — inside an [Express](https://expressjs.com/) app.
+A minimal Twitter/X clone laid out as `trails new twitter-clone --api --minimal`
+generates it: `bin/trails`, `config/`, and `app/models` + `app/controllers`
+loaded by Zeitwerk, run on Node's native type stripping (no `tsx`, no build
+step before boot).
 
-It exercises the parts of ActiveRecord you reach for first:
+It exercises the parts of trails you reach for first:
 
-- **Migrations** — timestamped files in `db/migrate/`, each a `Migration`
-  subclass with a reversible `change()`, run through a Rails-style
-  `db:migrate` / `db:rollback` / `db:setup` CLI (`src/cli.ts`).
-- **Models** — `class X extends Base` with `belongsTo`, `hasMany`,
-  `hasMany … through:` (self-referential follows!), scopes, and validations
-  (`src/models/`).
-- **Querying** — `findByBang`, `where`, `order`, `includes` (eager loading),
-  `limit`, scopes, association proxies (`user.tweets.createBang(...)`), and
-  `count`.
-- **Error mapping** — `RecordNotFound` → 404, `RecordInvalid` → 422 (`app.ts`).
+- **Migrations** — timestamped files in `db/migrate/`, each a
+  `Migration.get(8.0)` subclass with a reversible `change()`, run by
+  `bin/trails db:migrate` / `db:rollback` / `db:setup`.
+- **Models** — `class X extends ApplicationRecord` with `belongsTo`,
+  `hasMany`, `hasMany … through:` (self-referential follows), scopes and
+  validations (`app/models/`).
+- **Controllers and routes** — `ActionController::API` controllers
+  (`app/controllers/`) behind nested `resources` (`config/routes.ts`).
+- **Error mapping** — `rescueFrom` in `ApplicationController`:
+  `RecordNotFound` → 404, `RecordInvalid` → 422, `RecordNotUnique` → 409,
+  malformed JSON → 400.
 
 ## Run it
 
-From the repo root the packages must be built once (the example imports the
-compiled `dist/`):
+Build the workspace once from the repo root (`pnpm build`). Then, from this
+directory:
 
 ```sh
-pnpm --filter @blazetrails/activerecord... build
+bin/trails db:setup     # create the database, load the schema, seed it
+bin/trails server       # or `pnpm dev`; serves on :3000
+pnpm test               # vitest: model smoke + HTTP integration tests
+pnpm build              # schema-driven type-check via trails-tsc
 ```
 
-Then, from this directory:
+Connection settings live in `config/database.ts`, keyed by environment;
+`TRAILS_ENV` (default `development`) picks the entry. Each environment is a
+SQLite file under `storage/`.
+
+### Deploy
 
 ```sh
-pnpm install          # if you haven't already at the workspace root
-pnpm db:setup         # create the database, run migrations, load seeds
-pnpm typecheck        # schema-driven type-check via trails-tsc (see below)
-pnpm start            # boots the HTTP server on :3000
+pnpm install --frozen-lockfile
+bin/trails build        # write the Zeitwerk autoload manifests to .trails/autoload
+TRAILS_ENV=production bin/trails db:prepare
+TRAILS_ENV=production bin/trails server
 ```
 
-`pnpm smoke` runs the whole flow end-to-end with no HTTP and no setup needed.
-It runs as `TRAILS_ENV=test`, which the config below maps to an in-memory DB,
-and migrates it from scratch.
-
-### Connection config
-
-All connection settings live in **`config/database.ts`** — the single
-source of truth, like Rails' `config/database.yml`. It's keyed by
-environment; `TRAILS_ENV` (default `development`) picks the entry.
-`loadDatabaseConfig` from `@blazetrails/activerecord-cli` loads the file into
-`Base.configurations`, and `Base.establishConnection()` with no arguments then
-resolves the current environment through that registry (see `src/db.ts`, which
-contains no config of its own):
-
-```ts
-const config = {
-  development: { adapter: "sqlite3", database: "storage/development.sqlite3", pool: 5 },
-  test: { adapter: "sqlite3", database: ":memory:", pool: 1 },
-  production: { adapter: "sqlite3", database: "storage/production.sqlite3", pool: 5 },
-};
-export default config;
-```
-
-To use Postgres or MySQL, edit this file (e.g.
-`{ adapter: "postgresql", database: "twitter", host: "localhost" }`) —
-the model code is adapter-agnostic, exactly like Rails.
-
-> We key on `TRAILS_ENV`, not `NODE_ENV`: the JS ecosystem treats `NODE_ENV`
-> as a build-time hint, so reusing it to select a database silently picks the
-> wrong one in many setups. `NODE_ENV` is honored only as a fallback. This is
-> the convention documented in [`packages/activerecord-cli/README.md`](../../packages/activerecord-cli/README.md).
+An API-only app has no asset pipeline, so there is no `assets:precompile`
+step, exactly as the generated `--api` Dockerfile omits it.
 
 ## Database tasks
 
-A small `rails db:*`-style runner (`src/cli.ts`) wraps ActiveRecord's
-`Migration` / `MigrationContext`:
-
-| Command                  | Description                                   |
-| ------------------------ | --------------------------------------------- |
-| `pnpm db:create`         | Create the database                           |
-| `pnpm db:drop`           | Delete the database                           |
-| `pnpm db:migrate`        | Run pending migrations                        |
-| `pnpm db:rollback [n]`   | Roll back the last `n` migrations (default 1) |
-| `pnpm db:migrate:status` | Show each migration's `up`/`down` state       |
-| `pnpm db:seed`           | Load `db/seeds.ts`                            |
-| `pnpm db:schema:dump`    | Dump the current schema to `db/schema.ts`     |
-| `pnpm db:setup`          | `create` + `migrate` + `seed`                 |
-| `pnpm db:prepare`        | Create if needed, migrate, seed when empty    |
-| `pnpm db:reset`          | `drop` + `setup`                              |
-
-Migrations live in `db/migrate/<YYYYMMDDHHMMSS>_<name>.ts`:
-
-```ts
-import { Migration } from "@blazetrails/activerecord";
-
-export default class CreateUsers extends Migration {
-  async change() {
-    await this.createTable("users", (t) => {
-      t.string("handle");
-      t.string("display_name");
-      t.string("bio");
-      t.timestamps();
-    });
-  }
-}
-```
-
-The 14-digit filename prefix is the version recorded in `schema_migrations`.
-`change()` is reversible, so `db:rollback` drops the table automatically.
-Like Rails refusing to boot with pending migrations, `pnpm start` exits with
-a hint to run `db:migrate` if any migration is unapplied.
+| Command                        | Description                                  |
+| ------------------------------ | -------------------------------------------- |
+| `bin/trails db:create`         | Create the database                          |
+| `bin/trails db:drop`           | Delete the database                          |
+| `bin/trails db:migrate`        | Run pending migrations, dump `db/schema.ts`  |
+| `bin/trails db:rollback`       | Roll back the last migration (`STEP=n`)      |
+| `bin/trails db:migrate:status` | Show each migration's `up`/`down` state      |
+| `bin/trails db:seed`           | Load `db/seeds.ts`                           |
+| `bin/trails db:setup`          | `create` + `schema:load` + `seed`            |
+| `bin/trails db:prepare`        | Create if needed, migrate, seed when created |
+| `bin/trails db:reset`          | `drop` + `setup`                             |
 
 ## API
 
@@ -118,6 +72,7 @@ a hint to run `db:migrate` if any migration is unapplied.
 | `GET  /users/:handle/timeline`       | Tweets from everyone they follow                 |
 | `POST /users/:handle/follow/:target` | Follow another user                              |
 | `POST /tweets/:id/like`              | Like a tweet (`handle` in body)                  |
+| `GET  /up`                           | Health check                                     |
 
 ### Example session
 
@@ -135,42 +90,16 @@ curl localhost:3000/users/alice/timeline
 
 ## Zero-declare, schema-driven models via `trails-tsc`
 
-The models in `src/models/` are pure Rails-style static blocks — **no
-`declare` fields, no `this.attribute(...)` calls, no `import type { Tweet }`
-lines.** Just associations, scopes, and validations:
+The models are Rails-style static blocks with no `declare` fields and no
+`this.attribute(...)` calls. Their attributes come from the schema:
 
-```ts
-export class User extends Base {
-  static {
-    this.hasMany("tweets", { dependent: "destroy" });
-    this.hasMany("following", { through: "activeFollows", source: "followee", className: "User" });
-    this.validates("handle", { presence: true });
-    this.validatesUniqueness("handle");
-  }
-}
-```
+- **Types:** [`trails-tsc`](../../README.md#zero-declare-models--trails-tsc)
+  reads `db/schema.ts` (the `--schema` flag in the `build` script) and injects
+  a `declare` member per column, plus association proxies and scope readers.
+  `bin/trails db:migrate` rewrites `db/schema.ts`; commit it, as Rails
+  apps commit `schema.rb`.
+- **Runtime:** the columns are reflected from the live database, as Rails
+  does.
 
-Where do the attributes (`user.handle`, `tweet.body`, `created_at`, …) come
-from? The **schema** — exactly like Rails, which reads them from the DB at
-boot:
-
-- **Types:** [`trails-tsc`](../../README.md#zero-declare-models--trails-tsc),
-  a drop-in `tsc` replacement, reads `db/schema.ts` (the `--schema` flag in
-  the `typecheck` script) and injects a `declare` member per column, plus
-  association proxies (`user.tweets`), scope readers (`Tweet.recent()`), and
-  target imports. After migrations, run `pnpm db:schema:dump` (which calls
-  `ar db:schema:dump`) to regenerate `db/schema.ts` and commit it — just as
-  Rails rewrites `schema.rb` after migrating.
-- **Runtime:** `loadModelSchemas()` (in `src/db.ts`) calls `Model.loadSchema()`
-  for each model after connecting, reflecting the columns off the live
-  database. (Rails does this lazily on first use; we warm it eagerly so the
-  first request is ready.)
-
-Plain `tsc` **cannot** type these files — every attribute, association, and
-scope comes back as `unknown`. That's the whole point: try
-`pnpm exec tsc --noEmit` and watch it fail, then `pnpm typecheck` and watch
-`trails-tsc` pass. The runtime (`tsx`) is unaffected either way.
-
-> The activerecord package's `dx-tests/declare-patterns.test-d.ts` documents
-> the manual `declare` + `this.attribute` escape hatch, for when you'd rather
-> run with a stock `tsc` toolchain instead of `trails-tsc`.
+Plain `tsc` cannot type these files; `pnpm build` can. The runtime is
+unaffected either way.

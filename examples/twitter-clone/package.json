@@ -1,35 +1,38 @@
 {
   "name": "@blazetrails/example-twitter-clone",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "A tiny Twitter clone built on Express + @blazetrails/activerecord",
+  "description": "A tiny Twitter clone: an API-only trails app",
   "scripts": {
-    "dev": "tsx watch src/server.ts",
-    "start": "tsx src/server.ts",
-    "smoke": "TRAILS_ENV=test tsx src/smoke.ts",
-    "typecheck": "trails-tsc --schema db/schema.ts --noEmit -p tsconfig.json",
-    "db:create": "tsx src/cli.ts db:create",
-    "db:drop": "tsx src/cli.ts db:drop",
-    "db:migrate": "tsx src/cli.ts db:migrate",
-    "db:rollback": "tsx src/cli.ts db:rollback",
-    "db:migrate:status": "tsx src/cli.ts db:migrate:status",
-    "db:seed": "tsx src/cli.ts db:seed",
-    "db:schema:dump": "ar db:schema:dump",
-    "db:setup": "tsx src/cli.ts db:setup",
-    "db:prepare": "tsx src/cli.ts db:prepare",
-    "db:reset": "tsx src/cli.ts db:reset"
+    "build": "trails-tsc --schema db/schema.ts",
+    "test": "vitest run",
+    "trails": "trails",
+    "dev": "trails server",
+    "start": "trails server",
+    "db:create": "trails db:create",
+    "db:migrate": "trails db:migrate",
+    "db:seed": "trails db:seed",
+    "db:setup": "trails db:setup",
+    "db:reset": "trails db:reset"
   },
   "dependencies": {
+    "@blazetrails/actionpack": "workspace:*",
+    "@blazetrails/activemodel": "workspace:*",
     "@blazetrails/activerecord": "workspace:*",
     "@blazetrails/activesupport": "workspace:*",
     "@blazetrails/date": "workspace:*",
-    "better-sqlite3": "^13.0.3",
-    "express": "^4.21.2"
+    "@blazetrails/rack": "workspace:*",
+    "@blazetrails/rackup": "workspace:*",
+    "@blazetrails/ruby-compat": "workspace:*",
+    "@blazetrails/trailties": "workspace:*",
+    "better-sqlite3": "^13.0.3"
   },
   "devDependencies": {
     "@blazetrails/activerecord-cli": "workspace:*",
-    "@types/express": "^4.17.21",
-    "tsx": "^4.21.0"
+    "@blazetrails/trails-tsc": "workspace:*",
+    "@types/node": "^25.3.5",
+    "vite": "^7.0.0",
+    "vitest": "^3.0.0"
   }
 }

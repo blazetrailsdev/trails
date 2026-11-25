@@ -1,14 +1,12 @@
-import { Base } from "@blazetrails/activerecord";
+import { ApplicationRecord } from "./application-record.ts";
 
-/** Join record: `follower_id` follows `followee_id`. */
-export class Follow extends Base {
+export class Follow extends ApplicationRecord {
   static {
     this.belongsTo("follower", { className: "User" });
     this.belongsTo("followee", { className: "User" });
 
     this.validates("follower_id", { presence: true });
     this.validates("followee_id", { presence: true });
-    // Can't follow the same person twice.
     this.validatesUniquenessOf("followee_id", { scope: "follower_id" });
   }
 }

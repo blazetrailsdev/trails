@@ -1467,7 +1467,7 @@ jobs:
       - if: ${{ matrix.shard == 1 && needs.changes.outputs.ar_scope == '' }}
         run: pnpm vitest run packages/activerecord-cli
       - if: ${{ matrix.shard == 1 && (needs.changes.outputs.ar_scope == '' || contains(needs.changes.outputs.ar_scope, 'packages/activerecord-cli')) }}
-        run: pnpm --filter @blazetrails/example-twitter-clone smoke
+        run: pnpm --filter @blazetrails/example-twitter-clone test
 
   # `ARCONN=sqlite3_mem` is the only lane where `in_memory_db?` is true, so
   # without it every `skipIf(inMemoryDb())` guard is dead code (RFC 0029).

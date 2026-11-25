@@ -28,7 +28,7 @@ export const sweptFilesInsideUnsweptTrees = [
   "eslint/test-fixture-parity.test.mjs",
   "examples/twitter-clone/db/migrate/20260101000002_create_tweets.ts",
   "examples/twitter-clone/db/schema.ts",
-  "examples/twitter-clone/src/models/tweet.ts",
+  "examples/twitter-clone/app/models/tweet.ts",
   "packages/website/docs/.vitepress/theme/index.mjs",
   "packages/website/vite.config.ts",
   "scripts/api-compare/audit-cross-file-calls.test.ts",
