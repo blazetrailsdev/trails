@@ -165,6 +165,12 @@ describe("GeneratorsTest", () => {
     expect(klass!.namespace()).toBe("fixjour");
   });
 
+  it("find by namespace with duplicated name", async () => {
+    const klass = await Generators.findByNamespace("foobar");
+    expect(klass).toBeTruthy();
+    expect(klass!.namespace()).toEqual("foobar:foobar");
+  });
+
   it("find by namespace without base or context looks into trails namespace", async () => {
     expect(await Generators.findByNamespace("model")).toBeTruthy();
   });
@@ -224,6 +230,11 @@ describe("GeneratorsTest", () => {
     const output = await help();
     expect(output).toMatch(/Fixjour:/);
     expect(output).toMatch(/^ {2}fixjour$/m);
+  });
+
+  it("default banner should show generator namespace", async () => {
+    const klass = (await Generators.findByNamespace("foobar")) as unknown as { banner(): string };
+    expect(klass.banner()).toMatch(/^bin\/trails generate foobar:foobar/);
   });
 
   it("default banner should not show trails generator namespace", async () => {
