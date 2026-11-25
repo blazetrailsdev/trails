@@ -530,6 +530,8 @@ describe("buildAutoload", () => {
       File.write(`${tmp}/app/views/posts/index.html.tse`, "<h1>Posts</h1>");
       const root = File.realpath(tmp);
       let tsorted = 0;
+      const main = new Loader();
+      main.tag = "trails.main";
       seats.Trails = {
         application: {
           config: { root },
@@ -544,6 +546,7 @@ describe("buildAutoload", () => {
             }),
           }),
           initializers: { tsort: () => ((tsorted += 1), []) },
+          autoloaders: { main },
           initialized: () => true,
           reloadRoutesUnlessLoaded: async () => true,
           routes: () => ({ namedRoutes: { helperNames: () => [] } }),
@@ -556,6 +559,9 @@ describe("buildAutoload", () => {
       expect(File.isExist(`${root}/.trails/views/posts/index.html.tse.js`)).toBe(true);
       expect(File.isExist(`${elsewhere}/.trails`)).toBe(false);
       expect(tsorted).toBe(0);
+      expect(File.read(`${root}/.trails/autoload/install.generated.js`)).toContain(
+        '"trails.main": [imports0, manifest0],',
+      );
       expect(File.read(`${root}/.trails/boot.generated.js`)).toContain(
         '"app/views/posts/index.html.tse": async () => ({ ...(await import("./views/posts/index.html.tse.js")), source: ',
       );

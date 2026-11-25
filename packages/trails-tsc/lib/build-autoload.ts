@@ -58,10 +58,12 @@ export async function buildAutoload({
     }
   }
   let loaders: BootLoader[] = [];
-  if (application != null && !application.initialized?.()) {
+  if (application != null) {
     loaders = [application.autoloaders?.once, application.autoloaders?.main].filter(
       (loader): loader is BootLoader => loader != null,
     );
+  }
+  if (application != null && !application.initialized?.()) {
     const own = loaders.map((loader) => Object.getOwnPropertyDescriptors(loader));
     for (const loader of loaders) loader.setup = loader.eagerLoad = async () => {};
     try {
