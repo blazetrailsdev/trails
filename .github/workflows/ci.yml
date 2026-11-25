@@ -1256,8 +1256,6 @@ jobs:
       - run: pnpm install --frozen-lockfile --prefer-offline
       - uses: ./.github/actions/cache-build
       - run: pnpm build
-      # Experiment: the isolation harness writes each test app under <repo>/tmp.
-      # Mounting it on tmpfs tells whether the lane is disk-bound.
       - name: Mount tmp on tmpfs
         run: |
           mkdir -p tmp
