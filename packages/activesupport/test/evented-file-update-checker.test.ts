@@ -35,6 +35,7 @@ describe("EventedFileUpdateCheckerTest", () => {
   // PERMANENT-SKIP: CLAUDE.md § "Runtime facts Node does not expose", the `fork` bullet.
   it.skip("notifies forked processes");
 
+  // BLOCKED: evented-file-update-checker-gc-test
   it.skip("can be garbage collected");
 
   it("should detect changes through symlink", async () => {
