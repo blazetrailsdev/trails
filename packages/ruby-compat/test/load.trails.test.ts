@@ -8,6 +8,7 @@ import {
   rbFLoad,
   rbFRequireFile,
   registerCompiledFiles,
+  resolveTsThenJs,
   setLoadImporter,
 } from "../lib/load.js";
 import { TopLevel } from "../lib/object.js";
@@ -158,5 +159,28 @@ describe("rbFRequireFile", () => {
       expect(await rbFRequireFile("rb_f_require_ext.ts")).toBe(true);
       expect(rbModRemoveConst(Object, "RbFRequireExt")).toBe("ts");
     });
+  });
+});
+
+describe("resolveTsThenJs", () => {
+  it("answers the .js sibling of a .ts file a compiled tree ships as .js", async () => {
+    const root = await mkdtemp(join(tmpdir(), "trails-resolve-ts-js-"));
+    try {
+      await writeFile(join(root, "config.js"), "");
+      expect(resolveTsThenJs(join(root, "config.ts"))).toBe(join(root, "config.js"));
+      await writeFile(join(root, "config.ts"), "");
+      expect(resolveTsThenJs(join(root, "config.ts"))).toBe(join(root, "config.ts"));
+      expect(resolveTsThenJs(join(root, "missing.ts"))).toBe(join(root, "missing.ts"));
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("serves a .ts lookup from a compiled map's .js key", () => {
+    registerCompiledFiles("/compiled-ts-js-probe", { "config.js": async () => ({}) });
+    expect(isCompiledFile("/compiled-ts-js-probe/config.ts")).toBe(true);
+    expect(resolveTsThenJs("/compiled-ts-js-probe/config.ts")).toBe(
+      "/compiled-ts-js-probe/config.ts",
+    );
   });
 });

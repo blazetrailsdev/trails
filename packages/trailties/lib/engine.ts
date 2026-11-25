@@ -21,6 +21,7 @@ import {
   rbModName,
   rbObjRespondTo,
   rbProcCall,
+  resolveTsThenJs,
   block,
   setEnv,
   uniqBang,
@@ -165,17 +166,25 @@ export class Engine extends Trailtie {
     return undefined;
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm resolveTsThenJs — PERMANENT
+   */
   static findRootWithFlag(
     flag: string,
     rootPath: string | undefined,
     defaultValue?: string,
   ): string {
-    while (rootPath && File.isDirectory(rootPath) && !File.isExist(`${rootPath}/${flag}`)) {
+    while (
+      rootPath &&
+      File.isDirectory(rootPath) &&
+      !File.isExist(resolveTsThenJs(`${rootPath}/${flag}`))
+    ) {
       const parent = File.dirname(rootPath);
       rootPath = parent !== rootPath ? parent : undefined;
     }
-    const root = rootPath && File.isExist(`${rootPath}/${flag}`) ? rootPath : defaultValue;
+    const root =
+      rootPath && File.isExist(resolveTsThenJs(`${rootPath}/${flag}`)) ? rootPath : defaultValue;
     if (!root) throw new Error(`Could not find root path for ${this.name}`);
     return File.realpath(root);
   }

@@ -1991,6 +1991,10 @@
       "module": "resolv.js",
       "scc": null
     },
+    "resolveTsThenJs": {
+      "module": "load.js",
+      "scc": null
+    },
     "RFC2396_PARSER": {
       "module": "uri.js",
       "scc": null

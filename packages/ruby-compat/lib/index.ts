@@ -353,6 +353,7 @@ export {
   rbFRequireFile,
   loadingTable,
   registerCompiledFiles,
+  resolveTsThenJs,
   setLoadImporter,
   rbRequireLoaded,
 } from "./load.js";

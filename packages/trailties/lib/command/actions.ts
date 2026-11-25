@@ -1,13 +1,17 @@
 import { Rake } from "@blazetrails/rake";
-import { defineModule, Dir, File, getPath } from "@blazetrails/ruby-compat";
+import { defineModule, Dir, File, getPath, resolveTsThenJs } from "@blazetrails/ruby-compat";
 import { APP_PATH, ENGINE_PATH, ENGINE_ROOT } from "../app-path.js";
 import { Engine } from "../engine.js";
 import { Generators } from "../generators.js";
 import { Trails } from "../trails.js";
 
-/** @missingRailsArgs expand_path — PERMANENT */
+/**
+ * @missingRailsArgs expand_path — PERMANENT
+ * @inventedArm resolveTsThenJs — PERMANENT
+ */
 export function setApplicationDirectoryBang(): void {
-  if (!File.isExist(File.expandPath("config.ts"))) Dir.chdir(File.expandPath("../..", APP_PATH));
+  if (!File.isExist(resolveTsThenJs(File.expandPath("config.ts"))))
+    Dir.chdir(File.expandPath("../..", APP_PATH));
 }
 
 export async function requireApplicationBang(): Promise<void> {
