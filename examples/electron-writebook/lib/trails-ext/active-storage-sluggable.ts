@@ -27,7 +27,7 @@ export const Sluggable = defineModule(
 
     slugPath(this: Host): string {
       return (
-        Trails.application.routes().urlHelpers as unknown as {
+        Trails.application.routes().urlHelpers() as unknown as {
           actionTextMarkdownUploadPath(slug: string | null): string;
         }
       ).actionTextMarkdownUploadPath(this.slug);

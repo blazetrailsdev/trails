@@ -13,6 +13,7 @@ export type Attachment = {
   slugPath(): string;
   url(): Promise<string>;
   record: Promise<{ record?: Promise<{ owningBook?(): Promise<Book | null> }> } | null>;
+  blob: Promise<unknown>;
 };
 
 export class UploadsController extends ApplicationController {
@@ -35,13 +36,16 @@ export class UploadsController extends ApplicationController {
     ))!;
     const uploads = (
       this.markdown as unknown as {
-        uploads: { attach(files: unknown[]): Promise<void>; attachments(): Promise<Attachment[]> };
+        uploads: {
+          attach(files: unknown[]): Promise<void>;
+          attachments: PromiseLike<Attachment[]>;
+        };
       }
     ).uploads;
     await uploads.attach([this.params.get("file")]);
     await this.markdown.saveBang();
 
-    this.upload = (await uploads.attachments()).at(-1)!;
+    this.upload = (await uploads.attachments).at(-1)!;
 
     await this.render({
       json: {
@@ -97,6 +101,7 @@ export class UploadsController extends ApplicationController {
 
   private async redirectToAttachmentPath(): Promise<void> {
     await ActiveStorageCurrent.set({ urlOptions: { onlyPath: true } }, async () => {
+      await this.attachment.blob;
       await this.head(":found", { location: await this.attachment.url() });
     });
   }

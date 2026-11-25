@@ -37,7 +37,12 @@ export class LeafablesController extends ApplicationController {
     await this.positionNewLeaf(this.leaf);
   }
 
-  async show(): Promise<void> {}
+  async show(): Promise<void> {
+    await this.respondTo((format: Record<string, (block?: () => unknown) => void>) => {
+      format.html();
+      format.md();
+    });
+  }
 
   async edit(): Promise<void> {}
 

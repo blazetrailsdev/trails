@@ -1,0 +1,6 @@
+---
+title: "<%= leaf.title %>"
+url: "<%= leafableSlugUrl(leaf) %>"
+---
+
+<%= raw(await (await leaf.leafable).markable()) %>
