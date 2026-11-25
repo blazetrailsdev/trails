@@ -516,8 +516,8 @@ export class DatabaseTasks {
     const filename = dbConfig.schemaDump(format);
     if (filename == null) return null;
 
-    const path = File.dirname(filename) === this.dbDir ? filename : File.join(this.dbDir, filename);
-    return path;
+    if (File.dirname(filename) === this.dbDir) return filename;
+    return File.join(this.dbDir, filename);
   }
 
   /** @missingRailsArgs dump — PERMANENT */
@@ -858,7 +858,7 @@ export class DatabaseTasks {
   /** @inventedArm resolveTsThenJs — PERMANENT */
   static async reconstructFromSchema(dbConfig: HashConfig, file?: string): Promise<void> {
     file ??= this.schemaDumpPath(dbConfig, dbConfig.schemaFormat()) ?? undefined;
-    if (file !== undefined) file = resolveTsThenJs(file);
+    if (file != null) file = resolveTsThenJs(file);
     if (file !== undefined) this.checkSchemaFile(file);
 
     const { NoDatabaseError } = await import("../errors.js");

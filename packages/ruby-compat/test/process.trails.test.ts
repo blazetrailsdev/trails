@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { NotImplementedError } from "../lib/not-implemented-error.js";
 import { ArgumentError } from "../lib/argument-error.js";
+import { NotImplementedError } from "../lib/not-implemented-error.js";
 import { Process } from "../lib/process.js";
 import { getProcessAdapter } from "../lib/process-adapter.js";
 import { Errno } from "../lib/errno.js";
