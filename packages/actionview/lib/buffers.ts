@@ -1,5 +1,6 @@
 import { SafeBuffer, htmlEscape, htmlSafe, isHtmlSafe } from "@blazetrails/activesupport";
 import { rbObjAsString } from "@blazetrails/ruby-compat/object";
+import { rbObjDup } from "@blazetrails/ruby-compat/include";
 
 export class OutputBuffer {
   private _raw: string;
@@ -78,8 +79,7 @@ export class OutputBuffer {
   }
 
   dup(): this {
-    const copy = Object.assign(Object.create(Object.getPrototypeOf(this) as object), this) as this;
-    return copy.initializeCopy(this);
+    return rbObjDup(this);
   }
 
   capture<TArgs extends unknown[]>(

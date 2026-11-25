@@ -1,4 +1,4 @@
-import { File, LOAD_PATH, abort, getPath, rbArgv } from "@blazetrails/ruby-compat";
+import { File, LOAD_PATH, abort, rbArgv, rbFRequireFile } from "@blazetrails/ruby-compat";
 import { FileList } from "./file-list.js";
 
 const argv: string[] = [];
@@ -14,14 +14,14 @@ for (const [index, argument] of rbArgv().entries()) {
     argv.push(argument);
   } else if (/\*/.test(argument)) {
     for (const file of (await FileList.get(argument).toA()) as string[]) {
-      await import(getPath().pathToFileURL!(File.expandPath(file)).href);
+      await rbFRequireFile(File.expandPath(file));
     }
   } else {
     const path = File.expandPath(argument);
 
     if (!(await File.isExistAsync(path))) abort(`\nFile does not exist: ${path}\n\n`);
 
-    await import(getPath().pathToFileURL!(path).href);
+    await rbFRequireFile(path);
   }
 }
 

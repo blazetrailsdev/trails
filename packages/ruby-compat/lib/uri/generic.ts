@@ -10,6 +10,7 @@ import {
   InvalidURIError,
   URI,
 } from "./common.js";
+import { rbObjDup } from "../include.js";
 import { IPAddr } from "../ipaddr.js";
 import { warn } from "../kernel-warn.js";
 import { env as ENV } from "../process-adapter.js";
@@ -585,7 +586,7 @@ export class Generic {
    * @noRailsEquivalent PERMANENT
    */
   normalize(): this {
-    const uri = this.dup();
+    const uri = rbObjDup(this);
     uri.normalizeBang();
     return uri;
   }
@@ -736,7 +737,7 @@ export class Generic {
       throw new BadURIError("both URI are relative");
     }
 
-    const base = this.dup();
+    const base = rbObjDup(this);
 
     const authority = rel.authority;
 
@@ -759,12 +760,6 @@ export class Generic {
     if (rel.fragment != null) base.fragment = rel.fragment;
 
     return base;
-  }
-
-  /** `Object#dup` (`vendor/ruby/v3.3.11/object.c:2205`) of a URI — the shallow copy
-   *  `merge` mutates in place (`generic.rb:1140`). */
-  protected dup(): this {
-    return Object.assign(Object.create(Object.getPrototypeOf(this) as object), this) as this;
   }
 
   /**

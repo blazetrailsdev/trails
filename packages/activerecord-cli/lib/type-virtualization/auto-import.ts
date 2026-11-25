@@ -1,5 +1,5 @@
 import * as ts from "typescript/unstable/ast";
-import { getPath } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat";
 import { walk, type ClassInfo } from "./walker.js";
 import { resolveAssociationTarget } from "./resolve-target.js";
 import { tsApi } from "./ts-api.js";
@@ -91,7 +91,7 @@ function collectNamesInScope(sf: ts.SourceFile): Set<string> {
 
 function computeRelativeImport(fromFile: string, toFile: string): string {
   const absolute = (file: string): string =>
-    /^([A-Za-z]:)?[\\/]/.test(file) ? file : getPath().resolve(file);
+    /^([A-Za-z]:)?[\\/]/.test(file) ? file : File.expandPath(file);
   const fromPath = absolute(fromFile);
   const toPath = absolute(toFile);
   const windows = /^[A-Za-z]:|\\/.test(fromPath) || /^[A-Za-z]:|\\/.test(toPath);
