@@ -8,6 +8,7 @@ import { ArgumentError } from "./argument-error.js";
 import { classpaths } from "./classpath.js";
 import { FloatDomainError } from "./float-domain-error.js";
 import { FrozenError } from "./frozen-error.js";
+import { warn } from "./kernel-warn.js";
 import { rbIntegerTypeP } from "./numeric.js";
 import {
   rbBuiltinClassName,
@@ -211,10 +212,13 @@ export class Rational {
     return new Rational(this.numerator * (o / g), this.denominator / g);
   }
 
-  /** `vendor/ruby/v3.3.11/rational.c:903` `rb_rational_div` (`Rational#/`), for the
-   * Integer divisor this port needs, cancelled the same way {@link mul} is.
+  /** `vendor/ruby/v3.3.11/rational.c:903` `rb_rational_div` (`Rational#/`), for an
+   * Integer or Rational divisor (`f_muldiv`), the Integer one cancelled the same way {@link mul} is.
    * @noRailsEquivalent PERMANENT — Ruby core, part of the Rational above. */
-  quo(other: number | bigint): Rational {
+  quo(other: number | bigint | Rational): Rational {
+    if (other instanceof Rational) {
+      return new Rational(this.numerator * other.denominator, this.denominator * other.numerator);
+    }
     const o = BigInt(other);
     const g = iGcd(this.numerator, o);
     return new Rational(this.numerator / g, this.denominator * (o / g));
@@ -405,15 +409,199 @@ export function nuratLoader(self: Rational, a: object): Rational {
  * @noRailsEquivalent PERMANENT — Ruby core `Kernel#Rational()`, which Rails
  * calls and does not define. */
 export function rational(
-  numv: number | bigint | Rational | { toR(): Rational },
-  denv: number | bigint = 1,
+  numv: number | bigint | string | Rational | { toR(): Rational },
+  denv: number | bigint | string = 1,
 ): Rational {
   if (numv == null) throw new TypeError("can't convert nil into Rational");
-  if (typeof numv === "object" && !(numv instanceof Rational)) numv = numv.toR();
+  if (typeof numv === "string") numv = stringToRStrict(numv);
+  else if (typeof numv === "object" && !(numv instanceof Rational)) numv = numv.toR();
+  if (typeof denv === "string") return rational(numv).quo(rational(stringToRStrict(denv)));
   if (numv instanceof Rational) {
     return denv === 1 || denv === 1n ? numv : numv.quo(denv);
   }
   return new Rational(numv, denv);
+}
+
+interface Cursor {
+  s: number;
+}
+
+/** @internal `vendor/ruby/v3.3.11/bignum.c:4074` `rb_int_parse_cstr` for base 10 with
+ * `RB_INT_PARSE_UNDERSCORE` and no sign or prefix: the digits at `p.s`, an
+ * underscore allowed only between two of them. */
+function rbIntParseCstr(str: string, p: Cursor): { n: bigint; count: number } | null {
+  const md = /^\d+(?:_\d+)*/.exec(str.slice(p.s));
+  if (md == null) return null;
+  p.s += md[0].length;
+  const digits = md[0].replaceAll("_", "");
+  return { n: BigInt(digits), count: digits.length };
+}
+
+/** @internal `vendor/ruby/v3.3.11/rational.c:2308` `read_sign`. */
+function readSign(str: string, p: Cursor, e: number): string {
+  let sign = "?";
+  if (p.s < e && (str[p.s] === "-" || str[p.s] === "+")) {
+    sign = str[p.s];
+    p.s++;
+  }
+  return sign;
+}
+
+/** @internal `vendor/ruby/v3.3.11/rational.c:2338` `read_num`. */
+function readNum(str: string, p: Cursor, end: number, out: { num: bigint; nexp: bigint }): boolean {
+  let fn = 0n;
+  let ok = false;
+
+  out.nexp = 0n;
+  out.num = 0n;
+  if (p.s < end && str[p.s] !== ".") {
+    const n = rbIntParseCstr(str, p);
+    if (n == null) return false;
+    out.num = n.n;
+    ok = true;
+  }
+
+  if (p.s < end && str[p.s] === ".") {
+    p.s++;
+    const fp = rbIntParseCstr(str, p);
+    if (fp == null) return true;
+    out.nexp = BigInt(fp.count);
+    const l = 10n ** out.nexp;
+    out.num = out.num === 0n ? fp.n : out.num * l + fp.n;
+    fn = BigInt(fp.count);
+    ok = true;
+  }
+
+  if (ok && p.s + 1 < end && (str[p.s] === "e" || str[p.s] === "E")) {
+    p.s++;
+    const expsign = readSign(str, p, end);
+    const parsed = rbIntParseCstr(str, p);
+    if (parsed == null) return true;
+    let exp = parsed.n;
+    if (exp !== 0n) {
+      if (expsign === "-") {
+        if (fn !== 0n) exp = exp + fn;
+      } else {
+        if (fn !== 0n) exp = exp - fn;
+        exp = -exp;
+      }
+      out.nexp = exp;
+    }
+  }
+
+  return ok;
+}
+
+/** @internal `vendor/ruby/v3.3.11/rational.c:2398` `skip_ws`. */
+function skipWs(str: string, s: number, e: number): number {
+  while (s < e && " \t\n\v\f\r".includes(str[s])) ++s;
+  return s;
+}
+
+const FIXNUM_MAX = 2n ** 62n - 1n;
+const SQRT_LONG_MAX = 3037000499n;
+
+/**
+ * @internal `f_expt10` (`vendor/ruby/v3.3.11/rational.c:169`), `rb_int_pow(10, x)`:
+ * `int_pow` (`numeric.c:4454-4491`) squares while `FIT_SQRT_LONG`, and hands the
+ * rest to `rb_big_pow` (`bignum.c:6297-6309`), which answers a Float once
+ * `xbits * yy` passes `BIGLEN_LIMIT`.
+ */
+function fExpt10(n: bigint): bigint | number {
+  let x = 10n;
+  let y = n;
+  let z = 1n;
+  if (y === 0n) return 1n;
+  if (y === 1n) return x;
+  if (y % 2n === 1n) z = x;
+  y -= y % 2n;
+  do {
+    while (y % 2n === 0n) {
+      if (x >= SQRT_LONG_MAX) return bigPow(x, y, z);
+      x = x * x;
+      y >>= 1n;
+    }
+    if (x * z > FIXNUM_MAX) return bigPow(x, y, z);
+    z = x * z;
+  } while (--y);
+  return z;
+}
+
+/** @internal `vendor/ruby/v3.3.11/numeric.c:4485-4490`, `int_pow`'s `bignum:` arm
+ * over `rb_big_pow`'s `BIGLEN_LIMIT` check (`bignum.c:6297-6309`). */
+function bigPow(x: bigint, yy: bigint, z: bigint): bigint | number {
+  const xbits = BigInt(x.toString(2).length);
+  if (xbits * yy > 32n * 1024n * 1024n) {
+    warn("in a**b, b may be too big", { uplevel: 0 });
+    return Infinity;
+  }
+  const v = x ** yy;
+  return z !== 1n ? z * v : v;
+}
+
+/** @internal `vendor/ruby/v3.3.11/rational.c:2406` `parse_rat`, strict and raising. */
+function parseRat(str: string): Rational | number | null {
+  const e = str.length;
+  const p: Cursor = { s: skipWs(str, 0, e) };
+  const sign = readSign(str, p, e);
+
+  const n = { num: 0n, nexp: 0n };
+  if (!readNum(str, p, e, n)) return null;
+  let { num, nexp } = n;
+  let den = 1n;
+  if (p.s < e && str[p.s] === "/") {
+    p.s++;
+    const d = { num: 0n, nexp: 0n };
+    if (!readNum(str, p, e, d)) {
+      return null;
+    } else if (d.num === 0n) {
+      throw new ZeroDivisionError("divided by 0");
+    } else if (skipWs(str, p.s, e) !== e) {
+      return null;
+    } else {
+      den = d.num;
+      nexp = nexp - d.nexp;
+    }
+  } else if (skipWs(str, p.s, e) !== e) {
+    return null;
+  }
+
+  if (nexp !== 0n) {
+    if (nexp < 0n) {
+      const mul = nexp >= -FIXNUM_MAX - 1n && nexp <= FIXNUM_MAX ? fExpt10(-nexp) : Infinity;
+      if (typeof mul !== "number") {
+        num = num * mul;
+      } else {
+        return sign === "-" ? -Infinity : Infinity;
+      }
+    } else {
+      const div = nexp >= -FIXNUM_MAX - 1n && nexp <= FIXNUM_MAX ? fExpt10(nexp) : Infinity;
+      if (typeof div !== "number") {
+        den = den * div;
+      } else {
+        return sign === "-" ? -0.0 : +0.0;
+      }
+    }
+  }
+
+  if (sign === "-") {
+    num = -num;
+  }
+
+  return new Rational(num, den);
+}
+
+/** @internal `vendor/ruby/v3.3.11/rational.c:2476` `string_to_r_strict`. */
+function stringToRStrict(self: string): Rational | number {
+  const num = parseRat(self);
+  if (num == null) {
+    throw new ArgumentError(`invalid value for convert(): ${rbInspect(self)}`);
+  }
+
+  if (typeof num === "number" && num !== 0) {
+    throw new FloatDomainError("Infinity");
+  }
+  return num;
 }
 
 classpaths.set(Rational, { path: "Rational", permanent: true });
