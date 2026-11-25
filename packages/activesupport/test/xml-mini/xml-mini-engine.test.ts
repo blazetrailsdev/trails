@@ -4,6 +4,8 @@ import * as XmlMini from "../../lib/xml-mini.js";
 import * as XmlMini_REXML from "../../lib/xml-mini/rexml.js";
 import * as XmlMini_Nokogiri from "../../lib/xml-mini/nokogiri.js";
 import * as XmlMini_NokogiriSAX from "../../lib/xml-mini/nokogirisax.js";
+import * as XmlMini_LibXML from "../../lib/xml-mini/libxml.js";
+import * as XmlMini_LibXMLSAX from "../../lib/xml-mini/libxmlsax.js";
 import { assertRaises } from "../../lib/testing/assertions.js";
 import { fromXml } from "../../lib/core-ext/hash/conversions.js";
 import { FileLike } from "../../lib/xml-mini.js";
@@ -34,9 +36,15 @@ interface EngineTestsOptions {
   engine: string;
   backendModule: XmlMini.XmlMiniBackend;
   expansionAttackError: new (...args: any[]) => Error;
+  setup?: () => void;
 }
 
-function engineTests({ engine, backendModule, expansionAttackError }: EngineTestsOptions): void {
+function engineTests({
+  engine,
+  backendModule,
+  expansionAttackError,
+  setup,
+}: EngineTestsOptions): void {
   function assertEngineClass(actual: unknown): void {
     expect(actual).toBe(backendModule);
   }
@@ -53,6 +61,7 @@ function engineTests({ engine, backendModule, expansionAttackError }: EngineTest
     beforeEach(async () => {
       defaultBackend = XmlMini.backend();
       await XmlMini.setBackend(engine);
+      setup?.();
     });
 
     afterEach(async () => {
@@ -266,5 +275,20 @@ await runWithGem("@blazetrails/nokogiri", (Nokogiri) => {
     engine: "NokogiriSAX",
     backendModule: XmlMini_NokogiriSAX,
     expansionAttackError: RuntimeError,
+  });
+});
+
+await runWithGem("@blazetrails/libxml-ruby", ({ LibXML }) => {
+  engineTests({
+    engine: "LibXML",
+    backendModule: XmlMini_LibXML,
+    expansionAttackError: LibXML.XML.Error,
+    setup: () => LibXML.XML.Error.setHandler(() => {}),
+  });
+
+  engineTests({
+    engine: "LibXMLSAX",
+    backendModule: XmlMini_LibXMLSAX,
+    expansionAttackError: LibXML.XML.Error,
   });
 });

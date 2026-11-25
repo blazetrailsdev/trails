@@ -1,3 +1,5 @@
+import { Duration } from "../../../lib/duration.js";
+import { travelTo } from "../../../lib/testing/time-helpers.js";
 import { expect, it } from "vitest";
 import { Entry } from "../../../lib/cache/entry.js";
 import { coder } from "../../../lib/cache/coder.js";
@@ -106,23 +108,23 @@ export function cacheStoreCoderBehavior(host: CacheStoreCoderBehaviorHost): void
   it("coder is used during handle expired entry when expired", async () => {
     const coder = new SpyCoder();
     const store = host.lookupStore({ coder });
-    await store.write("foo", "bar", { expiresIn: 0.05 });
+    await store.write("foo", "bar", { expiresIn: Duration.seconds(1) });
     expect(coder.loadedEntries.length).toBe(0);
     expect(coder.dumpedEntries.length).toBe(1);
 
-    await new Promise((r) => setTimeout(r, 100));
-
-    const val = await store.fetch(
-      "foo",
-      { raceConditionTtl: 5, compress: true, compressThreshold: 0 },
-      () => "baz",
-    );
-    expect(val).toBe("baz");
-    expect(coder.loadedEntries.length).toBe(1);
-    expect(coder.loadedEntries[0].value).toBe("bar");
-    expect(coder.dumpedEntries.length).toBe(1);
-    expect(coder.dumpCompressedEntries.length).toBe(2);
-    expect(coder.dumpCompressedEntries[0].value).toBe("bar");
-    expect(coder.dumpCompressedEntries[coder.dumpCompressedEntries.length - 1].value).toBe("baz");
+    await travelTo(Duration.seconds(2).fromNow(), {}, async () => {
+      const val = await store.fetch(
+        "foo",
+        { raceConditionTtl: 5, compress: true, compressThreshold: 0 },
+        () => "baz",
+      );
+      expect(val).toBe("baz");
+      expect(coder.loadedEntries.length).toBe(1);
+      expect(coder.loadedEntries[0].value).toBe("bar");
+      expect(coder.dumpedEntries.length).toBe(1);
+      expect(coder.dumpCompressedEntries.length).toBe(2);
+      expect(coder.dumpCompressedEntries[0].value).toBe("bar");
+      expect(coder.dumpCompressedEntries[coder.dumpCompressedEntries.length - 1].value).toBe("baz");
+    });
   });
 }

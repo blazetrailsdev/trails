@@ -8110,6 +8110,22 @@ describe("extractFromProgram — defineColumnMethods() generated column methods"
     expect(blob.aliasOf).toBe("binary");
   });
 
+  it("gives a prototype alias of a bodied method that method's parameters", () => {
+    const info = extractFromFiles("/p", {
+      "builder.ts": `
+        export class HashBuilder {
+          onCharacters(string: string): void {}
+        }
+        export interface HashBuilder { onCdataBlock(cdata: string): void }
+        HashBuilder.prototype.onCdataBlock = HashBuilder.prototype.onCharacters;
+      `,
+    });
+    const klass = info.classes["builder.ts:HashBuilder"];
+    const alias = klass.instanceMethods.find((m) => m.name === "onCdataBlock")!;
+    expect(alias.aliasOf).toBe("onCharacters");
+    expect(alias.params.map((p) => p.name)).toEqual(["string"]);
+  });
+
   it("credits a module's included hook to every class that includes the module", () => {
     const hooked = SRC.replace(
       /TableDefinition\.defineColumnMethods[^]*$/,

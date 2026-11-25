@@ -40,6 +40,8 @@
       "@blazetrails/msgpack": ["../../msgpack/lib/index.ts"],
       "@blazetrails/rack": ["../../rack/lib/index.ts"],
       "@blazetrails/nokogiri": ["../../nokogiri/lib/index.ts"],
+      "@blazetrails/libxml-ruby": ["../../libxml-ruby/lib/libxml-ruby.ts"],
+      "@blazetrails/listen": ["../../listen/lib/listen.ts"],
       "@blazetrails/actionview/tse-modules": ["../../actionview/types/tse-modules.d.ts"]
     }
   },

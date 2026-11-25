@@ -20,11 +20,6 @@ describe("XmlMini backends", () => {
     await expect(castBackendNameToModule("JDOM")).rejects.toThrow(
       "JRuby is required to use the JDOM backend for XmlMini",
     );
-    for (const name of ["LibXML", "LibXMLSAX"]) {
-      await expect(castBackendNameToModule(name)).rejects.toThrow(
-        "cannot load such file -- libxml",
-      );
-    }
   });
 });
 

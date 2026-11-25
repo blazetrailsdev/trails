@@ -212,6 +212,7 @@
     "./dist/duration.js",
     "./dist/encrypted-configuration.js",
     "./dist/error-reporter.js",
+    "./dist/evented-file-update-checker.js",
     "./dist/execution-context/test-helper.js",
     "./dist/execution-wrapper.js",
     "./dist/executor/test-helper.js",
@@ -276,10 +277,14 @@
     "./dist/transliterate.js",
     "./dist/values/time-zone.js",
     "./dist/xml-mini.js",
+    "./dist/xml-mini/libxml.js",
+    "./dist/xml-mini/libxmlsax.js",
     "./dist/xml-mini/nokogiri.js",
     "./dist/xml-mini/nokogirisax.js"
   ],
   "devDependencies": {
+    "@blazetrails/libxml-ruby": "workspace:*",
+    "@blazetrails/listen": "workspace:*",
     "@blazetrails/msgpack": "workspace:*",
     "@blazetrails/nokogiri": "workspace:*",
     "@blazetrails/rack": "workspace:*",
@@ -295,6 +300,8 @@
     "tinyglobby": "^0.2.16"
   },
   "peerDependencies": {
+    "@blazetrails/libxml-ruby": "workspace:*",
+    "@blazetrails/listen": "workspace:*",
     "@blazetrails/msgpack": "workspace:*",
     "@blazetrails/nokogiri": "workspace:*",
     "@blazetrails/rack": "workspace:*",
@@ -302,6 +309,12 @@
     "ioredis": ">=6.0.0"
   },
   "peerDependenciesMeta": {
+    "@blazetrails/libxml-ruby": {
+      "optional": true
+    },
+    "@blazetrails/listen": {
+      "optional": true
+    },
     "@blazetrails/msgpack": {
       "optional": true
     },

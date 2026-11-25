@@ -426,7 +426,7 @@ export abstract class Store {
     throw new NotImplementedError(`${this.constructor.name} does not support cleanup`);
   }
 
-  async clear(_options?: StoreOptions): Promise<void> {
+  async clear(_options?: StoreOptions): Promise<unknown> {
     // @nie disposition=keep-as-strategy-hook
     throw new NotImplementedError(`${this.constructor.name} does not support clear`);
   }

@@ -552,8 +552,17 @@ function appendIndex(map: Map<string, number[]>, key: string, idx: number): void
 }
 
 /** Consume the first unconsumed index from a queue, returning it or -1. */
-function consumeIndex(queue: number[] | undefined, consumed: Set<number>): number {
+function consumeIndex(
+  queue: number[] | undefined,
+  consumed: Set<number>,
+  prefer?: (idx: number) => boolean,
+): number {
   if (!queue) return -1;
+  if (prefer) {
+    for (const idx of queue) {
+      if (!consumed.has(idx) && prefer(idx)) return idx;
+    }
+  }
   for (const idx of queue) {
     if (!consumed.has(idx)) return idx;
   }
@@ -1239,7 +1248,16 @@ export function main(
         const tc = file.testCases[ri];
         if (isTestCaseUnported(file.file, tc.description, tc.ancestors[0])) continue;
         const np = normPath(tc.ancestors, tc.description);
-        let tsIdx = consumeIndex(pathIndex.get(np), consumedTs);
+        let tsIdx = consumeIndex(
+          pathIndex.get(np),
+          consumedTs,
+          (idx) =>
+            !assertionKindMismatch(
+              tc.assertionKinds,
+              tsTests[idx].assertionKinds,
+              !!tsTests[idx].pending,
+            ),
+        );
         if (tsIdx < 0) tsIdx = consumeIndex(pathAliasIndex.get(np), consumedTs);
         if (tsIdx < 0) {
           const qp = classPathQualified(tc);

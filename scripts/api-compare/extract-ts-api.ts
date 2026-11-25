@@ -1412,10 +1412,14 @@ export function extractFromProgram(
       if (entity === undefined) continue;
       const at = entity.instanceMethods.findIndex((m) => m.name === generated.name);
       if (at !== -1 && entity.instanceMethods[at].bodyless !== true) continue;
+      const original =
+        generated.aliasOf !== undefined
+          ? entity.instanceMethods.find((m) => m.name === generated.aliasOf && !m.bodyless)
+          : undefined;
       const method: MethodInfo = {
         name: generated.name,
         visibility: "public",
-        params: [{ name: "names", kind: "rest" }],
+        params: original?.params ?? [{ name: "names", kind: "rest" }],
         isStatic: false,
         line: generated.line,
         file: relPath,
