@@ -291,6 +291,10 @@ a genuine gap:
   - `initialize` (only in: `parser/argument.rb`, `parser/option.rb`; ported in TS as `initialize`)
 - PERMANENT: trailties CLAUDE.md, "A Gemfile is a package.json (`GemfileEntry`, `bundle install`, gemspec)": Puma (`web_server_gemfile_entry`), propshaft (`asset_pipeline_gemfile_entry`), jbuilder (`jbuilder_gemfile_entry`) and `bundle lock --add-platform` (`add_bundler_platforms`) are rows that section marks not ported.
   - `web_server_gemfile_entry`, `asset_pipeline_gemfile_entry`, `jbuilder_gemfile_entry`, `add_bundler_platforms` (only in: `generators/app_base.rb`)
+- PERMANENT: `ensure_fiber_workers_have_required_dependency` (configuration.rb:136-143) only `require`s the `async` gem, which trails inlines into FiberPool (packages/solid-queue/CLAUDE.md, "`FiberPool` inlines the `async` gem").
+  - `ensure_fiber_workers_have_required_dependency` (only in: `configuration.rb`)
+- PERMANENT: Interruptible's self-pipe (processes/interruptible.rb:5-8,17,34-38) wakes a sleeping process through `IO.pipe`; a Node process has one thread, so `interrupt` / `interruptible_sleep` wake through a ruby-compat `Queue`.
+  - `self_pipe`, `create_self_pipe` (only in: `processes/interruptible.rb`)
 - PERMANENT: Ruby-engine facts with no Node analogue. `jruby?` (generators/app_base.rb:747-749) is `defined?(JRUBY_VERSION)`, and `version_manager_ruby_version` (:751-761) fills only `ruby-version.tt` from rbenv, rvm and `RUBY_ENGINE`; a trails app runs on Node and writes no `.ruby-version`.
   - `jruby?`, `version_manager_ruby_version` (only in: `generators/app_base.rb`)
 - PERMANENT: `ParserExtractor` ports its `if defined?(Prism)` arm (source_annotation_extractor.rb:25-33) over the TypeScript scanner; `Parser < Ripper` with `comments` / `on_comment` (:35-47) is the fallback for a Ruby without Prism and has no JS counterpart.
