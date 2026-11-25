@@ -1,5 +1,5 @@
 import { afterAll } from "vitest";
-import { getEnv } from "@blazetrails/activesupport";
+import { getEnv, seconds } from "@blazetrails/activesupport";
 import { Base, DatabaseTasks } from "@blazetrails/activerecord";
 import { setEnv } from "@blazetrails/ruby-compat";
 import { dummyConfigs, primary, primaryConfig } from "./dummy-database.js";
@@ -31,6 +31,7 @@ await loadQueueSchema();
 await Base.establishConnection(primaryConfig);
 
 Engine.config.solidQueue.connectsTo = { database: { writing: ":queue" } };
+Engine.config.solidQueue.shutdownTimeout = seconds(2);
 
 afterAll(async () => {
   const { Record } = await import("../../lib/record.js");
