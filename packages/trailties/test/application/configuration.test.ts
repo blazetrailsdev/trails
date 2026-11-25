@@ -3927,6 +3927,60 @@ export class Foo extends ApplicationRecord {
       "foo",
     ]);
   });
+
+  it.sequential("PostgresqlAdapter.decode_dates is true by default for new apps", async () => {
+    onTestFinished(() => {
+      ActiveRecord.ActiveRecord.ConnectionAdapters.PostgreSQLAdapter.decodeDates = false;
+    });
+    await t.appFile(
+      "config/initializers/active-record.ts",
+      `import { ActiveRecord } from "@blazetrails/activerecord";\nawait ActiveRecord.Base.establishConnection({ adapter: "postgresql" });\n`,
+    );
+
+    await app("development");
+
+    expect(ActiveRecord.ActiveRecord.ConnectionAdapters.PostgreSQLAdapter.decodeDates).toBe(true);
+  });
+
+  it.sequential(
+    "PostgresqlAdapter.decode_dates is false by default for upgraded apps",
+    async () => {
+      onTestFinished(() => {
+        ActiveRecord.ActiveRecord.ConnectionAdapters.PostgreSQLAdapter.decodeDates = false;
+      });
+      await t.removeFromConfig(".*this\\.config\\.loadDefaults.*\\n");
+      await t.appFile(
+        "config/initializers/active-record.ts",
+        `import { ActiveRecord } from "@blazetrails/activerecord";\nawait ActiveRecord.Base.establishConnection({ adapter: "postgresql" });\n`,
+      );
+
+      await app("development");
+
+      expect(ActiveRecord.ActiveRecord.ConnectionAdapters.PostgreSQLAdapter.decodeDates).toBe(
+        false,
+      );
+    },
+  );
+
+  it.sequential(
+    "PostgresqlAdapter.decode_dates can be configured via config.active_record.postgresql_adapter_decode_dates",
+    async () => {
+      onTestFinished(() => {
+        ActiveRecord.ActiveRecord.ConnectionAdapters.PostgreSQLAdapter.decodeDates = false;
+      });
+      await t.removeFromConfig(".*this\\.config\\.loadDefaults.*\\n");
+      await t.addToConfig("this.config.activeRecord.postgresqlAdapterDecodeDates = true;");
+
+      await t.appFile(
+        "config/initializers/active-record.ts",
+        `import { ActiveRecord } from "@blazetrails/activerecord";\nawait ActiveRecord.Base.establishConnection({ adapter: "postgresql" });\n`,
+      );
+
+      await app("development");
+
+      expect(ActiveRecord.ActiveRecord.ConnectionAdapters.PostgreSQLAdapter.decodeDates).toBe(true);
+    },
+  );
 });
 
 const I18N_HANDLER = `import { I18n } from "@blazetrails/activesupport";
