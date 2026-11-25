@@ -1270,6 +1270,11 @@ export class Base extends Model {
   _destroyed = false;
   _readonly = false;
   _previouslyNewRecord = false;
+  /**
+   * @internal
+   * @noRailsEquivalent PERMANENT
+   */
+  declare _builtBeforeSchemaLoad: boolean | undefined;
 
   /**
    * @inlinedFrom ActiveRecord::Inheritance::ClassMethods#new rails/v8.0.5.2/activerecord/lib/active_record/inheritance.rb:56-78
@@ -1316,6 +1321,7 @@ export class Base extends Model {
 
     if (!allocating) {
       this._newRecord = true;
+      this._builtBeforeSchemaLoad = !ModelSchema.isSchemaLoaded.call(new.target);
       this._attributes = new.target._defaultAttributes().deepDup();
     }
 

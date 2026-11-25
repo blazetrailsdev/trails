@@ -48,4 +48,18 @@ describe("Persistence#save on a record built against a cold schema cache (trails
     expect(topic.readAttribute("created_at")).not.toBeNull();
     expect((await Topic.find(topic.id)).id).toEqual(topic.id);
   });
+
+  it("save completes the column attributes of a record built cold on a table without a primary key", async () => {
+    class Matey extends Base {
+      static {
+        this.tableName = "mateys";
+      }
+    }
+    Base.connectionPool().schemaCache.clearBang();
+    const matey = new Matey();
+    expect(matey.hasAttribute("weight")).toBe(false);
+    expect(await matey.save()).toBe(true);
+    expect(matey.hasAttribute("weight")).toBe(true);
+    expect(await Matey.count()).toBe(1);
+  });
 });
