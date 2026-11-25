@@ -57,16 +57,12 @@ export class ETag {
     return ETAG in headers || "last-modified" in headers;
   }
 
-  /**
-   * @internal
-   * @inventedArm if — CONVERGEABLE rack-body-parts-are-safebuffer-objects
-   */
+  /** @internal */
   private digestBody(body: Array<string | Uint8Array>): string | null {
     let digest: ReturnType<typeof Digest.SHA256.new> | null = null;
 
     for (const part of body) {
-      if (part.length > 0)
-        (digest ??= Digest.SHA256.new()).update(part instanceof Uint8Array ? part : String(part));
+      if (part.length > 0) (digest ??= Digest.SHA256.new()).update(part);
     }
 
     return digest && digest.hexdigest().substring(0, 32);

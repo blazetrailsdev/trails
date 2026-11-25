@@ -257,7 +257,6 @@ export class Response {
   private _block: ((self: Response) => void) | null;
   private _writer: (chunk: string | Uint8Array) => string | Uint8Array;
 
-  /** @inventedArm if — CONVERGEABLE rack-body-parts-are-safebuffer-objects */
   constructor(
     body: any = null,
     status: number | string = 200,
@@ -287,11 +286,7 @@ export class Response {
     } else if (Array.isArray(body)) {
       this._body = body;
       this._buffered = true;
-      this.length = body.reduce(
-        (s: number, p: string | Uint8Array) =>
-          s + Buffer.byteLength(p instanceof Uint8Array ? p : String(p)),
-        0,
-      );
+      this.length = body.reduce((s: number, p: string | Uint8Array) => s + Buffer.byteLength(p), 0);
     } else {
       this._body = body;
       this._buffered = null;
