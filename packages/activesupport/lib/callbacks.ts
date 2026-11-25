@@ -1,17 +1,14 @@
-import {
-  aryDeleteIf,
-  extend,
-  kernelCatch,
-  NoMethodError,
-  rbBlockGivenP,
-  rbClassSuperclass,
-  rbModSingletonP,
-  RuntimeError,
-  Thread,
-  Struct,
-  rbClearMethodCache,
-  capitalize,
-} from "@blazetrails/ruby-compat";
+import { aryDeleteIf } from "@blazetrails/ruby-compat/array";
+import { rbBlockGivenP } from "@blazetrails/ruby-compat/hash";
+import { extend } from "@blazetrails/ruby-compat/include";
+import { kernelCatch } from "@blazetrails/ruby-compat/kernel-catch";
+import { rbClearMethodCache } from "@blazetrails/ruby-compat/method-cache";
+import { NoMethodError } from "@blazetrails/ruby-compat/no-method-error";
+import { rbClassSuperclass, rbModSingletonP } from "@blazetrails/ruby-compat/object";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
+import { capitalize } from "@blazetrails/ruby-compat/string/case-mapping";
+import { Struct } from "@blazetrails/ruby-compat/struct";
+import { Thread } from "@blazetrails/ruby-compat/thread";
 
 import { kernelArray } from "./array-utils.js";
 import { classAttribute } from "./class-attribute.js";

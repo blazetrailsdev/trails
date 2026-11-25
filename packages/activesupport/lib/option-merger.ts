@@ -1,4 +1,4 @@
-import { rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { rbObjRespondTo } from "@blazetrails/ruby-compat/object";
 import { deepMerge, isPlainObject } from "./hash-utils.js";
 
 export class OptionMerger {

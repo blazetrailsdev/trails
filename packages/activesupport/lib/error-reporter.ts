@@ -1,4 +1,5 @@
-import { ArgumentError, RuntimeError } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
 import { ExecutionContext } from "./execution-context.js";
 import { IsolatedExecutionState } from "./isolated-execution-state.js";
 export type ErrorSeverity = "error" | "warning" | "info";

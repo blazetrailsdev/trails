@@ -1,6 +1,7 @@
 import { Date as RubyDate, DateTime as RubyDateTime, Time as RubyTime } from "@blazetrails/date";
 import { getutc } from "../date-time/calculations.js";
-import { include, TopLevel } from "@blazetrails/ruby-compat";
+import { include } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
 import { TimeWithZone } from "../../time-with-zone.js";
 import { TimeZone } from "../../values/time-zone.js";
 import { findZoneBang, zone as currentZone } from "../../time-zone-config.js";

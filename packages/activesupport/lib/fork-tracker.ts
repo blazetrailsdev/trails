@@ -1,10 +1,7 @@
-import {
-  aryDelete,
-  prepend,
-  Process,
-  rbCallSuper,
-  rbSingletonClass,
-} from "@blazetrails/ruby-compat";
+import { aryDelete } from "@blazetrails/ruby-compat/array";
+import { prepend, rbCallSuper } from "@blazetrails/ruby-compat/include";
+import { rbSingletonClass } from "@blazetrails/ruby-compat/object";
+import { Process } from "@blazetrails/ruby-compat/process";
 
 export const ForkTracker = {
   CoreExt: {

@@ -1,4 +1,4 @@
-import { TopLevel } from "@blazetrails/ruby-compat";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
 import { deprecator } from "../../deprecator.js";
 import * as Compatibility from "./compatibility.js";
 

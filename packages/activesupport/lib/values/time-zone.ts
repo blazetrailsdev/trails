@@ -20,16 +20,13 @@ import {
   TimezonePeriod,
   InvalidCountryCode,
 } from "@blazetrails/tzinfo";
-import {
-  equals as cmpEquals,
-  fetch,
-  KeyError,
-  rbModName,
-  rbObjClass,
-  Rational,
-  sprintf,
-  stringValue,
-} from "@blazetrails/ruby-compat";
+import { equals as cmpEquals } from "@blazetrails/ruby-compat/comparable";
+import { fetch } from "@blazetrails/ruby-compat/hash";
+import { sprintf } from "@blazetrails/ruby-compat/kernel-format";
+import { KeyError } from "@blazetrails/ruby-compat/key-error";
+import { rbModName, rbObjClass } from "@blazetrails/ruby-compat/object";
+import { Rational } from "@blazetrails/ruby-compat/rational";
+import { stringValue } from "@blazetrails/ruby-compat/string/support";
 import type { DateParts } from "@blazetrails/date";
 import { YAML } from "@blazetrails/ruby-compat/yaml";
 import { instantFrom } from "../temporal.js";

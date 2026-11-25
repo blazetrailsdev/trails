@@ -1,35 +1,24 @@
-import {
-  ENUMERABLE_METHOD_TABLE,
-  Enumerable,
-  StandardError,
-  max,
-  rbBigNorm,
-  rbFSend,
-  rbIntegerTypeP,
-  rbPlus,
-  TopLevel,
-  rbClearMethodCache,
-} from "@blazetrails/ruby-compat";
+import { max } from "@blazetrails/ruby-compat/comparable";
+import { Enumerable } from "@blazetrails/ruby-compat/enumerable";
+import { rbClearMethodCache } from "@blazetrails/ruby-compat/method-cache";
+import { rbBigNorm, rbIntegerTypeP, rbPlus } from "@blazetrails/ruby-compat/numeric";
+import { ENUMERABLE_METHOD_TABLE, rbFSend, TopLevel } from "@blazetrails/ruby-compat/object";
+import { StandardError } from "@blazetrails/ruby-compat/standard-error";
 import { Range } from "@blazetrails/ruby-compat/range";
+import { each } from "@blazetrails/ruby-compat/array";
+import { min } from "@blazetrails/ruby-compat/comparable";
 import {
-  block,
-  each,
   type Each,
   groupBy as enumGroupBy,
-  Hash,
-  hashAref,
-  hashAset,
   isAny,
   isNone,
   map,
-  min,
-  rbEqual,
-  rbObjRespondTo,
-  size,
   sortBy,
-  toEnum,
-  type Enumerator,
-} from "@blazetrails/ruby-compat";
+} from "@blazetrails/ruby-compat/enumerable";
+import { toEnum, type Enumerator } from "@blazetrails/ruby-compat/enumerator";
+import { block, Hash, hashAref, hashAset, size } from "@blazetrails/ruby-compat/hash";
+import { rbObjRespondTo } from "@blazetrails/ruby-compat/object";
+import { rbEqual } from "@blazetrails/ruby-compat/rb-equal";
 import { first, isInclude, reject, toA } from "@blazetrails/ruby-compat/enumerable";
 import { sum as enumerableSum } from "../enumerable-utils.js";
 import { isPlainObject, valuesAt } from "../hash-utils.js";

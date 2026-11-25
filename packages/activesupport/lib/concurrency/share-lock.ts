@@ -1,11 +1,11 @@
+import { Enumerable } from "@blazetrails/ruby-compat/enumerable";
 import {
-  Enumerable,
   monSynchronize,
   newCond,
-  RuntimeError,
-  Thread,
   type MonitorConditionVariable,
-} from "@blazetrails/ruby-compat";
+} from "@blazetrails/ruby-compat/monitor";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
+import { Thread } from "@blazetrails/ruby-compat/thread";
 
 type Purpose = string | null;
 type Compatible = Array<Purpose | false>;

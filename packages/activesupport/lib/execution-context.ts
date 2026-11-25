@@ -1,4 +1,4 @@
-import { rbObjDup } from "@blazetrails/ruby-compat";
+import { rbObjDup } from "@blazetrails/ruby-compat/include";
 import { IsolatedExecutionState } from "./isolated-execution-state.js";
 import type { TestHelper } from "./execution-context/test-helper.js";
 

@@ -1,4 +1,4 @@
-import type { Pathname } from "@blazetrails/ruby-compat";
+import type { Pathname } from "@blazetrails/ruby-compat/pathname";
 import { runLoadHooks } from "./lazy-load-hooks.js";
 import { ActiveSupport } from "./namespaces.js";
 import {
@@ -39,13 +39,9 @@ import "./executor/test-helper.js";
 import "./current-attributes/test-helper.js";
 import "./execution-context/test-helper.js";
 import { include, type Extended } from "@blazetrails/ruby-compat/include";
-import {
-  prepend,
-  rbAnyToS,
-  rbModMethodDefined,
-  rbModToS,
-  RuntimeError,
-} from "@blazetrails/ruby-compat";
+import { prepend } from "@blazetrails/ruby-compat/include";
+import { rbAnyToS, rbModMethodDefined, rbModToS } from "@blazetrails/ruby-compat/object";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
 
 export class TestCase extends Minitest.Test {
   declare static fileFixturePath: string | Pathname | null;

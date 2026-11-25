@@ -1,13 +1,13 @@
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
 import {
-  ArgumentError,
-  Fiber,
   getAsyncContext,
-  Thread,
-  rbObjDup,
   type AsyncContext,
   type AsyncContextAdapter,
-  rbClearMethodCache,
-} from "@blazetrails/ruby-compat";
+} from "@blazetrails/ruby-compat/async-context-adapter";
+import { Fiber } from "@blazetrails/ruby-compat/fiber";
+import { rbObjDup } from "@blazetrails/ruby-compat/include";
+import { rbClearMethodCache } from "@blazetrails/ruby-compat/method-cache";
+import { Thread } from "@blazetrails/ruby-compat/thread";
 
 type IsolatedKey = string | symbol | object;
 

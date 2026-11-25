@@ -1,4 +1,4 @@
-import type { Pathname } from "@blazetrails/ruby-compat";
+import type { Pathname } from "@blazetrails/ruby-compat/pathname";
 
 export function isBlank(pathname: Pathname): boolean {
   return pathname.toString().length === 0;

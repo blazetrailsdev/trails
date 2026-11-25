@@ -1,12 +1,15 @@
 import { ActiveSupport } from "../namespaces.js";
-import { Dir, File, FileUtils, type Pathname } from "@blazetrails/ruby-compat";
+import { Dir } from "@blazetrails/ruby-compat/dir";
+import { File } from "@blazetrails/ruby-compat/file";
+import { FileUtils } from "@blazetrails/ruby-compat/file-utils";
+import type { Pathname } from "@blazetrails/ruby-compat/pathname";
 import type { CacheOptions, CacheStore } from "./index.js";
 import { Entry } from "./entry.js";
 import { ArgumentError, Store, inspectOptions, type StoreOptions } from "./store.js";
 import { atomicWrite } from "../core-ext/file/atomic.js";
-import { kernelInteger } from "@blazetrails/ruby-compat";
+import { kernelInteger } from "@blazetrails/ruby-compat/kernel-integer";
 import { Digest } from "../digest.js";
-import { isEmpty } from "@blazetrails/ruby-compat";
+import { isEmpty } from "@blazetrails/ruby-compat/ruby-empty";
 
 export const FILENAME_MAX_SIZE = 226;
 const FILEPATH_MAX_SIZE = 900;

@@ -1,4 +1,4 @@
-import { rbClearMethodCache } from "@blazetrails/ruby-compat";
+import { rbClearMethodCache } from "@blazetrails/ruby-compat/method-cache";
 import { Range } from "@blazetrails/ruby-compat/range";
 
 import { SoleItemExpectedError, sole as enumerableSole } from "../enumerable.js";

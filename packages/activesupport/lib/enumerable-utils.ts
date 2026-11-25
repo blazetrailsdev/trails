@@ -1,10 +1,10 @@
+import { Enumerable } from "@blazetrails/ruby-compat/enumerable";
 import {
-  Enumerable,
   numericPlus,
   rbBigNorm,
   rbFloatTypeP,
   rbIntegerTypeP,
-} from "@blazetrails/ruby-compat";
+} from "@blazetrails/ruby-compat/numeric";
 import { Range } from "@blazetrails/ruby-compat/range";
 
 function intRangeSum(beg: number | bigint, end: number | bigint, excl: boolean, init: unknown) {

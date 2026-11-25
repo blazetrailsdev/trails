@@ -1,4 +1,6 @@
-import { ArgumentError, Dir, File } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { Dir } from "@blazetrails/ruby-compat/dir";
+import { File } from "@blazetrails/ruby-compat/file";
 
 export class FileUpdateChecker<R extends Promise<void> | void = Promise<void> | void> {
   private files: string[];

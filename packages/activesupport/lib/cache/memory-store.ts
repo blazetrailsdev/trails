@@ -4,7 +4,8 @@ import { coder } from "./coder.js";
 import { Entry } from "./entry.js";
 import type { Duration } from "../duration.js";
 import { Store, inspectOptions, type StoreOptions } from "./store.js";
-import { kernelInteger, Process } from "@blazetrails/ruby-compat";
+import { kernelInteger } from "@blazetrails/ruby-compat/kernel-integer";
+import { Process } from "@blazetrails/ruby-compat/process";
 
 const PER_ENTRY_OVERHEAD = 240;
 

@@ -1,12 +1,6 @@
-import {
-  block as rbBlock,
-  fetch,
-  Hash,
-  rbCallSuper,
-  rbModName,
-  rbObjId,
-  slice,
-} from "@blazetrails/ruby-compat";
+import { block as rbBlock, fetch, Hash, slice } from "@blazetrails/ruby-compat/hash";
+import { rbCallSuper } from "@blazetrails/ruby-compat/include";
+import { rbModName, rbObjId } from "@blazetrails/ruby-compat/object";
 import { underscore } from "../../inflector.js";
 import { ActiveSupport } from "../../namespaces.js";
 import { extractOptionsBang } from "../../core-ext/array/extract-options.js";

@@ -1,4 +1,5 @@
-import { Module as RbModule, rbModMethodDefined, rbModUndefMethod } from "@blazetrails/ruby-compat";
+import { Module as RbModule } from "@blazetrails/ruby-compat/include";
+import { rbModMethodDefined, rbModUndefMethod } from "@blazetrails/ruby-compat/object";
 
 type Module = { prototype: object };
 

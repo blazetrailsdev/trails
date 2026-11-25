@@ -1,4 +1,7 @@
-import { StringIO, Zlib, b, getZlib } from "@blazetrails/ruby-compat";
+import { StringIO } from "@blazetrails/ruby-compat/string-io";
+import { b } from "@blazetrails/ruby-compat/string/b";
+import { Zlib } from "@blazetrails/ruby-compat/zlib";
+import { getZlib } from "@blazetrails/ruby-compat/zlib-adapter";
 
 export class Stream extends StringIO {
   constructor(string = "") {

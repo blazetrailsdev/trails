@@ -1,5 +1,5 @@
 import { HashWithIndifferentAccess } from "./hash-with-indifferent-access.js";
-import { regexpEscape } from "@blazetrails/ruby-compat";
+import { regexpEscape } from "@blazetrails/ruby-compat/regexp";
 
 export type FilterProc = (
   key: string,

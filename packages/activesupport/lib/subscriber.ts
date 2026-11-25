@@ -1,5 +1,6 @@
 import { Notifications } from "./notifications.js";
-import { camelized, rbFSend, rbModMethodDefined, TypeError } from "@blazetrails/ruby-compat";
+import { camelized, rbFSend, rbModMethodDefined } from "@blazetrails/ruby-compat/object";
+import { TypeError } from "@blazetrails/ruby-compat/type-error";
 import { underscore } from "./inflector.js";
 import { publicInstanceMethods } from "@blazetrails/ruby-compat/include";
 import type { NotificationSubscriber } from "./notifications.js";

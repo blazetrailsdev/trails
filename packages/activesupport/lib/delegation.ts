@@ -1,19 +1,19 @@
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { iseqLocationSetup } from "@blazetrails/ruby-compat/method";
+import { rbClearMethodCache } from "@blazetrails/ruby-compat/method-cache";
+import { NameError } from "@blazetrails/ruby-compat/name-error";
+import { NilClass } from "@blazetrails/ruby-compat/nil-class";
+import { NoMethodError } from "@blazetrails/ruby-compat/no-method-error";
 import {
-  ArgumentError,
-  iseqLocationSetup,
-  NameError,
-  NilClass,
-  NoMethodError,
   rbModName,
   rbModToS,
   rbObjClass,
   rbFSend,
   rbObjRespondTo,
   nameErrMesgReceiver,
-  constGet,
-  TypeError,
-  rbClearMethodCache,
-} from "@blazetrails/ruby-compat";
+} from "@blazetrails/ruby-compat/object";
+import { TypeError } from "@blazetrails/ruby-compat/type-error";
+import { constGet } from "@blazetrails/ruby-compat/variable";
 import { Module } from "@blazetrails/ruby-compat/include";
 import { constantize, safeConstantize } from "./inflector.js";
 import { callerLocations, type CallerLocation } from "./deprecation.js";

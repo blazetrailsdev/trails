@@ -1,12 +1,8 @@
-import {
-  Fiber,
-  include,
-  Mutex,
-  prepend,
-  rbCallSuper,
-  Thread,
-  ThreadError,
-} from "@blazetrails/ruby-compat";
+import { Fiber } from "@blazetrails/ruby-compat/fiber";
+import { include, prepend, rbCallSuper } from "@blazetrails/ruby-compat/include";
+import { Mutex } from "@blazetrails/ruby-compat/mutex";
+import { Thread } from "@blazetrails/ruby-compat/thread";
+import { ThreadError } from "@blazetrails/ruby-compat/thread-error";
 import { Dependencies } from "../dependencies.js";
 import { Monitor, synchronize } from "./monitor.js";
 

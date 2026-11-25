@@ -1,17 +1,14 @@
-import { isStruct, type StructInstance } from "@blazetrails/ruby-compat";
+import { isStruct, type StructInstance } from "@blazetrails/ruby-compat/struct";
 import { Date as RubyDate, DateTime as RubyDateTime, Time as RubyTime } from "@blazetrails/date";
 
 import { ActiveSupportJSON } from "../../json.js";
 import { Encoding, type EncodeOptions } from "../../json/encoding.js";
-import {
-  ARRAY_METHOD_TABLE,
-  Hash as RubyHash,
-  Kernel,
-  rbModDefineMethod,
-  Range as RangeValue,
-  STRING_METHOD_TABLE,
-  toS,
-} from "@blazetrails/ruby-compat";
+import { ARRAY_METHOD_TABLE } from "@blazetrails/ruby-compat/array";
+import { Hash as RubyHash } from "@blazetrails/ruby-compat/hash";
+import { Kernel } from "@blazetrails/ruby-compat/include";
+import { rbModDefineMethod, toS } from "@blazetrails/ruby-compat/object";
+import { Range as RangeValue } from "@blazetrails/ruby-compat/range";
+import { STRING_METHOD_TABLE } from "@blazetrails/ruby-compat/string/method-table";
 import { BigDecimal as BigDecimalValue } from "../big-decimal/conversions.js";
 import * as instanceVariables from "./instance-variables.js";
 import { formattedOffset } from "../time/conversions.js";

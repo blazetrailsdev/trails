@@ -23,6 +23,7 @@
       "@blazetrails/ruby-compat/range": ["../../ruby-compat/lib/range.ts"],
       "@blazetrails/ruby-compat/*": ["../../ruby-compat/lib/*.ts"],
       "@blazetrails/ruby-compat": ["../../ruby-compat/lib/index.ts"],
+      "@blazetrails/ruby-compat/*": ["../../ruby-compat/lib/*.ts"],
       "@blazetrails/builder": ["../../builder/lib/builder.ts"],
       "@blazetrails/html-sanitizer": ["../../html-sanitizer/lib/index.ts"],
       "@blazetrails/msgpack": ["../../msgpack/lib/index.ts"],

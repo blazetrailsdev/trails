@@ -1,4 +1,4 @@
-import { TopLevel } from "@blazetrails/ruby-compat";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
 import { concern as moduleConcern } from "../module/concerning.js";
 
 type ModuleBody = Record<string, unknown>;

@@ -1,4 +1,5 @@
-import { TypeError, rbClearMethodCache } from "@blazetrails/ruby-compat";
+import { rbClearMethodCache } from "@blazetrails/ruby-compat/method-cache";
+import { TypeError } from "@blazetrails/ruby-compat/type-error";
 import { Range } from "@blazetrails/ruby-compat/range";
 
 /**

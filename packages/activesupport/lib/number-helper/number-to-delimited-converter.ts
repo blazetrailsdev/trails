@@ -1,4 +1,4 @@
-import { fetch } from "@blazetrails/ruby-compat";
+import { fetch } from "@blazetrails/ruby-compat/hash";
 import { NumberConverter } from "./number-converter.js";
 import type { NumberWithDelimiterOptions } from "../number-helper.js";
 

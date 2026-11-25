@@ -1,12 +1,9 @@
 import { SafeBuffer, htmlSafe } from "../string/output-safety.js";
-import {
-  binaryString,
-  NotImplementedError,
-  rbObjAsString,
-  StringScanner,
-  TSE,
-  TopLevel,
-} from "@blazetrails/ruby-compat";
+import { binaryString } from "@blazetrails/ruby-compat/io";
+import { NotImplementedError } from "@blazetrails/ruby-compat/not-implemented-error";
+import { rbObjAsString, TopLevel } from "@blazetrails/ruby-compat/object";
+import { StringScanner } from "@blazetrails/ruby-compat/string-scanner";
+import { TSE } from "@blazetrails/ruby-compat/tse";
 import { Unicode } from "../../multibyte/unicode.js";
 
 const HTML_ESCAPE: Record<string, string> = {

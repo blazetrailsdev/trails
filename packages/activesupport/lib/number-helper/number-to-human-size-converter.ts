@@ -1,4 +1,4 @@
-import { kernelFloat } from "@blazetrails/ruby-compat";
+import { kernelFloat } from "@blazetrails/ruby-compat/kernel-float";
 import { NumberConverter } from "./number-converter.js";
 import { NumberToRoundedConverter } from "./number-to-rounded-converter.js";
 import type { NumberToHumanSizeOptions } from "../number-helper.js";

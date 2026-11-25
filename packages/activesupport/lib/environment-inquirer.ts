@@ -1,4 +1,4 @@
-import { ArgumentError } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
 import { StringInquirer } from "./string-inquirer.js";
 import { isIn } from "./core-ext/object/inclusion.js";
 

@@ -269,7 +269,7 @@ const rule = {
       ImportSpecifier(node) {
         importedNames.add(node.local.name);
         if (
-          node.parent?.source?.value === "@blazetrails/ruby-compat" &&
+          /^@blazetrails\/ruby-compat(\/|$)/.test(node.parent?.source?.value ?? "") &&
           node.imported?.name === node.local.name
         ) {
           rubyCompatImports.add(node.local.name);

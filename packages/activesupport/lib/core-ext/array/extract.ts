@@ -1,10 +1,7 @@
-import {
-  ARRAY_METHOD_TABLE,
-  block as markBlock,
-  Enumerator,
-  rtest,
-  toEnum,
-} from "@blazetrails/ruby-compat";
+import { ARRAY_METHOD_TABLE } from "@blazetrails/ruby-compat/array";
+import { Enumerator, toEnum } from "@blazetrails/ruby-compat/enumerator";
+import { block as markBlock } from "@blazetrails/ruby-compat/hash";
+import { rtest } from "@blazetrails/ruby-compat/object";
 
 export function extractBang<T>(array: T[], block: (item: T) => boolean): T[];
 export function extractBang<T>(array: T[]): Enumerator<T>;

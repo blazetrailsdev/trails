@@ -1,4 +1,4 @@
-import { ARRAY_METHOD_TABLE } from "@blazetrails/ruby-compat";
+import { ARRAY_METHOD_TABLE } from "@blazetrails/ruby-compat/array";
 
 export class Array {
   static from<T>(self: T[], position: number): T[] {

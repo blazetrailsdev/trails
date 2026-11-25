@@ -1,6 +1,8 @@
 import { inflections } from "./inflector/inflections.js";
 import { NameError } from "./core-ext/name-error.js";
-import { type ConstantTable, LoadError, constGet, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { LoadError } from "@blazetrails/ruby-compat/load-error";
+import { type ConstantTable, rbObjRespondTo } from "@blazetrails/ruby-compat/object";
+import { constGet } from "@blazetrails/ruby-compat/variable";
 import { ActiveSupport } from "./namespaces.js";
 import * as Inflector from "./inflector.js";
 import { I18n } from "./i18n.js";

@@ -1,4 +1,5 @@
-import { KeyError, fetch } from "@blazetrails/ruby-compat";
+import { fetch } from "@blazetrails/ruby-compat/hash";
+import { KeyError } from "@blazetrails/ruby-compat/key-error";
 import { classAttribute } from "./class-attribute.js";
 
 export class NonActionable extends Error {

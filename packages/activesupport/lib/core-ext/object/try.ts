@@ -1,4 +1,5 @@
-import { rbBlockGivenP, rbFSend, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { rbBlockGivenP } from "@blazetrails/ruby-compat/hash";
+import { rbFSend, rbObjRespondTo } from "@blazetrails/ruby-compat/object";
 
 type TryBlock = (this: unknown, self?: unknown) => unknown;
 

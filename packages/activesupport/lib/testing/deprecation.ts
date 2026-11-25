@@ -1,5 +1,5 @@
 import { Deprecation as ActiveSupportDeprecation } from "../deprecation.js";
-import { regexpEscape } from "@blazetrails/ruby-compat";
+import { regexpEscape } from "@blazetrails/ruby-compat/regexp";
 import { ArgumentError } from "../hash-utils.js";
 import { assert } from "./assertions.js";
 

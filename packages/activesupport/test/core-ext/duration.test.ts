@@ -18,7 +18,6 @@ import {
 import { TimeWithZone } from "../../lib/time-with-zone.js";
 import { TimeZone } from "../../lib/values/time-zone.js";
 import { setZone, zone } from "../../lib/time-zone-config.js";
-import { clock } from "../../lib/time-travel.js";
 import { withEnvTz } from "../../lib/time-zone-test-helpers.js";
 import {
   minusWithDuration as minusWithTimeDuration,
@@ -376,11 +375,7 @@ describe("DurationTest", () => {
     setZone(null);
     try {
       withEnvTz("US/Eastern", () => {
-        const now = vi
-          .spyOn(clock, "now")
-          .mockReturnValue(
-            Temporal.Instant.fromEpochMilliseconds(RubyTime.local(2000).toI() * 1000),
-          );
+        const now = vi.spyOn(RubyTime, "now").mockReturnValue(RubyTime.local(2000));
         try {
           assertNotInstanceOf(TimeWithZone, Duration.seconds(5).since());
           expect(Duration.seconds(5).since()).toEqual(RubyTime.local(2000, 1, 1, 0, 0, 5));
@@ -429,9 +424,7 @@ describe("DurationTest", () => {
   it("before and after without argument", () => {
     const oldZone = zone();
     setZone(null);
-    const now = vi
-      .spyOn(clock, "now")
-      .mockReturnValue(Temporal.Instant.fromEpochMilliseconds(new Date(2000, 0, 1).getTime()));
+    const now = vi.spyOn(RubyTime, "now").mockReturnValue(RubyTime.local(2000));
     try {
       expect(Duration.second(1).before()).toEqual(
         minusWithTimeDuration.call(RubyTime.local(2000), Duration.second(1)),

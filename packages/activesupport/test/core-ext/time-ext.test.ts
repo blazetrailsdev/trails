@@ -11,7 +11,6 @@ import {
 import { assertDeprecated } from "../../lib/testing/deprecation.js";
 import { deprecator } from "../../lib/deprecator.js";
 import { Duration } from "../../lib/duration.js";
-import { setFrozenTime } from "../../lib/time-travel.js";
 import { inTimeZone } from "../../lib/core-ext/date-and-time/zones.js";
 import { zone as timeZone, setZone } from "../../lib/time-zone-config.js";
 import { TimeWithZone } from "../../lib/time-with-zone.js";
@@ -116,11 +115,17 @@ function zoned(
 }
 
 function withTimeCurrent<T>(current: Date | TimeWithZone, fn: () => T): T {
-  setFrozenTime(current instanceof Date ? current : new Date(current.toI() * 1000));
+  const spy = vi
+    .spyOn(RubyTime, "now")
+    .mockReturnValue(
+      current instanceof Date
+        ? RubyTime.at(new Rational(current.getTime(), 1000))
+        : current.toTime(),
+    );
   try {
     return fn();
   } finally {
-    setFrozenTime(null);
+    spy.mockRestore();
   }
 }
 

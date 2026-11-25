@@ -1,4 +1,5 @@
-import { fetch, rbObjDup } from "@blazetrails/ruby-compat";
+import { fetch } from "@blazetrails/ruby-compat/hash";
+import { rbObjDup } from "@blazetrails/ruby-compat/include";
 import { NumberConverter } from "./number-converter.js";
 import type { NumberToPhoneOptions } from "../number-helper.js";
 import { isBlank, isPresent } from "../core-ext/object/blank.js";

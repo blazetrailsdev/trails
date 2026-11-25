@@ -1,4 +1,4 @@
-import { rbCallSuper } from "@blazetrails/ruby-compat";
+import { rbCallSuper } from "@blazetrails/ruby-compat/include";
 import { CurrentAttributes } from "../current-attributes.js";
 
 /** @internal */

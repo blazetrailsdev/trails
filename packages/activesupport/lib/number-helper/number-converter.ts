@@ -1,4 +1,7 @@
-import { Hash, Rational, isSymbol, rbObjDup, symbolToS } from "@blazetrails/ruby-compat";
+import { Hash } from "@blazetrails/ruby-compat/hash";
+import { rbObjDup } from "@blazetrails/ruby-compat/include";
+import { Rational } from "@blazetrails/ruby-compat/rational";
+import { isSymbol, symbolToS } from "@blazetrails/ruby-compat/symbol";
 import { I18n } from "../i18n.js";
 import { camelize } from "../inflector.js";
 import { BigDecimal } from "../core-ext/big-decimal/conversions.js";

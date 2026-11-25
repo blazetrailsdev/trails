@@ -1,4 +1,6 @@
-import { StringIO, include, rbObjRespondTo, type Included } from "@blazetrails/ruby-compat";
+import { include, type Included } from "@blazetrails/ruby-compat/include";
+import { rbObjRespondTo } from "@blazetrails/ruby-compat/object";
+import { StringIO } from "@blazetrails/ruby-compat/string-io";
 import type { IO } from "@blazetrails/libxml-ruby";
 import { LibXML } from "@blazetrails/libxml-ruby";
 import { isBlank } from "../core-ext/object/blank.js";

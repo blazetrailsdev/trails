@@ -28,7 +28,8 @@
       "value": 456478
     },
     "unpacked": {
-      "value": 2287603
+      "value": 2323937,
+      "reason": "RFC 0192: ruby-compat subpath imports are longer specifiers than the barrel, in .js, .d.ts and maps (trails#10746)"
     },
     "entries": {
       "value": 746

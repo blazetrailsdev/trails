@@ -1,10 +1,8 @@
-import {
-  ArgumentError,
-  NameError,
-  rbEqual,
-  rbInspect,
-  rbClearMethodCache,
-} from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { rbClearMethodCache } from "@blazetrails/ruby-compat/method-cache";
+import { NameError } from "@blazetrails/ruby-compat/name-error";
+import { rbInspect } from "@blazetrails/ruby-compat/object";
+import { rbEqual } from "@blazetrails/ruby-compat/rb-equal";
 import { assert } from "./assertions.js";
 
 /** @noRailsEquivalent PERMANENT */

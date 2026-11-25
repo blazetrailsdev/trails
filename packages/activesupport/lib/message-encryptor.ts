@@ -1,14 +1,11 @@
-import {
-  Cipher,
-  b,
-  prepend,
-  rbEqual,
-  byteslice,
-  type Bytes,
-  rbModName,
-  sprintf,
-  rbObjId,
-} from "@blazetrails/ruby-compat";
+import type { Bytes } from "@blazetrails/ruby-compat/fs-adapter";
+import { prepend } from "@blazetrails/ruby-compat/include";
+import { sprintf } from "@blazetrails/ruby-compat/kernel-format";
+import { rbModName, rbObjId } from "@blazetrails/ruby-compat/object";
+import { Cipher } from "@blazetrails/ruby-compat/openssl";
+import { rbEqual } from "@blazetrails/ruby-compat/rb-equal";
+import { b } from "@blazetrails/ruby-compat/string/b";
+import { byteslice } from "@blazetrails/ruby-compat/string/byte-methods";
 import { MessageVerifier } from "./message-verifier.js";
 import { Codec, type MessageSerializer } from "./messages/codec.js";
 import type { ExpectedMetadataOptions, MetadataOptions } from "./messages/metadata.js";

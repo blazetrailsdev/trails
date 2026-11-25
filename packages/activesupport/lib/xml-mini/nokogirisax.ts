@@ -1,5 +1,6 @@
 import { isBlank } from "../string-utils.js";
-import { StringIO, warn } from "@blazetrails/ruby-compat";
+import { warn } from "@blazetrails/ruby-compat/kernel-warn";
+import { StringIO } from "@blazetrails/ruby-compat/string-io";
 import { RuntimeError } from "../rexml/document.js";
 
 let Nokogiri: typeof import("@blazetrails/nokogiri");

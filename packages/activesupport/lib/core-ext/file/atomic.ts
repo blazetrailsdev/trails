@@ -1,4 +1,6 @@
-import { File, FileUtils, type FsStatResult } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat/file";
+import { FileUtils } from "@blazetrails/ruby-compat/file-utils";
+import type { FsStatResult } from "@blazetrails/ruby-compat/fs-adapter";
 import { Tempfile } from "../../tempfile.js";
 
 type AtomicWriteBlock<T> = (tempFile: Tempfile) => T;

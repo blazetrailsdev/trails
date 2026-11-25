@@ -1,13 +1,8 @@
 import { Logger, SimpleFormatter, type LoggerFormatter } from "./logger.js";
 import type { BroadcastLogger } from "./broadcast-logger.js";
-import {
-  ArgumentError,
-  extend,
-  extended,
-  rbObjAsString,
-  rbObjClone,
-  rbObjId,
-} from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { extend, extended, rbObjClone } from "@blazetrails/ruby-compat/include";
+import { rbObjAsString, rbObjId } from "@blazetrails/ruby-compat/object";
 import { IsolatedExecutionState } from "./isolated-execution-state.js";
 import { isBlank } from "./core-ext/object/blank.js";
 

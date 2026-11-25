@@ -2,7 +2,11 @@ import { Date as RubyDate, DateTime as RubyDateTime, Time as RubyTime } from "@b
 import type { TimeWithZone } from "../../time-with-zone.js";
 import { ActiveSupport } from "../../namespaces.js";
 import { Tryable } from "../object/try.js";
-import { cmp, fetch, include, Range, TopLevel, type Included } from "@blazetrails/ruby-compat";
+import { cmp } from "@blazetrails/ruby-compat/comparable";
+import { fetch } from "@blazetrails/ruby-compat/hash";
+import { include, type Included } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
+import { Range } from "@blazetrails/ruby-compat/range";
 import { actsLike } from "../object/acts-like.js";
 import * as DateAndTimeCalculations from "./calculations.js";
 

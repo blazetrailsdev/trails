@@ -1,14 +1,10 @@
 import { ArgumentError } from "./hash-utils.js";
-import {
-  DigestClass,
-  getCrypto,
-  OpenSSL,
-  format,
-  rbModName,
-  rbObjAsString,
-  rbObjId,
-  type Bytes,
-} from "@blazetrails/ruby-compat";
+import { getCrypto } from "@blazetrails/ruby-compat/crypto-adapter";
+import { DigestClass } from "@blazetrails/ruby-compat/digest";
+import type { Bytes } from "@blazetrails/ruby-compat/fs-adapter";
+import { format } from "@blazetrails/ruby-compat/kernel-format";
+import { rbModName, rbObjAsString, rbObjId } from "@blazetrails/ruby-compat/object";
+import { OpenSSL } from "@blazetrails/ruby-compat/openssl";
 
 export class KeyGenerator {
   private static _hashDigestClass?: DigestClass;

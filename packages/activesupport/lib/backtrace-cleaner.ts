@@ -1,4 +1,7 @@
-import { Gem, RbConfig, rbObjAsString, regexpEscape } from "@blazetrails/ruby-compat";
+import { Gem } from "@blazetrails/ruby-compat/gem";
+import { rbObjAsString } from "@blazetrails/ruby-compat/object";
+import { RbConfig } from "@blazetrails/ruby-compat/rb-config";
+import { regexpEscape } from "@blazetrails/ruby-compat/regexp";
 
 type LineFilter = (line: string) => string;
 type LineSilencer = (line: string) => boolean;

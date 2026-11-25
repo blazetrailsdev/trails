@@ -1,19 +1,17 @@
 import { TimeZone } from "./values/time-zone.js";
 import { PeriodNotFound, Timezone, TimezonePeriod } from "@blazetrails/tzinfo";
 import {
-  Range,
-  basicObjRespondTo,
-  rbObjRespondTo,
   equals as cmpEquals,
   greaterThan,
   greaterThanOrEqual,
   isBetween,
   lessThan,
   lessThanOrEqual,
-  NoMethodError,
-  PROTOCOL_PROBES,
-  rbObjClassname,
-} from "@blazetrails/ruby-compat";
+} from "@blazetrails/ruby-compat/comparable";
+import { PROTOCOL_PROBES } from "@blazetrails/ruby-compat/method-missing-proxy";
+import { NoMethodError } from "@blazetrails/ruby-compat/no-method-error";
+import { basicObjRespondTo, rbObjRespondTo, rbObjClassname } from "@blazetrails/ruby-compat/object";
+import { Range } from "@blazetrails/ruby-compat/range";
 import { actsLike } from "./core-ext/object/acts-like.js";
 import { Duration } from "./duration.js";
 import { currentTime } from "./time-travel.js";
@@ -22,14 +20,11 @@ import { DateTime } from "@blazetrails/date";
 import { YAML } from "@blazetrails/ruby-compat/yaml";
 import { instantFrom } from "./temporal.js";
 import { Time } from "@blazetrails/date";
-import {
-  Rational,
-  rational,
-  rbDefineAllocFunc,
-  rbEqual,
-  rbHash,
-  rbInspect,
-} from "@blazetrails/ruby-compat";
+import { rbDefineAllocFunc } from "@blazetrails/ruby-compat/include";
+import { rbInspect } from "@blazetrails/ruby-compat/object";
+import { Rational, rational } from "@blazetrails/ruby-compat/rational";
+import { rbEqual } from "@blazetrails/ruby-compat/rb-equal";
+import { rbHash } from "@blazetrails/ruby-compat/rb-hash";
 import { ArgumentError } from "./hash-utils.js";
 import { Encoding } from "./json/encoding.js";
 import { DATE_FORMATS } from "./core-ext/time/conversions.js";

@@ -1,13 +1,12 @@
+import { Module, rbObjIsKindOf } from "@blazetrails/ruby-compat/include";
+import { rbClearMethodCache } from "@blazetrails/ruby-compat/method-cache";
 import {
   CLASS_METHOD_TABLE,
-  Module,
-  TypeError,
   rbClassAttachedObject,
-  rbObjIsKindOf,
   rbModSingletonP,
   rbObjSingletonClass,
-  rbClearMethodCache,
-} from "@blazetrails/ruby-compat";
+} from "@blazetrails/ruby-compat/object";
+import { TypeError } from "@blazetrails/ruby-compat/type-error";
 
 export interface ClassAttributeOptions {
   instanceAccessor?: boolean;

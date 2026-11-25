@@ -1,4 +1,5 @@
-import { rbCallSuper, rbObjMethod } from "@blazetrails/ruby-compat";
+import { rbCallSuper } from "@blazetrails/ruby-compat/include";
+import { rbObjMethod } from "@blazetrails/ruby-compat/method";
 import type { Test } from "./assertions.js";
 
 export function afterTeardown(this: Test): unknown {

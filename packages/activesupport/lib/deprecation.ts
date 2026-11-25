@@ -1,4 +1,4 @@
-import { include } from "@blazetrails/ruby-compat";
+import { include } from "@blazetrails/ruby-compat/include";
 import { MethodWrapper } from "./deprecation/method-wrappers.js";
 import { Behavior } from "./deprecation/behaviors.js";
 import { Reporting } from "./deprecation/reporting.js";

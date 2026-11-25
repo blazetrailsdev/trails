@@ -5,7 +5,7 @@ import type { ErrorReporter } from "./error-reporter.js";
 import { Callbacks } from "./callbacks.js";
 import type { FilterListEntry } from "./callbacks.js";
 import { include, type Extended, type Included } from "@blazetrails/ruby-compat/include";
-import { Fiber } from "@blazetrails/ruby-compat";
+import { Fiber } from "@blazetrails/ruby-compat/fiber";
 import { IsolatedExecutionState } from "./isolated-execution-state.js";
 
 function isThenable(value: unknown): value is PromiseLike<unknown> {
@@ -183,7 +183,7 @@ export class ExecutionWrapper {
       const result = block();
       if (isThenable(result)) {
         deferred = true;
-        return Promise.resolve(result).finally(() => instance.complete()) as Promise<Awaited<T>>;
+        return Promise.resolve(result).finally(() => instance.complete());
       }
       return result;
     } finally {

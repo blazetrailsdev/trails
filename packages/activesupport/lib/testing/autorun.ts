@@ -2,18 +2,12 @@ import { afterEach, beforeEach, expect } from "vitest";
 import type { TestContext } from "vitest";
 import { getFn, setFn } from "vitest/suite";
 import { Time } from "@blazetrails/date";
-import {
-  RuntimeError,
-  publicInstanceMethods,
-  iseqLocationSetup,
-  rbModMethodDefined,
-  rbModToS,
-  env,
-  isModuleIncluded,
-  rbFSend,
-  TopLevel,
-  rbClearMethodCache,
-} from "@blazetrails/ruby-compat";
+import { publicInstanceMethods, isModuleIncluded } from "@blazetrails/ruby-compat/include";
+import { iseqLocationSetup } from "@blazetrails/ruby-compat/method";
+import { rbClearMethodCache } from "@blazetrails/ruby-compat/method-cache";
+import { rbModMethodDefined, rbModToS, rbFSend, TopLevel } from "@blazetrails/ruby-compat/object";
+import { env } from "@blazetrails/ruby-compat/process-adapter";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
 import { safeConstantize } from "../inflector.js";
 import { TestCase } from "../test-case.js";
 import { Isolation } from "./isolation.js";

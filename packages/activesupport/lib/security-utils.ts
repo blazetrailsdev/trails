@@ -1,4 +1,7 @@
-import { ArgumentError, classModule, getCrypto, type Bytes } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { classModule } from "@blazetrails/ruby-compat/class-module";
+import { getCrypto } from "@blazetrails/ruby-compat/crypto-adapter";
+import type { Bytes } from "@blazetrails/ruby-compat/fs-adapter";
 
 export class SecurityUtils {
   static readonly [classModule] = true;

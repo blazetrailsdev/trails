@@ -1,10 +1,8 @@
-import {
-  type Binding,
-  File,
-  RuntimeError,
-  StandardError,
-  TopLevel,
-} from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat/file";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
+import { StandardError } from "@blazetrails/ruby-compat/standard-error";
+import type { Binding } from "@blazetrails/ruby-compat/variable";
 import { parse as yamlParse } from "@blazetrails/ruby-compat/psych-adapter";
 import { Psych } from "@blazetrails/ruby-compat/psych";
 import { parse as tseParse } from "@blazetrails/tse-compiler";
