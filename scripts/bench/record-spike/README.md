@@ -31,6 +31,22 @@ activesupport are both off its import graph. Its test imports
   ActiveRecord's does: a loaded association or a null foreign key costs no
   promise.
 
+- **Validation is a function over a record.** `validates` turns its options
+  into closures once, at declaration. `validate(record, validators)` runs
+  them and returns plain entries (`{ attribute, type, options }`), in
+  declaration order. `isValid`, `save` returning `false`, `saveBang` raising
+  `RecordInvalid`, and `record.errors` are thin wrappers over that list. A
+  model with no validators skips the whole step, and no `Errors` object is
+  built until one is asked for or a validation fails.
+- **Message text is built on demand, and i18n is a function.** An entry
+  becomes text only when `fullMessages`, `messages` or `messagesFor` is read.
+  English is built in. An application sets `Base.i18n` to a function from a
+  key to a string, and the spike asks it for ActiveRecord's keys in
+  ActiveRecord's order (`activerecord.errors.models.<model>.attributes.<attribute>.<type>`
+  first, `errors.messages.<type>` last, and `activerecord.attributes.<model>.<attribute>`
+  for the attribute's name). The spike imports no i18n library; the test
+  wires the function to `@blazetrails/i18n` and gets ActiveRecord's output.
+
 ## Layout
 
 The files are named for the Rails files that hold the same behaviour. Each
@@ -46,6 +62,9 @@ the function.
 | `persistence.ts`         | `instantiate`, insert, update, delete                  |
 | `relation.ts`            | The immutable relation and its SQL                     |
 | `associations.ts`        | `belongsTo` reader and writer; preload for `includes`  |
+| `validations.ts`         | The validators and `validate`, as plain functions      |
+| `model-errors.ts`        | `Errors`, the view of a record's failed validations    |
+| `translation.ts`         | Message and attribute-name lookup; English defaults    |
 | `connection-handling.ts` | The handle on `better-sqlite3` and its statement cache |
 | `type.ts`                | Cast and serialize for integer, text and datetime      |
 
@@ -68,14 +87,19 @@ inside one transaction on every side.
 
 | Measure                       | driver | spike | activerecord | spike / driver | activerecord / driver |
 | ----------------------------- | -----: | ----: | -----------: | -------------: | --------------------: |
-| load                          |   2.90 |  2.44 |        16.03 |            0.8 |                   5.5 |
-| load, then read every column  |   3.95 | 12.21 |        83.12 |            3.1 |                  21.0 |
-| find by id                    |   5.20 |  4.49 |       231.85 |            0.9 |                  44.6 |
-| belongsTo, unloaded           |   4.92 |  5.39 |       348.07 |            1.1 |                  70.8 |
-| load with belongsTo preloaded |   3.57 |  2.91 |        17.39 |            0.8 |                   4.9 |
-| insert                        |   3.88 |  8.87 |       607.67 |            2.3 |                 156.6 |
-| update one column             |   2.31 |  5.57 |       345.93 |            2.4 |                 149.9 |
-| heap bytes retained per row   |    738 |   853 |        1,302 |            1.2 |                   1.8 |
+| load                          |   2.46 |  2.26 |        11.28 |            0.9 |                   4.6 |
+| load, then read every column  |   2.87 | 11.90 |        64.47 |            4.1 |                  22.4 |
+| find by id                    |   4.63 |  4.12 |       207.05 |            0.9 |                  44.7 |
+| belongsTo, unloaded           |   3.90 |  4.40 |       306.74 |            1.1 |                  78.6 |
+| load with belongsTo preloaded |   2.51 |  2.83 |        15.36 |            1.1 |                   6.1 |
+| insert                        |   3.63 |  9.58 |       570.30 |            2.6 |                 157.2 |
+| update one column             |   2.10 |  4.82 |       322.01 |            2.3 |                 153.4 |
+| insert, three validations     |   3.61 | 10.23 |       600.08 |            2.8 |                 166.1 |
+| heap bytes retained per row   |    734 |   850 |        1,297 |            1.2 |                   1.8 |
+
+"insert, three validations" checks presence and a maximum length on one
+column and integer numericality on another. It adds about 0.7 µs to the
+spike's insert and about 30 µs to ActiveRecord's.
 
 The driver column returns plain row objects and casts nothing, so its
 datetime columns stay strings. The host is shared: between runs the absolute
@@ -124,6 +148,11 @@ Before the last two, the insert row was 4.3 times the driver.
 - **`limit` takes an integer or a string of digits, and nothing else.**
   ActiveRecord accepts whatever `Integer()` casts. Because the spike writes
   the limit into the SQL text, that check is what keeps other text out of it.
+- **Five validators.** `presence`, `length` (`minimum`, `maximum`, `is`),
+  `numericality`, `inclusion` and `uniqueness`, with `allowNil` and
+  `allowBlank`. No `on:`, `if:`, custom validator classes or `validate`
+  blocks. `uniqueness` has no `scope`.
+- **`errors.messages` is a plain object**, as `changes` is.
 - **A datetime is a `Temporal.Instant`.** ActiveRecord answers
   `TimeWithZone` or `@blazetrails/date`'s `Time`, both of which import
   ruby-compat.
@@ -131,11 +160,12 @@ Before the last two, the insert row was 4.3 times the driver.
   `HashWithIndifferentAccess`.
 - **No transaction around a save.** ActiveRecord wraps each `save` and
   `destroy` in one.
-- **Column defaults are not read.** A new record starts with every column
-  `null`.
+- **Only literal column defaults are read.** A number or a quoted string
+  becomes the new record's starting value. A default that is an expression,
+  such as `CURRENT_TIMESTAMP`, is left to the database.
 - **Decimal, float, boolean and blob columns are not cast.** They pass
   through as the driver returns them.
 
-Out of scope altogether: validations, callbacks, transactions, single-table
+Out of scope altogether: callbacks, transactions, single-table
 inheritance, every association but `belongsTo`, table-name inference, and
 any database but SQLite.

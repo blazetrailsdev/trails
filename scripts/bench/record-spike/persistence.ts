@@ -2,7 +2,9 @@ import { changedIndexes, changesApplied } from "./attribute-methods.js";
 import type { Base } from "./base.js";
 import { quoteColumnName } from "./connection-handling.js";
 import { primaryKeyBang, type ModelSchema } from "./model-schema.js";
+import { RecordInvalid } from "./errors.js";
 import { serialize } from "./type.js";
+import { validate } from "./validations.js";
 
 /** Builds a persisted record around a row the database returned, with no copy. */
 export function instantiate(schema: ModelSchema, row: unknown[]): Base {
@@ -12,10 +14,13 @@ export function instantiate(schema: ModelSchema, row: unknown[]): Base {
   record._newRecord = false;
   record._destroyed = false;
   record._associationCache = null;
+  record._beforeTypeCast = null;
+  record._errors = null;
   return record;
 }
 
 export function save(record: Base): boolean {
+  if (!isValid(record)) return false;
   if (record._newRecord) createRecord(record);
   else updateRecord(record);
   changesApplied(record);
@@ -56,6 +61,24 @@ function updateRecord(record: Base): void {
   const binds = indexes.map((i) => serialize(types[i], record._row[i]));
   binds.push(record._original![primaryKeyIndex]);
   klass.connection.execute(sql, binds);
+}
+
+/** Runs the model's validators and leaves what failed in the record's errors. */
+export function isValid(record: Base): boolean {
+  const validators = record._schema.klass._validators;
+  if (validators.length === 0) {
+    if (record._errors !== null) record._errors.clear();
+    return true;
+  }
+  const failures = validate(record, validators);
+  if (failures.length === 0 && record._errors === null) return true;
+  record.errors.replace(failures);
+  return failures.length === 0;
+}
+
+export function saveBang(record: Base): true {
+  if (!save(record)) throw new RecordInvalid(record);
+  return true;
 }
 
 export function destroy(record: Base): void {

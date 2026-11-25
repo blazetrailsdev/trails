@@ -2,10 +2,18 @@ import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { Base as ActiveRecordBase } from "@blazetrails/activerecord";
+import { I18n } from "../../../packages/activemodel/lib/index.js";
 import { Notifications } from "../../../packages/activesupport/lib/index.js";
 import { TopLevel, constSet } from "@blazetrails/ruby-compat";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { Base, RecordNotFound, UnknownAttributeError, UnknownPrimaryKey } from "./index.js";
+import {
+  Base,
+  RecordInvalid,
+  RecordNotFound,
+  UnknownAttributeError,
+  UnknownPrimaryKey,
+  validate,
+} from "./index.js";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const TABLES = ["authors", "posts", "tasks"];
@@ -34,10 +42,21 @@ interface SqlPayload {
 
 interface Model extends Row {
   save(): Promise<boolean>;
+  saveBang(): Promise<unknown>;
+  isValid(): Promise<boolean>;
+  errors: ModelErrors;
   update(attributes: Row): Promise<boolean>;
   destroy(): Promise<unknown>;
   isNewRecord(): boolean;
   isPersisted(): boolean;
+}
+interface ModelErrors {
+  add(attribute: string, type?: string): void;
+  count: number;
+  fullMessages: string[];
+  messages: Record<string, string[]>;
+  details: Record<string, unknown[]>;
+  messagesFor(attribute: string): string[];
 }
 interface Query {
   where(conditions: Row): Query;
@@ -62,6 +81,19 @@ interface Models {
   Author: ModelClass;
   Post: ModelClass;
   Task: ModelClass;
+  Article: ModelClass;
+}
+
+function validations(model: {
+  validates(attribute: string, options: Record<string, unknown>): void;
+}): void {
+  model.validates("title", { presence: true, length: { maximum: 5 } });
+  model.validates("tags_count", {
+    numericality: { onlyInteger: true, greaterThan: 0 },
+    allowNil: true,
+  });
+  model.validates("body", { inclusion: { in: ["a", "b"] } });
+  model.validates("title", { uniqueness: true });
 }
 
 const faithful = (() => {
@@ -81,10 +113,17 @@ const faithful = (() => {
       this.tableName = "tasks";
     }
   }
+  class Article extends ActiveRecordBase {
+    static {
+      this.tableName = "posts";
+      validations(this);
+    }
+  }
+  Object.defineProperty(Article, "name", { value: "Article" });
   Object.defineProperty(Author, "name", { value: "Author" });
   Object.defineProperty(Post, "name", { value: "Post" });
   Object.defineProperty(Task, "name", { value: "Task" });
-  return { Author, Post, Task } as unknown as Models;
+  return { Author, Post, Task, Article } as unknown as Models;
 })();
 
 class Author extends Base {
@@ -110,7 +149,15 @@ class Task extends Base {
   }
   declare starting: Temporal.Instant | null;
 }
-const spike = { Author, Post, Task } as unknown as Models;
+class Article extends Base {
+  static {
+    this.tableName = "posts";
+    validations(this);
+  }
+  declare title: string | null;
+  declare tags_count: number | null;
+}
+const spike = { Author, Post, Task, Article } as unknown as Models;
 
 const faithfulLog: Statement[] = [];
 const spikeLog: Statement[] = [];
@@ -118,6 +165,7 @@ const spikeLog: Statement[] = [];
 beforeAll(async () => {
   constSet(TopLevel, "Author", faithful.Author);
   constSet(TopLevel, "Post", faithful.Post);
+  constSet(TopLevel, "Article", faithful.Article);
   Notifications.subscribe("sql.active_record", (event: { payload: SqlPayload }) => {
     const { name, sql, type_casted_binds: binds } = event.payload;
     if (name === "TRANSACTION" || name === "SCHEMA" || name == null) return;
@@ -304,6 +352,118 @@ describe("record spike", () => {
     });
   });
 
+  describe("validations", () => {
+    const report = (record: Model): unknown => ({
+      count: record.errors.count,
+      full: record.errors.fullMessages,
+      messages: JSON.parse(JSON.stringify(record.errors.messages)),
+      details: JSON.parse(JSON.stringify(record.errors.details)),
+      title: record.errors.messagesFor("title"),
+    });
+    const cases: Record<string, (models: Models) => Promise<unknown>> = {
+      "an invalid record": async ({ Article }) => {
+        const article = new Article({ title: "", body: "zz", tags_count: 0 });
+        return [
+          await article.isValid(),
+          report(article),
+          await article.save(),
+          article.isNewRecord(),
+        ];
+      },
+      "a value too long, and one not an integer": async ({ Article }) => {
+        const article = await Article.create({ title: "toolong", body: "a", tags_count: 1.5 });
+        return [article.isPersisted(), report(article)];
+      },
+      "a value that is not a number": async ({ Article }) => {
+        const article = new Article({ title: "a", body: "a", tags_count: "many" });
+        return [await article.isValid(), report(article)];
+      },
+      "a valid record, then a duplicate": async ({ Article }) => {
+        const first = await Article.create({ title: "ok", body: "a", tags_count: 2 });
+        const second = await Article.create({ title: "ok", body: "b" });
+        return [first.isPersisted(), report(first), second.isPersisted(), report(second)];
+      },
+      "an update that stays unique against other rows only": async ({ Article }) => {
+        const article = await Article.create({ title: "ok", body: "a" });
+        return [await article.update({ body: "b" }), await article.update({ body: "c" })];
+      },
+      "errors are replaced on the next validation": async ({ Article }) => {
+        const article = new Article({ title: "", body: "a" });
+        await article.isValid();
+        article.title = "fine";
+        return [await article.isValid(), report(article)];
+      },
+      "saveBang and createBang raise RecordInvalid": async ({ Article }) => {
+        const save = await new Article({ body: "a" }).saveBang().catch((e: Error) => e.message);
+        const create = await Article.createBang({ title: "toolong", body: "zz" }).catch(
+          (e: Error) => e.message,
+        );
+        return [save, create];
+      },
+      "errors added by hand": async ({ Article }) => {
+        const article = new Article({ title: "a", body: "a" });
+        article.errors.add("base", "is odd");
+        article.errors.add("title", "looks wrong");
+        article.errors.add("body", ":blank");
+        return report(article);
+      },
+    };
+    for (const [name, body] of Object.entries(cases)) {
+      it(`matches ActiveRecord for ${name}`, async () => {
+        const [theirs, ours] = await onBoth(body);
+        expect(ours).toEqual(theirs);
+        expect(spikeLog).toEqual(faithfulLog);
+      });
+    }
+
+    it("takes an application's translations through a function, with no i18n import", async () => {
+      I18n.backend().storeTranslations("en", {
+        errors: { messages: { inclusion: "is not on the list" } },
+        activerecord: {
+          attributes: { article: { tags_count: "Tag total" } },
+          errors: {
+            models: { article: { attributes: { title: { blank: "is needed" } } } },
+            messages: { greater_than: "has to be over %{count}" },
+          },
+        },
+      });
+      Base.i18n = (key, options) =>
+        I18n.exists(key) ? String(I18n.translate(key, options)) : undefined;
+      try {
+        const [theirs, ours] = await onBoth(async ({ Article }) => {
+          const article = new Article({ title: "", body: "zz", tags_count: 0 });
+          await article.isValid();
+          return article.errors.fullMessages;
+        });
+        expect(ours).toEqual(theirs);
+        expect(ours).toEqual([
+          "Title is needed",
+          "Tag total has to be over 0",
+          "Body is not on the list",
+        ]);
+      } finally {
+        Base.i18n = null;
+        I18n.setBackend(new I18n.Simple());
+      }
+    });
+
+    it("exposes the same check as a function over a record", () => {
+      const article = new Article({ title: "", tags_count: 0 });
+      expect(validate(article, Article._validators)).toEqual([
+        { attribute: "title", type: ":blank", options: {} },
+        { attribute: "tags_count", type: ":greater_than", options: { value: 0, count: 0 } },
+        { attribute: "body", type: ":inclusion", options: { value: null } },
+      ]);
+      expect(article.errors.count).toBe(0);
+    });
+
+    it("raises RecordInvalid carrying the record", async () => {
+      const error = await Article.createBang({ body: "a" }).catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(RecordInvalid);
+      expect((error as RecordInvalid).record).toBeInstanceOf(Article);
+    });
+  });
+
   describe("the model layer", () => {
     it("defines one accessor pair per column on the prototype, from the database", async () => {
       await faithful.Post.create({ title: "a", body: "b" });
@@ -361,7 +521,7 @@ describe("record spike", () => {
     it("compares cast values, so a stored value that casts to null is not a change to null", async () => {
       await faithful.Post.create({ title: "a", body: "b" });
       const created = await Post.create({ title: "a", body: "b" });
-      Base.connection.raw.exec(`UPDATE posts SET tags_count = 'x' WHERE id = ${created.id}`);
+      Base.connection.raw.exec(`UPDATE posts SET tags_count = '' WHERE id = ${created.id}`);
       const post = await Post.find(created.id);
       post.tags_count = null;
       expect(post.isChanged).toBe(false);
@@ -373,7 +533,7 @@ describe("record spike", () => {
       expect(() => new Post({ nope: 1 })).toThrow(UnknownAttributeError);
       const post = new Post();
       post.assignAttributes({ title: "a", tags_count: 1 });
-      expect(post.changes).toEqual({ title: [null, "a"], tags_count: [null, 1] });
+      expect(post.changes).toEqual({ title: [null, "a"], tags_count: [0, 1] });
     });
 
     it("answers a loaded belongsTo without a promise and an unloaded one with a promise", async () => {

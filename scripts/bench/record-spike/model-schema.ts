@@ -1,7 +1,7 @@
 import type { Base } from "./base.js";
 import { quoteColumnName, quote } from "./connection-handling.js";
 import { ActiveRecordError, UnknownPrimaryKey } from "./errors.js";
-import { lookupCastType, type ColumnType } from "./type.js";
+import { cast, lookupCastType, type ColumnType } from "./type.js";
 
 export interface Column {
   readonly name: string;
@@ -28,7 +28,7 @@ export interface ModelSchema {
   readonly primaryKeyIndex: number;
   readonly readers: AttributeReader[];
   readonly writers: Map<string, AttributeWriter>;
-  readonly blankRow: readonly null[];
+  readonly defaultRow: readonly unknown[];
   readonly selectSql: string;
   readonly findSql: string;
 }
@@ -49,6 +49,14 @@ interface TableInfoRow {
   name: string;
   type: string;
   pk: number;
+  dflt_value: string | null;
+}
+
+function columnDefault(type: ColumnType, literal: string | null): unknown {
+  if (literal === null || /^null$/i.test(literal)) return null;
+  const quoted = /^'((?:[^']|'')*)'$/.exec(literal);
+  if (quoted !== null) return cast(type, quoted[1].replaceAll("''", "'"));
+  return /^-?\d+(\.\d+)?$/.test(literal) ? cast(type, Number(literal)) : null;
 }
 
 export function reflectSchema(klass: typeof Base): ModelSchema {
@@ -82,7 +90,7 @@ export function reflectSchema(klass: typeof Base): ModelSchema {
     primaryKeyIndex: primaryKey === null ? -1 : columnIndex.get(primaryKey)!,
     readers: [],
     writers: new Map(),
-    blankRow: columns.map(() => null),
+    defaultRow: columns.map((column, i) => columnDefault(column.type, info[i].dflt_value)),
     selectSql,
     findSql: `${selectSql} WHERE ${quotedTableName}.${quoteColumnName(primaryKey ?? "id")} = ? LIMIT 1`,
   };

@@ -3,10 +3,13 @@ import * as AttributeMethods from "./attribute-methods.js";
 import type { Attributes } from "./attribute-methods.js";
 import { Connection, type DatabaseConfig } from "./connection-handling.js";
 import { ConnectionNotEstablished, RecordNotFound } from "./errors.js";
+import { Errors } from "./model-errors.js";
 import * as ModelSchema from "./model-schema.js";
 import * as Persistence from "./persistence.js";
 import { Relation, type OrderDirection } from "./relation.js";
+import { humanAttributeName, type Translate } from "./translation.js";
 import { cast } from "./type.js";
+import * as Validations from "./validations.js";
 
 export type ModelClass<T extends Base = Base> = (new (attributes?: Attributes | null) => T) &
   typeof Base;
@@ -24,7 +27,11 @@ export class Base {
   /** @internal */
   static _reflections: Map<string, Associations.Reflection> = new Map();
   /** @internal */
+  static _validators: Validations.Validator[] = [];
+  /** @internal */
   declare static _schema: ModelSchema.ModelSchema;
+  /** An application's translations, consulted before the built-in English messages. */
+  static i18n: Translate | null = null;
 
   /** @internal */
   declare _schema: ModelSchema.ModelSchema;
@@ -38,16 +45,22 @@ export class Base {
   _destroyed: boolean;
   /** @internal */
   _associationCache: Map<string, Base | null> | null;
+  /** @internal */
+  _beforeTypeCast: Map<number, unknown> | null;
+  /** @internal */
+  _errors: Errors | null;
 
   declare id: number | null;
 
   constructor(attributes: Attributes | null = null) {
     const schema = (this.constructor as typeof Base).schema;
-    this._row = schema.blankRow.slice();
-    this._original = schema.blankRow;
+    this._row = schema.defaultRow.slice();
+    this._original = schema.defaultRow;
     this._newRecord = true;
     this._destroyed = false;
     this._associationCache = null;
+    this._beforeTypeCast = null;
+    this._errors = null;
     if (attributes !== null) AttributeMethods.assignAttributes(this, attributes);
   }
 
@@ -81,6 +94,19 @@ export class Base {
 
   static belongsTo(name: string, options: Associations.BelongsToOptions): void {
     Associations.belongsTo(this, name, options);
+  }
+
+  static validates(
+    ...args: [...attributes: string[], options: Validations.ValidatesOptions]
+  ): void {
+    const options = args.at(-1) as Validations.ValidatesOptions;
+    const attributes = args.slice(0, -1) as string[];
+    if (!Object.hasOwn(this, "_validators")) this._validators = this._validators.slice();
+    this._validators.push(...Validations.buildValidators(attributes, options));
+  }
+
+  static humanAttributeName(attribute: string): string {
+    return humanAttributeName(this.name, attribute, this.i18n);
   }
 
   static all<T extends Base>(this: ModelClass<T>): Relation<T> {
@@ -138,15 +164,21 @@ export class Base {
     return record;
   }
 
-  static createBang<T extends Base>(
+  static async createBang<T extends Base>(
     this: ModelClass<T>,
     attributes: Attributes | null = null,
   ): Promise<T> {
-    return this.create(attributes);
+    const record = new this(attributes);
+    Persistence.saveBang(record);
+    return record;
   }
 
   readAttribute(name: string): unknown {
     return AttributeMethods.readAttribute(this, name);
+  }
+
+  readAttributeBeforeTypeCast(name: string): unknown {
+    return AttributeMethods.readAttributeBeforeTypeCast(this, name);
   }
 
   writeAttribute(name: string, value: unknown): void {
@@ -181,8 +213,20 @@ export class Base {
     return !this._newRecord && !this._destroyed;
   }
 
+  get errors(): Errors {
+    return (this._errors ??= new Errors(this));
+  }
+
+  async isValid(): Promise<boolean> {
+    return Persistence.isValid(this);
+  }
+
   async save(): Promise<boolean> {
     return Persistence.save(this);
+  }
+
+  async saveBang(): Promise<true> {
+    return Persistence.saveBang(this);
   }
 
   async update(attributes: Attributes): Promise<boolean> {

@@ -25,3 +25,13 @@ export class UnknownPrimaryKey extends ActiveRecordError {
     super(`Unknown primary key for table ${String(model.tableName)} in model ${model.name}.`);
   }
 }
+
+export class RecordInvalid extends ActiveRecordError {
+  override name = "RecordInvalid";
+  readonly record: unknown;
+
+  constructor(record: { errors: { fullMessages: string[] } }) {
+    super(`Validation failed: ${record.errors.fullMessages.join(", ")}`);
+    this.record = record;
+  }
+}

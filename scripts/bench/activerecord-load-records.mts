@@ -34,6 +34,27 @@ class SpikeStory extends SpikeBase {
   }
 }
 
+function validations(model: {
+  validates(attribute: string, options: Record<string, unknown>): void;
+}): void {
+  model.validates("c1", { presence: true, length: { maximum: 20 } });
+  model.validates("c0", { numericality: { onlyInteger: true } });
+}
+
+class ValidatedStory extends Base {
+  static {
+    this.tableName = "stories";
+    validations(this);
+  }
+}
+
+class ValidatedSpikeStory extends SpikeBase {
+  static {
+    this.tableName = "stories";
+    validations(this);
+  }
+}
+
 type Row = Record<string, unknown>;
 
 function asRows(records: Promise<object[]>): Promise<Row[]> {
@@ -46,6 +67,7 @@ interface Side {
   parent(row: Row): unknown;
   find(id: number): Promise<unknown>;
   insert(): Promise<unknown[]>;
+  insertValidated(): Promise<unknown>;
   update(written: unknown[]): Promise<void>;
   reset(): Promise<void>;
   pluck?(): Promise<unknown>;
@@ -78,6 +100,11 @@ function driverSide(): Side {
       db.exec("COMMIT");
       return ids;
     },
+    async insertValidated() {
+      db.exec("BEGIN");
+      for (let i = 0; i < ROWS; i++) insert.get(WRITTEN.c0, WRITTEN.c1, WRITTEN.c2);
+      db.exec("COMMIT");
+    },
     async update(ids) {
       db.exec("BEGIN");
       for (const id of ids) update.run("changed", id);
@@ -93,6 +120,7 @@ async function spikeSide(): Promise<Side> {
   db.exec(CREATE);
   db.exec(SEED);
   await SpikeStory.loadSchema();
+  await ValidatedSpikeStory.loadSchema();
   return {
     load: () => asRows(SpikeStory.all().toArray()),
     loadWithParent: () => asRows(SpikeStory.includes("parent").toArray()),
@@ -104,6 +132,11 @@ async function spikeSide(): Promise<Side> {
       for (let i = 0; i < ROWS; i++) records.push(await SpikeStory.create(WRITTEN));
       db.exec("COMMIT");
       return records;
+    },
+    async insertValidated() {
+      db.exec("BEGIN");
+      for (let i = 0; i < ROWS; i++) await ValidatedSpikeStory.create(WRITTEN);
+      db.exec("COMMIT");
     },
     async update(records) {
       db.exec("BEGIN");
@@ -120,6 +153,7 @@ async function activeRecordSide(): Promise<Side> {
   await conn.execute(CREATE);
   await conn.execute(SEED);
   await Story.loadSchema();
+  await ValidatedStory.loadSchema();
   await Story.first();
   return {
     load: () => asRows(Story.all().toArray()),
@@ -132,6 +166,11 @@ async function activeRecordSide(): Promise<Side> {
         for (let i = 0; i < ROWS; i++) records.push(await Story.create(WRITTEN));
       });
       return records;
+    },
+    async insertValidated() {
+      await Base.transaction(async () => {
+        for (let i = 0; i < ROWS; i++) await ValidatedStory.create(WRITTEN);
+      });
     },
     async update(records) {
       await Base.transaction(async () => {
@@ -170,6 +209,7 @@ async function measure(side: Side): Promise<Record<string, number>> {
     let written: unknown[] = [];
     const insert = await time(async () => void (written = await side.insert()));
     const update = await time(() => side.update(written));
+    const validated = await time(() => side.insertValidated());
     await side.reset();
     const pluck = side.pluck ? await time(side.pluck) : null;
     if (run === 0) continue;
@@ -180,6 +220,7 @@ async function measure(side: Side): Promise<Record<string, number>> {
     record("load with belongsTo preloaded", preload);
     record("insert", insert);
     record("update one column", update);
+    record("insert, three validations", validated);
     if (pluck !== null) record("pluck every column", pluck);
   }
   const medians: Record<string, number> = {};

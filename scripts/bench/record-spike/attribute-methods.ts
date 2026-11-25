@@ -28,8 +28,13 @@ function readerFor({ index, type }: Column): AttributeReader {
 function writerFor({ index, type }: Column): AttributeWriter {
   return (record, value) => {
     if (record._original === null) record._original = record._row.slice();
-    record._row[index] =
-      type === "datetime" && isDatabaseDatetime(value) ? value : cast(type, value);
+    const casted = type === "datetime" && isDatabaseDatetime(value) ? value : cast(type, value);
+    record._row[index] = casted;
+    if (casted !== value && type === "integer") {
+      (record._beforeTypeCast ??= new Map()).set(index, value);
+    } else if (record._beforeTypeCast !== null) {
+      record._beforeTypeCast.delete(index);
+    }
   };
 }
 
@@ -59,6 +64,14 @@ export function defineAttributeMethods(schema: ModelSchema): void {
 export function readAttribute(record: Base, name: string): unknown {
   const index = record._schema.columnIndex.get(name);
   return index === undefined ? null : record._schema.readers[index].call(record);
+}
+
+/** What was assigned, where the cast changed it; otherwise the value the record holds. */
+export function readAttributeBeforeTypeCast(record: Base, name: string): unknown {
+  const index = record._schema.columnIndex.get(name);
+  if (index === undefined) return null;
+  const raw = record._beforeTypeCast;
+  return raw !== null && raw.has(index) ? raw.get(index) : record._row[index];
 }
 
 export function writeAttribute(record: Base, name: string, value: unknown): void {
@@ -118,4 +131,5 @@ export function changes(record: Base): Record<string, [unknown, unknown]> {
 
 export function changesApplied(record: Base): void {
   record._original = null;
+  record._beforeTypeCast = null;
 }

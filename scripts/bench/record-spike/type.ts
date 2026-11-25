@@ -12,8 +12,9 @@ function castInteger(value: unknown): number | null {
   if (typeof value === "bigint") return Number(value);
   if (typeof value === "boolean") return value ? 1 : 0;
   if (typeof value === "string") {
+    if (value.trim() === "") return null;
     const n = Number.parseInt(value, 10);
-    return Number.isNaN(n) ? null : n;
+    return Number.isNaN(n) ? 0 : n;
   }
   return null;
 }
