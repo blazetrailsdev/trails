@@ -156,12 +156,12 @@ export async function fetchSource(
   return { ref: source.origin.ref, sha };
 }
 
+const CLONE_ATTEMPTS = 5;
+const CLONE_BACKOFF_MS = 2000;
+
 async function cloneRef(source: UpstreamSource, ref: string, dest: string): Promise<string> {
   console.log(`[${source.name}] cloning ${source.origin.url}@${ref}...`);
   await mkdir(dirname(dest), { recursive: true });
-  // GitHub intermittently answers a clone with HTTP 403/5xx from CI runners;
-  // one such answer used to fail a whole shard's `pnpm build` (tzinfo's
-  // build:data). Retry with exponential backoff, clearing any partial clone.
   for (let attempt = 1; ; attempt++) {
     try {
       await execFileAsync("git", ["clone", "--depth=1", "--branch", ref, source.origin.url, dest]);
@@ -178,9 +178,6 @@ async function cloneRef(source: UpstreamSource, ref: string, dest: string): Prom
   }
   return git(["rev-parse", "HEAD"], dest);
 }
-
-const CLONE_ATTEMPTS = 5;
-const CLONE_BACKOFF_MS = 2000;
 
 /**
  * Fetch `ref` as a candidate into `vendor/<name>/<versionDir(ref)>/`, beside
