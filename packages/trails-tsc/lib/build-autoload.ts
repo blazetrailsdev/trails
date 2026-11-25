@@ -29,6 +29,7 @@ interface BootApplication extends BootEngine {
   config: BootEngine["config"] & { helpersPaths?: readonly string[] };
   railties?(): Iterable<object>;
   initializers: { tsort(): BootInitializer[] };
+  initialized?(): boolean;
   autoloaders?: Partial<Record<"main" | "once", BootLoader>>;
 }
 
@@ -49,8 +50,15 @@ export async function buildAutoload({
 
   const trails = (TopLevel as { Trails?: { application?: BootApplication | null } }).Trails;
   const application = trails?.application;
+  if (views && application != null) {
+    for (const dir of application.paths?.().get("app/views")?.existent() ?? []) {
+      if ((await File.isDirectoryAsync(dir)) && `${dir}/`.includes("/app/views/")) {
+        await buildViews({ cwd: application.config.root ?? cwd, viewsDir: dir, inPlace: true });
+      }
+    }
+  }
   let loaders: BootLoader[] = [];
-  if (application != null) {
+  if (application != null && !application.initialized?.()) {
     loaders = [application.autoloaders?.once, application.autoloaders?.main].filter(
       (loader): loader is BootLoader => loader != null,
     );
@@ -88,7 +96,7 @@ export async function buildAutoload({
     );
     if (await File.isExistAsync(environmentFile)) {
       const trailsDir = File.expandPath(".trails", root);
-      await writeBoot(trailsDir, root, application, environmentFile, views);
+      await writeBoot(trailsDir, root, application, environmentFile);
       await writeEntry(trailsDir, root, applicationFile, environmentFile, tagged);
     }
   }
@@ -345,7 +353,6 @@ async function writeBoot(
   root: string,
   application: BootApplication,
   environmentFile?: string,
-  views = false,
 ): Promise<void> {
   const path = getPath();
   const engines = [application, ...(application.railties?.() ?? [])].filter(
@@ -368,9 +375,6 @@ async function writeBoot(
       if (key === "app/views") {
         for (const dir of node.existent()) {
           if (!(await File.isDirectoryAsync(dir))) continue;
-          if (views && engine === application && `${dir}/`.includes("/app/views/")) {
-            await buildViews({ cwd: root, viewsDir: dir, inPlace: true });
-          }
           await viewEntries(trailsDir, root, dir, viewImports);
         }
         continue;
