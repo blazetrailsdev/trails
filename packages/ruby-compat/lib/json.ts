@@ -6,9 +6,6 @@ import { rbObjClassname } from "./object.js";
 
 const globalJSON = globalThis.JSON;
 
-/** @internal The json gem's `ignore = ws | comment` between tokens
- * (`vendor/ruby/v3.3.11/ext/json/parser/parser.rl:105-108`): a comment is read as
- * whitespace, an unterminated `/*` and a `//` with no closing `cr` (`:106`) raise. */
 function stripJsonComments(value: string): string {
   let out = "";
   let index = 0;
@@ -22,13 +19,11 @@ function stripJsonComments(value: string): string {
       out += value.slice(start, ++index);
     } else if (char === "/" && value[index + 1] === "*") {
       const end = value.indexOf("*/", index + 2);
-      if (end === -1) throw new SyntaxError(`unexpected token at '${value.slice(index)}'`);
-      index = end + 2;
-      out += " ";
+      index = end === -1 ? value.length : end + 2;
+      out += end === -1 ? "/*" : " ";
     } else if (char === "/" && value[index + 1] === "/") {
       const end = value.indexOf("\n", index + 2);
-      if (end === -1) throw new SyntaxError(`unexpected token at '${value.slice(index)}'`);
-      index = end;
+      index = end === -1 ? value.length : end;
       out += " ";
     } else {
       out += char;
@@ -85,8 +80,7 @@ export namespace JSON {
    * or into a new `objectClass` instance filled through its `[]=`
    * (`parser.rl:139-143,179`).
    *
-   * `quirksMode` is accepted and read by nothing, as json 2.x does.
-   *
+   * @inventedArm try — CONVERGEABLE json-parse-skips-comments-in-one-pass-and-takes-options
    * @noRailsEquivalent PERMANENT — Ruby stdlib `JSON.parse`
    * (`vendor/ruby/v3.3.11/ext/json/lib/json/common.rb:219`).
    */
@@ -96,7 +90,6 @@ export namespace JSON {
       symbolizeNames?: boolean;
       freeze?: boolean;
       objectClass?: new () => Hash<string, unknown>;
-      quirksMode?: boolean;
     },
   ): unknown {
     if (source instanceof Uint8Array) {
@@ -109,20 +102,24 @@ export namespace JSON {
     if (typeof source !== "string") {
       throw new TypeError(`no implicit conversion of ${rbObjClassname(source)} into String`);
     }
-    const { symbolizeNames, freeze, objectClass } = opts ?? {};
     const reviver =
-      symbolizeNames == null && freeze == null && objectClass == null
+      opts === undefined
         ? undefined
         : (_key: string, value: unknown): unknown => {
-            if (Array.isArray(value)) return freeze ? Object.freeze(value) : value;
+            if (Array.isArray(value)) return opts.freeze ? Object.freeze(value) : value;
             if (typeof value !== "object" || value === null) return value;
-            const hash = objectClass ? new objectClass() : new Hash<string, unknown>();
+            const hash = opts.objectClass ? new opts.objectClass() : new Hash<string, unknown>();
             for (const [name, v] of Object.entries(value)) {
-              hash.set(symbolizeNames ? `:${name}` : name, v);
+              hash.set(opts.symbolizeNames ? `:${name}` : name, v);
             }
-            return freeze ? hash.freeze() : hash;
+            return opts.freeze ? hash.freeze() : hash;
           };
-    return globalJSON.parse(stripJsonComments(source), reviver);
+    try {
+      return globalJSON.parse(source, reviver);
+    } catch (error) {
+      if (!(error instanceof SyntaxError)) throw error;
+      return globalJSON.parse(stripJsonComments(source), reviver);
+    }
   }
 
   /**
