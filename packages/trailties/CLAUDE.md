@@ -356,3 +356,18 @@ Ruled by the operator on 2026-11-19.
   web-console assertion, belong to the post-launch web-console RFC
   (`web-console-railtie-and-app-generator-entry`); RFC 0248 neither ports nor
   waits for them.
+
+## Config files are TypeScript modules (`config_for`, `ActiveSupport::ConfigurationFile`)
+
+Rails' `Application#config_for` (`vendor/rails/v8.0.5.2/railties/lib/rails/application.rb:292-316`)
+reads `config/<name>.yml` through `ActiveSupport::ConfigurationFile.parse`,
+which runs ERB and rescues `Psych::SyntaxError`. A trails app's config files
+are TypeScript modules: `configFor` loads `config/<name>.ts` / `.js` and reads
+its default export, and never reads YAML. Its miss arm names the `.ts` path
+(`Could not load configuration. No such file - <path>.ts`), where Rails'
+`application.rb:315` names the `.yml` one. The YAML-only arms (ERB evaluation,
+the "YAML syntax error occurred while parsing" message, a patched
+`YAML.load` dropping `symbolize_names`) have no counterpart, so a Rails test
+asserting one (`railties/test/application/configuration_test.rb:2687`,
+`:2698`, `:2723`) is parked as `it.skip` under a `PERMANENT-SKIP:` line citing
+this section. Ruled by the operator on 2026-11-25.
