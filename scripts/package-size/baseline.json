@@ -23,13 +23,13 @@
   },
   "activesupport": {
     "tarball": {
-      "value": 450598
+      "value": 456478
     },
     "unpacked": {
-      "value": 2255610
+      "value": 2287603
     },
     "entries": {
-      "value": 737
+      "value": 746
     }
   },
   "arel": {

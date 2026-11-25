@@ -211,6 +211,7 @@
     "./dist/duration.js",
     "./dist/encrypted-configuration.js",
     "./dist/error-reporter.js",
+    "./dist/evented-file-update-checker.js",
     "./dist/execution-context/test-helper.js",
     "./dist/execution-wrapper.js",
     "./dist/executor/test-helper.js",

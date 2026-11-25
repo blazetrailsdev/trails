@@ -79,6 +79,8 @@
       "@blazetrails/sqlite3/engine/expo-sqlite": ["../../sqlite3/lib/engine/expo-sqlite.ts"],
       "@blazetrails/sqlite3": ["../../sqlite3/lib/index.ts"],
       "@blazetrails/nokogiri": ["../../nokogiri/lib/index.ts"],
+      "@blazetrails/libxml-ruby": ["../../libxml-ruby/lib/libxml-ruby.ts"],
+      "@blazetrails/listen": ["../../listen/lib/listen.ts"],
       "@blazetrails/builder": ["../../builder/lib/builder.ts"],
       "@blazetrails/bcrypt": ["../../bcrypt/lib/index.ts"],
       "@blazetrails/date": ["../../date/lib/index.ts"],

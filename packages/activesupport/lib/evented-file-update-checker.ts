@@ -17,15 +17,13 @@ import { transformKeysBang } from "./hash-utils.js";
 
 export class EventedFileUpdateChecker<R = unknown> {
   private _block: () => R;
-  private _core!: EventedFileUpdateChecker.Core;
+  private _core: EventedFileUpdateChecker.Core;
 
   /** @internal */
-  protected constructor(block?: () => R) {
-    if (!block) {
-      throw new ArgumentError("A block is required to initialize an EventedFileUpdateChecker");
-    }
-
+  protected constructor(block: () => R, core: EventedFileUpdateChecker.Core) {
     this._block = block;
+    this._core = core;
+    ObjectSpace.defineFinalizer(this, this._core.finalizer());
   }
 
   static async new<R>(
@@ -33,10 +31,12 @@ export class EventedFileUpdateChecker<R = unknown> {
     dirs: Record<string, string | string[]> = {},
     block?: () => R,
   ): Promise<EventedFileUpdateChecker<R>> {
-    const checker = rbClassNewInstance(this, block) as EventedFileUpdateChecker<R>;
-    checker._core = await EventedFileUpdateChecker.Core.new(files, dirs);
-    ObjectSpace.defineFinalizer(checker, checker._core.finalizer());
-    return checker;
+    if (!block) {
+      throw new ArgumentError("A block is required to initialize an EventedFileUpdateChecker");
+    }
+
+    const core = await EventedFileUpdateChecker.Core.new(files, dirs);
+    return rbClassNewInstance(this, block, core) as EventedFileUpdateChecker<R>;
   }
 
   inspect(): string {
