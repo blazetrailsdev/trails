@@ -148,9 +148,8 @@ describe("ShareLockTest", () => {
     }
   });
 
-  it.skip("killed thread loses lock", () => {
-    // PERMANENT-SKIP: ruby-compat's Thread#kill marks the thread dead but cannot unwind a JS body awaiting a promise, so the killed thread's ensure never runs and its share is never released (thread.ts, Thread#exit).
-  });
+  // BLOCKED: thread-kill-unwinds-awaiting-body
+  it.skip("killed thread loses lock", () => {});
 
   it("exclusive conflicting purpose", async () => {
     for (const useUpgrading of [false, true]) {

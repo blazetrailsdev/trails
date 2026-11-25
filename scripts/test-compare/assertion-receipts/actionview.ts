@@ -189,4 +189,21 @@ export const actionview: Record<string, AssertionReceipt[]> = {
         'template/template_test.rb:150 `render.encoding` is Encoding::UTF_8 — a JS string carries no encoding tag (CLAUDE.md, "A String has no encoding tag either")',
     },
   ],
+  "actionview:template/template_test.rb › TestERBTemplate › strict locals with non ascii default values":
+    [
+      {
+        kind: "assert_equal",
+        value: null,
+        as: null,
+        reason:
+          'template/template_test.rb:344 `source.encoding` — a JS string carries no encoding tag (CLAUDE.md, "A String has no encoding tag either")',
+      },
+      {
+        kind: "assert_equal",
+        value: null,
+        as: null,
+        reason:
+          'template/template_test.rb:347 `render.encoding` — a JS string carries no encoding tag (CLAUDE.md, "A String has no encoding tag either")',
+      },
+    ],
 };

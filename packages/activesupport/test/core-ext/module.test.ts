@@ -10,6 +10,7 @@ import {
   constDefined,
   rbModRemoveConst,
 } from "@blazetrails/ruby-compat";
+import { rbCBasicObject as BasicObject } from "@blazetrails/ruby-compat";
 import { delegate, delegateMissingTo } from "../../lib/module-ext.js";
 import { DelegationError } from "../../lib/delegation.js";
 import { callerLocations } from "../../lib/deprecation.js";
@@ -110,6 +111,17 @@ class Event {
   }
 }
 delegate.call(Event.prototype, "foo", { to: "case" });
+
+class BasicEvent extends BasicObject {
+  constructor(public case_: any) {
+    super();
+  }
+
+  get case() {
+    return this.case_;
+  }
+}
+delegate.call(BasicEvent.prototype, "foo", { to: "case" });
 
 class SideEffect {
   ints = [1, 2, 3];
@@ -226,6 +238,17 @@ class Cavern {
   }
 }
 delegateMissingTo.call(Cavern, "target");
+
+class BasicCavern extends BasicObject {
+  constructor(public _target: any) {
+    super();
+  }
+
+  get target() {
+    return this._target;
+  }
+}
+delegateMissingTo.call(BasicCavern, "target");
 
 describe("ModuleTest", () => {
   let david: Someone & Record<string, any>;
@@ -539,13 +562,25 @@ describe("ModuleTest", () => {
     assertNil(deserializedArray[1]);
   });
 
+  it("delegate to missing raises delegation error on basic object", async () => {
+    const cavern = new BasicCavern(null);
+
+    await assertRaises([DelegationError], {}, () => (cavern as any).someMethod);
+  });
+
+  it("delegate raises delegation error on basic object", async () => {
+    const cavern = new BasicEvent(null) as BasicEvent & Record<string, any>;
+
+    await assertRaises([DelegationError], {}, () => cavern.foo());
+  });
+
   it("delegate with case", () => {
     const event = new Event(new Tester()) as Event & Record<string, any>;
     expect(event.foo()).toEqual(1);
   });
 
+  // PERMANENT-SKIP: Ruby method visibility is not carried at run time (CLAUDE.md, "Method visibility is compile-time only").
   it.skip("private delegate", () => {
-    // PERMANENT-SKIP: Ruby method visibility is not carried at run time (CLAUDE.md, "Method visibility is compile-time only").
     class Location {
       "@place": Somewhere;
       constructor(place: Somewhere) {
@@ -563,8 +598,8 @@ describe("ModuleTest", () => {
     assert("city" in place);
   });
 
+  // PERMANENT-SKIP: Ruby method visibility is not carried at run time (CLAUDE.md, "Method visibility is compile-time only").
   it.skip("private delegate prefixed", () => {
-    // PERMANENT-SKIP: Ruby method visibility is not carried at run time (CLAUDE.md, "Method visibility is compile-time only").
     class Location {
       "@place": Somewhere;
       constructor(place: Somewhere) {
@@ -588,8 +623,8 @@ describe("ModuleTest", () => {
     assert("the_city" in place);
   });
 
+  // PERMANENT-SKIP: Ruby method visibility is not carried at run time (CLAUDE.md, "Method visibility is compile-time only").
   it.skip("private delegate with private option", () => {
-    // PERMANENT-SKIP: Ruby method visibility is not carried at run time (CLAUDE.md, "Method visibility is compile-time only").
     class Location {
       "@place": Somewhere;
       constructor(place: Somewhere) {
@@ -607,8 +642,8 @@ describe("ModuleTest", () => {
     assert("city" in place);
   });
 
+  // PERMANENT-SKIP: Ruby method visibility is not carried at run time (CLAUDE.md, "Method visibility is compile-time only").
   it.skip("some public some private delegate with private option", () => {
-    // PERMANENT-SKIP: Ruby method visibility is not carried at run time (CLAUDE.md, "Method visibility is compile-time only").
     class Location {
       "@place": Somewhere;
       constructor(place: Somewhere) {
@@ -626,8 +661,8 @@ describe("ModuleTest", () => {
     assert("city" in place);
   });
 
+  // PERMANENT-SKIP: Ruby method visibility is not carried at run time (CLAUDE.md, "Method visibility is compile-time only").
   it.skip("private delegate prefixed with private option", () => {
-    // PERMANENT-SKIP: Ruby method visibility is not carried at run time (CLAUDE.md, "Method visibility is compile-time only").
     class Location {
       "@place": Somewhere;
       constructor(place: Somewhere) {

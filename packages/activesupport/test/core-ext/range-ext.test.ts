@@ -13,6 +13,9 @@ import "../../lib/core-ext/range/compare-range.js";
 import "../../lib/core-ext/range/conversions.js";
 import "../../lib/core-ext/range/each.js";
 import "../../lib/core-ext/range/overlap.js";
+import "../../lib/core-ext/range/sole.js";
+import { SoleItemExpectedError } from "../../lib/core-ext/enumerable.js";
+import { assertRaises } from "../../lib/testing/assertions.js";
 
 function assertOperator<T>(o1: Range<T>, operator: "overlap", o2: Range<T>): void {
   expect(o1[operator](o2)).toBeTruthy();
@@ -338,5 +341,19 @@ describe("RangeTest", () => {
   it("date time with step", () => {
     const datetime = DateTime.now();
     expect([...new Range(DateTimeExt.ago(datetime, 3600), datetime).step(1)]).toBeTruthy();
+  });
+
+  it("sole", async () => {
+    expect(new Range(1, 1).sole()).toBe(1);
+
+    await assertRaises([SoleItemExpectedError], { match: "no item found" }, () =>
+      new Range(2, 1).sole(),
+    );
+
+    await assertRaises(
+      [SoleItemExpectedError],
+      { match: "infinite range '..1' cannot represent a sole item" },
+      () => new Range(null, 1).sole(),
+    );
   });
 });

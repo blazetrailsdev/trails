@@ -283,6 +283,13 @@ describe("TimeWithZoneTest", () => {
     expect(twz.xmlschema()).toBe("1999-12-31T19:00:00-05:00");
   });
 
+  it("xmlschema with datetime local time", () => {
+    const tz = TimeZone.find("America/New_York")!;
+    const twz = new TimeWithZone(null, tz, DateTime.civil(2025, 11, 7, 12));
+
+    expect(twz.xmlschema()).toBe("2025-11-07T12:00:00-05:00");
+  });
+
   it("xmlschema with fractional seconds", () => {
     twz = twz.plus(0.1234560001);
     expect(twz.xmlschema(3)).toEqual("1999-12-31T19:00:00.123-05:00");

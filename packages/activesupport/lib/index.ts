@@ -347,6 +347,7 @@ import "./core-ext/date/zones.js";
 import "./core-ext/date-and-time/zones.js";
 import "./core-ext/array/access.js";
 import "./core-ext/enumerable.js";
+import "./core-ext/range/sole.js";
 export * from "./core-ext/time/conversions.js";
 export { rfc3339 } from "./time-ext.js";
 export * from "./core-ext/time/compatibility.js";

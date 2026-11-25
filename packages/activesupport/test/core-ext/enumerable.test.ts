@@ -539,7 +539,6 @@ describe("EnumerableTests", () => {
     ]).toEqual(expected);
   });
 
-  it.skip("doesnt bust constant cache", () => {
-    // PERMANENT-SKIP: MRI-only — `skip "Only applies to MRI" unless defined?(RubyVM.stat)` (enumerable_test.rb:404)
-  });
+  // PERMANENT-SKIP: MRI-only — `skip "Only applies to MRI" unless defined?(RubyVM.stat)` (enumerable_test.rb:404)
+  it.skip("doesnt bust constant cache", () => {});
 });

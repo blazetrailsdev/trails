@@ -188,6 +188,7 @@
     "./dist/core-ext/range/conversions.js",
     "./dist/core-ext/range/each.js",
     "./dist/core-ext/range/overlap.js",
+    "./dist/core-ext/range/sole.js",
     "./dist/core-ext/securerandom.js",
     "./dist/core-ext/string/behavior.js",
     "./dist/core-ext/string/conversions.js",

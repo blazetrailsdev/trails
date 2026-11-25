@@ -52,6 +52,66 @@ describe("IsolatedExecutionStateTest", () => {
     expect(IsolatedExecutionState.get("test")).toBeUndefined();
   });
 
+  it("#share_with copies state from another thread", async () => {
+    IsolatedExecutionState.set("foo", "bar");
+    IsolatedExecutionState.set("baz", "qux");
+
+    const t1 = Thread.current();
+    let result: Record<string, unknown> | null = null;
+
+    await new Thread(() => {
+      IsolatedExecutionState.shareWith(t1);
+      result = {
+        foo: IsolatedExecutionState.get("foo"),
+        baz: IsolatedExecutionState.get("baz"),
+      };
+    }).join();
+
+    expect(result!.foo).toBe("bar");
+    expect(result!.baz).toBe("qux");
+  });
+
+  it("#share_with restores original state after block", async () => {
+    IsolatedExecutionState.set("original", "value");
+
+    const t1 = Thread.current();
+    IsolatedExecutionState.set("foo", "parent");
+
+    await new Thread(() => {
+      IsolatedExecutionState.set("foo", "child");
+      IsolatedExecutionState.set("bar", "child_only");
+
+      IsolatedExecutionState.shareWith(t1);
+      expect(IsolatedExecutionState.get("foo")).toBe("parent");
+      expect(IsolatedExecutionState.get("bar")).toBeUndefined();
+    }).join();
+  });
+
+  it("#share_with with except parameter accepts single key or array", async () => {
+    IsolatedExecutionState.set("foo", "bar");
+    IsolatedExecutionState.set("secret1", "should not copy");
+    IsolatedExecutionState.set("secret2", "also should not copy");
+    IsolatedExecutionState.set("keep", "keep this");
+
+    const t1 = Thread.current();
+    let result: Record<string, unknown> | null = null;
+
+    await new Thread(() => {
+      IsolatedExecutionState.shareWith(t1, { except: ["secret1", "secret2"] });
+      result = {
+        foo: IsolatedExecutionState.get("foo"),
+        secret1: IsolatedExecutionState.get("secret1"),
+        secret2: IsolatedExecutionState.get("secret2"),
+        keep: IsolatedExecutionState.get("keep"),
+      };
+    }).join();
+
+    expect(result!.foo).toBe("bar");
+    expect(result!.secret1).toBeUndefined();
+    expect(result!.secret2).toBeUndefined();
+    expect(result!.keep).toBe("keep this");
+  });
+
   it("get/set/has/delete on the fallback (no scope)", () => {
     expect(IsolatedExecutionState.isKey("k")).toBe(false);
     IsolatedExecutionState.set("k", 1);

@@ -223,6 +223,48 @@ describe("TestTSETemplate", () => {
     expect(await render()).toBe("Hello");
   });
 
+  it("locals with parentheses", async () => {
+    template = newTemplate("<%# locals: (message: '(Hello)') -%>\n<%= message %>");
+    expect(await render()).toBe("(Hello)");
+
+    template = newTemplate("<%# locals: (message: '(Hello') -%>\n<%= message %>");
+    expect(await render()).toBe("(Hello");
+
+    template = newTemplate("<%# locals: (message: 'Hello)') -%>\n<%= message %>");
+    expect(await render()).toBe("Hello)");
+  });
+
+  it("locals can spread to multiple lines", async () => {
+    const source = [
+      "<%# locals: (arg_1:,",
+      "             arg_2: null,",
+      "             arg_3: []) -%>",
+      "<%= arg_1 %><%= arg_2 %><%= arg_3 %>",
+    ].join("\n");
+    template = newTemplate(source);
+    expect(await render({ arg_1: "First" })).toBe("First[]");
+  });
+
+  it("locals can spread to multiple lines with closing parenthesis on diff line", async () => {
+    const source = [
+      "<%# locals: (",
+      "              arg_1:,",
+      "              arg_2: null,",
+      "              arg_3: []",
+      "             ) -%>",
+      "<%= arg_1 %><%= arg_2 %><%= arg_3 %>",
+    ].join("\n");
+    template = newTemplate(source);
+    expect(await render({ arg_1: "First" })).toBe("First[]");
+  });
+
+  it("strict locals with non ascii default values", async () => {
+    const source = '<%# locals: (label: "caf\u00e9") -%>\n<p><%= label %> \u00fc</p>';
+
+    template = newTemplate(source);
+    expect(await render()).toBe("<p>caf\u00e9 \u00fc</p>");
+  });
+
   it("required locals must be specified", async () => {
     const error = await assertRaises([Template.Error], {}, async () => {
       template = newTemplate("<%# locals: (message:) -%>");

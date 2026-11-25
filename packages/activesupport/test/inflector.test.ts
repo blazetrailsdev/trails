@@ -1,4 +1,7 @@
-import { afterAll, beforeAll, beforeEach, describe, it, expect } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, it, expect, vi } from "vitest";
+import { LoadError } from "@blazetrails/ruby-compat";
+import { ActiveSupport } from "../lib/namespaces.js";
+import { assertRaises } from "../lib/testing/assertions.js";
 import {
   pluralize,
   singularize,
@@ -390,6 +393,37 @@ describe("InflectorTest", () => {
     runSafeConstantizeTestsOn((string) => safeConstantize(string));
   });
 
+  it("safe constantize treats load error constant name as literal", async () => {
+    const mismatches: Record<string, string> = {
+      "Example.Channel": "ExampleXChannel",
+      "Example.Channel::Nested": "ExampleXChannel",
+    };
+
+    for (const [requestedName, reportedName] of Object.entries(mismatches)) {
+      const error = new LoadError(`Unable to autoload constant ${reportedName}`);
+
+      const stub = vi.spyOn(ActiveSupport.Inflector, "constantize").mockImplementation(() => {
+        throw error;
+      });
+      try {
+        await assertRaises([LoadError], {}, () => safeConstantize(requestedName));
+      } finally {
+        stub.mockRestore();
+      }
+    }
+
+    const matchingError = new LoadError("Unable to autoload constant Example.Channel");
+
+    const stub = vi.spyOn(ActiveSupport.Inflector, "constantize").mockImplementation(() => {
+      throw matchingError;
+    });
+    try {
+      expect(safeConstantize("Example.Channel::Nested")).toBeUndefined();
+    } finally {
+      stub.mockRestore();
+    }
+  });
+
   it("pluralize plurals", () => {
     expect(pluralize("plurals")).toEqual("plurals");
     expect(pluralize("Plurals")).toEqual("Plurals");
@@ -494,6 +528,16 @@ describe("InflectorTest", () => {
 
   it("camelize with underscores", () => {
     expect(camelize("Camel_Case")).toBe("CamelCase");
+  });
+
+  it("overlapping acronyms", () => {
+    withInflections((inflect) => {
+      inflect.acronym("USD");
+      inflect.acronym("USDC");
+
+      expect(underscore("USD")).toBe("usd");
+      expect(underscore("USDC")).toBe("usdc");
+    });
   });
 
   it("acronyms", () => {

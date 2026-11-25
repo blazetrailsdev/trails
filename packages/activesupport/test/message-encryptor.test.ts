@@ -176,9 +176,8 @@ describe("MessageEncryptorTest", () => {
     assertAeadNotDecrypted(encryptor, [text, iv, authTag.slice(0, -1)].join("--"));
   });
 
-  it.skip("backwards compatibility decrypt previously encrypted messages without metadata", () => {
-    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — marshal
-  });
+  // PERMANENT-SKIP: the messages were Marshal-dumped by Ruby (CLAUDE.md, "Runtime facts Node does not expose": a Marshal blob written by Ruby, ruled 2026-11-19).
+  it.skip("backwards compatibility decrypt previously encrypted messages without metadata", () => {});
 
   it("inspect does not show secrets", () => {
     const encryptor = new MessageEncryptor(secret, undefined, { cipher: "aes-256-gcm" });

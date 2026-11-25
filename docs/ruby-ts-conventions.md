@@ -291,6 +291,12 @@ a genuine gap:
   - `initialize` (only in: `parser/argument.rb`, `parser/option.rb`; ported in TS as `initialize`)
 - PERMANENT: trailties CLAUDE.md, "A Gemfile is a package.json (`GemfileEntry`, `bundle install`, gemspec)": Puma (`web_server_gemfile_entry`), propshaft (`asset_pipeline_gemfile_entry`), jbuilder (`jbuilder_gemfile_entry`) and `bundle lock --add-platform` (`add_bundler_platforms`) are rows that section marks not ported.
   - `web_server_gemfile_entry`, `asset_pipeline_gemfile_entry`, `jbuilder_gemfile_entry`, `add_bundler_platforms` (only in: `generators/app_base.rb`)
+- PERMANENT: Ruby-engine facts with no Node analogue. `jruby?` (generators/app_base.rb:747-749) is `defined?(JRUBY_VERSION)`, and `version_manager_ruby_version` (:751-761) fills only `ruby-version.tt` from rbenv, rvm and `RUBY_ENGINE`; a trails app runs on Node and writes no `.ruby-version`.
+  - `jruby?`, `version_manager_ruby_version` (only in: `generators/app_base.rb`)
+- PERMANENT: `ParserExtractor` ports its `if defined?(Prism)` arm (source_annotation_extractor.rb:25-33) over the TypeScript scanner; `Parser < Ripper` with `comments` / `on_comment` (:35-47) is the fallback for a Ruby without Prism and has no JS counterpart.
+  - `comments`, `on_comment` (only in: `source_annotation_extractor.rb`)
+- PERMANENT: `LineFiltering.extended` picks `MT5#run` or `MT6#run_suite` by `Minitest::VERSION` (test_unit/line_filtering.rb:7-15). trails has one runner, so the port carries the single `run` arm, and Minitest is not ported (operator ruling, 2026-11-24).
+  - `run_suite` (only in: `test_unit/line_filtering.rb`)
 - PERMANENT: trailties CLAUDE.md, "A Gemfile is a package.json (`GemfileEntry`, `bundle install`, gemspec)": `github` writes a Gemfile `github` source block, and `append_file_with_newline` appends a Gemfile line for `gem` / `gem_group` / `github` (generators/actions.rb:125-140, :511-515); `gem` writes the `package.json` entry instead, so neither has a mapped artifact.
   - `github`, `append_file_with_newline` (only in: `generators/actions.rb`, `generators/base.rb`)
 - PERMANENT: trailties CLAUDE.md, "A Gemfile is a package.json (`GemfileEntry`, `bundle install`, gemspec)": benchmark-ips (`add_ips_to_gemfile`, and the `ips_installed?` guard it sits behind, rails/benchmark/benchmark_generator.rb:18-27) is a row that section marks not ported, and `.ruby-version` (`ruby_version`, rails/app/app_generator.rb:54-56) maps onto `.node-version`, which `node_version` already writes.
