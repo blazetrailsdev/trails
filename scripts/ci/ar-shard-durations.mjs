@@ -2,9 +2,12 @@
 // Rebuilds scripts/ci/ar-shard-durations.json, the per-file timings
 // scripts/ci/duration-sequencer.ts balances the AR adapter shards with.
 //
-//   node scripts/ci/ar-shard-durations.mjs <run-id>
+//   node scripts/ci/ar-shard-durations.mjs <run-id>...
+//   node scripts/ci/ar-shard-durations.mjs --latest <n>
 //
-// <run-id> is a green `CI` run on main. Every leg of the SQLite, PostgreSQL,
+// Each <run-id> is a green `CI` run on main; `--latest <n>` takes the n most
+// recent ones. A file's time is its median across the runs, so one slow
+// hosted runner (about ±25% between jobs, trails#10272) does not skew it. Every leg of the SQLite, PostgreSQL,
 // MariaDB and numbered Trailties lanes is read, so each table covers every
 // file once.
 // A file vitest reports with no time (a skipped file) is recorded as 0; the
@@ -30,36 +33,84 @@ async function gh(args) {
   return stdout;
 }
 
-const runId = process.argv[2];
-if (!runId) {
-  console.error("usage: node scripts/ci/ar-shard-durations.mjs <run-id>");
+const args = process.argv.slice(2);
+let runIds = args;
+if (args[0] === "--latest") {
+  const n = Number(args[1]);
+  if (!(n > 0)) throw new Error("--latest takes a positive count");
+  const runs = JSON.parse(
+    await gh([
+      "run",
+      "list",
+      "-w",
+      "ci.yml",
+      "-b",
+      "main",
+      "-s",
+      "success",
+      "-e",
+      "push",
+      "-L",
+      String(n),
+      "--json",
+      "databaseId",
+    ]),
+  );
+  runIds = runs.map((r) => String(r.databaseId));
+}
+if (runIds.length === 0) {
+  console.error("usage: node scripts/ci/ar-shard-durations.mjs <run-id>... | --latest <n>");
   process.exit(2);
 }
 
-const { jobs } = JSON.parse(await gh(["run", "view", runId, "--json", "jobs"]));
-const out = {};
-for (const [adapter, pattern] of Object.entries(LANES)) {
-  const legs = jobs.filter((job) => pattern.test(job.name));
-  if (legs.length === 0) throw new Error(`run ${runId} has no ${adapter} legs`);
-  const table = {};
-  for (const leg of legs) {
-    if (leg.conclusion !== "success") throw new Error(`${leg.name} is ${leg.conclusion}`);
-    const log = await gh([
-      "api",
-      "--allow-escape-sequences",
-      `repos/{owner}/{repo}/actions/jobs/${leg.databaseId}/logs`,
-    ]);
-    for (const raw of log.split("\n")) {
-      const match = FILE_LINE.exec(
-        raw.replace(new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, "g"), ""),
-      );
-      if (!match || match[1].startsWith("packages/activerecord-cli/")) continue;
-      const ms = match[2] == null ? 0 : Number(match[2]) * (match[3] === "s" ? 1000 : 1);
-      table[match[1]] = Math.round(ms);
-    }
+const median = (xs) => {
+  const sorted = [...xs].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[mid] : Math.round((sorted[mid - 1] + sorted[mid]) / 2);
+};
+
+const samples = {};
+for (const runId of runIds) {
+  const { jobs } = JSON.parse(await gh(["run", "view", runId, "--json", "jobs"]));
+  for (const [adapter, table] of Object.entries(await readRun(runId, jobs))) {
+    samples[adapter] ??= {};
+    for (const [file, ms] of Object.entries(table)) (samples[adapter][file] ??= []).push(ms);
   }
+}
+const out = {};
+for (const adapter of Object.keys(LANES)) {
+  const table = Object.fromEntries(
+    Object.entries(samples[adapter]).map(([file, times]) => [file, median(times)]),
+  );
   out[adapter] = Object.fromEntries(Object.entries(table).sort(([a], [b]) => (a < b ? -1 : 1)));
-  console.log(`${adapter}: ${Object.keys(table).length} files from ${legs.length} legs`);
+  console.log(`${adapter}: ${Object.keys(table).length} files from ${runIds.length} runs`);
+}
+
+async function readRun(runId, jobs) {
+  const tables = {};
+  for (const [adapter, pattern] of Object.entries(LANES)) {
+    const legs = jobs.filter((job) => pattern.test(job.name));
+    if (legs.length === 0) throw new Error(`run ${runId} has no ${adapter} legs`);
+    const table = {};
+    for (const leg of legs) {
+      if (leg.conclusion !== "success") throw new Error(`${leg.name} is ${leg.conclusion}`);
+      const log = await gh([
+        "api",
+        "--allow-escape-sequences",
+        `repos/{owner}/{repo}/actions/jobs/${leg.databaseId}/logs`,
+      ]);
+      for (const raw of log.split("\n")) {
+        const match = FILE_LINE.exec(
+          raw.replace(new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, "g"), ""),
+        );
+        if (!match || match[1].startsWith("packages/activerecord-cli/")) continue;
+        const ms = match[2] == null ? 0 : Number(match[2]) * (match[3] === "s" ? 1000 : 1);
+        table[match[1]] = Math.round(ms);
+      }
+    }
+    tables[adapter] = table;
+  }
+  return tables;
 }
 
 // One line per adapter: the table is data, and a line per file would be
