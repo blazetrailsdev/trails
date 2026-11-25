@@ -218,10 +218,10 @@ export class Connection {
     }
 
     const ioptsForReset = iopts;
-    if (iopts.hostaddr == null || iopts.hostaddr === false) {
-      if (iopts.host != null && iopts.host !== false && String(iopts.host) !== "") {
-        iopts = await Connection.resolveHosts(iopts);
-      }
+    // eslint-disable-next-line no-empty
+    if (iopts.hostaddr != null && iopts.hostaddr !== false) {
+    } else if (iopts.host != null && iopts.host !== false && String(iopts.host) !== "") {
+      iopts = await this.resolveHosts(iopts);
     }
     const conn =
       ((await this.connectStart(iopts)) as T | null) ??
@@ -915,7 +915,7 @@ export class Connection {
   async reset(): Promise<this> {
     let iopts: Record<string, unknown> = this._ioptsForReset ?? _compact(this.conninfoHash());
     if (iopts.host != null && iopts.host !== false && String(iopts.host) !== "") {
-      iopts = await Connection.resolveHosts(iopts);
+      iopts = await (this.constructor as typeof Connection).resolveHosts(iopts);
     }
     const conninfo = (this.constructor as typeof Connection).parseConnectArgs(iopts);
     await this.resetStart2(conninfo);
@@ -1172,7 +1172,13 @@ export class Connection {
           for (;;) {
             const st = engine!._getCopyData(this, true);
             if (st === 0) {
-              await this.block();
+              try {
+                await this.block();
+              } catch (error) {
+                if (!(error instanceof ConnectionBad)) throw error;
+                this.bad = true;
+                return false;
+              }
             } else if (st !== -1) {
               continue;
             } else {
