@@ -9,7 +9,13 @@ import { Callbacks } from "./callbacks.js";
 import { classAttribute } from "./class-attribute.js";
 import { CodeGenerator } from "./code-generator.js";
 import { with as with_ } from "./core-ext/object/with.js";
-import { include, Module, type Extended, type Included } from "@blazetrails/ruby-compat/include";
+import {
+  include,
+  Module,
+  rbObjDup,
+  type Extended,
+  type Included,
+} from "@blazetrails/ruby-compat/include";
 import { IsolatedExecutionState } from "./isolated-execution-state.js";
 import type { TestHelper } from "./current-attributes/test-helper.js";
 
@@ -216,20 +222,11 @@ export class CurrentAttributes {
     const result: Record<string, AttributeValue> = {};
     for (const [key, value] of Object.entries(ctor.defaults)) {
       if (value !== NOT_SET) {
-        result[key] = typeof value === "function" ? (value as () => unknown)() : dup(value);
+        result[key] = typeof value === "function" ? (value as () => unknown)() : rbObjDup(value);
       }
     }
     return result;
   }
-}
-
-/** @internal */
-function dup(value: unknown): unknown {
-  if (Array.isArray(value)) return [...value];
-  if (value !== null && typeof value === "object") {
-    return Object.assign(Object.create(Object.getPrototypeOf(value) as object), value);
-  }
-  return value;
 }
 
 const CURRENT_ATTRIBUTES_INSTANCES = "current_attributes_instances";

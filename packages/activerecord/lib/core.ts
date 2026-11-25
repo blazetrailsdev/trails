@@ -25,6 +25,7 @@ import {
   rbObjRespondTo,
   inherited,
   rbInspect,
+  rbObjClone,
 } from "@blazetrails/ruby-compat";
 import {
   NameError,
@@ -777,20 +778,8 @@ export function initializeDup(
   rbCallSuper(this, initializeDup, other);
 }
 
-interface CloneRecord {
-  _attributes: unknown;
-  _previouslyNewRecord: boolean;
-  errors: { constructor: new (base: unknown) => unknown };
-}
-
-/** @noRailsEquivalent CONVERGEABLE adopt-rbobjdup-rbobjclone-at-remaining-copy-sites */
-export function clone<T extends CloneRecord>(this: T): T {
-  const copy = Object.create(Object.getPrototypeOf(this)) as T;
-  Object.assign(copy, this);
-  copy._attributes = this._attributes;
-  copy._previouslyNewRecord = false;
-  (copy as unknown as { _errors: unknown })._errors = new this.errors.constructor(copy);
-  return copy;
+export function clone<T extends object>(this: T): T {
+  return rbObjClone(this);
 }
 
 /** @internal */

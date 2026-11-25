@@ -8,6 +8,7 @@ import {
   NoMethodError,
   rbCallSuper,
   rbClearMethodCache,
+  rbObjDup,
 } from "@blazetrails/ruby-compat";
 
 export const Aggregations = {};
@@ -135,10 +136,7 @@ function writerMethod(
           const method = (part as Record<string, unknown>)[value];
           this.writeAttribute(key, typeof method === "function" ? method.call(part) : method);
         }
-        cache.set(
-          name,
-          Object.freeze(Object.assign(Object.create(Object.getPrototypeOf(part)), part)),
-        );
+        cache.set(name, Object.freeze(rbObjDup(part)));
       }
     },
     configurable: true,

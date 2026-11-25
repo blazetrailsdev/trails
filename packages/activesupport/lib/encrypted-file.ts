@@ -2,8 +2,7 @@ import {
   SecureRandom,
   FileUtils,
   IO,
-  getFs,
-  getPath,
+  File,
   env as processEnv,
   chomp,
 } from "@blazetrails/ruby-compat";
@@ -89,10 +88,9 @@ export class EncryptedFile {
   /** @missingRailsName strip — PERMANENT */
   async read(): Promise<string> {
     const key = await this.key();
-    const fs = getFs();
     const path = await this.resolveContentPath();
-    if (key !== null && (await fs.exists(path))) {
-      return this.decrypt((await fs.readFile(path, "utf8")).trim());
+    if (key !== null && (await File.isExistAsync(path))) {
+      return this.decrypt((await File.readAsync(path)).trim());
     }
     throw new MissingContentError(path);
   }
@@ -111,20 +109,18 @@ export class EncryptedFile {
     contents: string,
     block: (tmpPath: string) => void | Promise<void>,
   ): Promise<void> {
-    const fs = getFs();
-    const path = getPath();
     const contentPath = await this.resolveContentPath();
 
     await Tempfile.create(
-      ["", "-" + chomp(path.basename(contentPath), ".enc")],
-      path.dirname(contentPath),
+      ["", "-" + chomp(File.basename(contentPath), ".enc")],
+      File.dirname(contentPath),
       async (tmpFile) => {
         const tmpPath = tmpFile.path()!;
-        await fs.writeFile!(tmpPath, contents, { mode: 0o600 });
+        await File.writeAsync(tmpPath, contents, { perm: 0o600 });
 
         await block(tmpPath);
 
-        const updatedContents = await fs.readFile(tmpPath, "utf8");
+        const updatedContents = await File.readAsync(tmpPath);
 
         if (updatedContents !== contents) await this.write(updatedContents);
       },
@@ -162,9 +158,8 @@ export class EncryptedFile {
 
   private async readKeyFile(): Promise<string | null> {
     if (this.keyFileContents != null) return this.keyFileContents;
-    const fs = getFs();
-    return (this.keyFileContents = (await fs.exists(this.keyPath))
-      ? (await fs.readFile(this.keyPath, "utf8")).trim()
+    return (this.keyFileContents = (await File.isExistAsync(this.keyPath))
+      ? (await File.readAsync(this.keyPath)).trim()
       : null);
   }
 
@@ -192,11 +187,9 @@ export class EncryptedFile {
 
   private async resolveContentPath(): Promise<string> {
     if (this.resolvedContentPath !== null) return this.resolvedContentPath;
-    const fs = getFs();
     try {
-      const lstat = fs.lstat ? await fs.lstat(this.contentPath) : null;
-      if (lstat?.isSymbolicLink?.() && fs.realpath) {
-        this.resolvedContentPath = await fs.realpath(this.contentPath);
+      if (await File.isSymlinkAsync(this.contentPath)) {
+        this.resolvedContentPath = await File.realpathAsync(this.contentPath);
       } else {
         this.resolvedContentPath = this.contentPath;
       }

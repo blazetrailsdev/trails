@@ -2,7 +2,7 @@ import { presence, TopLevel } from "@blazetrails/activesupport";
 import { Minitest } from "@blazetrails/activesupport/testing/assertions";
 import { Encoding } from "@blazetrails/ruby-compat/encoding";
 import { File } from "@blazetrails/ruby-compat/file";
-import { getFs } from "@blazetrails/ruby-compat/fs-adapter";
+import { FileUtils } from "@blazetrails/ruby-compat/file-utils";
 import { defineModule } from "@blazetrails/ruby-compat/include";
 import { rbModMethodDefined } from "@blazetrails/ruby-compat/object";
 import { Pathname } from "@blazetrails/ruby-compat/pathname";
@@ -130,18 +130,16 @@ function absoluteHtmlPath(this: ScreenshotHelperHost): string {
 export async function saveHtml(this: ScreenshotHelperHost): Promise<void> {
   if (!this._page) return;
   const path = absoluteHtmlPath.call(this);
-  const fs = getFs();
-  await fs.mkdir!(File.join(TopLevel.Trails!.root()!, screenshotsDir()), { recursive: true });
+  await FileUtils.mkdirPAsync(File.join(TopLevel.Trails!.root()!, screenshotsDir()));
   const content = await this._page.content();
-  await fs.writeFile!(path, content);
+  await File.writeAsync(path, content);
 }
 
 /** @internal */
 export async function saveImage(this: ScreenshotHelperHost): Promise<Buffer | undefined> {
   if (!this._page) return;
   const path = absoluteImagePath.call(this);
-  const fs = getFs();
-  await fs.mkdir!(File.join(TopLevel.Trails!.root()!, screenshotsDir()), { recursive: true });
+  await FileUtils.mkdirPAsync(File.join(TopLevel.Trails!.root()!, screenshotsDir()));
   return this._page.screenshot({ path });
 }
 
