@@ -468,8 +468,6 @@ jobs:
               --ignore-pattern packages/actionpack/**
               --ignore-pattern packages/trailties/**
               --ignore-pattern scripts/**
-          # EXPERIMENT (CI timing): `rest-full` is the control, the `rest`
-          # paths linted whole; `rest-a/b/c/root` are the same paths split.
           - shard: rest-full
             force: true
             paths: >-
@@ -1498,8 +1496,6 @@ jobs:
         run: pnpm vitest run scripts/test-deps scripts/parity/pipeline/query/node scripts/mixin-declaration-drift.test.ts
       - if: needs.changes.outputs.ar_scope == '' || contains(needs.changes.outputs.ar_scope, 'packages/activestorage')
         uses: ./.github/actions/activestorage-media-binaries
-      # EXPERIMENT (CI timing): Active Record's own cases run in non-isolated
-      # forks; everything else in the lane stays isolated.
       - if: needs.changes.outputs.ar_scope == ''
         run: pnpm vitest run packages/activerecord/ --project activerecord --shard=${{ matrix.shard }}/${{ strategy.job-total }}
         continue-on-error: true
@@ -1863,7 +1859,6 @@ jobs:
       - if: needs.changes.outputs.ar_scope == ''
         run: pnpm vitest run packages/activerecord/ packages/solid-queue/ packages/solid-cable/ packages/solid-cache/ packages/activestorage/ packages/actionmailbox/ packages/actiontext/ packages/turbo/ --project '!system' --shard=${{ matrix.shard }}/${{ strategy.job-total }}
         env:
-          # EXPERIMENT (CI timing): load the framework from built dist.
           AR_DIST: "1"
           VITEST_SHARD_DURATIONS: postgresql
           VITEST_SHARD_ONE_EXTRA_MS: "110000"
