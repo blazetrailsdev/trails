@@ -56,6 +56,11 @@ jobs:
       - run: pnpm --filter @blazetrails/website exec svelte-kit sync
       - name: Build playground (examples/browser-sqlite)
         run: pnpm --filter @blazetrails/website run playground:build
+      - name: Boot the built playground before it deploys
+        run: |
+          pnpm --filter @blazetrails/example-browser-sqlite exec playwright install chromium
+          DIST="$PWD/packages/website/static/playground" BASE="${SITE_BASE:-}/playground/" \
+            pnpm --filter @blazetrails/example-browser-sqlite smoke
       - name: Build SvelteKit
         run: pnpm --filter @blazetrails/website exec vite build
       - name: Build docs (typedoc + VitePress)
