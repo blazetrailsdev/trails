@@ -4,7 +4,7 @@ import { describe, it, expect, afterEach, beforeEach } from "vitest";
 import { Base } from "@blazetrails/actionview";
 import { Trailtie, type ActionViewConfig } from "../../lib/trailties/action-view.js";
 import { Deprecators } from "@blazetrails/activesupport";
-import { Trailtie as BaseTrailtie } from "../../lib/trailtie.js";
+import { Engine } from "../../lib/engine.js";
 import { deprecator } from "@blazetrails/actionview";
 
 let deprecators: Deprecators;
@@ -31,7 +31,7 @@ describe("RailtieTest", () => {
   });
 
   it("ActionView::Railtie is registered in the global subclasses list", () => {
-    expect(BaseTrailtie.subclasses()).toContain(Trailtie);
+    expect(Engine.subclasses()).toContain(Trailtie);
   });
 
   it("seeds the actionView config slot with Rails-matching defaults", () => {

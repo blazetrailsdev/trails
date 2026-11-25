@@ -113,6 +113,10 @@ const LAZY_DIRS: Record<string, string[]> = {
 
 /** A package subpath export whose module, imported alone, must answer its classes' paths, so it carries its own table. */
 const SUBPATH_EXPORT_TABLES: Record<string, string[]> = {
+  actioncable: ["engine.ts"],
+  actionmailbox: ["engine.ts"],
+  actiontext: ["engine.ts"],
+  activestorage: ["engine.ts"],
   trailties: [
     "autoloaders.ts",
     "autoloaders/inflector.ts",

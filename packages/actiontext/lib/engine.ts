@@ -1,3 +1,4 @@
+import "./constants.engine.generated.js";
 import { OrderedOptions, TopLevel, onLoad } from "@blazetrails/activesupport";
 import type { Base } from "@blazetrails/activerecord";
 import "@blazetrails/trailties/trailties/action-controller";

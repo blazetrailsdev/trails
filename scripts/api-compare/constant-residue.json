@@ -1,6 +1,6 @@
 {
   "actioncable": {
-    "rows": 60,
+    "rows": 61,
     "excluded": [],
     "unwalked": [
       "channel/broadcasting.ts::Broadcasting",
@@ -37,7 +37,7 @@
     }
   },
   "actionmailbox": {
-    "rows": 31,
+    "rows": 32,
     "excluded": ["app/controllers/action-mailbox/base-controller.ts::BaseController"],
     "unwalked": [
       "app/controllers/action-mailbox/ingresses/mailgun/inbound-emails-controller.ts::InboundEmailsController.Authenticator",
@@ -226,7 +226,7 @@
     }
   },
   "actiontext": {
-    "rows": 27,
+    "rows": 28,
     "excluded": [],
     "unwalked": [],
     "residue": {
@@ -246,6 +246,7 @@
       "attribute.ts::Attribute": "ActionText::Attribute",
       "content.ts::Content": "ActionText::Content",
       "encrypted-rich-text.ts::EncryptedRichText": "ActionText::EncryptedRichText",
+      "engine.ts::Engine": "ActionText::Engine",
       "fragment.ts::Fragment": "ActionText::Fragment",
       "gem-version.ts::VERSION": "ActionText::VERSION",
       "html-conversion.ts::HtmlConversion": "ActionText::HtmlConversion",
@@ -671,7 +672,7 @@
     }
   },
   "activestorage": {
-    "rows": 91,
+    "rows": 92,
     "excluded": [],
     "unwalked": [
       "attached/changes.ts::Changes",

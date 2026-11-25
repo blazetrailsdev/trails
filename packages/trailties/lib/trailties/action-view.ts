@@ -22,7 +22,7 @@ import {
   ViewReloader,
 } from "@blazetrails/actionview";
 import { Nokogiri } from "@blazetrails/nokogiri";
-import { Trailtie as BaseTrailtie } from "../trailtie.js";
+import { Engine } from "../engine.js";
 
 export interface ActionViewConfig {
   embedAuthenticityTokenInRemoteForms: boolean | null;
@@ -48,9 +48,9 @@ declare module "../trailtie/configuration.js" {
   }
 }
 
-export class Trailtie extends BaseTrailtie {
+export class Trailtie extends Engine {
   static {
-    BaseTrailtie.register(this);
+    Engine.register(this, import.meta.dirname);
 
     this.config.set("actionView", {
       embedAuthenticityTokenInRemoteForms: null,

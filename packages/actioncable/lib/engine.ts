@@ -1,3 +1,4 @@
+import "./constants.engine.generated.js";
 import type { RackApp } from "@blazetrails/actionpack";
 import type { RackEnv } from "@blazetrails/rack";
 import {
@@ -147,5 +148,4 @@ export class Engine extends BaseEngine {
   }
 }
 
-Object.defineProperty(Engine, "name", { value: "ActionCable::Engine" });
 ActionCable.Engine = Engine;
