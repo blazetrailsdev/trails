@@ -1,3 +1,4 @@
+import { Pathname } from "@blazetrails/ruby-compat";
 import { assertNothingRaised } from "@blazetrails/activesupport/testing/assertions";
 import {
   File,
@@ -54,7 +55,7 @@ describe("Trails::Command::CredentialsTest", () => {
     FileUtils.mkdirP("config");
     File.write(".gitignore", "");
     const config = {
-      root: appPath,
+      root: new Pathname(appPath),
       get credentials() {
         let contentPath = `config/credentials/${env.TRAILS_ENV}.yml.enc`;
         if (!File.isExist(contentPath)) contentPath = "config/credentials.yml.enc";

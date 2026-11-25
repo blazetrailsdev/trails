@@ -1,3 +1,4 @@
+import { Pathname } from "@blazetrails/ruby-compat";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import { File, include, TopLevel, constSet } from "@blazetrails/ruby-compat";
 import { BacktraceCleaner } from "../lib/backtrace-cleaner.js";
@@ -12,7 +13,7 @@ import {
 
 describe("Paths remaining surface", () => {
   it("edits a path's list and reads Root's hash surface", async () => {
-    const root = new Root("/trails");
+    const root = new Root(new Pathname("/trails"));
     const path = root.add("app", { glob: "*.{rb,ts}" });
     path.concat(["lib"]);
     path.unshift("vendor");

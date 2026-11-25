@@ -12,6 +12,7 @@ import {
   rbClassSuperclass,
   rbFRequire,
   rbObjIsKindOf,
+  type Pathname,
 } from "@blazetrails/ruby-compat";
 import { Loader } from "@blazetrails/zeitwerk";
 import type { Autoloaders } from "../autoloaders.js";
@@ -47,7 +48,7 @@ export interface FinisherExecutor {
 }
 
 export interface FinisherConfig {
-  root: string | null;
+  root: Pathname | null;
   allowConcurrency: boolean | "unsafe" | null;
   toPrepareBlocks: ConfigurationBlock[];
   eagerLoad: boolean | null;
@@ -94,7 +95,7 @@ Finisher.initializer("add_generator_templates", async function (this: FinisherHo
 /** @inventedArm eagerLoad — PERMANENT */
 Finisher.initializer("setup_main_autoloader", async function (this: FinisherHost) {
   const autoloader = this.autoloaders.main;
-  autoloader.manifestRoot ??= this.config.root;
+  autoloader.manifestRoot ??= this.config.root?.toString() ?? null;
 
   const alreadyConfiguredDirs = new Set(autoloader.dirs() as readonly string[]);
 

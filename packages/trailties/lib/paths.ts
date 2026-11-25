@@ -11,10 +11,10 @@ export interface PathOptions {
 }
 
 export class Root {
-  path: string | null;
+  path: Pathname | null;
   _entries: Map<string, Path> = new Map();
 
-  constructor(path: string | null) {
+  constructor(path: Pathname | null) {
     this.path = path;
   }
 
@@ -115,7 +115,7 @@ export class Path {
   }
 
   absoluteCurrent(): string {
-    return File.expandPath(this._current, this._root.path!);
+    return File.expandPath(this._current, this._root.path);
   }
 
   children(): Path[] {

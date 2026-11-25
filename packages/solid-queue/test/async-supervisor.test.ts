@@ -1,3 +1,4 @@
+import { Pathname } from "@blazetrails/ruby-compat";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import "./support/dummy-application.js";
 import {
@@ -87,7 +88,9 @@ describe("AsyncSupervisorTest", () => {
   });
 
   beforeEach(() => {
-    vi.spyOn(TopLevel.Trails!, "root").mockReturnValue(`${import.meta.dirname}/support/dummy`);
+    vi.spyOn(TopLevel.Trails!, "root").mockReturnValue(
+      new Pathname(`${import.meta.dirname}/support/dummy`),
+    );
   });
 
   afterEach(async () => {

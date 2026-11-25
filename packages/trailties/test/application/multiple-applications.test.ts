@@ -1,3 +1,4 @@
+import { Pathname } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { TestCase } from "@blazetrails/activesupport/test-case";
 import { Isolation } from "@blazetrails/activesupport/testing/isolation";
@@ -161,7 +162,7 @@ describe("MultipleApplicationsTest", { timeout: 120_000 }, () => {
     (app.config as Config).someSetting = "a_different_setting";
     expect((app.config as Config).someSetting).toBe("a_different_setting");
 
-    const newConfig = new Configuration("root_of_application") as Config;
+    const newConfig = new Configuration(new Pathname("root_of_application")) as Config;
     newConfig.someSetting = "some_setting_dude";
     app.config = newConfig;
 

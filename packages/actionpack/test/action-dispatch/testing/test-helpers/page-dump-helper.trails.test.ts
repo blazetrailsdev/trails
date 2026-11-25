@@ -1,3 +1,4 @@
+import { Pathname } from "@blazetrails/ruby-compat";
 import { describe, it, expect, afterEach, beforeEach } from "vitest";
 import { TopLevel } from "@blazetrails/activesupport";
 import { tmpdir } from "os";
@@ -13,7 +14,7 @@ import {
 describe("ActionDispatch::TestHelpers::PageDumpHelper", () => {
   const previousTrails = TopLevel.Trails;
   beforeEach(() => {
-    TopLevel.Trails = { root: () => tmpdir() } as never;
+    TopLevel.Trails = { root: () => new Pathname(tmpdir()) } as never;
   });
   afterEach(() => {
     TopLevel.Trails = previousTrails;

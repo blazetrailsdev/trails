@@ -1,3 +1,4 @@
+import { Pathname } from "@blazetrails/ruby-compat";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -32,7 +33,7 @@ describe("ActionController::Trailtie", () => {
       async helpersPaths() {
         return this.config.helpersPaths;
       },
-      config: Object.assign(new Configuration("/app"), { helpersPaths: [] }),
+      config: Object.assign(new Configuration(new Pathname("/app")), { helpersPaths: [] }),
     };
     savedConfig = structuredClone(
       Trailtie.config.get("actionController") as ActionControllerConfig,
@@ -86,7 +87,7 @@ describe("action_controller.set_helpers_path", () => {
       async helpersPaths() {
         return this.config.helpersPaths;
       },
-      config: Object.assign(new Configuration("/app"), { helpersPaths: [root] }),
+      config: Object.assign(new Configuration(new Pathname("/app")), { helpersPaths: [root] }),
     };
     savedConfig = structuredClone(
       Trailtie.config.get("actionController") as ActionControllerConfig,

@@ -1,3 +1,4 @@
+import { Pathname } from "@blazetrails/ruby-compat";
 import { describe, it, expect, afterEach } from "vitest";
 import { Base } from "@blazetrails/activerecord";
 import * as nodeFs from "node:fs";
@@ -29,9 +30,9 @@ describe("Configuration#databaseConfiguration", () => {
     );
 
     Base.configurations(
-      (await new Configuration(tmpRoot).databaseConfiguration()) as unknown as Parameters<
-        typeof Base.configurations
-      >[0],
+      (await new Configuration(
+        new Pathname(tmpRoot),
+      ).databaseConfiguration()) as unknown as Parameters<typeof Base.configurations>[0],
     );
     await RootConfigModel.establishConnection();
 
@@ -43,7 +44,7 @@ describe("Configuration#databaseConfiguration", () => {
   it("raises when no config file exists and DATABASE_URL is unset", async () => {
     tmpRoot = nodeFs.mkdtempSync(nodePath.join(nodeOs.tmpdir(), "trailties-root-"));
 
-    await expect(new Configuration(tmpRoot).databaseConfiguration()).rejects.toThrow(
+    await expect(new Configuration(new Pathname(tmpRoot)).databaseConfiguration()).rejects.toThrow(
       /Could not load database configuration/,
     );
   });
@@ -59,10 +60,9 @@ describe("Configuration#databaseConfiguration", () => {
       }),
     );
 
-    const config = (await new Configuration(tmpRoot).databaseConfiguration()) as Record<
-      string,
-      Record<string, unknown>
-    >;
+    const config = (await new Configuration(
+      new Pathname(tmpRoot),
+    ).databaseConfiguration()) as Record<string, Record<string, unknown>>;
     expect(Object.keys(config)).toEqual(["test"]);
     expect(config.test).toEqual({ adapter: "sqlite3", database: "storage/test.sqlite3", pool: 9 });
   });
@@ -81,10 +81,9 @@ describe("Configuration#databaseConfiguration", () => {
       }),
     );
 
-    const config = (await new Configuration(tmpRoot).databaseConfiguration()) as Record<
-      string,
-      Record<string, Record<string, unknown>>
-    >;
+    const config = (await new Configuration(
+      new Pathname(tmpRoot),
+    ).databaseConfiguration()) as Record<string, Record<string, Record<string, unknown>>>;
     expect(config.test.primary).toEqual({ adapter: "sqlite3", database: "storage/test.sqlite3" });
     expect(config.test.animals).toEqual({ adapter: "sqlite3", database: "storage/animals_test" });
   });
@@ -100,10 +99,9 @@ describe("Configuration#databaseConfiguration", () => {
       }),
     );
 
-    const config = (await new Configuration(tmpRoot).databaseConfiguration()) as Record<
-      string,
-      Record<string, unknown>
-    >;
+    const config = (await new Configuration(
+      new Pathname(tmpRoot),
+    ).databaseConfiguration()) as Record<string, Record<string, unknown>>;
     expect(config.staging).toEqual({ adapter: "sqlite3", database: "storage/shared.sqlite3" });
     expect(Object.keys(config)).toEqual(["test"]);
   });

@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { deepDup, TopLevel } from "@blazetrails/activesupport";
 import { Base, Migration, type DatabaseAdapter } from "@blazetrails/activerecord";
 import "./support/database/setup.js";
-import { Record } from "../lib/record.js";
+import { Record } from "../lib/app/models/action-mailbox/record.js";
 import type { Configuration } from "@blazetrails/trailties/trailtie/configuration";
 import { CreateActionMailboxTables } from "../lib/db/migrate/20180917164000_create_action_mailbox_tables.js";
 

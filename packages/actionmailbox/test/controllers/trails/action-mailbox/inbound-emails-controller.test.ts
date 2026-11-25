@@ -7,7 +7,7 @@ import { assertDifference } from "@blazetrails/activesupport/testing/assertions"
 import type { Message } from "@blazetrails/mail";
 import { Trails } from "@blazetrails/trailties";
 import "../../../test-helper.js";
-import { InboundEmail } from "../../../../lib/inbound-email.js";
+import { InboundEmail } from "../../../../lib/app/models/action-mailbox/inbound-email.js";
 import "../../../../lib/app/controllers/trails/conductor/action-mailbox/inbound-emails-controller.js";
 
 const routes = TopLevel.Trails!.application!.routes() as unknown as RouteSet;

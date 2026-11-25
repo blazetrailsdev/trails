@@ -1,3 +1,4 @@
+import { Pathname } from "@blazetrails/ruby-compat";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { Configuration } from "../../lib/application/configuration.js";
 import { Trailtie as BaseTrailtie } from "../../lib/trailtie.js";
@@ -57,7 +58,9 @@ const blogApp = (): {
   executor: class extends Executor {},
   messageVerifier: (name: string) => new MessageVerifier(`secret-${name}`),
   deprecators: new Deprecators(),
-  config: Object.assign(new Configuration("/nonexistent-app"), { filterParameters: [] }),
+  config: Object.assign(new Configuration(new Pathname("/nonexistent-app")), {
+    filterParameters: [],
+  }),
   credentials,
 });
 
@@ -239,7 +242,7 @@ describe("RailtieTest", () => {
   it("runInitializers enables auto filtered parameters when add_to_filter_parameters is set", async () => {
     const app = {
       deprecators: new Deprecators(),
-      config: Object.assign(new Configuration("/nonexistent-app"), {
+      config: Object.assign(new Configuration(new Pathname("/nonexistent-app")), {
         filterParameters: [] as Array<string | RegExp>,
       }),
       credentials,
@@ -255,7 +258,7 @@ describe("RailtieTest", () => {
   it("runInitializers does not enable auto filtered parameters when add_to_filter_parameters is unset", async () => {
     const app = {
       deprecators: new Deprecators(),
-      config: Object.assign(new Configuration("/nonexistent-app"), {
+      config: Object.assign(new Configuration(new Pathname("/nonexistent-app")), {
         filterParameters: [] as Array<string | RegExp>,
       }),
       credentials,

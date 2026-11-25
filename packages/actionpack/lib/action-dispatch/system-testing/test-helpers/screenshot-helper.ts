@@ -105,7 +105,7 @@ export function screenshotsDir(): string {
 
 /** @internal */
 function absolutePath(this: ScreenshotHelperHost): Pathname {
-  return new Pathname(TopLevel.Trails!.root()!).join(screenshotsDir(), imageName.call(this));
+  return TopLevel.Trails!.root()!.join(screenshotsDir(), imageName.call(this));
 }
 
 /** @internal */

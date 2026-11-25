@@ -1,3 +1,4 @@
+import { Pathname } from "@blazetrails/ruby-compat";
 import type {} from "@blazetrails/vitest-matchers";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import "./support/dummy-application.js";
@@ -48,7 +49,7 @@ describe("CliTest", () => {
   });
 
   beforeEach(() => {
-    vi.spyOn(TopLevel.Trails!, "root").mockReturnValue(dummyRoot);
+    vi.spyOn(TopLevel.Trails!, "root").mockReturnValue(new Pathname(dummyRoot));
   });
 
   afterEach(() => {

@@ -1,3 +1,4 @@
+import { Pathname } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
 import { TopLevel } from "@blazetrails/activesupport";
 import { File } from "@blazetrails/ruby-compat/file";
@@ -20,7 +21,7 @@ describe("AllowBrowser default block", () => {
 
     const fixtures = `${File.dirname(new URL(import.meta.url).pathname)}/../../fixtures`;
     const trails = TopLevel.Trails;
-    TopLevel.Trails = { root: () => fixtures } as unknown as typeof trails;
+    TopLevel.Trails = { root: () => new Pathname(fixtures) } as unknown as typeof trails;
     try {
       const c = new ModernController();
       const request = new Request({

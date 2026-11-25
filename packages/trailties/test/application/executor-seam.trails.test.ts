@@ -1,3 +1,4 @@
+import { Pathname } from "@blazetrails/ruby-compat";
 import { rbFSend } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
 import { Executor as ActionDispatchExecutor } from "@blazetrails/actionpack";
@@ -30,7 +31,9 @@ describe("ActionDispatch::Executor around a request (trails)", () => {
   beforeAll(async () => {
     await runTrailtieInitializers(Trailtie, {
       deprecators: new Deprecators(),
-      config: Object.assign(new Configuration("/nonexistent-app"), { filterParameters: [] }),
+      config: Object.assign(new Configuration(new Pathname("/nonexistent-app")), {
+        filterParameters: [],
+      }),
       credentials: async () => ({ config: async () => ({}), dig: () => undefined }),
     });
   });
@@ -86,9 +89,9 @@ describe("ActionDispatch::Executor around a request (trails)", () => {
   });
 
   it("opens the session through the built default middleware stack", async () => {
-    const paths = new Root("/app");
+    const paths = new Root(new Pathname("/app"));
     paths.add("public");
-    const config = new Configuration("/app");
+    const config = new Configuration(new Pathname("/app"));
     config.publicFileServer.enabled = false;
     const stack = new DefaultMiddlewareStack(
       { config, executor: app.executor, reloader: app.reloader },

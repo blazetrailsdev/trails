@@ -1,5 +1,5 @@
 import ts from "typescript-5";
-import { Dir, File, TopLevel, getFs, getPath } from "@blazetrails/ruby-compat";
+import { Dir, File, TopLevel, getFs, getPath, type Pathname } from "@blazetrails/ruby-compat";
 import { Registry, writeArtifacts } from "@blazetrails/zeitwerk";
 import { buildViews } from "./build-views.js";
 
@@ -21,7 +21,7 @@ interface BootPaths {
 }
 
 interface BootEngine {
-  config: { root: string | null };
+  config: { root: Pathname | null };
   paths?(): BootPaths;
 }
 
@@ -82,7 +82,7 @@ export async function buildAutoload({
     }
   }
 
-  const root = application?.config.root ?? cwd;
+  const root = application?.config.root?.toString() ?? cwd;
   const dirs: string[] = [];
   const tagged: [string, string][] = [];
   for (const loader of [...Registry.loaders]) {

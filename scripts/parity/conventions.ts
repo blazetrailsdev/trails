@@ -274,6 +274,15 @@ export const RUBY_FILE_TS_OVERRIDES: Record<string, string> = {
     "app/controllers/trails/conductor/action-mailbox/incinerates-controller.ts",
   "actionmailbox:action_mailbox/reroutes_controller.rb":
     "app/controllers/trails/conductor/action-mailbox/reroutes-controller.ts",
+  "actionmailbox:inbound_email.rb": "app/models/action-mailbox/inbound-email.ts",
+  "actionmailbox:inbound_email/incineratable.rb":
+    "app/models/action-mailbox/inbound-email/incineratable.ts",
+  "actionmailbox:inbound_email/incineratable/incineration.rb":
+    "app/models/action-mailbox/inbound-email/incineratable/incineration.ts",
+  "actionmailbox:inbound_email/message_id.rb":
+    "app/models/action-mailbox/inbound-email/message-id.ts",
+  "actionmailbox:inbound_email/routable.rb": "app/models/action-mailbox/inbound-email/routable.ts",
+  "actionmailbox:record.rb": "app/models/action-mailbox/record.ts",
   "activestorage:analyze_job.rb": "app/jobs/active-storage/analyze-job.ts",
   "activestorage:attachment.rb": "app/models/active-storage/attachment.ts",
   "activestorage:base_controller.rb": "app/controllers/active-storage/base-controller.ts",

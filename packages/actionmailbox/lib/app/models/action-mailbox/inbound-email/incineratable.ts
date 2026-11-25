@@ -1,8 +1,8 @@
-import "../constants.incineratable.generated.js";
+import "../../../../constants.incineratable.generated.js";
 import { Concern, extend } from "@blazetrails/activesupport";
-import { ActionMailbox } from "../action-mailbox.js";
+import { ActionMailbox } from "../../../../action-mailbox.js";
 import type { InboundEmail } from "../inbound-email.js";
-import { IncinerationJob } from "../incineration-job.js";
+import { IncinerationJob } from "../../../../incineration-job.js";
 import { Incineration } from "./incineratable/incineration.js";
 
 export const Incineratable = {

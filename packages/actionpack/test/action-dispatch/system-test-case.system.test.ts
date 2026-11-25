@@ -1,3 +1,4 @@
+import { Pathname } from "@blazetrails/ruby-compat";
 import { afterAll, describe, it, expect, inject } from "vitest";
 import { TopLevel } from "@blazetrails/activesupport";
 import { assertEqual } from "@blazetrails/activesupport/testing/assertions";
@@ -10,7 +11,7 @@ import { imagePath } from "../../lib/action-dispatch/system-testing/test-helpers
 const trails = TopLevel.Trails;
 TopLevel.Trails = {
   ...trails,
-  root: () => Dir.pwd(),
+  root: () => new Pathname(Dir.pwd()),
   application: {
     call: async () => [
       200,

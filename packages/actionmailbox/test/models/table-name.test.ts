@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Base } from "@blazetrails/activerecord";
 import "../support/database/setup.js";
-import { InboundEmail } from "../../lib/inbound-email.js";
+import { InboundEmail } from "../../lib/app/models/action-mailbox/inbound-email.js";
 
 describe("ActionMailbox::TableNameTest", () => {
   let oldPrefix: string | null;

@@ -1,3 +1,4 @@
+import { Pathname } from "@blazetrails/ruby-compat";
 import { afterAll } from "vitest";
 import { Base as ActiveJobBase } from "@blazetrails/activejob";
 import {
@@ -46,7 +47,7 @@ const configuration = new Configuration();
 TopLevel.Trails = {
   ...TopLevel.Trails,
   env: TopLevel.Trails?.env ?? new EnvironmentInquirer(envName),
-  root: () => File.expandPath("..", import.meta.dirname),
+  root: () => new Pathname(File.expandPath("..", import.meta.dirname)),
   application: {
     routes: () => app.routes(),
     envConfig: () => ({}),
@@ -85,7 +86,7 @@ Application.register(Dummy, import.meta.dirname);
 export const app = Dummy.instance();
 app.config.setRoot(TopLevel.Trails!.root()!);
 app.config.loadDefaults("8.0");
-setTrailsRoot(TopLevel.Trails!.root()!);
+setTrailsRoot(TopLevel.Trails!.root()!.toString());
 const configurations = Base.configurations();
 
 for (const railtie of [
@@ -101,7 +102,7 @@ for (const railtie of [
   }
 }
 
-DatabaseTasks.root = TopLevel.Trails!.root()!;
+DatabaseTasks.root = TopLevel.Trails!.root()!.toString();
 await DatabaseTasks.purge(Base.configurations().configsFor({ envName, name: "primary" })!);
 
 await import("../../../lib/app/models/active-storage/blob.js");

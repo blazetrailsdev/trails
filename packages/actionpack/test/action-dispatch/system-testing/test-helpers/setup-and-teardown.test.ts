@@ -1,3 +1,4 @@
+import { Pathname } from "@blazetrails/ruby-compat";
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { TopLevel } from "@blazetrails/activesupport";
 import { Dir } from "@blazetrails/ruby-compat/dir";
@@ -29,7 +30,7 @@ describe("ActionDispatch::SystemTesting::TestHelpers::SetupAndTeardown", () => {
   });
 
   it("before_teardown calls take_failed_screenshot", async () => {
-    TopLevel.Trails = { root: () => Dir.pwd() } as typeof TopLevel.Trails;
+    TopLevel.Trails = { root: () => new Pathname(Dir.pwd()) } as typeof TopLevel.Trails;
     vite.currentDriver = "selenium";
     vi.spyOn(console, "log").mockImplementation(() => {});
     const host = build({

@@ -6,7 +6,7 @@ import { Mail } from "@blazetrails/mail";
 import "../test-helper.js";
 import { Blob } from "@blazetrails/activestorage/app/models/active-storage/blob";
 import { ActionMailbox } from "../../lib/action-mailbox.js";
-import { InboundEmail } from "../../lib/inbound-email.js";
+import { InboundEmail } from "../../lib/app/models/action-mailbox/inbound-email.js";
 import { TestCase } from "../../lib/test-case.js";
 
 class InboundEmailTest extends TestCase {

@@ -13,7 +13,7 @@ Trails.env = "test";
 
 await import("../../dummy/config/environment.js");
 
-DatabaseTasks.root = Trails.root()!;
+DatabaseTasks.root = Trails.root()!.toString();
 await DatabaseTasks.purge(Base.configurations().configsFor({ envName: "test", name: "primary" })!);
 
 const { CreateActiveStorageTables } =
@@ -23,7 +23,7 @@ const { CreateActionMailboxTables } =
 const { Attachment } =
   await import("@blazetrails/activestorage/app/models/active-storage/attachment");
 const { Blob } = await import("@blazetrails/activestorage/app/models/active-storage/blob");
-const { InboundEmail } = await import("../../../lib/inbound-email.js");
+const { InboundEmail } = await import("../../../lib/app/models/action-mailbox/inbound-email.js");
 
 await CreateActiveStorageTables.migrate("up");
 await CreateActionMailboxTables.migrate("up");

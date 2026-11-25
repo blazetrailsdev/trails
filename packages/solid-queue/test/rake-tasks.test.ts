@@ -1,3 +1,4 @@
+import { Pathname } from "@blazetrails/ruby-compat";
 import type {} from "@blazetrails/vitest-matchers";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import "./support/dummy-application.js";
@@ -23,7 +24,7 @@ describe("RakeTasksTest", () => {
   });
 
   beforeEach(async () => {
-    vi.spyOn(TopLevel.Trails!, "root").mockReturnValue(dummyRoot);
+    vi.spyOn(TopLevel.Trails!, "root").mockReturnValue(new Pathname(dummyRoot));
     previousRakeApplication = Rake.application;
     rake = new Application();
     Rake.application = rake;
@@ -37,9 +38,7 @@ describe("RakeTasksTest", () => {
   });
 
   it("solid_queue:check exits 0 and prints OK message for a valid configuration", async () => {
-    vi.spyOn(Configuration.prototype as never, "isSkipRecurringTasks").mockReturnValue(
-      true as never,
-    );
+    vi.spyOn(Configuration.prototype as never, "isSkipRecurringTasks").mockReturnValue(true);
 
     const [out, err] = await captureIo(async () => {
       await expect((await rake.get("solid_queue:check")).invoke()).resolves.not.toThrow();
@@ -53,9 +52,7 @@ describe("RakeTasksTest", () => {
     vi.spyOn(Configuration.prototype as never, "invalidTasks").mockResolvedValue([
       { key: "broken", errors: { fullMessages: ["is invalid"] } },
     ] as never);
-    vi.spyOn(Configuration.prototype as never, "isSkipRecurringTasks").mockReturnValue(
-      false as never,
-    );
+    vi.spyOn(Configuration.prototype as never, "isSkipRecurringTasks").mockReturnValue(false);
 
     let status: number | null = null;
     const [out, err] = await captureIo(async () => {

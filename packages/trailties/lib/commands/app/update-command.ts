@@ -101,7 +101,7 @@ export class UpdateCommand extends Base {
   private async appGenerator(): Promise<AppGenerator> {
     if (this._appGenerator === undefined) {
       const gen = new AppGenerator(["trails"], await this.generatorOptions(), {
-        destinationRoot: Trails.root(),
+        destinationRoot: Trails.root()?.toString(),
       });
       if (
         !(await File.isExistAsync(

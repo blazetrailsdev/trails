@@ -1,4 +1,4 @@
-import { File, Pathname, TopLevel } from "@blazetrails/ruby-compat";
+import { File, TopLevel } from "@blazetrails/ruby-compat";
 import type { AppGenerator } from "@blazetrails/trailties/generators";
 
 /**
@@ -23,9 +23,7 @@ export default async function (this: AppGenerator): Promise<void> {
 
   if (
     await File.isExistAsync(
-      new Pathname(TopLevel.Trails!.root()!)
-        .join("app/javascript/entrypoints/application.js")
-        .toString(),
+      TopLevel.Trails!.root()!.join("app/javascript/entrypoints/application.js").toString(),
     )
   ) {
     this.say("Import Stimulus controllers");

@@ -1,3 +1,4 @@
+import { Pathname } from "@blazetrails/ruby-compat";
 import { constSetPath } from "../../support/const-set-path.js";
 import { camelize } from "@blazetrails/activesupport";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
@@ -1650,7 +1651,9 @@ describe("PageDumpIntegrationTest", () => {
     }
 
     async withRoot<T>(block: () => T | Promise<T>): Promise<T> {
-      const spy = vi.spyOn(TopLevel.Trails!, "root").mockReturnValue(File.join(Dir.pwd(), "test"));
+      const spy = vi
+        .spyOn(TopLevel.Trails!, "root")
+        .mockReturnValue(new Pathname(File.join(Dir.pwd(), "test")));
       try {
         return await block();
       } finally {

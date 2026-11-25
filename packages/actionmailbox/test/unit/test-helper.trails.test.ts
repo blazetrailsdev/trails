@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import "../support/database/setup.js";
-import "../../lib/inbound-email.js";
+import "../../lib/app/models/action-mailbox/inbound-email.js";
 import { ApplicationMailbox } from "../dummy/app/mailboxes/application-mailbox.js";
 import { TestCase } from "../../lib/test-case.js";
 

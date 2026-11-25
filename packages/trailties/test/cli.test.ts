@@ -17,8 +17,12 @@ async function trails(...argv: string[]): Promise<string> {
     output += String(s);
     return true;
   });
+  const adapter = rb.getProcessAdapter();
+  const { exit } = adapter;
+  adapter.exit = (() => undefined) as never;
   const cwd = Dir.pwd();
   onTestFinished(() => {
+    adapter.exit = exit;
     Dir.chdir(cwd);
     rb.rbAryReplace(rb.rbArgv(), []);
     rb.setExitCode(0);

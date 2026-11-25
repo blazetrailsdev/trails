@@ -103,7 +103,7 @@ export const Behavior = {
     const klass = this.constructor as unknown as typeof ClassMethods;
     return await IO.readlinesAsync(
       File.join(
-        TopLevel.Trails!.root() as string,
+        TopLevel.Trails!.root()!,
         "test",
         "fixtures",
         underscore(rbModName(klass.mailerClass.call(klass as never))!),

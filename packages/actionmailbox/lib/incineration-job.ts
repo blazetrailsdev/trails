@@ -1,7 +1,7 @@
 import { Base } from "@blazetrails/activejob";
 import { RecordNotFound } from "@blazetrails/activerecord";
 import { ActionMailbox } from "./action-mailbox.js";
-import type { InboundEmail } from "./inbound-email.js";
+import type { InboundEmail } from "./app/models/action-mailbox/inbound-email.js";
 
 export class IncinerationJob extends Base {
   static {

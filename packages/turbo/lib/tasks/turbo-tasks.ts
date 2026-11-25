@@ -1,7 +1,6 @@
 import { DSL, Task } from "@blazetrails/rake";
 import {
   File,
-  Pathname,
   RbConfig,
   STDOUT as $stdout,
   TopLevel,
@@ -21,9 +20,7 @@ export const Tasks = {
   },
 
   async isUsingBun(): Promise<boolean> {
-    return File.isExistAsync(
-      new Pathname(TopLevel.Trails!.root()!).join("bun.config.js").toString(),
-    );
+    return File.isExistAsync(TopLevel.Trails!.root()!.join("bun.config.js").toString());
   },
 };
 
@@ -35,16 +32,12 @@ DSL.namespace("turbo", () => {
     "install",
     block(async () => {
       if (
-        (await File.isExistAsync(
-          new Pathname(TopLevel.Trails!.root()!).join("package.json").toString(),
-        )) &&
+        (await File.isExistAsync(TopLevel.Trails!.root()!.join("package.json").toString())) &&
         (await Turbo.Tasks!.isUsingBun())
       ) {
         await (await Task.get("turbo:install:bun")).invoke();
       } else if (
-        await File.isExistAsync(
-          new Pathname(TopLevel.Trails!.root()!).join("package.json").toString(),
-        )
+        await File.isExistAsync(TopLevel.Trails!.root()!.join("package.json").toString())
       ) {
         await (await Task.get("turbo:install:node")).invoke();
       } else {

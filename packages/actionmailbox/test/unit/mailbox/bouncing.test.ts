@@ -5,8 +5,8 @@ import { TestHelper } from "@blazetrails/actionmailer/test-helper";
 import { TestCase } from "@blazetrails/activesupport/test-case";
 import { constSet, include } from "@blazetrails/ruby-compat";
 import { BounceMailer } from "../../test-helper.js";
-import "../../../lib/inbound-email.js";
-import type { InboundEmail } from "../../../lib/inbound-email.js";
+import "../../../lib/app/models/action-mailbox/inbound-email.js";
+import type { InboundEmail } from "../../../lib/app/models/action-mailbox/inbound-email.js";
 import { Base } from "../../../lib/base.js";
 import { TestHelper as ActionMailboxTestHelper } from "../../../lib/test-helper.js";
 

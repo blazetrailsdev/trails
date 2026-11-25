@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { File } from "@blazetrails/ruby-compat";
 import "../support/database/setup.js";
-import "../../lib/inbound-email.js";
+import "../../lib/app/models/action-mailbox/inbound-email.js";
 import { TestCase } from "../../lib/test-case.js";
 
 class TestHelperTest extends TestCase {}

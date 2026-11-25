@@ -334,7 +334,7 @@ describe("DebugExceptionsTest", () => {
     assertMatch(/RuntimeError\npuke/, body());
 
     const trails = TopLevel.Trails;
-    TopLevel.Trails = { root: () => "." } as unknown as typeof trails;
+    TopLevel.Trails = { root: () => new Pathname(".") } as unknown as typeof trails;
     try {
       await t.get("/", { headers: xhrRequestEnv });
 

@@ -82,7 +82,10 @@ const LAZY_DIRS: Record<string, string[]> = {
     "subscription-adapter/test.ts",
     "test-helper.ts",
   ],
-  actionmailbox: ["inbound-email.ts", "inbound-email/"],
+  actionmailbox: [
+    "app/models/action-mailbox/inbound-email.ts",
+    "app/models/action-mailbox/inbound-email/",
+  ],
   actionmailer: ["test-case.ts", "test-helper.ts"],
   actionview: ["test-case.ts", "testing/resolvers.ts"],
   activejob: ["test-case.ts", "test-helper.ts"],

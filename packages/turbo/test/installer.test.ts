@@ -55,7 +55,7 @@ describe("InstallerTest", () => {
 
   beforeEach(async () => {
     rootDir = new Pathname(new URL("../tmp/", import.meta.url).pathname).join(crypto.randomUUID());
-    vi.spyOn(Trails, "root").mockReturnValue(rootDir.toString());
+    vi.spyOn(Trails, "root").mockReturnValue(new Pathname(rootDir.toString()));
     system.mockImplementation(async (...args: unknown[]) => {
       if (args.includes("app:template")) {
         const location = String(args.at(-1)).replace(/^LOCATION=/, "");

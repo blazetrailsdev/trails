@@ -1,3 +1,4 @@
+import { Pathname } from "@blazetrails/ruby-compat";
 import { describe, it, expect, vi } from "vitest";
 import { env, setEnv, getFs, getOsAsync, getPath, rbObjClassname } from "@blazetrails/ruby-compat";
 import { useInMemoryDatabaseUrl } from "../support/in-memory-database-url.js";
@@ -61,7 +62,9 @@ const blogApp = (): {
   credentials: typeof credentials;
 } => ({
   deprecators: new Deprecators(),
-  config: Object.assign(new Configuration("/nonexistent-app"), { filterParameters: [] }),
+  config: Object.assign(new Configuration(new Pathname("/nonexistent-app")), {
+    filterParameters: [],
+  }),
   credentials,
 });
 
@@ -150,7 +153,7 @@ describe("RailtieTest (trails-only)", () => {
   it("config.loadDefaults 7.1 makes generate_secure_token_on initialize on a booted app", async () => {
     const saved = Trailtie.config.get("activeRecord");
     try {
-      const config = new Configuration("/app");
+      const config = new Configuration(new Pathname("/app"));
       config.set("activeRecord", { encryption: {} });
       config.loadDefaults("7.1");
 
@@ -219,7 +222,7 @@ describe("RailtieTest (trails-only)", () => {
         const fileWatcher = class {};
         await runTrailtieInitializers(Trailtie, {
           ...blogApp(),
-          config: Object.assign(new Configuration("/nonexistent-app"), {
+          config: Object.assign(new Configuration(new Pathname("/nonexistent-app")), {
             filterParameters: [],
             fileWatcher,
           }),
@@ -269,7 +272,7 @@ describe("ActiveRecord::Railtie active_record.define_attribute_methods", () => {
       Trailtie.config.set("activeRecord", { ...saved, checkSchemaCacheDumpVersion });
       const app = {
         ...blogApp(),
-        config: Object.assign(new Configuration("/nonexistent-app"), {
+        config: Object.assign(new Configuration(new Pathname("/nonexistent-app")), {
           filterParameters: [],
           eagerLoad: true,
         }),
@@ -336,7 +339,7 @@ describe("ActiveRecord::Railtie rescue_responses", () => {
     ]);
     await runTrailtieInitializers(ActionDispatchTrailtie, {
       deprecators: new Deprecators(),
-      config: new Configuration("/app"),
+      config: new Configuration(new Pathname("/app")),
     });
     expect(new ExceptionWrapper(null, new RecordNotFound("gone")).statusCode).toBe(404);
     expect(new ExceptionWrapper(null, new RecordInvalid(null)).statusCode).toBe(422);

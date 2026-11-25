@@ -23,10 +23,10 @@ Trails.env = "test";
 await import("./dummy/config/environment.js");
 export const app = Trails.application!;
 Trails.logger = new Logger(null);
-setTrailsRoot(TopLevel.Trails!.root()!);
+setTrailsRoot(TopLevel.Trails!.root()!.toString());
 ActionController.Base.prependViewPath([File.expandPath("dummy/app/views", import.meta.dirname)]);
 
-DatabaseTasks.root = TopLevel.Trails!.root()!;
+DatabaseTasks.root = TopLevel.Trails!.root()!.toString();
 
 await DatabaseTasks.purge(
   Base.configurations().configsFor({

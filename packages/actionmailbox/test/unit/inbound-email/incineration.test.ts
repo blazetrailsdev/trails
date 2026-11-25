@@ -6,7 +6,7 @@ import { freezeTime, travel, travelBack } from "@blazetrails/activesupport/testi
 import { include } from "@blazetrails/ruby-compat";
 import "../../test-helper.js";
 import { ActionMailbox } from "../../../lib/action-mailbox.js";
-import { InboundEmail } from "../../../lib/inbound-email.js";
+import { InboundEmail } from "../../../lib/app/models/action-mailbox/inbound-email.js";
 import { IncinerationJob } from "../../../lib/incineration-job.js";
 import { TestCase } from "../../../lib/test-case.js";
 

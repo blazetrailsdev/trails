@@ -1,3 +1,4 @@
+import { Pathname } from "@blazetrails/ruby-compat";
 import { expect, vi } from "vitest";
 import { isPresent, TopLevel } from "@blazetrails/activesupport";
 import {
@@ -93,7 +94,7 @@ async function waitpid2(pid: number): Promise<[number, Status]> {
 }
 
 export function runSupervisor(options: { [key: string]: unknown } = {}, block?: () => void) {
-  vi.spyOn(TopLevel.Trails!, "root").mockReturnValue(dummyRoot);
+  vi.spyOn(TopLevel.Trails!, "root").mockReturnValue(new Pathname(dummyRoot));
   const supervisors: Supervisor[] = [];
   const started = vi.spyOn(Supervisor.prototype, "start").mockImplementationOnce(function (
     this: Supervisor,

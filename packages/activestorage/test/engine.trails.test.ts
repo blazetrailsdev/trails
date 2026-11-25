@@ -1,3 +1,4 @@
+import { Pathname } from "@blazetrails/ruby-compat";
 import { describe, expect, it, vi } from "vitest";
 import { onLoad, runLoadHooks } from "@blazetrails/activesupport";
 import { Base } from "@blazetrails/activerecord";
@@ -98,7 +99,7 @@ describe("ActiveStorage::Engine", () => {
       trails.configuration as unknown as { activeStorage: { serviceConfigurations?: unknown } }
     ).activeStorage;
     const configs = activeStorage.serviceConfigurations;
-    const root = vi.spyOn(trails, "root").mockReturnValue("/nonexistent-trails-root");
+    const root = vi.spyOn(trails, "root").mockReturnValue(new Pathname("/nonexistent-trails-root"));
     activeStorage.serviceConfigurations = undefined;
     try {
       const initializer = Engine.initializers.find((i) => i.name === "active_storage.services")!;
@@ -184,7 +185,7 @@ describe("ActiveStorage::Engine", () => {
     registerCompiledFiles(tmp, {
       "config/storage.ts": async () => (loads.push("config/storage.ts"), { default: compiled }),
     });
-    const root = vi.spyOn(trails, "root").mockReturnValue(tmp);
+    const root = vi.spyOn(trails, "root").mockReturnValue(new Pathname(tmp));
     activeStorage.serviceConfigurations = undefined;
     try {
       const initializer = Engine.initializers.find((i) => i.name === "active_storage.services")!;

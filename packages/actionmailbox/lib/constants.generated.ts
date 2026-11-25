@@ -8,11 +8,11 @@ import * as m5 from "./app/controllers/trails/conductor/action-mailbox/inbound-e
 import * as m6 from "./app/controllers/trails/conductor/action-mailbox/inbound-emails/sources-controller.js";
 import * as m7 from "./app/controllers/trails/conductor/action-mailbox/incinerates-controller.js";
 import * as m8 from "./app/controllers/trails/conductor/action-mailbox/reroutes-controller.js";
-import * as m9 from "./base.js";
-import * as m10 from "./callbacks.js";
-import * as m11 from "./gem-version.js";
-import * as m12 from "./incineration-job.js";
-import * as m13 from "./record.js";
+import * as m9 from "./app/models/action-mailbox/record.js";
+import * as m10 from "./base.js";
+import * as m11 from "./callbacks.js";
+import * as m12 from "./gem-version.js";
+import * as m13 from "./incineration-job.js";
 import * as m14 from "./relayer.js";
 import * as m15 from "./router.js";
 import * as m16 from "./router/route.js";
@@ -20,10 +20,10 @@ import * as m17 from "./routing-job.js";
 import * as m18 from "./routing.js";
 
 defineConstants([
-  [() => m9, "Base", "ActionMailbox::Base"],
-  [() => m10, "Callbacks", "ActionMailbox::Callbacks"],
-  [() => m10, "ClassMethods", "ActionMailbox::Callbacks::ClassMethods"],
-  [() => m12, "IncinerationJob", "ActionMailbox::IncinerationJob"],
+  [() => m10, "Base", "ActionMailbox::Base"],
+  [() => m11, "Callbacks", "ActionMailbox::Callbacks"],
+  [() => m11, "ClassMethods", "ActionMailbox::Callbacks::ClassMethods"],
+  [() => m13, "IncinerationJob", "ActionMailbox::IncinerationJob"],
   [
     () => m0,
     "InboundEmailsController",
@@ -55,7 +55,7 @@ defineConstants([
     "InboundEmailsController",
     "ActionMailbox::Ingresses::Sendgrid::InboundEmailsController",
   ],
-  [() => m13, "Record", "ActionMailbox::Record"],
+  [() => m9, "Record", "ActionMailbox::Record"],
   [() => m14, "Relayer", "ActionMailbox::Relayer"],
   [() => m14, "Relayer.Result", "ActionMailbox::Relayer::Result"],
   [() => m15, "Router", "ActionMailbox::Router"],
@@ -64,7 +64,7 @@ defineConstants([
   [() => m18, "Routing", "ActionMailbox::Routing"],
   [() => m18, "ClassMethods", "ActionMailbox::Routing::ClassMethods"],
   [() => m17, "RoutingJob", "ActionMailbox::RoutingJob"],
-  [() => m11, "VERSION", "ActionMailbox::VERSION"],
+  [() => m12, "VERSION", "ActionMailbox::VERSION"],
   [
     () => m6,
     "SourcesController",

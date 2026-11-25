@@ -1,3 +1,4 @@
+import { Pathname } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Deprecators, resetLoadHooks, runLoadHooks } from "@blazetrails/activesupport";
 import { ActionController, Request, Response, RouteSet } from "@blazetrails/actionpack";
@@ -23,7 +24,7 @@ beforeEach(() => {
     async helpersPaths() {
       return this.config.helpersPaths;
     },
-    config: Object.assign(new Configuration("/app"), { helpersPaths: [] }),
+    config: Object.assign(new Configuration(new Pathname("/app")), { helpersPaths: [] }),
   };
   savedConfig = structuredClone(Trailtie.config.get("actionController") as ActionControllerConfig);
 });
