@@ -57,6 +57,7 @@ export const packageEntries: Array<[string, string]> = [
   ["@blazetrails/msgpack", "../msgpack/lib/index.ts"],
   ["@blazetrails/sqlite3/engine/better-sqlite3", "../sqlite3/lib/engine/better-sqlite3.ts"],
   ["@blazetrails/sqlite3/engine/libsql", "../sqlite3/lib/engine/libsql.ts"],
+  ["@blazetrails/sqlite3/engine/bun-sqlite", "../sqlite3/lib/engine/bun-sqlite.ts"],
   ["@blazetrails/sqlite3/engine/node-sqlite", "../sqlite3/lib/engine/node-sqlite.ts"],
   ["@blazetrails/sqlite3/engine/expo-sqlite", "../sqlite3/lib/engine/expo-sqlite.ts"],
   ["@blazetrails/sqlite3", "../sqlite3/lib/index.ts"],

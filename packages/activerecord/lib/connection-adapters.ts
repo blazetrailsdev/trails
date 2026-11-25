@@ -98,6 +98,11 @@ register(
   "active_record/connection_adapters/sqlite3_adapter",
 );
 register(
+  "bun-sqlite",
+  "ActiveRecord::ConnectionAdapters::SQLite3Adapter",
+  "active_record/connection_adapters/sqlite3_adapter",
+);
+register(
   "expo-sqlite",
   "ActiveRecord::ConnectionAdapters::SQLite3Adapter",
   "active_record/connection_adapters/sqlite3_adapter",

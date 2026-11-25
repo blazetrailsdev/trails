@@ -97,7 +97,7 @@ describe("RegistrationIsolatedTest", () => {
 
     const expectedMessage =
       "Database configuration specifies nonexistent 'fake_legacy' adapter. " +
-      "Available adapters are: abstract, expo-sqlite, fake, libsql, libsql-remote, libsql-replica, mysql2, " +
+      "Available adapters are: abstract, bun-sqlite, expo-sqlite, fake, libsql, libsql-remote, libsql-replica, mysql2, " +
       "node-sqlite, postgresql, sqlite3. Ensure that the adapter is spelled correctly in " +
       "config/database.yml and that you've added the necessary adapter gem to your " +
       "Gemfile if it's not in the list of available adapters.";

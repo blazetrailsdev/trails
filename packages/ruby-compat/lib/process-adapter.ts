@@ -710,7 +710,8 @@ export const processAdapterConfig = {
   /** @noRailsEquivalent PERMANENT */
   get adapter(): string | null {
     if (!currentAdapter) return null;
-    return currentAdapter === nodeAutoRegistered ? "node" : "custom";
+    if (currentAdapter !== nodeAutoRegistered) return "custom";
+    return runtime();
   },
 };
 
@@ -730,7 +731,7 @@ interface NodeStream {
 }
 
 interface NodeProcessLike {
-  versions?: { node?: string };
+  versions?: { node?: string; bun?: string };
   env: Record<string, string | undefined>;
   argv: string[];
   cwd(): string;
@@ -762,9 +763,16 @@ function tryAutoRegisterNode(): boolean {
   const proc = (globalThis as { process?: NodeProcessLike }).process;
   if (!proc?.versions?.node) return false;
   const adapter = buildNodeAdapter(proc);
+  if (runtime() === "bun") delete adapter.registerHooks;
   nodeAutoRegistered = adapter;
   registerProcessAdapter(adapter);
   return true;
+}
+
+/** @noRailsEquivalent PERMANENT */
+export function runtime(): "node" | "bun" {
+  const proc = (globalThis as { process?: NodeProcessLike }).process;
+  return proc?.versions?.bun ? "bun" : "node";
 }
 
 /**
