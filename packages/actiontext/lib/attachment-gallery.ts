@@ -31,7 +31,7 @@ export class AttachmentGallery extends Model {
       .findAll(this.selector())
       .toA()
       .filter((node) =>
-        node.children.every((child) => {
+        node.children.toA().every((child) => {
           if (child.isText()) {
             return /^(\n| )*$/.test(child.text);
           } else {

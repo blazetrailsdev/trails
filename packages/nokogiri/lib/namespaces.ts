@@ -34,11 +34,22 @@ export const XML = { name: "Nokogiri::XML" } as {
   SyntaxError: typeof XmlSyntaxError;
 };
 
-export const HTML5 = { name: "Nokogiri::HTML5" } as {
+export const HTML5 = {
+  name: "Nokogiri::HTML5",
+  parse(...args: Parameters<typeof Html5Document.parse>): Html5Document {
+    return HTML5.Document.parse(...args);
+  },
+  fragment(...args: Parameters<typeof Html5DocumentFragment.parse>): Html5DocumentFragment {
+    return HTML5.DocumentFragment.parse(...args);
+  },
+} as {
   name: string;
+  parse(...args: Parameters<typeof Html5Document.parse>): Html5Document;
+  fragment(...args: Parameters<typeof Html5DocumentFragment.parse>): Html5DocumentFragment;
   Node: typeof Node;
   DocumentFragment: typeof Html5DocumentFragment;
   Document: typeof Html5Document;
+  QuirksMode: { NO_QUIRKS: number; QUIRKS: number; LIMITED_QUIRKS: number };
   readAndEncode(string: unknown, encoding: string | null): string;
 };
 
@@ -71,8 +82,18 @@ export const CSS = { name: "Nokogiri::CSS" } as {
   Tokenizer: typeof Tokenizer;
 };
 
-export type LibXml2 = typeof import("libxml2-wasm") &
-  Pick<typeof import("libxml2-wasm/lib/libxml2.mjs"), "xmlAddChild" | "xmlUnlinkNode">;
+export type LibXml2 = typeof import("libxml2-wasm") & {
+  XmlDocument: { getInstance(ptr: number): import("libxml2-wasm").XmlDocument };
+} & Pick<
+    typeof import("libxml2-wasm/lib/libxml2.mjs"),
+    | "xmlAddChild"
+    | "xmlUnlinkNode"
+    | "xmlNewParserCtxt"
+    | "xmlCtxtSetErrorHandler"
+    | "xmlReadString"
+    | "xmlFreeParserCtxt"
+    | "error"
+  >;
 
 const loadPath: Record<string, () => Promise<unknown>> = {
   "nokogiri/extension": () => import("./extension.js"),

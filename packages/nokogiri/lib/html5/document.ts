@@ -9,6 +9,12 @@ import { XPathVisitor } from "../css/xpath-visitor.js";
 
 type Parse5Document = DefaultTreeAdapterMap["document"];
 
+export const QuirksMode = {
+  NO_QUIRKS: 0,
+  QUIRKS: 1,
+  LIMITED_QUIRKS: 2,
+} as const;
+
 export class Document extends Node {
   declare document: Document;
 
@@ -21,6 +27,7 @@ export class Document extends Node {
 
   url: string | null = null;
   encoding: string | null = null;
+  quirksMode: number | null = null;
 
   constructor(_node: Parse5Document = defaultTreeAdapter.createDocument()) {
     super(_node as never);
@@ -31,12 +38,10 @@ export class Document extends Node {
     stringOrIo: string | Readable | null = null,
     url: string | null = null,
     encoding: string | null = null,
-    options: Record<string, unknown> = {},
+    options: { url?: string | null; encoding?: string | null; [key: string]: unknown } = {},
     block?: (options: Record<string, unknown>) => void,
   ): Document {
-    const kwargs: { url?: string | null; encoding?: string | null } & Record<string, unknown> =
-      options;
-    ({ url = url, encoding = encoding, ...options } = kwargs);
+    ({ url = url, encoding = encoding, ...options } = options);
     if (block) block(options);
     if (stringOrIo == null) stringOrIo = "";
 
@@ -128,3 +133,4 @@ export class Document extends Node {
 }
 
 HTML5.Document = Document;
+HTML5.QuirksMode = QuirksMode;

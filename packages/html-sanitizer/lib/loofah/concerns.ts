@@ -1,6 +1,5 @@
 import {
   HTML5,
-  XML,
   type Html5Document,
   type Html5DocumentFragment,
   type Html5Node,
@@ -22,7 +21,7 @@ export const ScrubBehavior = {
         const root = self.root;
         if (root) resolved.traverse(root);
       } else if (self instanceof HTML5.DocumentFragment) {
-        ScrubBehavior.NodeSet.scrubBang(new XML.NodeSet(self.document, self.children), resolved);
+        ScrubBehavior.NodeSet.scrubBang(self.children, resolved);
       } else {
         resolved.traverse(self);
       }

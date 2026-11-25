@@ -26,8 +26,9 @@ export interface SearchableHost {
   xpathImpl: typeof xpathImpl;
 }
 
+export const LOOKS_LIKE_XPATH = /^(\.\/|\/|\.\.|\.$)/;
+
 export function search(this: SearchableHost, ...args: unknown[]): NodeSet {
-  const LOOKS_LIKE_XPATH = /^(\.\/|\/|\.\.|\.$)/;
   const [paths, handler, ns, binds] = this.extractParams(args);
 
   const xpaths = [
@@ -94,7 +95,8 @@ export function extractParams(
   return [params as string[], handler, ns, binds];
 }
 
-function isHash(param: unknown): param is Record<string, unknown> {
+/** @internal */
+export function isHash(param: unknown): param is Record<string, unknown> {
   return param != null && Object.getPrototypeOf(param) === Object.prototype;
 }
 

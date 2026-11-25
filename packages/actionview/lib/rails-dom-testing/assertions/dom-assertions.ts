@@ -52,9 +52,9 @@ function compareDoms(expected: Fragment, actual: Fragment, strict: boolean): boo
 
 function extractChildren(node: Fragment, strict: boolean): Html5Node[] {
   if (strict) {
-    return node.children;
+    return node.children.toA();
   } else {
-    return node.children.filter((n) => !(n.isText() && isBlank(n.text)));
+    return node.children.toA().filter((n) => !(n.isText() && isBlank(n.text)));
   }
 }
 

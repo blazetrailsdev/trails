@@ -1064,7 +1064,7 @@
     }
   },
   "nokogiri": {
-    "rows": 25,
+    "rows": 27,
     "excluded": [],
     "unwalked": [],
     "residue": {
@@ -1077,8 +1077,10 @@
       "css/xpath-visitor.ts::BuiltinsConfig": "Nokogiri::CSS::XPathVisitor::BuiltinsConfig",
       "css/xpath-visitor.ts::DoctypeConfig": "Nokogiri::CSS::XPathVisitor::DoctypeConfig",
       "css/xpath-visitor.ts::XPathVisitor": "Nokogiri::CSS::XPathVisitor",
+      "gumbo.ts::Gumbo": "Nokogiri::Gumbo",
       "html5/document-fragment.ts::DocumentFragment": "Nokogiri::HTML5::DocumentFragment",
       "html5/document.ts::Document": "Nokogiri::HTML5::Document",
+      "html5/document.ts::QuirksMode": "Nokogiri::HTML5::QuirksMode",
       "html5/node.ts::Node": "Nokogiri::HTML5::Node",
       "xml/attr.ts::Attr": "Nokogiri::XML::Attr",
       "xml/document-fragment.ts::DocumentFragment": "Nokogiri::XML::DocumentFragment",
