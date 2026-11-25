@@ -19,6 +19,6 @@ describe("Generators.findByNamespace", () => {
       .bind(Engine.instance())
       .run({ config: { addAutoloadPathsToLoadPath: false } });
 
-    expect(await Trails.Generators!.findByNamespace("solid_cable:install")).toBe(InstallGenerator);
+    expect(await Trails.Generators!.findByNamespace("solid-cable:install")).toBe(InstallGenerator);
   });
 });
