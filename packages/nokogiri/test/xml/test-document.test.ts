@@ -1,4 +1,5 @@
 import { describe, it, expect, afterEach } from "vitest";
+import { Dir, Pathname } from "@blazetrails/ruby-compat";
 import { XmlDocument } from "../../lib/xml/document.js";
 import { ParseOptions } from "../../lib/xml/parse-options.js";
 
@@ -25,7 +26,7 @@ describe("Nokogiri::XML::Document", () => {
 
   it("root node has children", () => {
     const doc = XmlDocument.parse("<root><a/><b/></root>");
-    const children = doc.root.children;
+    const children = doc.root.children.toA();
     expect(children).toHaveLength(2);
     expect(children[0].name).toBe("a");
     expect(children[1].name).toBe("b");
@@ -43,7 +44,7 @@ describe("Nokogiri::XML::Document", () => {
 
   it("text node reports isText and content", () => {
     doc = XmlDocument.parse("<root>hello</root>");
-    const text = doc.root.children[0];
+    const text = doc.root.children.toA()[0];
     expect(text.isText()).toBe(true);
     expect(text.isElement()).toBe(false);
     expect(text.content).toBe("hello");
@@ -52,7 +53,7 @@ describe("Nokogiri::XML::Document", () => {
 
   it("cdata node reports isCdata and content", () => {
     doc = XmlDocument.parse("<root><![CDATA[raw data]]></root>");
-    const cdata = doc.root.children[0];
+    const cdata = doc.root.children.toA()[0];
     expect(cdata.isCdata()).toBe(true);
     expect(cdata.content).toBe("raw data");
     expect(cdata.name).toBe("#cdata-section");
@@ -124,7 +125,7 @@ describe("Nokogiri::XML::Searchable", () => {
     expect(doc.root.namespaces).toEqual({ xmlns: "urn:x", "xmlns:y": "urn:y" });
     expect(doc.css("a").length).toBe(1);
     expect(doc.css("y|b").length).toBe(1);
-    expect(doc.root.children[0].namespaces).toEqual({ xmlns: "urn:x", "xmlns:y": "urn:y" });
+    expect(doc.root.children.toA()[0].namespaces).toEqual({ xmlns: "urn:x", "xmlns:y": "urn:y" });
   });
 });
 
@@ -165,5 +166,27 @@ describe("Nokogiri::XML::Document.parse (trails)", () => {
     const doc = XmlDocument.parse({ read: () => "<root/>", isEof: () => true }, null, "UTF-8");
     expect(doc.encoding).toBe("UTF-8");
     expect(() => doc.root).toThrow();
+  });
+});
+
+describe("Nokogiri::XML::Document Pathname", () => {
+  it("parse can take pathnames", async () => {
+    const atom = `<?xml version="1.0"?><feed xmlns="http://www.w3.org/2005/Atom">${"<entry><author><name>a</name></author></entry>".repeat(20)}${"<!-- padding -->".repeat(256)}</feed>`;
+    const path = new Pathname(Dir.tmpdir()).join(`nokogiri-atom-${Date.now()}.xml`);
+    await path.write(atom);
+    try {
+      expect(path.size()).toBeGreaterThan(4096);
+
+      const doc = XmlDocument.parse(path);
+
+      expect(
+        doc.xpath("/xmlns:feed/xmlns:entry/xmlns:author", {
+          xmlns: "http://www.w3.org/2005/Atom",
+        }).length,
+      ).toBe(20);
+      expect(doc.url).toBe(path.expandPath().toString());
+    } finally {
+      await path.delete();
+    }
   });
 });

@@ -127,14 +127,14 @@ export class Node extends XmlNode {
     return this.content;
   }
 
-  get children(): Node[] {
-    if (!("childNodes" in this._node)) return [];
-    return childNodes(this._node, this.document);
+  get children(): NodeSet {
+    if (!("childNodes" in this._node)) return new NodeSet(this.document);
+    return new NodeSet(this.document, childNodes(this._node, this.document));
   }
 
   set children(nodeOrTags: Node | DocumentFragment | NodeSet | string) {
     const coerced = this.coerce(nodeOrTags);
-    new NodeSet(this.document, this.children).unlink();
+    this.children.unlink();
     if (coerced instanceof NodeSet) {
       coerced.each((n) => this.addChildNodeAndReparentAttrs(n));
     } else {
@@ -485,7 +485,7 @@ export class Node extends XmlNode {
   /** @internal */
   protected coerce(data: Node | DocumentFragment | NodeSet | string): Node | NodeSet {
     if (data instanceof NodeSet) return data;
-    if (data instanceof HTML5.DocumentFragment) return new NodeSet(data.document, data.children);
+    if (data instanceof HTML5.DocumentFragment) return data.children;
     if (typeof data === "string") {
       return new NodeSet(
         this.document,
@@ -526,7 +526,7 @@ export class Node extends XmlNode {
   /** @internal */
   private isPrependNewline(): boolean {
     if (!["pre", "textarea", "listing"].includes(this.name)) return false;
-    const first = this.children[0];
+    const first = this.children.first();
     return first !== undefined && first.isText() && first.content.startsWith("\n");
   }
 

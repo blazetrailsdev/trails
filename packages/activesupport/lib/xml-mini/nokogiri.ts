@@ -23,7 +23,7 @@ interface XmlAttr {
 interface XmlNode {
   readonly name: string;
   readonly content: string;
-  readonly children: XmlNode[];
+  readonly children: Iterable<XmlNode>;
   readonly attributeNodes: XmlAttr[];
   isElement(): boolean;
   isText(): boolean;

@@ -12,7 +12,7 @@ describe("Nokogiri::XML::DocumentFragment (trails)", () => {
   });
 
   it("an empty fragment has no children", () => {
-    expect(new DocumentFragment(XmlDocument.parse("<root/>")).children).toEqual([]);
+    expect(new DocumentFragment(XmlDocument.parse("<root/>")).children).toHaveLength(0);
   });
 
   it("children= given a DocumentFragment inserts its children", () => {

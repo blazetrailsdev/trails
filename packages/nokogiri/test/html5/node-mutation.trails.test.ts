@@ -55,7 +55,7 @@ describe("HTML5 node mutation", () => {
   it("parses a fragment from a document", () => {
     const fragment = new Document().fragment("<p>a</p><p>b</p>");
     expect(fragment.children.map((c) => c.name)).toEqual(["p", "p"]);
-    expect(new Document().fragment().children).toEqual([]);
+    expect(new Document().fragment().children).toHaveLength(0);
   });
 
   it("reads and writes inner_html", () => {
@@ -80,7 +80,7 @@ describe("HTML5 node mutation", () => {
 
   it("replaces a text node", () => {
     const fragment = DocumentFragment.parse("<p>a</p>");
-    fragment.atCss("p")!.children[0].replace("<b>b</b>");
+    fragment.atCss("p")!.children.toA()[0].replace("<b>b</b>");
     expect(fragment.toHtml()).toBe("<p><b>b</b></p>");
   });
 
@@ -142,7 +142,7 @@ describe("HTML5::DocumentFragment elements and is_a?", () => {
     expect(fragment.elements.map((node) => node.name)).toEqual(["p", "div"]);
     expect(fragment.elements.deconstruct()).toEqual(fragment.elements.toA());
     expect(fragment).toBeInstanceOf(XML.DocumentFragment);
-    expect(fragment.children[0]).not.toBeInstanceOf(XML.DocumentFragment);
+    expect(fragment.children.toA()[0]).not.toBeInstanceOf(XML.DocumentFragment);
   });
 });
 
@@ -151,7 +151,7 @@ describe("HTML5 nodes share the XML::Node chain", () => {
     const fragment = DocumentFragment.parse("<p>hi</p>");
     expect(fragment).toBeInstanceOf(XML.DocumentFragment);
     expect(fragment).toBeInstanceOf(XML.Node);
-    expect(fragment.children[0]).toBeInstanceOf(XML.Node);
+    expect(fragment.children.toA()[0]).toBeInstanceOf(XML.Node);
     expect(fragment._node.nodeName).toBe("#document-fragment");
     expect(fragment._node).not.toBeInstanceOf(XmlTreeNode);
   });

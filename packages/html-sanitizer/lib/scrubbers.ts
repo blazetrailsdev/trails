@@ -1,4 +1,4 @@
-import { XML, type Html5Node } from "@blazetrails/nokogiri";
+import { type Html5Node } from "@blazetrails/nokogiri";
 import { ArgumentError, aryDelete, rbObjDup, rbObjRespondTo, warn } from "@blazetrails/ruby-compat";
 
 import { Scrub } from "./loofah/html5/scrub.js";
@@ -85,7 +85,7 @@ export class PermitScrubber extends Scrubber {
   /** @internal */
   protected scrubNode(node: Html5Node): unknown {
     if (!(this.prune || node.namespace)) {
-      node.before(new XML.NodeSet(node.document, node.children));
+      node.before(node.children);
     }
     return node.remove();
   }
@@ -196,7 +196,7 @@ export class TextOnlyScrubber extends Scrubber {
     if (node.isText()) {
       return Scrubber.CONTINUE;
     } else {
-      node.before(new XML.NodeSet(node.document, node.children));
+      node.before(node.children);
       return node.remove();
     }
   }

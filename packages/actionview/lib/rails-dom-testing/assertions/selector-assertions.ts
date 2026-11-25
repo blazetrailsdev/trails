@@ -121,6 +121,7 @@ export function assertDomEncoded(
   const content = aryJoin(
     nodeset(element ?? this.selected).map((elem) =>
       elem.children
+        .toA()
         .filter((child) => child.isCdata() || (child.isText() && !child.isBlank()))
         .map((child) => child.content),
     ),

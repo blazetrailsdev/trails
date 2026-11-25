@@ -1,4 +1,4 @@
-import { XML, type Html5Node } from "@blazetrails/nokogiri";
+import { type Html5Node } from "@blazetrails/nokogiri";
 
 import { Scrubber } from "./scrubber.js";
 
@@ -11,7 +11,7 @@ export class Strip extends Scrubber {
   override scrub(node: Html5Node): unknown {
     if (this.html5libSanitize(node) === Scrubber.CONTINUE) return Scrubber.CONTINUE;
 
-    node.before(new XML.NodeSet(node.document, node.children));
+    node.before(node.children);
     node.remove();
     return Scrubber.STOP;
   }

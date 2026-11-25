@@ -113,7 +113,7 @@ describe("ActionText::PlainTextConversionTest", () => {
 
   it("deeply nested tags are converted", async () => {
     const fragment = Fragment.wrap("<div>Hello world!</div><div></div>");
-    let node = fragment.source.children.at(-1)!;
+    let node = fragment.source.children.toA().at(-1)!;
     for (let i = 0; i < 1_000; i++) {
       const child = node.dup();
       child.parent = node;

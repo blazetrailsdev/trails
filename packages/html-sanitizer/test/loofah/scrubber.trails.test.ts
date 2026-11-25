@@ -7,13 +7,13 @@ import { ScrubBehavior } from "../../lib/loofah/concerns.js";
 
 describe("Loofah::Scrubber#append_attribute", () => {
   test("writes the value alone when the attribute is absent", () => {
-    const node = Loofah.html5Fragment("<a>x</a>").children[0];
+    const node = Loofah.html5Fragment("<a>x</a>").children.toA()[0];
     new Loofah.Scrubber().appendAttribute(node, "rel", "nofollow");
     expect(node.get("rel")).toBe("nofollow");
   });
 
   test("appends a new value and keeps an existing one once", () => {
-    const node = Loofah.html5Fragment('<a rel="noopener">x</a>').children[0];
+    const node = Loofah.html5Fragment('<a rel="noopener">x</a>').children.toA()[0];
     const scrubber = new Loofah.Scrubber();
     scrubber.appendAttribute(node, "rel", "nofollow");
     scrubber.appendAttribute(node, "rel", "nofollow");
