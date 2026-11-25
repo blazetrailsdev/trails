@@ -99,6 +99,7 @@ export type LibXml2 = typeof import("libxml2-wasm") & {
     | "xmlReadString"
     | "xmlFreeParserCtxt"
     | "error"
+    | "XmlTreeCommonStruct"
     | "xmlSaveToIO"
     | "xmlSaveSetIndentString"
     | "xmlSaveTree"

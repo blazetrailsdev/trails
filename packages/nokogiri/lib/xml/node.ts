@@ -54,6 +54,14 @@ export class XmlNode {
     return hash;
   }
 
+  get type(): number {
+    return Nokogiri.LibXml2!.XmlTreeCommonStruct.type(this.pointerId);
+  }
+
+  isXml(): boolean {
+    return this.type === XmlNode.DOCUMENT_NODE;
+  }
+
   get name(): string {
     if (this._node instanceof Nokogiri.LibXml2!.XmlElement) return this._node.name;
     if (this._node instanceof Nokogiri.LibXml2!.XmlText) return "#text";
@@ -147,7 +155,7 @@ export class XmlNode {
   }
 
   toString(): string {
-    return (this.document as XmlDocument).isXml() ? this.toXml() : this.toHtml();
+    return (this.document as XmlNode).isXml() ? this.toXml() : this.toHtml();
   }
 
   /** @missingRailsArgs join — PERMANENT */
@@ -177,7 +185,7 @@ export class XmlNode {
     return this.toFormat(SaveOptions.DEFAULT_HTML, options);
   }
 
-  toXml(options: { saveWith?: number; encoding?: string | null } = {}): string {
+  toXml(options: { saveWith?: number; encoding?: string | null; indent?: number } = {}): string {
     options.saveWith ||= SaveOptions.DEFAULT_XML;
     return this.serialize(options);
   }
