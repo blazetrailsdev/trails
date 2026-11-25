@@ -291,7 +291,7 @@ export class Process {
    * `Process.uid`, the real user id (`proc_getuid`,
    * `vendor/ruby/v3.3.11/process.c:6264`).
    *
-   * @noRailsEquivalent PERMANENT — Ruby core `Process.uid`.
+   * @noRailsEquivalent PERMANENT
    */
   static get uid(): number {
     const uid = getProcessAdapter().uid;

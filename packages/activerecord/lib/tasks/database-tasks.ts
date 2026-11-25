@@ -506,7 +506,6 @@ export class DatabaseTasks {
     return structureLoadFlags;
   }
 
-  /** @inventedArm resolveTsThenJs — PERMANENT */
   static schemaDumpPath(
     dbConfig: HashConfig,
     format: SchemaFormat = dbConfig.schemaFormat(),
@@ -518,7 +517,7 @@ export class DatabaseTasks {
     if (filename == null) return null;
 
     const path = File.dirname(filename) === this.dbDir ? filename : File.join(this.dbDir, filename);
-    return format === "ts" ? resolveTsThenJs(path) : path;
+    return path;
   }
 
   /** @missingRailsArgs dump — PERMANENT */
@@ -558,6 +557,7 @@ export class DatabaseTasks {
     }
   }
 
+  /** @inventedArm resolveTsThenJs — PERMANENT */
   static async loadSchema(
     dbConfig: HashConfig,
     format: SchemaFormat = dbConfig.schemaFormat(),
@@ -567,6 +567,7 @@ export class DatabaseTasks {
     try {
       file ??= this.schemaDumpPath(dbConfig, format) ?? undefined;
       if (file == null) return;
+      file = resolveTsThenJs(file);
 
       verboseWas = Migration.verbose;
       Migration.verbose = isVerbose() && getEnv("VERBOSE") !== undefined;
@@ -777,6 +778,7 @@ export class DatabaseTasks {
     return this.migrationClass().connectionPool();
   }
 
+  /** @inventedArm resolveTsThenJs — PERMANENT */
   static async schemaUpToDate(
     configuration: unknown,
     _: unknown = null,
@@ -784,6 +786,7 @@ export class DatabaseTasks {
   ): Promise<boolean> {
     const dbConfig = this.resolveConfiguration(configuration)!;
     file ??= this.schemaDumpPath(dbConfig) ?? undefined;
+    if (file != null) file = resolveTsThenJs(file);
     if (!(file != null && File.isExist(file))) return true;
 
     return await this.withTemporaryPool(dbConfig, async (pool) => {
@@ -852,8 +855,10 @@ export class DatabaseTasks {
     });
   }
 
+  /** @inventedArm resolveTsThenJs — PERMANENT */
   static async reconstructFromSchema(dbConfig: HashConfig, file?: string): Promise<void> {
     file ??= this.schemaDumpPath(dbConfig, dbConfig.schemaFormat()) ?? undefined;
+    if (file !== undefined) file = resolveTsThenJs(file);
     if (file !== undefined) this.checkSchemaFile(file);
 
     const { NoDatabaseError } = await import("../errors.js");
@@ -970,7 +975,8 @@ export async function initializeDatabase(dbConfig: HashConfig): Promise<boolean>
       }
     }
     if (!alreadyInitialized) {
-      const schemaDumpPath = DatabaseTasks.schemaDumpPath(dbConfig);
+      let schemaDumpPath = DatabaseTasks.schemaDumpPath(dbConfig);
+      if (schemaDumpPath != null) schemaDumpPath = resolveTsThenJs(schemaDumpPath);
       if (schemaDumpPath != null && File.isExist(schemaDumpPath)) {
         await DatabaseTasks.loadSchema(dbConfig);
       }

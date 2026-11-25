@@ -754,6 +754,28 @@ describe("ConnectionPool schema cache", () => {
     });
   });
 
+  it("withConnection's first checkout lazily loads the schema cache without joining itself", async () => {
+    const prevLazy = lazilyLoadSchemaCache();
+    setLazilyLoadSchemaCache(true);
+
+    await withCacheDir(async (dir) => {
+      const cacheFile = join(dir, "schema_cache.json");
+      await writeCacheFixture(cacheFile, "more_testings", 0);
+      const pool = makeAmbientPool({ schemaCachePath: cacheFile });
+      try {
+        const answered = await Promise.race([
+          pool.withConnection(() => "answered"),
+          new Promise((resolve) => setTimeout(() => resolve("deadlocked"), 2000)),
+        ]);
+        expect(answered).toBe("answered");
+        expect(pool.schemaReflection.loadedCache).not.toBeNull();
+      } finally {
+        setLazilyLoadSchemaCache(prevLazy);
+        await closePoolConnections(pool);
+      }
+    });
+  });
+
   it("a pool too small for a second connection times out validating the lazily loaded cache", async () => {
     const prevLazy = lazilyLoadSchemaCache();
     setLazilyLoadSchemaCache(true);
