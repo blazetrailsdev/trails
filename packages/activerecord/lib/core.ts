@@ -778,6 +778,7 @@ export function initializeDup(
   rbCallSuper(this, initializeDup, other);
 }
 
+/** @noRailsEquivalent PERMANENT */
 export function clone<T extends object>(this: T): T {
   return rbObjClone(this);
 }
