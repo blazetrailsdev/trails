@@ -4,7 +4,6 @@ import { PG } from "./namespaces.js";
 /** @noRailsEquivalent PERMANENT */
 export const Constants = {
   CONNECTION_OK: 0,
-  INVALID_OID: 0,
   CONNECTION_BAD: 1,
   CONNECTION_STARTED: 2,
   CONNECTION_MADE: 3,
@@ -51,6 +50,7 @@ export const Constants = {
   PG_DIAG_COLUMN_NAME: 99,
   PG_DIAG_DATATYPE_NAME: 100,
   PG_DIAG_CONSTRAINT_NAME: 110,
+  INVALID_OID: 0,
 };
 
 PG.Constants = Constants;
