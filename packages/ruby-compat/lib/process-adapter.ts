@@ -762,7 +762,7 @@ function tryAutoRegisterNode(): boolean {
   nodeAttempted = true;
   const proc = (globalThis as { process?: NodeProcessLike }).process;
   if (!proc?.versions?.node) return false;
-  const adapter = runtime() === "bun" ? BunProcessAdapter(proc) : buildNodeAdapter(proc);
+  const adapter = runtime() === "bun" ? buildBunAdapter(proc) : buildNodeAdapter(proc);
   nodeAutoRegistered = adapter;
   registerProcessAdapter(adapter);
   return true;
@@ -774,8 +774,7 @@ export function runtime(): "node" | "bun" {
   return proc?.versions?.bun ? "bun" : "node";
 }
 
-/** @noRailsEquivalent PERMANENT */
-export function BunProcessAdapter(proc: NodeProcessLike): ProcessAdapter {
+function buildBunAdapter(proc: NodeProcessLike): ProcessAdapter {
   const { registerHooks: _registerHooks, ...node } = buildNodeAdapter(proc);
   return node;
 }

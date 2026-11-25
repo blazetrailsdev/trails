@@ -419,7 +419,6 @@ export {
   isRubyTzUptodate,
   registerProcessAdapter,
   runtime,
-  BunProcessAdapter,
   setEnv,
   signo2signm,
   setExitCode,
