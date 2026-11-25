@@ -78,9 +78,15 @@ vfs.onWrite = (path) => {
   const added = text.slice(from).replace(/\n$/, "");
   if (added) post({ type: "console", level: "log", text: added });
 };
-const { FRAMEWORK_ROOT } = await import("./package-names.ts");
-vfs.write(`${FRAMEWORK_ROOT}/trailties/package.json`, "{}", false);
-vfs.mkdirp(`${FRAMEWORK_ROOT}/trailties/dist/trailties`);
+const { FRAMEWORK_ROOT, SEAT_FRAMEWORK_DIR } = await import("./package-names.ts");
+Object.assign(globalThis, {
+  [SEAT_FRAMEWORK_DIR]: (dirname: string) => {
+    const pkg = dirname.slice(FRAMEWORK_ROOT.length + 1).split("/")[0];
+    vfs.write(`${FRAMEWORK_ROOT}/${pkg}/package.json`, "{}", false);
+    vfs.mkdirp(dirname);
+    return dirname;
+  },
+});
 const { installHost } = await import("./host.ts");
 installHost(vfs, moduleBase, (level, text) => post({ type: "console", level, text }));
 (await import("./crypto.ts")).installCrypto();

@@ -1,7 +1,7 @@
 import { builtinModules } from "node:module";
 import { fileURLToPath } from "node:url";
 import { defineConfig, type Plugin } from "vite";
-import { FRAMEWORK_ROOT, PACKAGE_NAMES } from "./src/runtime/package-names.ts";
+import { FRAMEWORK_ROOT, PACKAGE_NAMES, SEAT_FRAMEWORK_DIR } from "./src/runtime/package-names.ts";
 
 const resolve = (p: string) => fileURLToPath(new URL(p, import.meta.url));
 
@@ -73,12 +73,12 @@ function importMetaPaths(): Plugin {
     name: "import-meta-paths",
     transform(code, id) {
       const match = /\/packages\/([^/]+)\/(dist\/[^?]*)/.exec(id);
-      if (!match || !/import\.meta\.(dirname|filename)/.test(code)) return null;
+      if (!match || !/\bimport\.meta\.(dirname|filename)\b/.test(code)) return null;
       const filename = `${FRAMEWORK_ROOT}/${match[1]}/${match[2]}`;
       const dirname = filename.slice(0, filename.lastIndexOf("/"));
       return code
-        .replaceAll("import.meta.dirname", JSON.stringify(dirname))
-        .replaceAll("import.meta.filename", JSON.stringify(filename));
+        .replace(/\bimport\.meta\.dirname\b/g, `${SEAT_FRAMEWORK_DIR}(${JSON.stringify(dirname)})`)
+        .replace(/\bimport\.meta\.filename\b/g, JSON.stringify(filename));
     },
   };
 }

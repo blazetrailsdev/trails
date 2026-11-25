@@ -16,7 +16,13 @@ export const PACKAGE_NAMES = [
 /**
  * Where a framework module says it lives. A browser has no
  * `import.meta.dirname`, and an engine finds its root by walking up from it,
- * so the build gives each module this path and the runtime seats the
- * directory in the virtual filesystem.
+ * so the build gives each module a path under this root.
  */
 export const FRAMEWORK_ROOT = "/node_modules/@blazetrails";
+
+/**
+ * The global the build wraps each rewritten `import.meta.dirname` in. The
+ * runtime defines it to seat that directory, and its package's
+ * `package.json`, in the virtual filesystem, and to answer the directory.
+ */
+export const SEAT_FRAMEWORK_DIR = "__trailsSeatFrameworkDir";
