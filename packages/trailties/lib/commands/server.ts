@@ -302,7 +302,9 @@ export class ServerCommand extends Base {
       DoNotReverseLookup: true,
       config: this.userSuppliedOptions().includes("config")
         ? this.options.config
-        : this.options.config && resolveTsThenJs(this.options.config),
+        : this.options.config != null
+          ? resolveTsThenJs(this.options.config)
+          : this.options.config,
       environment: this.environment(),
       daemonize: this.options.daemon,
       pid: this.pid(),

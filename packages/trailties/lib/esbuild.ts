@@ -1,5 +1,5 @@
-/** @noRailsEquivalent PERMANENT */
-export const withoutLibxml2UntilNokogiriExtensionCompilesInWorkerd = {
+/** @noRailsEquivalent CONVERGEABLE nokogiri-extension-fails-in-workerd-runtime-wasm-compile */
+const withoutLibxml2UntilNokogiriExtensionCompilesInWorkerd = {
   name: "without-libxml2",
   setup(build: {
     onLoad(options: { filter: RegExp }, callback: () => { contents: string; loader: "js" }): void;
