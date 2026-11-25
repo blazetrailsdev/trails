@@ -65,10 +65,7 @@ async function open(file: string): Promise<ExpoDatabase> {
   return expoSqlite.openDatabaseAsync(file);
 }
 
-/**
- * @internal
- * @noRailsEquivalent PERMANENT
- */
+/** @internal */
 async function withBusyHandler<T>(
   handler: () => BusyHandler | null,
   attempt: () => Promise<T>,
