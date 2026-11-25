@@ -127,6 +127,9 @@ describe("ClassAttributeTest", () => {
     expect(Klass.setting).toBe("plop");
   });
 
+  // PERMANENT-SKIP: a JS class has no metaclass, so `rbObjSingletonClass` raises TypeError for a class receiver (CLAUDE.md, "`singleton_class` is a per-object subclass (`rbObjSingletonClass`)").
+  it.skip("when defined in a class's singleton class", () => {});
+
   it("when defined on an instance's singleton class", () => {
     const object = new Klass();
 

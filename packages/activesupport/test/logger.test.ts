@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { Logger, SimpleFormatter } from "../lib/logger.js";
 import { IsolatedExecutionState } from "../lib/isolated-execution-state.js";
-import { File, Fiber, Tempfile, Thread } from "@blazetrails/ruby-compat";
+import { File, Fiber, FrozenError, Tempfile, Thread, rbObjClone } from "@blazetrails/ruby-compat";
 import { BroadcastLogger } from "../lib/broadcast-logger.js";
 
 function makeBuffer() {
@@ -154,6 +154,37 @@ describe("LoggerTest", () => {
     expect(logger2.level).toBe(Logger.DEBUG);
     logger1.level = Logger.ERROR;
     expect(logger2.level).toBe(Logger.DEBUG);
+  });
+
+  it("logger freeze", () => {
+    const frozen = rbObjClone(logger);
+    Object.freeze(frozen);
+
+    expect(() => {
+      expect(frozen.level).toBe(Logger.DEBUG);
+
+      frozen.debug("I am frozen 1");
+      expect(output.string).toContain("I am frozen 1");
+
+      frozen.debug(undefined, () => "I am frozen 2");
+      expect(output.string).toContain("I am frozen 2");
+
+      frozen.add(Logger.INFO, "I am frozen 3");
+      expect(output.string).toContain("I am frozen 3");
+
+      frozen.silence(undefined, () => {
+        frozen.debug("I am frozen 4");
+      });
+      expect(output.string).not.toContain("I am frozen 4");
+    }).not.toThrow();
+
+    expect(() => {
+      frozen.level = Logger.INFO;
+    }).toThrow(FrozenError);
+
+    expect(() => {
+      frozen.formatter = new Logger.Formatter();
+    }).toThrow(FrozenError);
   });
 
   it("temporarily logging at a noisier level", () => {

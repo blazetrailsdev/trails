@@ -1762,6 +1762,29 @@ describe("FormWithActsLikeFormForTest", () => {
     assertDomEqual(expected, rendered);
   });
 
+  it("form with label namespace", async () => {
+    const post = new Post();
+    post.persisted = false;
+    Object.assign(post, { toKey: () => null });
+
+    await formWith({ model: post, namespace: "namespace" }, (f) => {
+      concat(f.label("title", null, { for: "my_title" }));
+      concat(f.textField("title", { id: "my_title" }));
+    });
+
+    const expected = wholeForm(
+      "/posts",
+      null,
+      null,
+      {},
+      () =>
+        "<label for='namespace_my_title'>Title</label>" +
+        "<input id='namespace_my_title' name='post[title]' type='text' />",
+    );
+
+    assertDomEqual(expected, rendered);
+  });
+
   it("form with label error wrapping", async () => {
     await formWith({ model: post() }, (f) => {
       concat(f.label("author_name", null, { class: "label" }));

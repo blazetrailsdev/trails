@@ -7,6 +7,7 @@ import { extend, TopLevel } from "@blazetrails/activesupport";
 import { assertRespondTo } from "@blazetrails/activesupport/testing/assertions";
 import { File } from "@blazetrails/ruby-compat/file";
 import { include, constSet } from "@blazetrails/ruby-compat/include";
+import { rbDeclareIvar, rbObjIvarSet } from "@blazetrails/ruby-compat/object";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { Engine } from "@blazetrails/trailties/engine";
 import { Trailtie } from "@blazetrails/trailties/trailtie";
@@ -177,7 +178,7 @@ describe("WithMountedEngine", () => {
     }
 
     async ivar_usage(): Promise<void> {
-      (this as { blogEngine: unknown }).blogEngine = "Not the engine route helper";
+      rbObjIvarSet(this, "@blog_engine", "Not the engine route helper");
       await this.render({ plain: this.blogEngine.postPath({ id: 1 }) });
     }
   }
@@ -185,6 +186,7 @@ describe("WithMountedEngine", () => {
     polymorphicPath: Helper;
     blogEngine: RoutesProxyInstance;
   }
+  rbDeclareIvar(OutsideEngineGeneratingController, "@blog_engine", "_ivarBlogEngine");
   include(OutsideEngineGeneratingController, BlogEngine.routes().mountedHelpers());
   include(OutsideEngineGeneratingController, TrailsApplication.routes().urlHelpers());
   constSet(TopLevel, "OutsideEngineGeneratingController", OutsideEngineGeneratingController);
@@ -351,8 +353,9 @@ describe("WithMountedEngine", () => {
     expect(t.response.body).toBe("http://www.example.com/awesome/blog/posts/1");
   });
 
-  it.skip("[APP] instance variable with same name as engine", () => {
-    // PERMANENT-SKIP: asserts that Ruby's `@blog_engine` ivar and its `blog_engine` method are separate names; a JS object has one namespace for fields and methods, so the controller's `blogEngine` field IS the mounted helper and assigning it raises TypeError.
+  it("[APP] instance variable with same name as engine", async () => {
+    await t.get("/ivar_usage");
+    expect(t.response.body).toBe("/awesome/blog/posts/1");
   });
 
   it("[OBJECT] proxy route should override respond_to?() as expected", () => {

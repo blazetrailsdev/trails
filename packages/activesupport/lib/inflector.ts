@@ -1,6 +1,6 @@
 import { inflections } from "./inflector/inflections.js";
 import { NameError } from "./core-ext/name-error.js";
-import { type ConstantTable, constGet } from "@blazetrails/ruby-compat";
+import { type ConstantTable, LoadError, constGet, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { ActiveSupport } from "./namespaces.js";
 import * as Inflector from "./inflector.js";
 import { I18n } from "./i18n.js";
@@ -197,12 +197,21 @@ export function safeConstantize(camelCasedWord: string): unknown {
   try {
     return constantize(camelCasedWord);
   } catch (e) {
-    if (!(e instanceof NameError)) throw e;
-    const name = e.constantName;
-    if (name && !(camelCasedWord.split("::").includes(name) || name === camelCasedWord)) {
-      throw e;
+    if (e instanceof NameError) {
+      const name = e.constantName;
+      if (name && !(camelCasedWord.split("::").includes(name) || name === camelCasedWord)) {
+        throw e;
+      }
+      return undefined;
+    } else if (e instanceof LoadError) {
+      const message = rbObjRespondTo(e, "originalMessage")
+        ? (e as LoadError & { originalMessage(): string }).originalMessage()
+        : e.message;
+      const constantName = camelCasedWord.split("::").find((part) => part !== "") ?? camelCasedWord;
+      if (!message.includes(`Unable to autoload constant ${constantName}`)) throw e;
+      return undefined;
     }
-    return undefined;
+    throw e;
   }
 }
 

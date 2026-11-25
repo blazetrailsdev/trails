@@ -525,9 +525,8 @@ describe("PlaceholderAssertionsTest", () => {
 });
 
 describe("CapybaraHTMLEncoderTest", () => {
-  it.skip("document_root_element can be configured to utilize Vitest", () => {
-    // PERMANENT-SKIP: CLAUDE.md, "System testing runs on Vitest (`SystemTestCase`, `SystemTesting::*`)" — no Capybara.
-  });
+  // PERMANENT-SKIP: CLAUDE.md, "System testing runs on Vitest (`SystemTestCase`, `SystemTesting::*`)" — no Capybara.
+  it.skip("document_root_element can be configured to utilize Vitest", () => {});
 });
 
 const RenderedViewContentTest = named(
@@ -638,19 +637,15 @@ describe("MissingHTMLParserTest", () => {
 });
 
 describe("AHelperWithInitializeTest", () => {
-  it.skip("the helper's initialize was actually called", () => {
-    // PERMANENT-SKIP: CLAUDE.md, "A module's `initialize` is inlined into the constructor (`@inlinedFrom`)" — a helper module has no `initialize` to run.
-  });
+  // PERMANENT-SKIP: CLAUDE.md, "A module's `initialize` is inlined into the constructor (`@inlinedFrom`)" — a helper module has no `initialize` to run.
+  it.skip("the helper's initialize was actually called", () => {});
 });
 
 describe("PatternMatchingTestCases", () => {
-  it.skip("document_root_element integrates with pattern matching", () => {
-    // PERMANENT-SKIP: CLAUDE.md, "Ruby pattern matching has no port (`assert_pattern`, `deconstruct_keys`)".
-  });
-  it.skip("rendered.html integrates with pattern matching", () => {
-    // PERMANENT-SKIP: CLAUDE.md, "Ruby pattern matching has no port (`assert_pattern`, `deconstruct_keys`)".
-  });
-  it.skip("rendered.json integrates with pattern matching", () => {
-    // PERMANENT-SKIP: CLAUDE.md, "Ruby pattern matching has no port (`assert_pattern`, `deconstruct_keys`)".
-  });
+  // PERMANENT-SKIP: CLAUDE.md, "Ruby pattern matching has no port (`assert_pattern`, `deconstruct_keys`)".
+  it.skip("document_root_element integrates with pattern matching", () => {});
+  // PERMANENT-SKIP: CLAUDE.md, "Ruby pattern matching has no port (`assert_pattern`, `deconstruct_keys`)".
+  it.skip("rendered.html integrates with pattern matching", () => {});
+  // PERMANENT-SKIP: CLAUDE.md, "Ruby pattern matching has no port (`assert_pattern`, `deconstruct_keys`)".
+  it.skip("rendered.json integrates with pattern matching", () => {});
 });

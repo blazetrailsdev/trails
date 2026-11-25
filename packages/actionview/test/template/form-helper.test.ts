@@ -911,6 +911,14 @@ describe("FormHelperTest", () => {
     assertDomEqual(expected, view.fileField("user", "avatar"));
   });
 
+  it("file field with accept attribute", () => {
+    const expected = '<input accept="image/*,video/*" type="file" name="import[file]" />';
+    assertDomEqual(
+      expected,
+      view.fileField("import", "file", { accept: ["image/*", "video/*"], id: null }),
+    );
+  });
+
   it("file field with multiple behavior", () => {
     const expected =
       '<input id="import_file" multiple="multiple" name="import[file][]" type="file" />';
@@ -4477,6 +4485,25 @@ describe("FormHelperTest", () => {
       () =>
         "<label for='namespace_post_title'>Title</label>" +
         "<input name='post[title]' type='text' id='namespace_post_title' value='Hello World' />",
+    );
+
+    assertDomEqual(expected, rendered);
+  });
+
+  it("form for with namespace with custom label for", async () => {
+    await formFor(post, { namespace: "namespace" }, (f) => {
+      concat(f.label("title", { for: "my_title" }));
+      concat(f.textField("title", { id: "my_title" }));
+    });
+
+    const expected = wholeForm(
+      "/posts/123",
+      "namespace_edit_post_123",
+      "edit_post",
+      { method: "patch" },
+      () =>
+        "<label for='namespace_my_title'>Title</label>" +
+        "<input name='post[title]' type='text' id='namespace_my_title' value='Hello World' />",
     );
 
     assertDomEqual(expected, rendered);

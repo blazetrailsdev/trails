@@ -496,6 +496,16 @@ describe("InflectorTest", () => {
     expect(camelize("Camel_Case")).toBe("CamelCase");
   });
 
+  it("overlapping acronyms", () => {
+    withInflections((inflect) => {
+      inflect.acronym("USD");
+      inflect.acronym("USDC");
+
+      expect(underscore("USD")).toBe("usd");
+      expect(underscore("USDC")).toBe("usdc");
+    });
+  });
+
   it("acronyms", () => {
     withInflections((inflect) => {
       inflect.acronym("API");

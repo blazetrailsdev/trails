@@ -295,4 +295,16 @@ describe("CurrentAttributesTest", () => {
     }
     expect((MyCurrent as unknown as { bar: unknown }).bar).toBeInstanceOf(Object);
   });
+
+  it("attribute delegators have precise signature", () => {
+    class MyCurrent extends CurrentAttributes {
+      static {
+        this.attribute("attr", { default: "att" });
+      }
+    }
+
+    const delegator = Object.getOwnPropertyDescriptor(MyCurrent, "attr")!;
+    expect(delegator.get!.length).toBe(0);
+    expect(delegator.set!.length).toBe(1);
+  });
 });

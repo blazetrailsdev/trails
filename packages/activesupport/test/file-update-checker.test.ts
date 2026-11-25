@@ -1,6 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { ArgumentError, Dir, File, FileUtils } from "@blazetrails/ruby-compat";
 import { FileUpdateChecker } from "../lib/file-update-checker.js";
+import { rbObjIvarGet } from "@blazetrails/ruby-compat";
+import { Time } from "@blazetrails/date";
+import { travelTo } from "../lib/testing/time-helpers.js";
 
 describe("FileUpdateCheckerTest", () => {
   let tmpdir: string;
@@ -38,6 +41,34 @@ describe("FileUpdateCheckerTest", () => {
   const rmF = (files: string[]): void => {
     FileUtils.rmF(files);
   };
+
+  it("should not reload files that appear in the future due to time travel", async () => {
+    let i = 0;
+
+    const checker = newChecker(tmpfiles(), {}, () => {
+      i += 1;
+    });
+    await touch(tmpfiles());
+
+    expect(await checker.executeIfUpdated()).toBeTruthy();
+    expect(i).toBe(1);
+
+    const originalLastUpdateAt = rbObjIvarGet(checker, "@last_update_at") as Date;
+    expect(originalLastUpdateAt.getTime() > Date.UTC(2020, 0, 1)).toBeTruthy();
+
+    travelTo(Time.utc(2020, 1, 1), {}, () => {
+      checker.execute();
+    });
+
+    expect(checker.isUpdated()).toBeFalsy();
+
+    const finalState = rbObjIvarGet(checker, "@last_update_at") as Date;
+    expect(finalState.getTime()).not.toBe(new Date(0).getTime());
+
+    await touch(tmpfiles());
+    expect(await checker.executeIfUpdated()).toBeTruthy();
+    expect(i).toBe(3);
+  });
 
   it("should not execute the block if no paths are given", async () => {
     let i = 0;

@@ -547,6 +547,7 @@ export { rbEqual } from "@blazetrails/ruby-compat";
 export { rbHash } from "@blazetrails/ruby-compat";
 export { caseEquals, isInclude } from "./core-ext/range/compare-range.js";
 export { overlap, overlaps } from "./core-ext/range/overlap.js";
+import "./core-ext/range/sole.js";
 
 export { I18n } from "./i18n.js";
 export { Scalar } from "./duration.js";

@@ -1,4 +1,5 @@
 import { Fiber } from "./fiber.js";
+import { rbDeclareIvar, rbObjIvarSet } from "./object.js";
 import { Formatter } from "./logger/formatter.js";
 import { LogDevice } from "./logger/log-device.js";
 import { Severity } from "./logger/severity.js";
@@ -66,7 +67,7 @@ export class Logger {
 
   /** @noRailsEquivalent PERMANENT */
   set level(severity: number | string) {
-    this._level = Severity.coerce(severity);
+    rbObjIvarSet(this, "@level", Severity.coerce(severity));
   }
 
   /** @noRailsEquivalent PERMANENT */
@@ -111,7 +112,7 @@ export class Logger {
 
   /** @noRailsEquivalent PERMANENT */
   set formatter(formatter: LoggerFormatter | null) {
-    this._formatter = formatter;
+    rbObjIvarSet(this, "@formatter", formatter);
   }
 
   /** @noRailsEquivalent PERMANENT */
@@ -286,3 +287,5 @@ export class Logger {
 }
 
 Logger.prototype.log = Logger.prototype.add;
+rbDeclareIvar(Logger, "@level", "_level");
+rbDeclareIvar(Logger, "@formatter", "_formatter");

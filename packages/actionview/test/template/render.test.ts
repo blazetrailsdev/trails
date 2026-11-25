@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { ORIGINAL_LOCALES } from "../support/abstract-unit.js";
+import { travel, travelBack } from "@blazetrails/activesupport/testing/time-helpers";
 
 import { ActionController, ExceptionWrapper, Mime } from "@blazetrails/actionpack";
 
@@ -7,7 +8,14 @@ import { Base } from "../../lib/base.js";
 import { Template } from "../../lib/template.js";
 import { Handlers } from "../../lib/template/handlers.js";
 import { FixtureResolver } from "../../lib/testing/resolvers.js";
-import { MemoryStore, I18n, Logger, symbolizeKeys, SafeBuffer } from "@blazetrails/activesupport";
+import {
+  Duration,
+  MemoryStore,
+  I18n,
+  Logger,
+  symbolizeKeys,
+  SafeBuffer,
+} from "@blazetrails/activesupport";
 import {
   assert,
   assertEqual,
@@ -1395,6 +1403,7 @@ describe("CachedCollectionViewRenderTest", () => {
   });
 
   afterEach(teardown);
+  afterEach(() => travelBack());
 
   it("template body written to cache", async () => {
     const customer = new Customer("david", 1);
@@ -1402,6 +1411,50 @@ describe("CachedCollectionViewRenderTest", () => {
     assertNil(await PartialRenderer.collectionCache().read(key));
     await view.render({ partial: "test/customer", collection: [customer], cached: true });
     assertEqual("Hello: david", String(await PartialRenderer.collectionCache().read(key)));
+  });
+
+  it("template body written to cache with expiration when expires_in set", async () => {
+    const customer = new Customer("jarrett", 2);
+    const key = cacheKey(customer, "test/_customer");
+    await view.render({
+      partial: "test/customer",
+      collection: [customer],
+      cached: { expiresIn: Duration.hours(1) },
+    });
+    assertEqual("Hello: jarrett", String(await PartialRenderer.collectionCache().read(key)));
+
+    travel(Duration.hours(2));
+
+    assertNil(await PartialRenderer.collectionCache().read(key));
+  });
+
+  it("collection caching with an expires_in set to nil does not expire", async () => {
+    PartialRenderer.setCollectionCache(new MemoryStore({ expiresIn: Duration.hours(1) }));
+    const customer = new Customer("david", 1);
+    const key = cacheKey(customer, "test/_customer");
+    await view.render({
+      partial: "test/customer",
+      collection: [customer],
+      cached: { expiresIn: null },
+    });
+    assertEqual("Hello: david", String(await PartialRenderer.collectionCache().read(key)));
+
+    travel(Duration.hours(2));
+
+    assertEqual("Hello: david", String(await PartialRenderer.collectionCache().read(key)));
+  });
+
+  it("collection caching without expires_in does not overwrite the default expires_in of the cache store", async () => {
+    PartialRenderer.setCollectionCache(new MemoryStore({ expiresIn: Duration.hours(1) }));
+
+    const customer = new Customer("david", 1);
+    const key = cacheKey(customer, "test/_customer");
+    await view.render({ partial: "test/customer", collection: [customer], cached: true });
+    assertEqual("Hello: david", String(await PartialRenderer.collectionCache().read(key)));
+
+    travel(Duration.hours(2));
+
+    assertNil(await PartialRenderer.collectionCache().read(key));
   });
 
   it("collection caching does not cache by default", async () => {
