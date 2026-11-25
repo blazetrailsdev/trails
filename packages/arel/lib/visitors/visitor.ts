@@ -1,17 +1,15 @@
+import { Hash, hashAset } from "@blazetrails/ruby-compat/hash";
+import { rbModAncestors, constSet } from "@blazetrails/ruby-compat/include";
+import { NoMethodError } from "@blazetrails/ruby-compat/no-method-error";
 import {
-  Hash,
-  NoMethodError,
-  TypeError,
-  hashAset,
   rbObjClass,
   rbFSend,
-  rbModAncestors,
   rbModName,
   rbObjClassname,
   rbObjRespondTo,
-  constSet,
   rtest,
-} from "@blazetrails/ruby-compat";
+} from "@blazetrails/ruby-compat/object";
+import { TypeError } from "@blazetrails/ruby-compat/type-error";
 import { Visitors } from "../namespaces.js";
 
 export abstract class Visitor {

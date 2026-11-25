@@ -1,4 +1,4 @@
-import { constSet } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
 import { Collectors } from "../namespaces.js";
 
 export class PlainString {

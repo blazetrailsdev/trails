@@ -1,13 +1,8 @@
 import { Attributes, Nodes, Visitors } from "../namespaces.js";
-import {
-  aryDeleteIf,
-  isNil,
-  NotImplementedError,
-  rbObjClone,
-  constSet,
-  rbObjRespondTo,
-  rtest,
-} from "@blazetrails/ruby-compat";
+import { aryDeleteIf } from "@blazetrails/ruby-compat/array";
+import { rbObjClone, constSet } from "@blazetrails/ruby-compat/include";
+import { NotImplementedError } from "@blazetrails/ruby-compat/not-implemented-error";
+import { isNil, rbObjRespondTo, rtest } from "@blazetrails/ruby-compat/object";
 import { arelNode } from "../arel.js";
 import { Node } from "../nodes/node.js";
 import { SQLString } from "../collectors/sql-string.js";

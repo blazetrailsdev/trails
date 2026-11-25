@@ -4,7 +4,9 @@ import { Attribute } from "./attributes/attribute.js";
 import { ValuesList } from "./nodes/values-list.js";
 import { SqlLiteral } from "./nodes/sql-literal.js";
 import { Table } from "./table.js";
-import { first, isEmpty, constSet } from "@blazetrails/ruby-compat";
+import { first } from "@blazetrails/ruby-compat/array";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { isEmpty } from "@blazetrails/ruby-compat/ruby-empty";
 import { Arel } from "./namespaces.js";
 import type { ArelNode } from "./arel.js";
 

@@ -1,6 +1,7 @@
 import { Time } from "@blazetrails/date";
 import { Module, isPlainObject } from "@blazetrails/activesupport";
-import { rbCallSuper, rtest } from "@blazetrails/ruby-compat";
+import { rbCallSuper } from "@blazetrails/ruby-compat/include";
+import { rtest } from "@blazetrails/ruby-compat/object";
 
 export interface InstanceMethods<T = unknown> {
   serialize(value: unknown): unknown;

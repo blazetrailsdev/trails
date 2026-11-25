@@ -4,12 +4,9 @@ import {
   Time as RubyTime,
   type DateParts,
 } from "@blazetrails/date";
-import {
-  numericMul,
-  rbModInstanceMethod,
-  rbObjAsString as toS,
-  toI,
-} from "@blazetrails/ruby-compat";
+import { rbModInstanceMethod } from "@blazetrails/ruby-compat/include";
+import { numericMul, toI } from "@blazetrails/ruby-compat/numeric";
+import { rbObjAsString as toS } from "@blazetrails/ruby-compat/object";
 import {
   type DateInfinity as DateInfinityType,
   type DateNegativeInfinity as DateNegativeInfinityType,

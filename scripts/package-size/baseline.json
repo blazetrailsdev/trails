@@ -12,10 +12,12 @@
   },
   "activemodel": {
     "tarball": {
-      "value": 110015
+      "value": 111060,
+      "reason": "ruby-compat barrel imports moved to longer subpath specifiers (RFC 0192)"
     },
     "unpacked": {
-      "value": 557993
+      "value": 569920,
+      "reason": "ruby-compat barrel imports moved to longer subpath specifiers (RFC 0192)"
     },
     "entries": {
       "value": 227
@@ -34,10 +36,12 @@
   },
   "arel": {
     "tarball": {
-      "value": 76233
+      "value": 76587,
+      "reason": "ruby-compat barrel imports moved to longer subpath specifiers (RFC 0192)"
     },
     "unpacked": {
-      "value": 438920
+      "value": 445130,
+      "reason": "ruby-compat barrel imports moved to longer subpath specifiers (RFC 0192)"
     },
     "entries": {
       "value": 261

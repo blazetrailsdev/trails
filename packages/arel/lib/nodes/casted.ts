@@ -1,5 +1,6 @@
 import { rbEqual, rbHash } from "@blazetrails/activesupport";
-import { isNil, rbFSend, constSet, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { isNil, rbFSend, rbObjRespondTo } from "@blazetrails/ruby-compat/object";
 import { Node } from "./node.js";
 import { NodeExpression } from "./node-expression.js";
 import { Arel, Attributes, Nodes } from "../namespaces.js";

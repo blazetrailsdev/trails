@@ -1,5 +1,6 @@
 import { HashWithIndifferentAccess, included, kernelArray } from "@blazetrails/activesupport";
-import { include, rbCallSuper, rbDeclareIvar, rbObjAsString } from "@blazetrails/ruby-compat";
+import { include, rbCallSuper } from "@blazetrails/ruby-compat/include";
+import { rbDeclareIvar, rbObjAsString } from "@blazetrails/ruby-compat/object";
 
 import { AttributeSet } from "./attribute-set.js";
 import {

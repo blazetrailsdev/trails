@@ -1,4 +1,4 @@
-import { block, fetch } from "@blazetrails/ruby-compat";
+import { block, fetch } from "@blazetrails/ruby-compat/hash";
 import { Error as ActiveModelError } from "./error.js";
 import { ActiveModel } from "./namespaces.js";
 

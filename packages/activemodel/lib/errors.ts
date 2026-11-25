@@ -4,19 +4,12 @@ import {
   presence,
   ToJsonWithActiveSupportEncoder,
 } from "@blazetrails/activesupport";
-import {
-  Enumerable,
-  FrozenError,
-  groupBy,
-  type Hash,
-  rbEqual,
-  rbInspect,
-  rbDeclareIvar,
-  rbModName,
-  rbObjDup,
-  toSym,
-  transformValues,
-} from "@blazetrails/ruby-compat";
+import { Enumerable, groupBy } from "@blazetrails/ruby-compat/enumerable";
+import { FrozenError } from "@blazetrails/ruby-compat/frozen-error";
+import { type Hash, transformValues } from "@blazetrails/ruby-compat/hash";
+import { rbObjDup } from "@blazetrails/ruby-compat/include";
+import { rbInspect, rbDeclareIvar, rbModName, toSym } from "@blazetrails/ruby-compat/object";
+import { rbEqual } from "@blazetrails/ruby-compat/rb-equal";
 import { Error as ActiveModelError } from "./error.js";
 import { NestedError } from "./nested-error.js";
 import { ActiveModel } from "./namespaces.js";

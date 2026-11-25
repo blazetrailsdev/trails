@@ -1,22 +1,12 @@
-import {
-  b,
-  basicObjRespondTo,
-  block,
-  Concurrent,
-  excSetBacktrace,
-  fetch,
-  Hash,
-  isInclude,
-  rbFCaller,
-  rbFSend,
-  rbClearMethodCache,
-  rbObjRespondTo,
-  constDefined,
-  constSet,
-  regexpEscape,
-  unpack1,
-  filterMap,
-} from "@blazetrails/ruby-compat";
+import { unpack1 } from "@blazetrails/ruby-compat/array";
+import { excSetBacktrace, rbFCaller } from "@blazetrails/ruby-compat/backtrace-location";
+import { Concurrent } from "@blazetrails/ruby-compat/concurrent/map";
+import { filterMap } from "@blazetrails/ruby-compat/enumerable";
+import { block, fetch, Hash, isInclude } from "@blazetrails/ruby-compat/hash";
+import { rbClearMethodCache, constDefined, constSet } from "@blazetrails/ruby-compat/include";
+import { basicObjRespondTo, rbFSend, rbObjRespondTo } from "@blazetrails/ruby-compat/object";
+import { regexpEscape } from "@blazetrails/ruby-compat/regexp";
+import { b } from "@blazetrails/ruby-compat/string/b";
 import {
   camelize,
   classAttribute,

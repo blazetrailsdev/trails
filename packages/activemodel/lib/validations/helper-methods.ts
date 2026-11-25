@@ -1,5 +1,5 @@
 import { extractOptionsBang } from "@blazetrails/activesupport";
-import { flatten } from "@blazetrails/ruby-compat";
+import { flatten } from "@blazetrails/ruby-compat/array";
 import type { ValidatableRecord } from "../validator.js";
 import { HelperMethods as AbsenceHelperMethods } from "./absence.js";
 import { HelperMethods as AcceptanceHelperMethods } from "./acceptance.js";

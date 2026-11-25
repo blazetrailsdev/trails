@@ -8,7 +8,7 @@ import { SqlLiteral } from "./nodes/sql-literal.js";
 import { BoundSqlLiteral } from "./nodes/bound-sql-literal.js";
 import { Table } from "./table.js";
 import type { UpdateValues } from "./crud.js";
-import { constSet } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
 import { Arel } from "./namespaces.js";
 import type { ArelNode } from "./arel.js";
 import type { Node } from "./nodes/node.js";

@@ -1,5 +1,6 @@
 import { Nodes } from "../namespaces.js";
-import { isNil, rbFSend, constSet, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { isNil, rbFSend, rbObjRespondTo } from "@blazetrails/ruby-compat/object";
 import { rbEqual, rbHash } from "@blazetrails/activesupport";
 import { Node } from "./node.js";
 

@@ -2,7 +2,7 @@ import { ArgumentError } from "../attribute-assignment.js";
 import { EachValidator } from "../validator.js";
 import type { ValidatableRecord } from "../validator.js";
 import { isBlank, slice, underscore } from "@blazetrails/activesupport";
-import { rbFSend, rtest } from "@blazetrails/ruby-compat";
+import { rbFSend, rtest } from "@blazetrails/ruby-compat/object";
 import { COMPARE_CHECKS, errorOptions } from "./comparability.js";
 import type { CompareKey } from "./comparability.js";
 import { resolveValue } from "./resolve-value.js";

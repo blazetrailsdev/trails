@@ -1,7 +1,7 @@
 import type { Attribute } from "../attribute.js";
 import { AttributeSet } from "../attribute-set.js";
 import type { ValueType } from "../type/value.js";
-import { type Hash, hashAref } from "@blazetrails/ruby-compat";
+import { type Hash, hashAref } from "@blazetrails/ruby-compat/hash";
 
 type DefaultTypes = Record<string, ValueType | null> | Hash<string, ValueType | null>;
 

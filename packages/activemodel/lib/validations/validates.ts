@@ -2,7 +2,8 @@ import { camelize, extractOptionsBang, sliceBang } from "@blazetrails/activesupp
 
 import { ArgumentError, NameError } from "../attribute-assignment.js";
 
-import { Range, constGet } from "@blazetrails/ruby-compat";
+import { Range } from "@blazetrails/ruby-compat/range";
+import { constGet } from "@blazetrails/ruby-compat/variable";
 
 export interface ValidatesHost {
   _validatesDefaultKeys(): string[];

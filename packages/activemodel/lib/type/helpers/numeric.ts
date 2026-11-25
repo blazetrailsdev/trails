@@ -1,13 +1,9 @@
 import { BigDecimal, presence } from "@blazetrails/activesupport";
-import {
-  cmp,
-  isNan,
-  Rational,
-  rbCallSuper,
-  rbFloatTypeP,
-  rbObjAsString as toS,
-  rbObjClass,
-} from "@blazetrails/ruby-compat";
+import { cmp } from "@blazetrails/ruby-compat/comparable";
+import { rbCallSuper } from "@blazetrails/ruby-compat/include";
+import { isNan, rbFloatTypeP } from "@blazetrails/ruby-compat/numeric";
+import { rbObjAsString as toS, rbObjClass } from "@blazetrails/ruby-compat/object";
+import { Rational } from "@blazetrails/ruby-compat/rational";
 import type { ValueType } from "../value.js";
 
 const NUMERIC_REGEX = /^\s*[+-]?\d/;

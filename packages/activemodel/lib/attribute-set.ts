@@ -1,8 +1,8 @@
 import { deepDup, indexWith, reverseMergeBang } from "@blazetrails/activesupport";
 import { Attribute } from "./attribute.js";
 import type { LazyAttributeHash } from "./attribute-set/builder.js";
+import { FrozenError } from "@blazetrails/ruby-compat/frozen-error";
 import {
-  FrozenError,
   type Block,
   type Hash,
   eachKey,
@@ -12,12 +12,11 @@ import {
   hasKey,
   hashAref,
   hashAset,
-  rbDeclareIvar,
-  rbEqual,
-  rbObjClone,
-  rbObjDup,
   transformValues,
-} from "@blazetrails/ruby-compat";
+} from "@blazetrails/ruby-compat/hash";
+import { rbObjClone, rbObjDup } from "@blazetrails/ruby-compat/include";
+import { rbDeclareIvar } from "@blazetrails/ruby-compat/object";
+import { rbEqual } from "@blazetrails/ruby-compat/rb-equal";
 import { ValueType } from "./type/value.js";
 
 type Attributes = Record<string, Attribute> | Hash<string, Attribute> | LazyAttributeHash;

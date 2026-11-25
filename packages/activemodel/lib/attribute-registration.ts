@@ -1,5 +1,6 @@
 import { DescendantsTracker, extend, included, registerSubclass } from "@blazetrails/activesupport";
-import { Hash, block as rbBlock, fetch, hashAref, rbObjAsString } from "@blazetrails/ruby-compat";
+import { Hash, block as rbBlock, fetch, hashAref } from "@blazetrails/ruby-compat/hash";
+import { rbObjAsString } from "@blazetrails/ruby-compat/object";
 import { ValueType } from "./type/value.js";
 import * as Type from "./type.js";
 import { AttributeSet } from "./attribute-set.js";

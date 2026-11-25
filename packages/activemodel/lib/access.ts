@@ -3,7 +3,8 @@ import {
   withIndifferentAccess,
   type HashWithIndifferentAccess,
 } from "@blazetrails/activesupport";
-import { flatten, rbFSend } from "@blazetrails/ruby-compat";
+import { flatten } from "@blazetrails/ruby-compat/array";
+import { rbFSend } from "@blazetrails/ruby-compat/object";
 
 export class Access {
   slice(...methods: unknown[]): HashWithIndifferentAccess<unknown> {

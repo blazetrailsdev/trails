@@ -1,6 +1,6 @@
 import { Nodes } from "../namespaces.js";
 import { include } from "@blazetrails/activesupport";
-import { constSet } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
 import { Node } from "./node.js";
 import { Expressions, type ExpressionsModule } from "../expressions.js";
 import { Predications, type PredicationsModule } from "../predications.js";

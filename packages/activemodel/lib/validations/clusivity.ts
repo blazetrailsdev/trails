@@ -1,16 +1,16 @@
 import { resolveValue } from "./resolve-value.js";
 import { ArgumentError } from "../attribute-assignment.js";
+import { rbObjIsKindOf } from "@blazetrails/ruby-compat/include";
 import {
-  Range,
   rbCDate,
   rbCDateTime,
   rbCNumeric,
   rbCTime,
   rbFSend,
-  rbObjIsKindOf,
   rbObjRespondTo,
   rtest,
-} from "@blazetrails/ruby-compat";
+} from "@blazetrails/ruby-compat/object";
+import { Range } from "@blazetrails/ruby-compat/range";
 
 export { resolveValue };
 

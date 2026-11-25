@@ -1,5 +1,5 @@
 import { include } from "@blazetrails/activesupport";
-import { rbObjClone, constSet } from "@blazetrails/ruby-compat";
+import { rbObjClone, constSet } from "@blazetrails/ruby-compat/include";
 import { ArelEngine, Node, _engine } from "./nodes/node.js";
 import { Visitors, Arel } from "./namespaces.js";
 import { PlainString } from "./collectors/plain-string.js";

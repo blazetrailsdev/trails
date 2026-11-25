@@ -10,7 +10,8 @@ import {
   type Included,
   type Extended,
 } from "@blazetrails/activesupport";
-import { isModuleIncluded, methodCacheSerial, rbObjDup, type Hash } from "@blazetrails/ruby-compat";
+import type { Hash } from "@blazetrails/ruby-compat/hash";
+import { isModuleIncluded, methodCacheSerial, rbObjDup } from "@blazetrails/ruby-compat/include";
 import type { Translation } from "./translation.js";
 import { ModelName } from "./naming.js";
 import { defineModelCallbacks as defineModelCallbacksImpl } from "./callbacks.js";

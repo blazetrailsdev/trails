@@ -1,14 +1,11 @@
 import { ValueType } from "./type/value.js";
 import { defaultValue } from "./type.js";
 import { MissingAttributeError } from "./attribute-methods.js";
-import {
-  hasKey,
-  rbEqual,
-  rbHash,
-  rbDeclareIvar,
-  rbObjAsString,
-  rbObjDup,
-} from "@blazetrails/ruby-compat";
+import { hasKey } from "@blazetrails/ruby-compat/hash";
+import { rbObjDup } from "@blazetrails/ruby-compat/include";
+import { rbDeclareIvar, rbObjAsString } from "@blazetrails/ruby-compat/object";
+import { rbEqual } from "@blazetrails/ruby-compat/rb-equal";
+import { rbHash } from "@blazetrails/ruby-compat/rb-hash";
 import { isDuplicable } from "@blazetrails/activesupport";
 import { ActiveModel } from "./namespaces.js";
 import type { UserProvidedDefault } from "./attribute/user-provided-default.js";

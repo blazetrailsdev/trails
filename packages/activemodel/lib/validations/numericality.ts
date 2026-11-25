@@ -1,14 +1,11 @@
-import { FLOAT_DIG } from "@blazetrails/ruby-compat";
-import {
-  ArgumentError,
-  isInclude,
-  isSymbol,
-  kernelFloat,
-  rbFSend,
-  rtest,
-  Range,
-  toI,
-} from "@blazetrails/ruby-compat";
+import { FLOAT_DIG } from "@blazetrails/ruby-compat/numeric";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { isInclude } from "@blazetrails/ruby-compat/hash";
+import { kernelFloat } from "@blazetrails/ruby-compat/kernel-float";
+import { toI } from "@blazetrails/ruby-compat/numeric";
+import { rbFSend, rtest } from "@blazetrails/ruby-compat/object";
+import { Range } from "@blazetrails/ruby-compat/range";
+import { isSymbol } from "@blazetrails/ruby-compat/symbol";
 
 import { EachValidator } from "../validator.js";
 import type { ValidatableRecord } from "../validator.js";

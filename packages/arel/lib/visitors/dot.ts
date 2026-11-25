@@ -5,13 +5,8 @@ import { Visitor } from "./visitor.js";
 import { Nodes, Visitors } from "../namespaces.js";
 import { Attribute as ModelAttribute } from "@blazetrails/activemodel";
 import { camelize } from "@blazetrails/activesupport";
-import {
-  rbFSend,
-  rbObjAsString,
-  rbObjClassname,
-  rbObjId,
-  constSet,
-} from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { rbFSend, rbObjAsString, rbObjClassname, rbObjId } from "@blazetrails/ruby-compat/object";
 
 export class Dot extends Visitor {
   private nodes: Node[] = [];

@@ -1,5 +1,6 @@
 import { include } from "@blazetrails/activesupport";
-import { constSet, Struct } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { Struct } from "@blazetrails/ruby-compat/struct";
 import { Arel, Attributes } from "../namespaces.js";
 import type { Node } from "../nodes/node.js";
 import { SqlLiteral } from "../nodes/sql-literal.js";

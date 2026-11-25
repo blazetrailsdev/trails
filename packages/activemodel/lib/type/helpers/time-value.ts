@@ -1,14 +1,9 @@
 import { Time } from "@blazetrails/date";
-import {
-  ArgumentError,
-  cmp,
-  numericMinus,
-  numericModulo,
-  numericPow,
-  Rational,
-  rbFSend,
-  rbObjRespondTo,
-} from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { cmp } from "@blazetrails/ruby-compat/comparable";
+import { numericMinus, numericModulo, numericPow } from "@blazetrails/ruby-compat/numeric";
+import { rbFSend, rbObjRespondTo } from "@blazetrails/ruby-compat/object";
+import { Rational } from "@blazetrails/ruby-compat/rational";
 import { actsLike, TimeWithZone } from "@blazetrails/activesupport";
 
 export interface TimezoneAware {

@@ -18,16 +18,12 @@ import { NamedWindow } from "./nodes/window.js";
 import { Table } from "./table.js";
 import { sql } from "./arel.js";
 import { Arel, Nodes } from "./namespaces.js";
-import {
-  capitalize,
-  isEmpty,
-  isSymbol,
-  constGet,
-  constSet,
-  rbObjAsString,
-  rtest,
-  symbolToS,
-} from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { rbObjAsString, rtest } from "@blazetrails/ruby-compat/object";
+import { isEmpty } from "@blazetrails/ruby-compat/ruby-empty";
+import { capitalize } from "@blazetrails/ruby-compat/string/case-mapping";
+import { isSymbol, symbolToS } from "@blazetrails/ruby-compat/symbol";
+import { constGet } from "@blazetrails/ruby-compat/variable";
 import { Comment } from "./nodes/comment.js";
 import { Lateral } from "./nodes/unary.js";
 import { And } from "./nodes/nary.js";

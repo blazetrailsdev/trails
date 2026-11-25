@@ -1,4 +1,5 @@
-import { rbEqual, rbObjAsString as toS } from "@blazetrails/ruby-compat";
+import { rbObjAsString as toS } from "@blazetrails/ruby-compat/object";
+import { rbEqual } from "@blazetrails/ruby-compat/rb-equal";
 import { ImmutableStringType } from "./immutable-string.js";
 
 export class StringType extends ImmutableStringType {

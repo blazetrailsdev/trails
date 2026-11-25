@@ -1,4 +1,4 @@
-import { except } from "@blazetrails/ruby-compat";
+import { except } from "@blazetrails/ruby-compat/hash";
 
 export const COMPARE_CHECKS = {
   greaterThan: ":>",

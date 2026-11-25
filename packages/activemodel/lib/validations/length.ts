@@ -2,7 +2,9 @@ import { ArgumentError } from "../attribute-assignment.js";
 import { EachValidator } from "../validator.js";
 import type { ValidatableRecord } from "../validator.js";
 import { camelize } from "@blazetrails/activesupport";
-import { except, hashDelete, Range, rbObjRespondTo, rtest } from "@blazetrails/ruby-compat";
+import { except, hashDelete } from "@blazetrails/ruby-compat/hash";
+import { rbObjRespondTo, rtest } from "@blazetrails/ruby-compat/object";
+import { Range } from "@blazetrails/ruby-compat/range";
 import { resolveValue } from "./resolve-value.js";
 import type { AttrNameArg, HelperMethodsHost } from "./helper-methods.js";
 

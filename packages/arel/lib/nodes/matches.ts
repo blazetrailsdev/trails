@@ -1,5 +1,5 @@
 import { Nodes } from "../namespaces.js";
-import { constSet } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
 import { Binary, NodeOrValue } from "./binary.js";
 import { buildQuoted } from "./casted.js";
 import type { ArelNode } from "../arel.js";

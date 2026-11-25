@@ -1,5 +1,5 @@
 import { include } from "@blazetrails/activesupport";
-import { constSet } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
 import { Nodes } from "../namespaces.js";
 import { Binary, NotEqual, FetchAttribute } from "./binary.js";
 import type { Node } from "./node.js";

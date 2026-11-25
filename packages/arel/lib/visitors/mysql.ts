@@ -1,5 +1,5 @@
 import { Nodes, Visitors } from "../namespaces.js";
-import { constSet } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
 import type { Table } from "../table.js";
 import { Node } from "../nodes/node.js";
 import "../nodes/index.js";

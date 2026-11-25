@@ -1,4 +1,4 @@
-import { constSet } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
 import { Arel } from "./namespaces.js";
 
 export class ArelError extends Error {

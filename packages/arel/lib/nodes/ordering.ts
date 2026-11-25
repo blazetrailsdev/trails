@@ -1,5 +1,5 @@
 import { Nodes } from "../namespaces.js";
-import { constSet } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
 import { Unary } from "./unary.js";
 import type { Ascending } from "./ascending.js";
 import type { Descending } from "./descending.js";

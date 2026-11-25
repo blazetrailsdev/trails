@@ -1,12 +1,8 @@
 import { asJson, indexWith, isBlank } from "@blazetrails/activesupport";
-import {
-  camelized,
-  hashAset,
-  rbCheckArrayType,
-  rbFSend,
-  rbModInstanceMethod,
-  rbObjRespondTo,
-} from "@blazetrails/ruby-compat";
+import { rbCheckArrayType } from "@blazetrails/ruby-compat/array";
+import { hashAset } from "@blazetrails/ruby-compat/hash";
+import { rbModInstanceMethod } from "@blazetrails/ruby-compat/include";
+import { camelized, rbFSend, rbObjRespondTo } from "@blazetrails/ruby-compat/object";
 
 import { NoMethodError, RuntimeError } from "./attribute-assignment.js";
 

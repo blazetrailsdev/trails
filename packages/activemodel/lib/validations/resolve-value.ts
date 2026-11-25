@@ -1,4 +1,5 @@
-import { isSymbol, rbFSend, rbObjRespondTo, symbolToS } from "@blazetrails/ruby-compat";
+import { rbFSend, rbObjRespondTo } from "@blazetrails/ruby-compat/object";
+import { isSymbol, symbolToS } from "@blazetrails/ruby-compat/symbol";
 
 export interface ResolveValue {
   resolveValue(record: unknown, value: unknown): unknown;

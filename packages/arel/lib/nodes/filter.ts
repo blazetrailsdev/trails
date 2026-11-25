@@ -1,6 +1,6 @@
 import { Nodes } from "../namespaces.js";
 import { include } from "@blazetrails/activesupport";
-import { constSet } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
 import { Binary } from "./binary.js";
 import { WindowPredications, type WindowPredicationsModule } from "../window-predications.js";
 import { AliasPredication, type AliasPredicationModule } from "../alias-predication.js";

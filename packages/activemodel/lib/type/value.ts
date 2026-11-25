@@ -1,11 +1,7 @@
-import {
-  type Included,
-  include,
-  rbDeclareIvar,
-  rbInspect as inspect,
-  rbEqual,
-  rbHash,
-} from "@blazetrails/ruby-compat";
+import { type Included, include } from "@blazetrails/ruby-compat/include";
+import { rbDeclareIvar, rbInspect as inspect } from "@blazetrails/ruby-compat/object";
+import { rbEqual } from "@blazetrails/ruby-compat/rb-equal";
+import { rbHash } from "@blazetrails/ruby-compat/rb-hash";
 import { NoMethodError } from "../attribute-assignment.js";
 import { SerializeCastValue } from "./serialize-cast-value.js";
 

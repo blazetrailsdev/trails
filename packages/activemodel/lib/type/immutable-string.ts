@@ -1,5 +1,6 @@
 import { BigDecimal, Duration } from "@blazetrails/activesupport";
-import { Rational, rbObjAsString as toS } from "@blazetrails/ruby-compat";
+import { rbObjAsString as toS } from "@blazetrails/ruby-compat/object";
+import { Rational } from "@blazetrails/ruby-compat/rational";
 import { ValueType } from "./value.js";
 
 export interface ImmutableStringTypeOptions {

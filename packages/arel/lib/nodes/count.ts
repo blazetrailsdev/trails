@@ -1,5 +1,5 @@
 import { Nodes } from "../namespaces.js";
-import { constSet } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
 import { Function } from "./function.js";
 import type { NodeOrValue } from "./binary.js";
 
