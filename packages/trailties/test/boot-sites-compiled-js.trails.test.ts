@@ -76,4 +76,16 @@ describe("boot sites find the .js file a compiled tree ships", () => {
 
     expect(loads).toEqual(["config/routes/admin.js"]);
   });
+
+  it("RoutesReloader prefetches only the .ts file when a draw path holds both", async () => {
+    tmp = Dir.mktmpdir("compiled_js_draw_both");
+    compiledJs(tmp, ["config/routes/admin.ts", "config/routes/admin.js"]);
+    const r = new RoutesReloader();
+    const draw = () => undefined;
+    r.routeSets.push({ drawPaths: [`${tmp}/config/routes`], draw } as never);
+
+    await r.prefetchBang();
+
+    expect(loads).toEqual(["config/routes/admin.ts"]);
+  });
 });
