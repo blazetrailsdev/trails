@@ -227,16 +227,6 @@ export { version } from "./version.js";
 import { ActiveRecord } from "./namespaces.js";
 export { ActiveRecord };
 export { ConnectionHandler } from "./connection-adapters/abstract/connection-handler.js";
-export { DatabaseTasks, DatabaseNotSupported } from "./tasks/database-tasks.js";
-export type {
-  DatabaseTaskHandler,
-  DatabaseTaskInstance,
-  SchemaFormat,
-} from "./tasks/database-tasks.js";
-export { eachCurrentEnvironment } from "./tasks/database-tasks.js";
-export { SQLiteDatabaseTasks } from "./tasks/sqlite-database-tasks.js";
-export { PostgreSQLDatabaseTasks } from "./tasks/postgresql-database-tasks.js";
-export { MySQLDatabaseTasks } from "./tasks/mysql-database-tasks.js";
 export {
   Migrator,
   UnknownMigrationVersionError,

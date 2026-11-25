@@ -26,6 +26,7 @@ import {
 import { prepend } from "@blazetrails/ruby-compat/include";
 import { Callbacks, type ActionController } from "@blazetrails/actionpack";
 import * as ActiveRecord from "@blazetrails/activerecord";
+import { DatabaseTasks } from "@blazetrails/activerecord/tasks/database-tasks.js";
 import { Fixture } from "@blazetrails/activerecord/fixtures.js";
 import "@blazetrails/activerecord/destroy-association-async-job";
 import type { Base as ActiveJobBase } from "@blazetrails/activejob";
@@ -175,8 +176,8 @@ export class Trailtie extends BaseTrailtie {
             if (ENGINE_ROOT !== undefined && (engine = await Engine.find(ENGINE_ROOT))) {
               const paths = engine.paths().get("db/migrate")!;
               if (paths.existent()) {
-                ActiveRecord.DatabaseTasks.migrationsPaths = [
-                  ...(await ActiveRecord.DatabaseTasks.migrationsPaths),
+                DatabaseTasks.migrationsPaths = [
+                  ...(await DatabaseTasks.migrationsPaths),
                   ...paths.toA(),
                 ];
               }

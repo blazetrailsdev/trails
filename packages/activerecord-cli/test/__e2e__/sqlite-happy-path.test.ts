@@ -2,7 +2,8 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { access, mkdir, readdir, readFile, symlink, writeFile } from "fs/promises";
 import { join } from "path";
 import { fileURLToPath, pathToFileURL } from "url";
-import { Base, DatabaseTasks } from "@blazetrails/activerecord";
+import { Base } from "@blazetrails/activerecord";
+import { DatabaseTasks } from "@blazetrails/activerecord/tasks/database-tasks.js";
 import { run } from "../../lib/cli.js";
 import {
   captureConsoleErrors,

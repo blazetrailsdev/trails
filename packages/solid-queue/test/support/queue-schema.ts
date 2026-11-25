@@ -1,4 +1,5 @@
-import { ActiveRecord, Base, DatabaseTasks, Schema } from "@blazetrails/activerecord";
+import { ActiveRecord, Base, Schema } from "@blazetrails/activerecord";
+import { DatabaseTasks } from "@blazetrails/activerecord/tasks/database-tasks.js";
 
 function dbConfig(name: string) {
   return Base.configurations().configsFor({

@@ -1,6 +1,7 @@
 import { afterAll } from "vitest";
 import { getEnv, seconds } from "@blazetrails/activesupport";
-import { Base, DatabaseTasks } from "@blazetrails/activerecord";
+import { Base } from "@blazetrails/activerecord";
+import { DatabaseTasks } from "@blazetrails/activerecord/tasks/database-tasks.js";
 import { setEnv } from "@blazetrails/ruby-compat";
 import { dummyConfigs, primary, primaryConfig } from "./dummy-database.js";
 import { Engine } from "../../lib/engine.js";

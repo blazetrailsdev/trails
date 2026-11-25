@@ -2125,3 +2125,12 @@ Type.register("xml", Xml, { adapter: "postgresql" });
 runLoadHooks("active_record_postgresqladapter", PostgreSQLAdapter);
 
 ConnectionAdapters.PostgreSQLAdapter = PostgreSQLAdapter;
+
+declare module "../namespaces.js" {
+  interface ConnectionAdapterClasses {
+    PostgreSQLAdapter: typeof PostgreSQLAdapter;
+  }
+  interface PostgreSQLOID {
+    Array: typeof import("./postgresql/oid/array.js").Array;
+  }
+}

@@ -344,3 +344,9 @@ Type.register("unsigned_integer", UnsignedInteger, { adapter: "mysql2" });
 include(Mysql2Adapter, Mysql2DatabaseStatements);
 
 ConnectionAdapters.Mysql2Adapter = Mysql2Adapter;
+
+declare module "../namespaces.js" {
+  interface ConnectionAdapterClasses {
+    Mysql2Adapter: typeof Mysql2Adapter;
+  }
+}

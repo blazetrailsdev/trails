@@ -264,6 +264,7 @@ const alias = {
     __dirname,
     "packages/activerecord/lib/message-pack.ts",
   ),
+  "@blazetrails/activerecord/tasks": path.resolve(__dirname, "packages/activerecord/lib/tasks"),
   "@blazetrails/activerecord/fixtures.js": path.resolve(
     __dirname,
     "packages/activerecord/lib/fixtures.ts",

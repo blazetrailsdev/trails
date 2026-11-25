@@ -5,10 +5,10 @@ import { join } from "path";
 import {
   Base,
   DatabaseConfigurations,
-  DatabaseTasks,
   UrlConfig,
   type DatabaseConfig,
 } from "@blazetrails/activerecord";
+import { DatabaseTasks } from "@blazetrails/activerecord/tasks/database-tasks.js";
 import { loadDatabaseConfig } from "../lib/db-helpers.js";
 import {
   environmentDbConfig,

@@ -6,7 +6,8 @@ import {
   with as with_,
   setTrailsRoot,
 } from "@blazetrails/activesupport";
-import { ActiveRecord, Base, DatabaseTasks, Migrator } from "@blazetrails/activerecord";
+import { ActiveRecord, Base, Migrator } from "@blazetrails/activerecord";
+import { DatabaseTasks } from "@blazetrails/activerecord/tasks/database-tasks.js";
 import { Trails } from "@blazetrails/trailties";
 import { ActionController } from "@blazetrails/actionpack";
 import { IntegrationTest } from "@blazetrails/actionpack/testing";

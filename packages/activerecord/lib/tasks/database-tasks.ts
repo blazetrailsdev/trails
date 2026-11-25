@@ -40,6 +40,9 @@ import {
 import { Base } from "../base.js";
 import { dumpSchemaAfterMigration } from "../active-record.js";
 import { ActiveRecord } from "../namespaces.js";
+import "./mysql-database-tasks.js";
+import "./postgresql-database-tasks.js";
+import "./sqlite-database-tasks.js";
 
 export class DatabaseNotSupported extends StandardError {}
 

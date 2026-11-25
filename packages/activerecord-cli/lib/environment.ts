@@ -1,11 +1,6 @@
 import { isAbsolute, resolve } from "path";
-import {
-  Base,
-  DatabaseConfigurations,
-  DatabaseTasks,
-  HashConfig,
-  UrlConfig,
-} from "@blazetrails/activerecord";
+import { Base, DatabaseConfigurations, HashConfig, UrlConfig } from "@blazetrails/activerecord";
+import { DatabaseTasks } from "@blazetrails/activerecord/tasks/database-tasks.js";
 
 function isMemoryOrUri(database: string): boolean {
   return database === ":memory:" || database.startsWith("file:");

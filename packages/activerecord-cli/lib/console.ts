@@ -1,4 +1,5 @@
-import { Base, DatabaseTasks } from "@blazetrails/activerecord";
+import { Base } from "@blazetrails/activerecord";
+import { DatabaseTasks } from "@blazetrails/activerecord/tasks/database-tasks.js";
 import { loadDatabaseConfig, tryLoadModels } from "./db-helpers.js";
 import { environmentDbConfig, establishEnvironmentConnection } from "./environment.js";
 
