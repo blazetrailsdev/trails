@@ -28,6 +28,7 @@ export class IntegerType extends ValueType<number | bigint> {
     return this.castValue(value);
   }
 
+  /** @inlinedFrom ActiveModel::Type::Helpers::Numeric#serialize rails/v8.0.5.2/activemodel/lib/active_model/type/helpers/numeric.rb:7-9 */
   serialize(value: unknown): unknown {
     if (typeof value === "string" && this.isNonNumericString(value)) return null;
     return this.ensureInRange(this.cast(value));
