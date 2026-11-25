@@ -2,7 +2,14 @@ import { SQLite3 } from "@blazetrails/sqlite3";
 import "../constants.sqlite3-adapter.generated.js";
 import { ConnectionAdapters } from "../namespaces.js";
 import type { DatabaseConfig } from "../database-configurations/database-config.js";
-import { sortByBang, anybits, fetch, rbRegMatchP, rbObjAsString } from "@blazetrails/ruby-compat";
+import {
+  sortByBang,
+  anybits,
+  fetch,
+  rbRegMatchP,
+  rbObjAsString,
+  runtime,
+} from "@blazetrails/ruby-compat";
 import type {
   DatabaseOptions,
   EngineOpenV2,
@@ -1197,7 +1204,11 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
   private static async resolveEngine(config: SQLite3Config): Promise<EngineOpenV2> {
     switch (config.adapter ?? "sqlite3") {
       case "sqlite3":
+        if (runtime() === "bun")
+          return (await import("@blazetrails/sqlite3/engine/bun-sqlite")).engine;
         return (await import("@blazetrails/sqlite3/engine/better-sqlite3")).engine;
+      case "bun-sqlite":
+        return (await import("@blazetrails/sqlite3/engine/bun-sqlite")).engine;
       case "node-sqlite":
         return (await import("@blazetrails/sqlite3/engine/node-sqlite")).engine;
       case "expo-sqlite":

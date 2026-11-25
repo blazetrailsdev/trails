@@ -28,6 +28,10 @@
       "types": "./dist/engine/node-sqlite.d.ts",
       "default": "./dist/engine/node-sqlite.js"
     },
+    "./engine/bun-sqlite": {
+      "types": "./dist/engine/bun-sqlite.d.ts",
+      "default": "./dist/engine/bun-sqlite.js"
+    },
     "./engine/expo-sqlite": {
       "types": "./dist/engine/expo-sqlite.d.ts",
       "default": "./dist/engine/expo-sqlite.js"
