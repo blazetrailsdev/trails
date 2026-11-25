@@ -765,7 +765,13 @@ function tryAutoRegisterNode(): boolean {
   const proc = (globalThis as { process?: NodeProcessLike }).process;
   if (!proc?.versions?.node) return false;
   const adapter = buildNodeAdapter(proc);
-  if (runtime() === "bun") delete adapter.registerHooks;
+  if (runtime() === "bun") {
+    delete adapter.registerHooks;
+    const host = globalThis as { Temporal?: unknown };
+    host.Temporal ??= (import.meta as { require?(id: string): { Temporal: unknown } }).require!(
+      "@js-temporal/polyfill",
+    ).Temporal;
+  }
   nodeAutoRegistered = adapter;
   registerProcessAdapter(adapter);
   return true;
@@ -1048,9 +1054,3 @@ export function __INTERNAL_resetProcessAdapter_TEST_ONLY(): void {
 }
 
 tryAutoRegisterNode();
-
-if (runtime() === "bun" && (globalThis as { Temporal?: unknown }).Temporal === undefined) {
-  (globalThis as { Temporal?: unknown }).Temporal = (
-    await import("@js-temporal/polyfill")
-  ).Temporal;
-}

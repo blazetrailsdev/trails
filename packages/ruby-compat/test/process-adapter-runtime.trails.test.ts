@@ -50,4 +50,12 @@ describe("runtime", () => {
       expect(processAdapterConfig.adapter).toBe("bun");
     },
   );
+
+  it.skipIf(realProcess.versions.bun === undefined)(
+    "the Bun adapter seats a global Temporal",
+    () => {
+      getProcessAdapter();
+      expect(Temporal.Now.instant()).toBeInstanceOf(Temporal.Instant);
+    },
+  );
 });
