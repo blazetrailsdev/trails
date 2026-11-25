@@ -116,7 +116,7 @@ export class EncryptedFile {
       File.dirname(contentPath),
       async (tmpFile) => {
         const tmpPath = tmpFile.path()!;
-        await File.writeAsync(tmpPath, contents, { perm: 0o600 });
+        await File.writeAsync(tmpPath, contents);
 
         await block(tmpPath);
 
