@@ -1484,6 +1484,25 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
   },
   {
     reason:
+      "PERMANENT: `ensure_fiber_workers_have_required_dependency` " +
+      "(configuration.rb:136-143) only `require`s the `async` gem, which trails " +
+      "inlines into FiberPool (packages/solid-queue/CLAUDE.md, " +
+      '"`FiberPool` inlines the `async` gem").',
+    names: ["ensure_fiber_workers_have_required_dependency"],
+    rubyFiles: ["configuration.rb"],
+    packages: ["solid-queue"],
+  },
+  {
+    reason:
+      "PERMANENT: Interruptible's self-pipe (processes/interruptible.rb:5-8,17,34-38) " +
+      "wakes a sleeping process through `IO.pipe`; a Node process has one thread, " +
+      "so `interrupt` / `interruptible_sleep` wake through a ruby-compat `Queue`.",
+    names: ["self_pipe", "create_self_pipe"],
+    rubyFiles: ["processes/interruptible.rb"],
+    packages: ["solid-queue"],
+  },
+  {
+    reason:
       "PERMANENT: Ruby-engine facts with no Node analogue. `jruby?` " +
       "(generators/app_base.rb:747-749) is `defined?(JRUBY_VERSION)`, and " +
       "`version_manager_ruby_version` (:751-761) fills only `ruby-version.tt` " +
