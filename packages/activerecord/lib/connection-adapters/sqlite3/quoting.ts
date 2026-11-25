@@ -20,7 +20,9 @@ import {
 import { BigDecimal } from "@blazetrails/activesupport";
 import { Database } from "@blazetrails/sqlite3";
 import { BinaryData } from "@blazetrails/activemodel";
-import { isFinite, Rational, toF, toS } from "@blazetrails/ruby-compat";
+import { isFinite, toF } from "@blazetrails/ruby-compat/numeric";
+import { toS } from "@blazetrails/ruby-compat/object";
+import { Rational } from "@blazetrails/ruby-compat/rational";
 import { ConnectionAdapters } from "../../namespaces.js";
 import * as Quoting from "./quoting.js";
 

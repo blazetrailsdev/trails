@@ -1,4 +1,4 @@
-import { rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { rbObjRespondTo } from "@blazetrails/ruby-compat/object";
 import { ArgumentError } from "../attribute-assignment.js";
 import { ValueType } from "./value.js";
 

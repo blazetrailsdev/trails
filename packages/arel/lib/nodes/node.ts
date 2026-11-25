@@ -1,6 +1,6 @@
 import { Nodes } from "../namespaces.js";
 import { SQLString } from "../collectors/sql-string.js";
-import { constSet } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
 import { include } from "@blazetrails/activesupport";
 import { FactoryMethods, type FactoryMethodsModule } from "../factory-methods.js";
 import type { And } from "./nary.js";

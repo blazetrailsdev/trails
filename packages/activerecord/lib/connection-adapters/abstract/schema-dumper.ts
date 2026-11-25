@@ -2,7 +2,7 @@ import { SchemaDumper as BaseSchemaDumper } from "../../schema-dumper.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../abstract-adapter.js";
 import type { Column } from "../column.js";
 import { compact, isPresent } from "@blazetrails/activesupport";
-import { rbInspect, rtest } from "@blazetrails/ruby-compat";
+import { rbInspect, rtest } from "@blazetrails/ruby-compat/object";
 
 export class SchemaDumper extends BaseSchemaDumper {
   static readonly DEFAULT_DATETIME_PRECISION = 6;

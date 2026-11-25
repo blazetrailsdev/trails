@@ -1,16 +1,12 @@
-import {
-  ArgumentError,
-  NameError,
-  NoMethodError,
-  NotImplementedError,
-  RuntimeError,
-  TypeError,
-  eachPair,
-  isEmpty,
-  rbFSend,
-  rbObjClassname,
-  rbObjRespondTo,
-} from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { eachPair } from "@blazetrails/ruby-compat/hash";
+import { NameError } from "@blazetrails/ruby-compat/name-error";
+import { NoMethodError } from "@blazetrails/ruby-compat/no-method-error";
+import { NotImplementedError } from "@blazetrails/ruby-compat/not-implemented-error";
+import { rbFSend, rbObjClassname, rbObjRespondTo } from "@blazetrails/ruby-compat/object";
+import { isEmpty } from "@blazetrails/ruby-compat/ruby-empty";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
+import { TypeError } from "@blazetrails/ruby-compat/type-error";
 import { UnknownAttributeError } from "./errors.js";
 
 export function assignAttributes(this: AttributeAssignment, newAttributes: unknown): void {

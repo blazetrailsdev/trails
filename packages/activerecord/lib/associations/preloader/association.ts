@@ -1,15 +1,11 @@
 import { isPresent, wrap } from "@blazetrails/activesupport";
-import {
-  eachWithIndex,
-  Hash,
-  rbEqual,
-  rbHash,
-  rbObjId,
-  Set,
-  toS,
-  uniq,
-  eachWithObject,
-} from "@blazetrails/ruby-compat";
+import { uniq } from "@blazetrails/ruby-compat/array";
+import { eachWithIndex, eachWithObject } from "@blazetrails/ruby-compat/enumerable";
+import { Hash } from "@blazetrails/ruby-compat/hash";
+import { rbObjId, toS } from "@blazetrails/ruby-compat/object";
+import { rbEqual } from "@blazetrails/ruby-compat/rb-equal";
+import { rbHash } from "@blazetrails/ruby-compat/rb-hash";
+import { Set } from "@blazetrails/ruby-compat/set";
 import type { Base } from "../../base.js";
 import type { AssociationReflection, ThroughReflection } from "../../reflection.js";
 

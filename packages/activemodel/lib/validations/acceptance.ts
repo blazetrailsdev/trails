@@ -1,7 +1,8 @@
 import { EachValidator } from "../validator.js";
 import type { ValidatableRecord } from "../validator.js";
 import { include, included, kernelArray, Module } from "@blazetrails/activesupport";
-import { aryIncludes, includedModules } from "@blazetrails/ruby-compat";
+import { aryIncludes } from "@blazetrails/ruby-compat/array";
+import { includedModules } from "@blazetrails/ruby-compat/include";
 import type { AttrNameArg, HelperMethodsHost } from "./helper-methods.js";
 
 interface AttributeMethodQueryable {

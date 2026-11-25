@@ -2,7 +2,8 @@ import "../../../constants.postgresql-oid-array.generated.js";
 import { ConnectionAdapters } from "../../../namespaces.js";
 import { ValueType } from "@blazetrails/activemodel";
 import { PG } from "@blazetrails/pg";
-import { rbEqual, rbFSend, rbObjAsString } from "@blazetrails/ruby-compat";
+import { rbFSend, rbObjAsString } from "@blazetrails/ruby-compat/object";
+import { rbEqual } from "@blazetrails/ruby-compat/rb-equal";
 
 export interface ArraySubtype {
   readonly type?: string | (() => string | undefined);

@@ -1,14 +1,9 @@
 import { classAttribute, humanize, deepDup, isPlainObject } from "@blazetrails/activesupport";
-import {
-  except,
-  kernelCatch,
-  rbHash,
-  rbInspect,
-  rbModName,
-  rbObjDup,
-  rbObjRespondTo,
-  toS,
-} from "@blazetrails/ruby-compat";
+import { except } from "@blazetrails/ruby-compat/hash";
+import { rbObjDup } from "@blazetrails/ruby-compat/include";
+import { kernelCatch } from "@blazetrails/ruby-compat/kernel-catch";
+import { rbInspect, rbModName, rbObjRespondTo, toS } from "@blazetrails/ruby-compat/object";
+import { rbHash } from "@blazetrails/ruby-compat/rb-hash";
 import { MissingTranslation, type TranslateKey } from "@blazetrails/i18n";
 import { I18n } from "./i18n.js";
 import { ActiveModel } from "./namespaces.js";

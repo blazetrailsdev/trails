@@ -19,14 +19,14 @@ import type { Case } from "./nodes/case.js";
 import type { Concat, Contains, Overlaps } from "./nodes/infix-operation.js";
 import { Nodes } from "./namespaces.js";
 import { rbEqual } from "@blazetrails/activesupport";
+import { NoMethodError } from "@blazetrails/ruby-compat/no-method-error";
 import {
   isNil,
-  NoMethodError,
   rbFSend,
   rbObjClassname,
   rbObjRespondTo,
   rtest,
-} from "@blazetrails/ruby-compat";
+} from "@blazetrails/ruby-compat/object";
 import type { NodeOrValue } from "./nodes/binary.js";
 
 function isSelectManagerLike(value: unknown): value is { ast: Node } {

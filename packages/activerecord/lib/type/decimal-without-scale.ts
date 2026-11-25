@@ -1,4 +1,4 @@
-import { rbInspect, toS } from "@blazetrails/ruby-compat";
+import { rbInspect, toS } from "@blazetrails/ruby-compat/object";
 import { BigIntegerType } from "@blazetrails/activemodel";
 
 export class DecimalWithoutScale extends BigIntegerType {

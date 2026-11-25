@@ -1,4 +1,4 @@
-import { rbScanArgs } from "@blazetrails/ruby-compat";
+import { rbScanArgs } from "@blazetrails/ruby-compat/keyword-splat";
 import { Arel } from "./namespaces.js";
 import { Node } from "./nodes/node.js";
 import { SqlLiteral } from "./nodes/sql-literal.js";

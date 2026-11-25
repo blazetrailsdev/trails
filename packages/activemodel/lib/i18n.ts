@@ -1,5 +1,5 @@
 import { I18n } from "@blazetrails/activesupport";
-import { File } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat/file";
 import { en } from "./locale/en.js";
 
 const enPath = File.expandPath(

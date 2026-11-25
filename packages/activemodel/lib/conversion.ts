@@ -1,4 +1,4 @@
-import { rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { rbObjRespondTo } from "@blazetrails/ruby-compat/object";
 import {
   underscore,
   tableize,

@@ -5,12 +5,9 @@ import {
   type DateParts,
 } from "@blazetrails/date";
 import { include } from "@blazetrails/activesupport";
-import {
-  rbFSend,
-  rbModInstanceMethod,
-  rbObjRespondTo,
-  StandardError,
-} from "@blazetrails/ruby-compat";
+import { rbModInstanceMethod } from "@blazetrails/ruby-compat/include";
+import { rbFSend, rbObjRespondTo } from "@blazetrails/ruby-compat/object";
+import { StandardError } from "@blazetrails/ruby-compat/standard-error";
 import { toFs } from "@blazetrails/activesupport/core-ext/date/conversions";
 import {
   AcceptsMultiparameterTime,

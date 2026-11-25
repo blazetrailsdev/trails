@@ -1,5 +1,6 @@
 import "../../constants.postgresql-schema-creation.generated.js";
-import { isSymbol, rtest } from "@blazetrails/ruby-compat";
+import { rtest } from "@blazetrails/ruby-compat/object";
+import { isSymbol } from "@blazetrails/ruby-compat/symbol";
 import { wrap } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
 import {

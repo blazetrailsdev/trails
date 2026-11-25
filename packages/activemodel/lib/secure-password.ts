@@ -1,5 +1,7 @@
 import { camelize, include, isPresent, Module, TopLevel } from "@blazetrails/activesupport";
-import { LoadError, rbObjRespondTo, warn } from "@blazetrails/ruby-compat";
+import { warn } from "@blazetrails/ruby-compat/kernel-warn";
+import { LoadError } from "@blazetrails/ruby-compat/load-error";
+import { rbObjRespondTo } from "@blazetrails/ruby-compat/object";
 import { Validations } from "./validations.js";
 import { Model } from "./model.js";
 

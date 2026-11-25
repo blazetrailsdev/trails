@@ -1,4 +1,4 @@
-import type { Module } from "@blazetrails/ruby-compat";
+import type { Module } from "@blazetrails/ruby-compat/include";
 import { assigningSynchronously } from "@blazetrails/activemodel";
 import { SingularAssociation } from "./singular-association.js";
 import { Builder } from "../../namespaces.js";

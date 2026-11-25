@@ -8,15 +8,11 @@ import {
 import { Result } from "../../result.js";
 import { FutureResult, Complete as FutureResultComplete } from "../../future-result.js";
 import { ActiveRecord, ConnectionAdapters } from "../../namespaces.js";
-import {
-  AtomicFixnum,
-  Fiber,
-  included,
-  rbCallSuper,
-  rbEnsure,
-  rbObjDup,
-  Thread,
-} from "@blazetrails/ruby-compat";
+import { AtomicFixnum } from "@blazetrails/ruby-compat/concurrent/atomic-fixnum";
+import { rbEnsure } from "@blazetrails/ruby-compat/ensure";
+import { Fiber } from "@blazetrails/ruby-compat/fiber";
+import { included, rbCallSuper, rbObjDup } from "@blazetrails/ruby-compat/include";
+import { Thread } from "@blazetrails/ruby-compat/thread";
 
 const LOCKED_QUERY = /\bFOR\s+(UPDATE|SHARE|NO\s+KEY\s+UPDATE|KEY\s+SHARE)\b/i;
 

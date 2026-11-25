@@ -1,4 +1,4 @@
-import { rbFSend } from "@blazetrails/ruby-compat";
+import { rbFSend } from "@blazetrails/ruby-compat/object";
 import {
   Value,
   kernelArray,

@@ -6,7 +6,9 @@ import {
   included,
   type Included,
 } from "@blazetrails/activesupport";
-import { type Hash, keys, rbCallSuper, rbDeclareIvar, rbObjClone } from "@blazetrails/ruby-compat";
+import { type Hash, keys } from "@blazetrails/ruby-compat/hash";
+import { rbCallSuper, rbObjClone } from "@blazetrails/ruby-compat/include";
+import { rbDeclareIvar } from "@blazetrails/ruby-compat/object";
 import { ValueType } from "./type/value.js";
 import { AttributeSet } from "./attribute-set.js";
 import {

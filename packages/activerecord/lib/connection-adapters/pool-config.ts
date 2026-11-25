@@ -4,7 +4,7 @@ import { ConnectionPool } from "./abstract/connection-pool.js";
 import { ConnectionDescriptor, type ConnectionOwner } from "./abstract/connection-handler.js";
 import { SchemaReflection } from "./schema-cache.js";
 import { synchronize } from "@blazetrails/activesupport";
-import { ObjectSpace } from "@blazetrails/ruby-compat";
+import { ObjectSpace } from "@blazetrails/ruby-compat/object-space";
 
 const INSTANCES = new ObjectSpace.WeakMap<PoolConfig, PoolConfig>();
 

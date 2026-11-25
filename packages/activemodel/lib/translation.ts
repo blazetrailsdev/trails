@@ -1,5 +1,6 @@
 import { humanize, include, isPresent, runLoadHooks } from "@blazetrails/activesupport";
-import { classModule, rbModAncestors, toS } from "@blazetrails/ruby-compat";
+import { classModule, rbModAncestors } from "@blazetrails/ruby-compat/include";
+import { toS } from "@blazetrails/ruby-compat/object";
 import type { TranslateKey } from "@blazetrails/i18n";
 import { I18n } from "./i18n.js";
 import { Naming, type ModelName } from "./naming.js";

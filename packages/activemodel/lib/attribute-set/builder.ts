@@ -1,22 +1,22 @@
 import { Attribute } from "../attribute.js";
-import type { Block, Hash } from "@blazetrails/ruby-compat";
+import type { Block, Hash } from "@blazetrails/ruby-compat/hash";
+import { each } from "@blazetrails/ruby-compat/array";
 import {
   hashAref,
   hashAset,
   block as rbBlock,
   dup,
-  each,
   eachKey,
   eachValue,
   except,
   fetch,
   hasKey,
   keys as hashKeys,
-  rbDeclareIvar,
-  rbEqual,
-  rbObjDup,
   transformValues,
-} from "@blazetrails/ruby-compat";
+} from "@blazetrails/ruby-compat/hash";
+import { rbObjDup } from "@blazetrails/ruby-compat/include";
+import { rbDeclareIvar } from "@blazetrails/ruby-compat/object";
+import { rbEqual } from "@blazetrails/ruby-compat/rb-equal";
 import { ValueType } from "../type/value.js";
 import { AttributeSet } from "../attribute-set.js";
 

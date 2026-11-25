@@ -1,4 +1,4 @@
-import { rbObjClone, constSet } from "@blazetrails/ruby-compat";
+import { rbObjClone, constSet } from "@blazetrails/ruby-compat/include";
 import { Nodes } from "../namespaces.js";
 import { ArgumentError, rbEqual, rbHash } from "@blazetrails/activesupport";
 import { arelNode } from "../arel.js";

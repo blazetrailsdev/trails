@@ -11,16 +11,10 @@ import {
   extended,
   moduleParents,
 } from "@blazetrails/activesupport";
-import {
-  isClassPathPending,
-  rbModName,
-  rbObjNotMatch,
-  rbObjRespondTo,
-  rbStrMatch,
-  rbStrSend,
-  classModule,
-  rbClearMethodCache,
-} from "@blazetrails/ruby-compat";
+import { isClassPathPending } from "@blazetrails/ruby-compat/classpath";
+import { classModule, rbClearMethodCache } from "@blazetrails/ruby-compat/include";
+import { rbModName, rbObjRespondTo } from "@blazetrails/ruby-compat/object";
+import { rbObjNotMatch, rbStrMatch, rbStrSend } from "@blazetrails/ruby-compat/string/method-table";
 import { ArgumentError, TypeError } from "./attribute-assignment.js";
 
 type RecordOrClass =

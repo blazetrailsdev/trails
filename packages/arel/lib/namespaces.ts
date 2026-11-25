@@ -1,5 +1,6 @@
 import { Autoload, extend, type Extended } from "@blazetrails/activesupport";
-import { constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
 import type { Attribute as AttributeClass } from "./attributes/attribute.js";
 import type * as CollectorsModule from "./collectors/index.js";
 import type * as NodesModule from "./nodes/index.js";

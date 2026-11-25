@@ -1,6 +1,8 @@
 import { Nodes } from "../namespaces.js";
 import { ArgumentError, rbEqual, rbHash, symbolizeKeys } from "@blazetrails/activesupport";
-import { rbInspect, rbModName, constSet, strCount } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { rbInspect, rbModName } from "@blazetrails/ruby-compat/object";
+import { strCount } from "@blazetrails/ruby-compat/string/tr";
 import { arelNode } from "../arel.js";
 import { NodeExpression } from "./node-expression.js";
 import { BindError } from "../errors.js";

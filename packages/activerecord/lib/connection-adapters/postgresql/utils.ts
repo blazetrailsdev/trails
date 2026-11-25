@@ -1,7 +1,8 @@
 import "../../constants.postgresql-utils.generated.js";
 import { rbHash } from "@blazetrails/activesupport";
 import { PG } from "@blazetrails/pg";
-import { rbEqual, rbObjClass } from "@blazetrails/ruby-compat";
+import { rbObjClass } from "@blazetrails/ruby-compat/object";
+import { rbEqual } from "@blazetrails/ruby-compat/rb-equal";
 
 export class Name {
   static readonly SEPARATOR = ".";

@@ -1,11 +1,7 @@
-import {
-  type Hash,
-  hashDelete,
-  type Module,
-  rbObjRespondTo,
-  rtest,
-  union,
-} from "@blazetrails/ruby-compat";
+import { union } from "@blazetrails/ruby-compat/array";
+import { type Hash, hashDelete } from "@blazetrails/ruby-compat/hash";
+import type { Module } from "@blazetrails/ruby-compat/include";
+import { rbObjRespondTo, rtest } from "@blazetrails/ruby-compat/object";
 import { safeConstantize } from "@blazetrails/activesupport";
 import type { AssociationInstanceHost } from "./association.js";
 import { SingularAssociation } from "./singular-association.js";

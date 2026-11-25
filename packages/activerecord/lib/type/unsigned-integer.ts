@@ -1,4 +1,4 @@
-import { numericMul } from "@blazetrails/ruby-compat";
+import { numericMul } from "@blazetrails/ruby-compat/numeric";
 import { IntegerType } from "@blazetrails/activemodel";
 
 export class UnsignedInteger extends IntegerType {

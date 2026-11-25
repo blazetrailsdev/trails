@@ -1,5 +1,6 @@
 import { Concern, extend, include, included } from "@blazetrails/activesupport";
-import { rbModAncestors, rbModInstanceMethod, rbModMethodDefined } from "@blazetrails/ruby-compat";
+import { rbModAncestors, rbModInstanceMethod } from "@blazetrails/ruby-compat/include";
+import { rbModMethodDefined } from "@blazetrails/ruby-compat/object";
 
 interface SerializeCastValueHost {
   constructor: { serializeCastValueCompatible(): boolean };

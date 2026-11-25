@@ -14,7 +14,8 @@
 
 import { typeCast as abstractTypeCast, type QuotingDispatchHost } from "../abstract/quoting.js";
 import { Time as RubyTime } from "@blazetrails/date";
-import { Rational, toS } from "@blazetrails/ruby-compat";
+import { toS } from "@blazetrails/ruby-compat/object";
+import { Rational } from "@blazetrails/ruby-compat/rational";
 import { BigDecimal, TimeWithZone } from "@blazetrails/activesupport";
 import { BinaryData } from "@blazetrails/activemodel";
 import { defaultTimezone } from "../../active-record.js";

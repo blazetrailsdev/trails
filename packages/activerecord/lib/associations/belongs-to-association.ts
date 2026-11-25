@@ -1,11 +1,8 @@
-import {
-  eachWithIndex,
-  fetch,
-  rbEqual,
-  rbFCaller,
-  rbFSend,
-  rbObjAsString,
-} from "@blazetrails/ruby-compat";
+import { rbFCaller } from "@blazetrails/ruby-compat/backtrace-location";
+import { eachWithIndex } from "@blazetrails/ruby-compat/enumerable";
+import { fetch } from "@blazetrails/ruby-compat/hash";
+import { rbFSend, rbObjAsString } from "@blazetrails/ruby-compat/object";
+import { rbEqual } from "@blazetrails/ruby-compat/rb-equal";
 import { ActiveRecord, Associations } from "../namespaces.js";
 import type { Base } from "../base.js";
 import { kernelArray } from "@blazetrails/activesupport";

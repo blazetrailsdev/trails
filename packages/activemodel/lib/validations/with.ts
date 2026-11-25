@@ -1,6 +1,8 @@
 import { extractOptionsBang } from "@blazetrails/activesupport";
-import type { Hash } from "@blazetrails/ruby-compat";
-import { rbBlockGivenP, rbFSend, rbObjMethod } from "@blazetrails/ruby-compat";
+import type { Hash } from "@blazetrails/ruby-compat/hash";
+import { rbBlockGivenP } from "@blazetrails/ruby-compat/hash";
+import { rbObjMethod } from "@blazetrails/ruby-compat/method";
+import { rbFSend } from "@blazetrails/ruby-compat/object";
 
 import { EachValidator } from "../validator.js";
 import type { ValidatableRecord } from "../validator.js";

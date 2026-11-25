@@ -1,5 +1,6 @@
 import { ArgumentError, sum } from "@blazetrails/activesupport";
-import { Hash, regexpEscape } from "@blazetrails/ruby-compat";
+import { Hash } from "@blazetrails/ruby-compat/hash";
+import { regexpEscape } from "@blazetrails/ruby-compat/regexp";
 import { Table, Nodes } from "@blazetrails/arel";
 import { maxIdentifierLength } from "../connection-adapters/abstract/database-limits.js";
 import type { Quoting } from "../connection-adapters/abstract/quoting.js";

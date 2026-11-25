@@ -1,4 +1,7 @@
-import { b, rbEqual, rbObjAsString as toS, unpack1 } from "@blazetrails/ruby-compat";
+import { unpack1 } from "@blazetrails/ruby-compat/array";
+import { rbObjAsString as toS } from "@blazetrails/ruby-compat/object";
+import { rbEqual } from "@blazetrails/ruby-compat/rb-equal";
+import { b } from "@blazetrails/ruby-compat/string/b";
 import { ValueType } from "./value.js";
 
 const textEncoder = new TextEncoder();

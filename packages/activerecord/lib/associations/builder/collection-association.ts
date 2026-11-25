@@ -1,4 +1,5 @@
-import { Module, constSet, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { Module, constSet } from "@blazetrails/ruby-compat/include";
+import { rbObjRespondTo } from "@blazetrails/ruby-compat/object";
 import { assigningSynchronously } from "@blazetrails/activemodel";
 import { camelize, classAttribute, kernelArray, singularize } from "@blazetrails/activesupport";
 import {

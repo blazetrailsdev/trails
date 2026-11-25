@@ -1,8 +1,8 @@
 {
   "app": "examples/serverless-lambda/config/environment.ts",
-  "total": 1890,
+  "total": 1894,
   "packages": {
-    "activerecord": 343,
+    "activerecord": 346,
     "ruby-compat": 205,
     "activesupport": 193,
     "actionpack": 140,
@@ -16,7 +16,7 @@
     "rake": 38,
     "rack": 37,
     "tzinfo": 37,
-    "nokogiri": 33,
+    "nokogiri": 34,
     "i18n": 29,
     "pg": 28,
     "html-sanitizer": 22,
@@ -43,9 +43,6 @@
   },
   "rubyCompatTarget": 180,
   "rubyCompatTargetWithWholeBarrelImports": 205,
-  "wholeBarrelImports": [
-    "packages/activerecord/dist/relation/spawn-methods.js",
-    "packages/rack-session/dist/cookie.js"
-  ],
-  "appTarget": 1865
+  "wholeBarrelImports": ["packages/rack-session/dist/cookie.js"],
+  "appTarget": 1869
 }

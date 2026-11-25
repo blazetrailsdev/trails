@@ -1,5 +1,8 @@
 import { HashWithIndifferentAccess, isDuplicable } from "@blazetrails/activesupport";
-import { NoMethodError, rbEqual, rbObjClone, TypeError } from "@blazetrails/ruby-compat";
+import { rbObjClone } from "@blazetrails/ruby-compat/include";
+import { NoMethodError } from "@blazetrails/ruby-compat/no-method-error";
+import { rbEqual } from "@blazetrails/ruby-compat/rb-equal";
+import { TypeError } from "@blazetrails/ruby-compat/type-error";
 import { AttributeSet } from "./attribute-set.js";
 
 /** @internal */

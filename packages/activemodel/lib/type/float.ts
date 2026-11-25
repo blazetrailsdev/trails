@@ -1,6 +1,6 @@
 import { include } from "@blazetrails/activesupport";
 import { BigDecimal } from "@blazetrails/activesupport";
-import { isNan, rbFloatTypeP, toF } from "@blazetrails/ruby-compat";
+import { isNan, rbFloatTypeP, toF } from "@blazetrails/ruby-compat/numeric";
 import { ValueType } from "./value.js";
 import { Numeric } from "./helpers/numeric.js";
 

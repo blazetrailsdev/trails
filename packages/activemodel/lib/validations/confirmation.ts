@@ -1,16 +1,16 @@
 import { EachValidator } from "../validator.js";
 import type { ValidatableRecord } from "../validator.js";
+import { filterMap } from "@blazetrails/ruby-compat/enumerable";
 import {
-  casecmp,
   isNil,
-  rbEqual,
   rbFSend,
   rbModAttrReader,
   rbModAttrWriter,
   rbModMethodDefined,
   rtest,
-  filterMap,
-} from "@blazetrails/ruby-compat";
+} from "@blazetrails/ruby-compat/object";
+import { rbEqual } from "@blazetrails/ruby-compat/rb-equal";
+import { casecmp } from "@blazetrails/ruby-compat/string/case-mapping";
 import type { AttrNameArg, HelperMethodsHost } from "./helper-methods.js";
 
 export class ConfirmationValidator extends EachValidator {

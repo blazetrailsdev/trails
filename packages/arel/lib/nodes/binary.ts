@@ -1,4 +1,4 @@
-import { rbObjClone, constSet } from "@blazetrails/ruby-compat";
+import { rbObjClone, constSet } from "@blazetrails/ruby-compat/include";
 import type { Attribute as ModelAttribute } from "@blazetrails/activemodel";
 import { include, rbEqual, rbHash } from "@blazetrails/activesupport";
 import { Attributes, Nodes } from "../namespaces.js";

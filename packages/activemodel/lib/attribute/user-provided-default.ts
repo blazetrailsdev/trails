@@ -1,4 +1,4 @@
-import { rtest } from "@blazetrails/ruby-compat";
+import { rtest } from "@blazetrails/ruby-compat/object";
 import { Attribute, FromUser } from "../attribute.js";
 import { ValueType } from "../type/value.js";
 

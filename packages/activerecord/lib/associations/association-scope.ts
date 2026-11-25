@@ -10,8 +10,11 @@ import type {
 import { RuntimeReflection } from "../reflection.js";
 import { AliasTracker } from "./alias-tracker.js";
 import { kernelArray } from "@blazetrails/activesupport";
-import { eachCons, isEmpty, rbEqual, union } from "@blazetrails/ruby-compat";
-import { SimpleDelegator } from "@blazetrails/ruby-compat";
+import { union } from "@blazetrails/ruby-compat/array";
+import { eachCons } from "@blazetrails/ruby-compat/enumerable";
+import { rbEqual } from "@blazetrails/ruby-compat/rb-equal";
+import { isEmpty } from "@blazetrails/ruby-compat/ruby-empty";
+import { SimpleDelegator } from "@blazetrails/ruby-compat/delegate";
 import { Associations } from "../namespaces.js";
 
 export type ValueTransformation<T = unknown> = (v: T) => unknown;

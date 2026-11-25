@@ -1,6 +1,7 @@
 import { Nodes } from "../namespaces.js";
 import { ArgumentError, include } from "@blazetrails/activesupport";
-import { stringSuperclass, constSet } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { stringSuperclass } from "@blazetrails/ruby-compat/string/method-table";
 import { arelNode } from "../arel.js";
 import { Fragments } from "./fragments.js";
 import { Expressions, type ExpressionsModule } from "../expressions.js";

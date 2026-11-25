@@ -1,5 +1,6 @@
 import { PlainString } from "./plain-string.js";
-import { Range, constSet } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { Range } from "@blazetrails/ruby-compat/range";
 import { Collectors } from "../namespaces.js";
 
 export class SQLString extends PlainString {

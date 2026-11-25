@@ -1,14 +1,13 @@
 import { include } from "@blazetrails/activesupport";
-import { FLOAT_DIG } from "@blazetrails/ruby-compat";
+import { FLOAT_DIG } from "@blazetrails/ruby-compat/numeric";
 import { BigDecimal, toD } from "@blazetrails/activesupport";
+import { rbFloatTypeP, round } from "@blazetrails/ruby-compat/numeric";
 import {
-  Rational,
-  rbFloatTypeP,
   rbInspect as inspect,
   rbObjAsString as toS,
   rbObjRespondTo,
-  round,
-} from "@blazetrails/ruby-compat";
+} from "@blazetrails/ruby-compat/object";
+import { Rational } from "@blazetrails/ruby-compat/rational";
 import { ValueType } from "./value.js";
 import { Numeric } from "./helpers/numeric.js";
 

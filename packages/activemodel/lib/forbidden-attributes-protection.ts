@@ -1,4 +1,4 @@
-import { rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { rbObjRespondTo } from "@blazetrails/ruby-compat/object";
 
 export class ForbiddenAttributesError extends globalThis.Error {}
 ForbiddenAttributesError.prototype.name = "ForbiddenAttributesError";

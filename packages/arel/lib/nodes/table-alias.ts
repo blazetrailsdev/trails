@@ -1,5 +1,6 @@
 import { Nodes } from "../namespaces.js";
-import { constSet, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { rbObjRespondTo } from "@blazetrails/ruby-compat/object";
 import { Node } from "./node.js";
 import { Binary } from "./binary.js";
 import { Cte } from "./cte.js";

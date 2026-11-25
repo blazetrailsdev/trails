@@ -6,7 +6,8 @@ import {
   kernelArray as array,
   type Extended,
 } from "@blazetrails/activesupport";
-import { isIntersect, rbCallSuper } from "@blazetrails/ruby-compat";
+import { isIntersect } from "@blazetrails/ruby-compat/array";
+import { rbCallSuper } from "@blazetrails/ruby-compat/include";
 import type { CallbackObject } from "../callbacks.js";
 
 export const ClassMethods = {

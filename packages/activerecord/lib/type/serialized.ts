@@ -6,16 +6,14 @@ import {
   type AttributeSet,
 } from "@blazetrails/activemodel";
 import { include } from "@blazetrails/activesupport";
+import { DelegateClass } from "@blazetrails/ruby-compat/delegate";
+import { type Hash, hashAref, keys } from "@blazetrails/ruby-compat/hash";
 import {
-  DelegateClass,
-  type Hash,
-  hashAref,
-  keys,
-  rbEqual,
   rbObjInspect,
   rbObjInstanceVariables,
   rbObjRespondTo,
-} from "@blazetrails/ruby-compat";
+} from "@blazetrails/ruby-compat/object";
+import { rbEqual } from "@blazetrails/ruby-compat/rb-equal";
 import { IndifferentHashAccessor } from "../store.js";
 import { EncryptedAttributeType } from "../encryption/encrypted-attribute-type.js";
 import { ColumnSerializer } from "../coders/column-serializer.js";

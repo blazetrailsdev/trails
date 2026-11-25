@@ -10,7 +10,8 @@ import {
   underscore,
 } from "@blazetrails/activesupport";
 import { UnknownPrimaryKey } from "./errors.js";
-import { ArgumentError, toS } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { toS } from "@blazetrails/ruby-compat/object";
 
 export interface SignedId {
   readonly signedIdVerifierSecret:

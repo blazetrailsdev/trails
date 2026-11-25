@@ -7,18 +7,15 @@ import {
   kernelArray,
 } from "@blazetrails/activesupport";
 
+import { flatten, uniq } from "@blazetrails/ruby-compat/array";
 import {
   block as rbBlock,
   dup as hashDup,
-  flatten,
   Hash,
-  rbCallSuper,
   rbBlockGivenP,
-  rbFSend,
-  rbModMethodDefined,
-  rbModSingletonP,
-  uniq,
-} from "@blazetrails/ruby-compat";
+} from "@blazetrails/ruby-compat/hash";
+import { rbCallSuper } from "@blazetrails/ruby-compat/include";
+import { rbFSend, rbModMethodDefined, rbModSingletonP } from "@blazetrails/ruby-compat/object";
 
 import { Errors } from "./errors.js";
 import { BlockValidator, EachValidator, Validator } from "./validator.js";

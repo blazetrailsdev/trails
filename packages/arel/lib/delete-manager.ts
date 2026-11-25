@@ -4,7 +4,7 @@ import { DeleteStatement } from "./nodes/delete-statement.js";
 import { Group } from "./nodes/unary.js";
 import { SqlLiteral } from "./nodes/sql-literal.js";
 import { Table } from "./table.js";
-import { constSet } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
 import { Arel } from "./namespaces.js";
 import type { ArelNode } from "./arel.js";
 import type { Node } from "./nodes/node.js";
