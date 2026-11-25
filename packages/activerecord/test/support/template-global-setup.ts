@@ -1,7 +1,6 @@
 import { RuntimeError } from "@blazetrails/ruby-compat";
 import pg from "pg";
 import mysql from "mysql2/promise";
-import "@blazetrails/sqlite3/better-sqlite3";
 import type { AbstractAdapter as DatabaseAdapter } from "../../lib/connection-adapters/abstract-adapter.js";
 import { ConnectionPool } from "../../lib/connection-adapters/abstract/connection-pool.js";
 import { ConnectionDescriptor } from "../../lib/connection-adapters/abstract/connection-handler.js";

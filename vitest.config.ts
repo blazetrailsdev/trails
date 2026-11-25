@@ -456,19 +456,6 @@ const alias = {
     __dirname,
     "packages/sqlite3/lib/engine/expo-sqlite.ts",
   ),
-  "@blazetrails/sqlite3/better-sqlite3": path.resolve(
-    __dirname,
-    "packages/sqlite3/lib/better-sqlite3.ts",
-  ),
-  "@blazetrails/sqlite3/libsql": path.resolve(__dirname, "packages/sqlite3/lib/libsql.ts"),
-  "@blazetrails/sqlite3/node-sqlite": path.resolve(
-    __dirname,
-    "packages/sqlite3/lib/node-sqlite.ts",
-  ),
-  "@blazetrails/sqlite3/expo-sqlite": path.resolve(
-    __dirname,
-    "packages/sqlite3/lib/expo-sqlite.ts",
-  ),
   "@blazetrails/sqlite3": path.resolve(__dirname, "packages/sqlite3/lib/index.ts"),
   "@blazetrails/mail/": path.resolve(__dirname, "packages/mail/lib") + "/",
   "@blazetrails/mail": path.resolve(__dirname, "packages/mail/lib/index.ts"),

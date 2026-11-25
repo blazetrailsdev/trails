@@ -23,18 +23,14 @@ type NodeSqliteModule = typeof import("node:sqlite");
 
 /**
  * @internal
- * @noRailsEquivalent CONVERGEABLE sqlite3-retire-the-sqlite-driver-interfaces
+ * @noRailsEquivalent CONVERGEABLE sqlite3-engine-module-surface-ruling
  */
 export let nodeSqlite: NodeSqliteModule | undefined;
 try {
   nodeSqlite = createRequire(import.meta.url)("node:sqlite") as NodeSqliteModule;
 } catch {}
 
-/**
- * @internal
- * @noRailsEquivalent CONVERGEABLE sqlite3-retire-the-sqlite-driver-interfaces
- */
-export function loadNodeSqlite(): NodeSqliteModule {
+function loadNodeSqlite(): NodeSqliteModule {
   if (!nodeSqlite) {
     throw new LoadError(
       "node:sqlite is not available. Node 22.5+ is required. " +
@@ -46,7 +42,7 @@ export function loadNodeSqlite(): NodeSqliteModule {
 
 /**
  * @internal
- * @noRailsEquivalent CONVERGEABLE sqlite3-retire-the-sqlite-driver-interfaces
+ * @noRailsEquivalent CONVERGEABLE sqlite3-engine-module-surface-ruling
  */
 export const errors: EngineErrors = {
   errcode(error) {
@@ -58,11 +54,7 @@ export const errors: EngineErrors = {
   },
 };
 
-/**
- * @internal
- * @noRailsEquivalent CONVERGEABLE sqlite3-retire-the-sqlite-driver-interfaces
- */
-export function sharedCacheDatabase(database: string, flags: number): string {
+function sharedCacheDatabase(database: string, flags: number): string {
   if ((flags & SQLite3.Constants.Open.SHAREDCACHE) === 0) return database;
   if (database.startsWith("file:")) {
     const hash = database.indexOf("#");

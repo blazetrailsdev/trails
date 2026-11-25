@@ -32,7 +32,7 @@ interface ExpoModule {
 
 /**
  * @internal
- * @noRailsEquivalent CONVERGEABLE sqlite3-retire-the-sqlite-driver-interfaces
+ * @noRailsEquivalent CONVERGEABLE sqlite3-engine-module-surface-ruling
  */
 export const errors: EngineErrors = {
   errcode(error) {

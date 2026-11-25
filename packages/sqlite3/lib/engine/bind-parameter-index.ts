@@ -1,6 +1,6 @@
 /**
  * @internal
- * @noRailsEquivalent CONVERGEABLE sqlite3-retire-the-sqlite-driver-interfaces
+ * @noRailsEquivalent CONVERGEABLE sqlite3-engine-module-surface-ruling
  */
 export function bindParameterIndex(sql: string, name: string): number {
   const code = stripLiterals(sql);
@@ -19,7 +19,7 @@ function stripLiterals(sql: string): string {
 
 /**
  * @internal
- * @noRailsEquivalent CONVERGEABLE sqlite3-retire-the-sqlite-driver-interfaces
+ * @noRailsEquivalent CONVERGEABLE sqlite3-engine-module-surface-ruling
  */
 export function bindParameterNames(sql: string): (string | null)[] {
   const names: (string | null)[] = [];

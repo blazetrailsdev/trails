@@ -1,6 +1,5 @@
 import { getEnv } from "@blazetrails/activesupport";
 import { Base, HashConfig } from "@blazetrails/activerecord";
-import "@blazetrails/sqlite3/better-sqlite3";
 import "@blazetrails/trailties/all";
 import { Trailtie as ActiveJobTrailtie } from "@blazetrails/trailties/trailties/active-job";
 import "../../../../lib/active-job/queue-adapters/solid-queue-adapter.js";

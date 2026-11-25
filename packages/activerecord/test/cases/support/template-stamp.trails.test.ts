@@ -1,5 +1,4 @@
 import { describe, it, expect } from "vitest";
-import "@blazetrails/sqlite3/better-sqlite3";
 import { Base } from "../../../lib/base.js";
 import { bootOutcome } from "../../support/boot-outcome.js";
 import { InternalMetadata } from "../../../lib/internal-metadata.js";
