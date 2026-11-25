@@ -408,6 +408,23 @@ describe("LoggingTest", () => {
     },
   );
 
+  it.skipIf(isAdapterIs("inline", "sneakers"))(
+    "retry different queue logging",
+    async ({ testCase: t }: Ctx) => {
+      await t.performEnqueuedJobs({}, async () => {
+        await t.performEnqueuedJobs({}, async () => {
+          await RetryJob.performLater("HeavyError", 2);
+          expect(t.logger.messages).toMatch(
+            /Performed RetryJob \(Job ID: .*?\) from .+\(default\) in .*ms/,
+          );
+        });
+        expect(t.logger.messages).toMatch(
+          /Performed RetryJob \(Job ID: .*?\) from .+\(low\) in .*ms/,
+        );
+      });
+    },
+  );
+
   it("enqueue retry logging on retry job", async ({ testCase: t }: Ctx) => {
     await t.performEnqueuedJobs({}, () => RescueJob.performLater("david"));
     expect(t.logger.messages).toMatch(

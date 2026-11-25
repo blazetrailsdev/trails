@@ -240,6 +240,12 @@ describe("AssertSelectTest", () => {
     assertSelect("a");
   });
 
+  it("assert select root xml", () => {
+    renderXml('<rss version="2.0"></rss>');
+
+    assertSelect("rss");
+  });
+
   it("nested assert select", () => {
     renderHtml('<div id="1">foo</div><div id="2">foo</div>');
     assertSelect(

@@ -197,6 +197,16 @@ describe("ActionCable::Channel::BaseTest", () => {
     expect(channel.isSubscribed()).toBeFalsy();
   });
 
+  it("unsubscribed? method returns correct status", async () => {
+    expect(channel.isUnsubscribed()).toBeFalsy();
+
+    await channel.subscribeToChannel();
+    expect(channel.isUnsubscribed()).toBeFalsy();
+
+    await channel.unsubscribeFromChannel();
+    expect(channel.isUnsubscribed()).toBeTruthy();
+  });
+
   it("connection identifiers", () => {
     expect((channel as unknown as { currentUser(): User }).currentUser().name).toBe(user.name);
   });

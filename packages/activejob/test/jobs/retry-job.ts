@@ -42,6 +42,8 @@ export class CustomDiscardableError extends StandardError {}
 constSet(TopLevel, "CustomDiscardableError", CustomDiscardableError);
 export class UnlimitedRetryError extends StandardError {}
 constSet(TopLevel, "UnlimitedRetryError", UnlimitedRetryError);
+export class HeavyError extends StandardError {}
+constSet(TopLevel, "HeavyError", HeavyError);
 
 export class RetryJob extends Base {
   static toString(): string {
@@ -87,6 +89,7 @@ RetryJob.retryOn(
   ),
 );
 RetryJob.retryOn(UnlimitedRetryError, { attempts: ":unlimited" });
+RetryJob.retryOn(HeavyError, { queue: "low" });
 
 RetryJob.discardOn(DiscardableError);
 RetryJob.discardOn(FirstDiscardableErrorOfTwo, SecondDiscardableErrorOfTwo);

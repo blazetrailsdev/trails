@@ -1261,12 +1261,13 @@
     }
   },
   "solid-cache": {
-    "rows": 26,
+    "rows": 27,
     "excluded": [],
     "unwalked": [],
     "residue": {
       "entry/expiration.ts::ClassMethods": "SolidCache::Entry::Expiration::ClassMethods",
       "entry/size.ts::ClassMethods": "SolidCache::Entry::Size::ClassMethods",
+      "generators/solid-cache/install/install-generator.ts::InstallGenerator": "SolidCache::InstallGenerator",
       "maglev-hash.ts::Preferences": "SolidCache::MaglevHash::Preferences"
     }
   },
