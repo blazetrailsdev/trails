@@ -1,4 +1,4 @@
-import { extend } from "@blazetrails/ruby-compat";
+import { extend } from "@blazetrails/ruby-compat/include";
 import { Concern } from "../concern.js";
 import { safeConstantize } from "../inflector.js";
 

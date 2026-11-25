@@ -1,4 +1,7 @@
-import { classModule, inherited, ObjectSpace, setClassDefinedHook } from "@blazetrails/ruby-compat";
+import { classModule } from "@blazetrails/ruby-compat/class-module";
+import { inherited } from "@blazetrails/ruby-compat/include";
+import { setClassDefinedHook } from "@blazetrails/ruby-compat/load";
+import { ObjectSpace } from "@blazetrails/ruby-compat/object-space";
 
 export type AnyClass = abstract new (...args: never) => unknown;
 

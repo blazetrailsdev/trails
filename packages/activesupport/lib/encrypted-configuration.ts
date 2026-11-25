@@ -1,11 +1,6 @@
-import {
-  eachKey,
-  NoMethodError,
-  rbObjAsString,
-  rbObjId,
-  rbObjRespondTo,
-  toSym,
-} from "@blazetrails/ruby-compat";
+import { eachKey } from "@blazetrails/ruby-compat/hash";
+import { NoMethodError } from "@blazetrails/ruby-compat/no-method-error";
+import { rbObjAsString, rbObjId, rbObjRespondTo, toSym } from "@blazetrails/ruby-compat/object";
 import { Psych } from "@blazetrails/ruby-compat/psych";
 import { EncryptedFile, MissingContentError } from "./encrypted-file.js";
 import { presence } from "./core-ext/object/blank.js";

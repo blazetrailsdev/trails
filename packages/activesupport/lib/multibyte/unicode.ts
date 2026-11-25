@@ -1,4 +1,5 @@
-import { bytes, scrub } from "@blazetrails/ruby-compat";
+import { bytes } from "@blazetrails/ruby-compat/string/bytes";
+import { scrub } from "@blazetrails/ruby-compat/string/scrub";
 
 export namespace Unicode {
   export function decompose(type: string, codepoints: number[]): number[] {

@@ -1,4 +1,5 @@
-import { rbEnsure, setVerbose, verbose } from "@blazetrails/ruby-compat";
+import { rbEnsure } from "@blazetrails/ruby-compat/ensure";
+import { setVerbose, verbose } from "@blazetrails/ruby-compat/verbose";
 
 export function silenceWarnings<T>(block: () => T): T {
   return withWarnings(null, block);

@@ -1,5 +1,7 @@
 import { Time } from "@blazetrails/date";
-import { rbCNumeric, rbEqual, rbObjDup, rbObjIsKindOf } from "@blazetrails/ruby-compat";
+import { rbObjDup, rbObjIsKindOf } from "@blazetrails/ruby-compat/include";
+import { rbCNumeric } from "@blazetrails/ruby-compat/object";
+import { rbEqual } from "@blazetrails/ruby-compat/rb-equal";
 import { deflate, inflate } from "../gzip.js";
 import { DeserializationError } from "./deserialization-error.js";
 import { coder } from "./coder.js";

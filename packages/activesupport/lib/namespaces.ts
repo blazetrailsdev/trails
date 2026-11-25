@@ -1,4 +1,7 @@
-import { LoadError, warn, TopLevel, constSet } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { warn } from "@blazetrails/ruby-compat/kernel-warn";
+import { LoadError } from "@blazetrails/ruby-compat/load-error";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
 import { extend, type Extended } from "@blazetrails/ruby-compat/include";
 import * as Autoload from "./dependencies/autoload.js";
 import type { BroadcastLogger } from "./broadcast-logger.js";
@@ -111,7 +114,7 @@ interface ParametersInstance {
   set(key: string, value: unknown): void;
 }
 
-export { TopLevel } from "@blazetrails/ruby-compat";
+export { TopLevel } from "@blazetrails/ruby-compat/object";
 
 declare module "@blazetrails/ruby-compat" {
   interface TrailsConfiguration {

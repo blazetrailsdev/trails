@@ -1,6 +1,8 @@
-import { rbFSend, rbObjDup, regexpEscape } from "@blazetrails/ruby-compat";
+import { rbObjDup } from "@blazetrails/ruby-compat/include";
+import { rbFSend } from "@blazetrails/ruby-compat/object";
+import { regexpEscape } from "@blazetrails/ruby-compat/regexp";
 import { I18n } from "../i18n.js";
-import { isEmpty } from "@blazetrails/ruby-compat";
+import { isEmpty } from "@blazetrails/ruby-compat/ruby-empty";
 
 export interface InflectionRule {
   rule: RegExp;

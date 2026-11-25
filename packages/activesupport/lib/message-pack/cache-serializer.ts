@@ -1,4 +1,4 @@
-import { RuntimeError } from "@blazetrails/ruby-compat";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
 import { extend, include } from "@blazetrails/ruby-compat/include";
 import { SIGNATURE_INT, Serializer, type SerializerHost } from "./serializer.js";
 import { Extensions, MissingClassError } from "./extensions.js";

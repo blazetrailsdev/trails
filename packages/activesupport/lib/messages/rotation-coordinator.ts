@@ -1,4 +1,5 @@
-import { rbIseqParameters, rbObjDup } from "@blazetrails/ruby-compat";
+import { rbObjDup } from "@blazetrails/ruby-compat/include";
+import { rbIseqParameters } from "@blazetrails/ruby-compat/method";
 import { extractBang } from "../core-ext/hash/slice.js";
 import { isPlainObject } from "../hash-utils.js";
 import type { OnRotation } from "./rotator.js";

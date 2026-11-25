@@ -1,4 +1,5 @@
-import { KERNEL_METHODS, PROTOCOL_PROBES, rbMethodName } from "@blazetrails/ruby-compat";
+import { KERNEL_METHODS, PROTOCOL_PROBES } from "@blazetrails/ruby-compat/method-missing-proxy";
+import { rbMethodName } from "@blazetrails/ruby-compat/symbol";
 
 function isPredicateSpelling(prop: string): boolean {
   return /^is[A-Z]/.test(prop) && !KERNEL_METHODS.has(prop) && !PROTOCOL_PROBES.has(prop);

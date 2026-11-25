@@ -1,5 +1,5 @@
 import { Date as RubyDate } from "@blazetrails/date";
-import { JSON as RbJSON } from "@blazetrails/ruby-compat";
+import { JSON as RbJSON } from "@blazetrails/ruby-compat/json";
 import { ArgumentError } from "./hash-utils.js";
 import { Encoding, type EncodeOptions } from "./json/encoding.js";
 import { zone } from "./time-zone-config.js";

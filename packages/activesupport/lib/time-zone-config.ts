@@ -1,4 +1,5 @@
-import { TEMPORAL_METHOD_TABLE, rbEnsure } from "@blazetrails/ruby-compat";
+import { rbEnsure } from "@blazetrails/ruby-compat/ensure";
+import { TEMPORAL_METHOD_TABLE } from "@blazetrails/ruby-compat/object";
 import { IsolatedExecutionState } from "./isolated-execution-state.js";
 import { inTimeZone, type DateOrTime } from "./core-ext/date-and-time/zones.js";
 import { TimeZone } from "./values/time-zone.js";

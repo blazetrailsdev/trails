@@ -1,16 +1,12 @@
 import { Date as RubyDate, DateTime as RubyDateTime, Time as RubyTime } from "@blazetrails/date";
-import {
-  fetch,
-  Rational,
-  rbObjClassname,
-  rbObjRespondTo,
-  rbPlus,
-  rbClearMethodCache,
-} from "@blazetrails/ruby-compat";
+import { fetch } from "@blazetrails/ruby-compat/hash";
+import { rbClearMethodCache } from "@blazetrails/ruby-compat/method-cache";
+import { rbPlus } from "@blazetrails/ruby-compat/numeric";
+import { rbObjClassname, rbObjRespondTo } from "@blazetrails/ruby-compat/object";
+import { Rational } from "@blazetrails/ruby-compat/rational";
 import { deprecator } from "../../deprecator.js";
 import { Duration } from "../../duration.js";
 import { ArgumentError } from "../../hash-utils.js";
-import { currentTimeInstant } from "../../time-travel.js";
 import { TimeWithZone } from "../../time-with-zone.js";
 import { zone as timeZone } from "../../time-zone-config.js";
 import { advance as dateAdvance } from "../date/calculations.js";
@@ -43,9 +39,7 @@ export interface AdvanceOptions {
 
 export function current(): TimeWithZone | RubyTime {
   const zone = timeZone();
-  return zone
-    ? zone.now()
-    : RubyTime.at(new Rational(currentTimeInstant().epochNanoseconds, 1_000_000_000n));
+  return zone ? zone.now() : RubyTime.now();
 }
 
 export const atWithoutCoercion = RubyTime.at.bind(RubyTime);

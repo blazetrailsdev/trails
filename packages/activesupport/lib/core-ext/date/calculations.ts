@@ -3,13 +3,10 @@ import { Duration } from "../../duration.js";
 import { IsolatedExecutionState } from "../../isolated-execution-state.js";
 import { TimeWithZone } from "../../time-with-zone.js";
 import { ArgumentError, zone as timeZone } from "../../time-zone-config.js";
-import {
-  Rational,
-  TEMPORAL_METHOD_TABLE,
-  isSymbol,
-  symbolToS,
-  rbClearMethodCache,
-} from "@blazetrails/ruby-compat";
+import { rbClearMethodCache } from "@blazetrails/ruby-compat/method-cache";
+import { TEMPORAL_METHOD_TABLE } from "@blazetrails/ruby-compat/object";
+import { Rational } from "@blazetrails/ruby-compat/rational";
+import { isSymbol, symbolToS } from "@blazetrails/ruby-compat/symbol";
 import { DAYS_INTO_WEEK } from "../date-and-time/calculations.js";
 import { inTimeZone } from "../date-and-time/zones.js";
 

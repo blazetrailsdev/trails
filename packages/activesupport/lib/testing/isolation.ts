@@ -1,23 +1,16 @@
-import {
-  Exception,
-  File,
-  IO,
-  Marshal,
-  Process,
-  StandardError,
-  Tempfile,
-  env,
-  excSetBacktrace,
-  pack,
-  include,
-  rbCallSuper,
-  rbFCaller,
-  rbInspect,
-  rbObjDup,
-  rbObjMethod,
-  rbObjRespondTo,
-  unpack1,
-} from "@blazetrails/ruby-compat";
+import { pack, unpack1 } from "@blazetrails/ruby-compat/array";
+import { excSetBacktrace, rbFCaller } from "@blazetrails/ruby-compat/backtrace-location";
+import { Exception } from "@blazetrails/ruby-compat/exception";
+import { File } from "@blazetrails/ruby-compat/file";
+import { include, rbCallSuper, rbObjDup } from "@blazetrails/ruby-compat/include";
+import { IO } from "@blazetrails/ruby-compat/io";
+import { Marshal } from "@blazetrails/ruby-compat/marshal";
+import { rbObjMethod } from "@blazetrails/ruby-compat/method";
+import { rbInspect, rbObjRespondTo } from "@blazetrails/ruby-compat/object";
+import { Process } from "@blazetrails/ruby-compat/process";
+import { env } from "@blazetrails/ruby-compat/process-adapter";
+import { StandardError } from "@blazetrails/ruby-compat/standard-error";
+import { Tempfile } from "@blazetrails/ruby-compat/tempfile";
 import { Assertion, Skip, UnexpectedError, type Test } from "./assertions.js";
 
 type Status = InstanceType<typeof Process.Status>;

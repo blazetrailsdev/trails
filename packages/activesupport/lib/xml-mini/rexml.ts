@@ -1,4 +1,4 @@
-import { rbInspect } from "@blazetrails/ruby-compat";
+import { rbInspect } from "@blazetrails/ruby-compat/object";
 import { ActiveSupport } from "../namespaces.js";
 import { Document, Element, ParseException } from "../rexml/document.js";
 import { isBlank } from "../string-utils.js";

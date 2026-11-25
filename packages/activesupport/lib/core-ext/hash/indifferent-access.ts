@@ -1,4 +1,4 @@
-import type { Hash } from "@blazetrails/ruby-compat";
+import type { Hash } from "@blazetrails/ruby-compat/hash";
 import { HashWithIndifferentAccess } from "../../hash-with-indifferent-access.js";
 
 type AnyObject = Record<string, unknown>;

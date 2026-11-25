@@ -1,4 +1,4 @@
-import { extend, extended, include } from "@blazetrails/ruby-compat";
+import { extend, extended, include } from "@blazetrails/ruby-compat/include";
 import {
   isModuleIncluded,
   prepend,

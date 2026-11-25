@@ -1,19 +1,16 @@
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
 import {
-  ArgumentError,
   Hash,
   dup,
   hashAset,
   hashDelete,
   hashReplace,
-  isSymbol,
   merge,
-  rbFSend,
-  rbObjDup,
-  rbModDefineMethod,
-  rbObjRespondTo,
-  symbolToS,
   valuesAt,
-} from "@blazetrails/ruby-compat";
+} from "@blazetrails/ruby-compat/hash";
+import { rbObjDup } from "@blazetrails/ruby-compat/include";
+import { rbFSend, rbModDefineMethod, rbObjRespondTo } from "@blazetrails/ruby-compat/object";
+import { isSymbol, symbolToS } from "@blazetrails/ruby-compat/symbol";
 import { isBlank } from "./core-ext/object/blank.js";
 import { isDuplicable } from "./core-ext/object/duplicable.js";
 import * as XmlMini from "./xml-mini.js";

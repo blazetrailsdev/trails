@@ -1,4 +1,7 @@
-import { Process, rbObjRespondTo, SecureRandom, throwDataP } from "@blazetrails/ruby-compat";
+import { throwDataP } from "@blazetrails/ruby-compat/kernel-catch";
+import { rbObjRespondTo } from "@blazetrails/ruby-compat/object";
+import { Process } from "@blazetrails/ruby-compat/process";
+import { SecureRandom } from "@blazetrails/ruby-compat/secure-random";
 
 export type EventPayload = Record<string, unknown>;
 

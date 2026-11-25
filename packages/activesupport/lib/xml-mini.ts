@@ -1,12 +1,14 @@
 import { camelize, singularize, underscore } from "./inflector.js";
 import { htmlEscape } from "./core-ext/tse/util.js";
-import { Base64, BigDecimal, toD } from "@blazetrails/ruby-compat";
+import { Base64 } from "@blazetrails/ruby-compat/base64";
+import { BigDecimal, toD } from "@blazetrails/ruby-compat/big-decimal";
 import { IsolatedExecutionState } from "./isolated-execution-state.js";
-import { LoadError, StringIO } from "@blazetrails/ruby-compat";
+import { LoadError } from "@blazetrails/ruby-compat/load-error";
+import { StringIO } from "@blazetrails/ruby-compat/string-io";
 import { Date as RubyDate, DateTime, Time as RubyTime } from "@blazetrails/date";
 import { Duration } from "./duration.js";
 import { utc as dateTimeUtc } from "./core-ext/date-time/calculations.js";
-import { rbObjAsString as toS } from "@blazetrails/ruby-compat";
+import { rbObjAsString as toS } from "@blazetrails/ruby-compat/object";
 import { toF, toI } from "./core-ext/string/conversions.js";
 import { Psych } from "@blazetrails/ruby-compat/psych";
 import * as XmlMini_REXML from "./xml-mini/rexml.js";

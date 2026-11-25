@@ -2,13 +2,11 @@ import { callerLocations, type CallerLocation, type Deprecation } from "../depre
 import { extend, include, Module, prepend } from "@blazetrails/ruby-compat/include";
 import { constantize } from "../inflector.js";
 import { PROTOCOL_PROBES } from "@blazetrails/ruby-compat/method-missing-proxy";
-import {
-  constGet,
-  rbEqual,
-  rbMethodName,
-  rbObjRespondTo,
-  rbStrSend,
-} from "@blazetrails/ruby-compat";
+import { rbObjRespondTo } from "@blazetrails/ruby-compat/object";
+import { rbEqual } from "@blazetrails/ruby-compat/rb-equal";
+import { rbStrSend } from "@blazetrails/ruby-compat/string/method-table";
+import { rbMethodName } from "@blazetrails/ruby-compat/symbol";
+import { constGet } from "@blazetrails/ruby-compat/variable";
 import { ArgumentError } from "../hash-utils.js";
 
 function inspect(value: unknown): string {

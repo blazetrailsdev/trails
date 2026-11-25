@@ -1,5 +1,5 @@
 import { ShareLock, type ShareLockThreadInfo } from "../concurrency/share-lock.js";
-import type { Thread } from "@blazetrails/ruby-compat";
+import type { Thread } from "@blazetrails/ruby-compat/thread";
 
 export class Interlock {
   private lock: ShareLock;

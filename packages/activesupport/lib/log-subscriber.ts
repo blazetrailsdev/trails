@@ -4,7 +4,7 @@ import type { Logger } from "./logger.js";
 import type { Notifications } from "./notifications.js";
 import { TopLevel } from "./namespaces.js";
 import { transformKeys } from "./hash-utils.js";
-import { rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { rbObjRespondTo } from "@blazetrails/ruby-compat/object";
 import { publicInstanceMethods } from "@blazetrails/ruby-compat/include";
 
 export class LogSubscriber extends Subscriber {

@@ -1,7 +1,9 @@
-import { constGet, LoadError, RuntimeError } from "@blazetrails/ruby-compat";
+import { LoadError } from "@blazetrails/ruby-compat/load-error";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
+import { constGet } from "@blazetrails/ruby-compat/variable";
 import { toParam } from "./hash-utils.js";
 import { extractOptionsBang } from "./core-ext/array/extract-options.js";
-import { env } from "@blazetrails/ruby-compat";
+import { env } from "@blazetrails/ruby-compat/process-adapter";
 import { MemoryStore } from "./cache/memory-store.js";
 import { OrderedOptions } from "./ordered-options.js";
 import "./cache/null-store.js";

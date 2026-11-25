@@ -1,6 +1,8 @@
 import { ArgumentError } from "./hash-utils.js";
 import { ActiveSupport } from "./namespaces.js";
-import { OpenSSL, rbObjAsString, type DigestClass } from "@blazetrails/ruby-compat";
+import type { DigestClass } from "@blazetrails/ruby-compat/digest";
+import { rbObjAsString } from "@blazetrails/ruby-compat/object";
+import { OpenSSL } from "@blazetrails/ruby-compat/openssl";
 
 export class Digest {
   private static _hashDigestClass?: DigestClass;

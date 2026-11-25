@@ -2,17 +2,15 @@ import { Time } from "@blazetrails/date";
 import { Entry } from "./entry.js";
 import type { Duration } from "../duration.js";
 import type { TimeWithZone } from "../time-with-zone.js";
-import {
-  ArgumentError,
-  Hash,
-  NotImplementedError,
-  TypeError,
-  kernelFloat,
-  kernelInteger,
-  rbInspect,
-  regexpEscape,
-  toI,
-} from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { Hash } from "@blazetrails/ruby-compat/hash";
+import { kernelFloat } from "@blazetrails/ruby-compat/kernel-float";
+import { kernelInteger } from "@blazetrails/ruby-compat/kernel-integer";
+import { NotImplementedError } from "@blazetrails/ruby-compat/not-implemented-error";
+import { toI } from "@blazetrails/ruby-compat/numeric";
+import { rbInspect } from "@blazetrails/ruby-compat/object";
+import { regexpEscape } from "@blazetrails/ruby-compat/regexp";
+import { TypeError } from "@blazetrails/ruby-compat/type-error";
 import { Coder, type CoderCompressor, type CoderSerializer } from "./coder.js";
 import { SerializerWithFallback, type Serializer } from "./serializer-with-fallback.js";
 import { deflate, inflate } from "../gzip.js";

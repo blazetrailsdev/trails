@@ -1,4 +1,6 @@
-import { ArgumentError, type Range, strSlice } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import type { Range } from "@blazetrails/ruby-compat/range";
+import { strSlice } from "@blazetrails/ruby-compat/string/slice";
 export { isBlank, isPresent } from "./core-ext/object/blank.js";
 
 export function squish(str: string): string {
@@ -109,7 +111,7 @@ export function stripHeredoc(str: string): string {
 }
 
 export function at(str: string, position: number | Range<number | null> | RegExp): string | null {
-  return strSlice(str, position as number);
+  return strSlice(str, position);
 }
 
 export function exclude(str: string, search: string): boolean {

@@ -1,13 +1,8 @@
-import {
-  ARRAY_METHOD_TABLE,
-  Hash,
-  isSymbol,
-  rbObjAsString as toS,
-  rbObjClass,
-  rbObjClassname,
-  rbObjIsKindOf,
-  symbolToS,
-} from "@blazetrails/ruby-compat";
+import { ARRAY_METHOD_TABLE } from "@blazetrails/ruby-compat/array";
+import { Hash } from "@blazetrails/ruby-compat/hash";
+import { rbObjIsKindOf } from "@blazetrails/ruby-compat/include";
+import { rbObjAsString as toS, rbObjClass, rbObjClassname } from "@blazetrails/ruby-compat/object";
+import { isSymbol, symbolToS } from "@blazetrails/ruby-compat/symbol";
 import { assertValidKeys } from "../../hash-utils.js";
 import { I18n } from "../../i18n.js";
 import { camelize, pluralize, singularize, underscore } from "../../inflector.js";

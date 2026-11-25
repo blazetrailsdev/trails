@@ -1,4 +1,4 @@
-import { TEMPORAL_METHOD_TABLE } from "@blazetrails/ruby-compat";
+import { TEMPORAL_METHOD_TABLE } from "@blazetrails/ruby-compat/object";
 import { inTimeZone, type DateOrTime } from "../date-and-time/zones.js";
 
 for (const seat of ["Temporal.PlainDate", "Temporal.PlainDateTime", "Temporal.ZonedDateTime"]) {

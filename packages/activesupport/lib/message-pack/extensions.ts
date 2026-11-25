@@ -4,28 +4,20 @@ import { ActiveSupport } from "../namespaces.js";
 import type { Serializer } from "./serializer.js";
 import { HashWithIndifferentAccess } from "../hash-with-indifferent-access.js";
 import { DateTime, Time } from "@blazetrails/date";
-import {
-  BigDecimal,
-  Complex,
-  Generic,
-  IPAddr,
-  NameError,
-  Pathname,
-  Range,
-  Rational,
-  RuntimeError,
-  URI,
-  complex,
-  rational,
-  rbCDate,
-  rbCDateTime,
-  rbCInteger,
-  rbCSymbol,
-  constGet,
-  rbObjMethod,
-  rbRegInitStr,
-  rbRegToS,
-} from "@blazetrails/ruby-compat";
+import { BigDecimal } from "@blazetrails/ruby-compat/big-decimal";
+import { Complex, complex } from "@blazetrails/ruby-compat/complex";
+import { IPAddr } from "@blazetrails/ruby-compat/ipaddr";
+import { rbObjMethod } from "@blazetrails/ruby-compat/method";
+import { NameError } from "@blazetrails/ruby-compat/name-error";
+import { rbCDate, rbCDateTime, rbCInteger, rbCSymbol } from "@blazetrails/ruby-compat/object";
+import { Pathname } from "@blazetrails/ruby-compat/pathname";
+import { Range } from "@blazetrails/ruby-compat/range";
+import { Rational, rational } from "@blazetrails/ruby-compat/rational";
+import { rbRegInitStr, rbRegToS } from "@blazetrails/ruby-compat/regexp";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
+import { URI } from "@blazetrails/ruby-compat/uri/common";
+import { Generic } from "@blazetrails/ruby-compat/uri/generic";
+import { constGet } from "@blazetrails/ruby-compat/variable";
 import { Duration, type DurationParts } from "../duration.js";
 import { compact, valuesAt } from "../hash-utils.js";
 import { TimeWithZone } from "../time-with-zone.js";

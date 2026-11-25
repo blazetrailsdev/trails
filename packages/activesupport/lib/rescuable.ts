@@ -1,13 +1,10 @@
-import {
-  ArgumentError,
-  NameError,
-  rbBlockGivenP,
-  constGet,
-  rbEqq,
-  rbInspect,
-  rbModName,
-  rbObjMethod,
-} from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { rbBlockGivenP } from "@blazetrails/ruby-compat/hash";
+import { rbObjMethod } from "@blazetrails/ruby-compat/method";
+import { NameError } from "@blazetrails/ruby-compat/name-error";
+import { rbInspect, rbModName } from "@blazetrails/ruby-compat/object";
+import { rbEqq } from "@blazetrails/ruby-compat/rb-equal";
+import { constGet } from "@blazetrails/ruby-compat/variable";
 import { Module, extend, rbObjIsKindOf, type Included } from "@blazetrails/ruby-compat/include";
 import { classAttribute } from "./class-attribute.js";
 import { Concern } from "./concern.js";

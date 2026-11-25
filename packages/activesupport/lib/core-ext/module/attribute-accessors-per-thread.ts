@@ -1,4 +1,4 @@
-import { NameError } from "@blazetrails/ruby-compat";
+import { NameError } from "@blazetrails/ruby-compat/name-error";
 import { IsolatedExecutionState } from "../../isolated-execution-state.js";
 import { extractOptionsBang } from "../array/extract-options.js";
 

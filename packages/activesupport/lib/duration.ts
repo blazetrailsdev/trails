@@ -7,38 +7,38 @@
  */
 
 import { DateTime as RubyDateTime, Time as RubyTime } from "@blazetrails/date";
+import { cmp, equals as cmpEquals } from "@blazetrails/ruby-compat/comparable";
+import { rbObjIsKindOf } from "@blazetrails/ruby-compat/include";
+import { NoMethodError } from "@blazetrails/ruby-compat/no-method-error";
 import {
-  cmp,
-  equals as cmpEquals,
   numericMinus,
   numericModulo,
   numericMul,
   numericPlus,
-  NoMethodError,
-  Rational,
   rbBigNorm,
   rbDbl2num,
   toF,
   rbFloatTypeP,
+} from "@blazetrails/ruby-compat/numeric";
+import {
   rbCNumeric,
-  rbEql,
-  rbEqual,
-  rbObjIsKindOf,
   rbObjRespondTo,
   rbFSend,
   rbObjClassname,
-} from "@blazetrails/ruby-compat";
+} from "@blazetrails/ruby-compat/object";
+import { Rational } from "@blazetrails/ruby-compat/rational";
+import { rbEql, rbEqual } from "@blazetrails/ruby-compat/rb-equal";
 import { advance as dateAdvance, since as dateSince } from "./core-ext/date/calculations.js";
 import {
   advance as datetimeAdvance,
   since as datetimeSince,
 } from "./core-ext/date-time/calculations.js";
 import { current as timeCurrent } from "./core-ext/time/calculations.js";
-import { rbInspect as inspect } from "@blazetrails/ruby-compat";
+import { rbInspect as inspect } from "@blazetrails/ruby-compat/object";
 import { ActiveSupport } from "./namespaces.js";
 import { ArgumentError } from "./hash-utils.js";
 import { toSentence } from "./core-ext/array/conversions.js";
-import { rbHash } from "@blazetrails/ruby-compat";
+import { rbHash } from "@blazetrails/ruby-compat/rb-hash";
 import type { TimeWithZone } from "./time-with-zone.js";
 import { actsLike } from "./core-ext/object/acts-like.js";
 import { ISO8601Parser } from "./duration/iso8601-parser.js";

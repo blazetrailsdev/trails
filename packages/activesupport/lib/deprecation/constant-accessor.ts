@@ -1,5 +1,6 @@
 import { included, prepend } from "@blazetrails/ruby-compat/include";
-import { rbConstMissing, rbModConstMissing, rbObjSingletonClass } from "@blazetrails/ruby-compat";
+import { rbObjSingletonClass } from "@blazetrails/ruby-compat/object";
+import { rbConstMissing, rbModConstMissing } from "@blazetrails/ruby-compat/variable";
 import { ArgumentError } from "../hash-utils.js";
 import { callerLocations, type Deprecation } from "../deprecation.js";
 import { constantize } from "../inflector.js";

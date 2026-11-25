@@ -1,11 +1,11 @@
-import { RuntimeError } from "@blazetrails/ruby-compat";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
 import * as XmlMini from "../../xml-mini.js";
-import { StringIO } from "@blazetrails/ruby-compat";
+import { StringIO } from "@blazetrails/ruby-compat/string-io";
 import { isBlank, isPresent } from "../object/blank.js";
-import { isEmpty } from "@blazetrails/ruby-compat";
+import { isEmpty } from "@blazetrails/ruby-compat/ruby-empty";
 import { wrap } from "../array/wrap.js";
 import { isPlainObject } from "../../hash-utils.js";
-import { rbInspect as inspect } from "@blazetrails/ruby-compat";
+import { rbInspect as inspect } from "@blazetrails/ruby-compat/object";
 
 export function fromXml(
   xml: string | Uint8Array | StringIO | null | undefined,

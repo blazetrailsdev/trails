@@ -1,16 +1,11 @@
-import {
-  ArgumentError,
-  Hash,
-  LoadError,
-  fetch,
-  Marshal,
-  RuntimeError,
-  extend,
-  include,
-  rbCallSuper,
-  rbRegMatchP,
-  rbStrStartWith,
-} from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { Hash, fetch } from "@blazetrails/ruby-compat/hash";
+import { extend, include, rbCallSuper } from "@blazetrails/ruby-compat/include";
+import { LoadError } from "@blazetrails/ruby-compat/load-error";
+import { Marshal } from "@blazetrails/ruby-compat/marshal";
+import { rbRegMatchP } from "@blazetrails/ruby-compat/regexp";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
+import { rbStrStartWith } from "@blazetrails/ruby-compat/string/sub";
 
 import { Notifications } from "../notifications.js";
 import { ActiveSupportJSON } from "../json.js";

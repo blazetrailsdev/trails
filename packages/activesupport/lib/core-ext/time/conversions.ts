@@ -1,4 +1,4 @@
-import { rbClearMethodCache } from "@blazetrails/ruby-compat";
+import { rbClearMethodCache } from "@blazetrails/ruby-compat/method-cache";
 import { DateTime as RubyDateTime, Time as RubyTime } from "@blazetrails/date";
 import { formattedOffset as dateTimeFormattedOffset } from "../date-time/conversions.js";
 import { ordinalize } from "../../inflector.js";

@@ -1,4 +1,4 @@
-import { SecureRandom } from "@blazetrails/ruby-compat";
+import { SecureRandom } from "@blazetrails/ruby-compat/secure-random";
 
 const DIGITS = "0123456789".split("");
 const UPPERCASE = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");

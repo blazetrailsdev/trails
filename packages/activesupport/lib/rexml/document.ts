@@ -1,4 +1,4 @@
-import { RuntimeError } from "@blazetrails/ruby-compat";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
 
 /** @noRailsEquivalent PERMANENT */
 export class ParseException extends Error {

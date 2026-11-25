@@ -1,4 +1,7 @@
-import { Hash, strip, toS, rbClearMethodCache } from "@blazetrails/ruby-compat";
+import { Hash } from "@blazetrails/ruby-compat/hash";
+import { rbClearMethodCache } from "@blazetrails/ruby-compat/method-cache";
+import { toS } from "@blazetrails/ruby-compat/object";
+import { strip } from "@blazetrails/ruby-compat/string/method-table";
 import { LogSubscriber } from "../log-subscriber.js";
 import { LOG_LEVELS, type Logger, type LogLevel } from "../logger.js";
 import { Notifications } from "../notifications.js";

@@ -1,4 +1,4 @@
-import { rbCallSuper } from "@blazetrails/ruby-compat";
+import { rbCallSuper } from "@blazetrails/ruby-compat/include";
 import { Thrown } from "./serializer-with-fallback.js";
 
 export type OnRotation = () => void;

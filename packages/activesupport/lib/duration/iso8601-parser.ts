@@ -1,5 +1,7 @@
 import type { DurationParts } from "../duration.js";
-import { ArgumentError, rbInspect as inspect, StringScanner } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { rbInspect as inspect } from "@blazetrails/ruby-compat/object";
+import { StringScanner } from "@blazetrails/ruby-compat/string-scanner";
 
 export class ParsingError extends ArgumentError {}
 

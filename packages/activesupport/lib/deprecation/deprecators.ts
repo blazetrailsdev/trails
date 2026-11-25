@@ -1,4 +1,4 @@
-import { Enumerator, toEnum } from "@blazetrails/ruby-compat";
+import { Enumerator, toEnum } from "@blazetrails/ruby-compat/enumerator";
 import type { Deprecation, DeprecationBehaviorInput } from "../deprecation.js";
 
 type OptionName = "silenced" | "debug" | "behavior" | "disallowedBehavior" | "disallowedWarnings";

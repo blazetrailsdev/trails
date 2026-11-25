@@ -1,4 +1,5 @@
-import { ArgumentError, Process } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { Process } from "@blazetrails/ruby-compat/process";
 import { Time } from "@blazetrails/date";
 import { Event } from "./instrumenter.js";
 import { IsolatedExecutionState } from "../isolated-execution-state.js";

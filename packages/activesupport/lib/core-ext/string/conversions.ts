@@ -1,6 +1,6 @@
 import { Date as RubyDate, DateTime, Time } from "@blazetrails/date";
-import { Rational } from "@blazetrails/ruby-compat";
-import { fetch } from "@blazetrails/ruby-compat";
+import { Rational } from "@blazetrails/ruby-compat/rational";
+import { fetch } from "@blazetrails/ruby-compat/hash";
 import { isBlank } from "../object/blank.js";
 import "../time/compatibility.js";
 

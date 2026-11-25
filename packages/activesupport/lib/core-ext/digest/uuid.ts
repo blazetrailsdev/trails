@@ -1,5 +1,7 @@
 import { ArgumentError } from "../../hash-utils.js";
-import { Digest, OpenSSL, SecureRandom, type DigestClass } from "@blazetrails/ruby-compat";
+import { Digest, type DigestClass } from "@blazetrails/ruby-compat/digest";
+import { OpenSSL } from "@blazetrails/ruby-compat/openssl";
+import { SecureRandom } from "@blazetrails/ruby-compat/secure-random";
 
 function namespaceBytes(hex: string): Uint8Array {
   return Uint8Array.from(hex.match(/../g)!, (byte) => parseInt(byte, 16));

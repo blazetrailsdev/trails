@@ -37,7 +37,6 @@ import {
   toI,
   usec,
 } from "../../lib/core-ext/date-time/conversions.js";
-import { setFrozenTime } from "../../lib/time-travel.js";
 import { TimeWithZone } from "../../lib/time-with-zone.js";
 import { TimeZone } from "../../lib/values/time-zone.js";
 import { setZone } from "../../lib/time-zone-config.js";
@@ -61,7 +60,6 @@ import { DATE_FORMATS } from "../../lib/core-ext/time/conversions.js";
 import { toTime } from "../../lib/core-ext/date-time/compatibility.js";
 
 afterEach(() => {
-  setFrozenTime(null);
   setZone(null);
 });
 
@@ -91,12 +89,11 @@ function withDateCurrent<T>(today: Temporal.PlainDate, fn: () => T): T {
 }
 
 function withFrozen<T>(now: Time | DateTime, fn: () => T): T {
-  const instant = (now instanceof Time ? now : now.toTime()).toZonedDateTime().toInstant();
-  setFrozenTime(new Date(instant.epochMilliseconds));
+  const spy = vi.spyOn(Time, "now").mockReturnValue(now instanceof Time ? now : now.toTime());
   try {
     return fn();
   } finally {
-    setFrozenTime(null);
+    spy.mockRestore();
   }
 }
 

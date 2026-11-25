@@ -1,5 +1,5 @@
 import { wrap } from "../core-ext/array/wrap.js";
-import { classModule } from "@blazetrails/ruby-compat";
+import { classModule } from "@blazetrails/ruby-compat/class-module";
 import type { ThreadLocalVar } from "../thread-local-var.js";
 
 /** @noRailsEquivalent PERMANENT */

@@ -1,4 +1,7 @@
-import { Hash, first, map, rbObjDup } from "@blazetrails/ruby-compat";
+import { first } from "@blazetrails/ruby-compat/array";
+import { map } from "@blazetrails/ruby-compat/enumerable";
+import { Hash } from "@blazetrails/ruby-compat/hash";
+import { rbObjDup } from "@blazetrails/ruby-compat/include";
 import { YAML } from "@blazetrails/ruby-compat/yaml";
 
 YAML.addBuiltinType("omap", (_type, val) => {

@@ -1,4 +1,6 @@
-import { fetch, rbObjDup, toS } from "@blazetrails/ruby-compat";
+import { fetch } from "@blazetrails/ruby-compat/hash";
+import { rbObjDup } from "@blazetrails/ruby-compat/include";
+import { toS } from "@blazetrails/ruby-compat/object";
 import { asJson, Float, isPlainObject, Numeric } from "../core-ext/object/json.js";
 
 export interface EncodeOptions {

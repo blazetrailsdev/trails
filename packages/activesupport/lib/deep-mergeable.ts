@@ -1,4 +1,4 @@
-import { isModuleIncluded, rbObjDup } from "@blazetrails/ruby-compat";
+import { isModuleIncluded, rbObjDup } from "@blazetrails/ruby-compat/include";
 
 type MergeBlock = (key: unknown, thisVal: unknown, otherVal: unknown) => unknown;
 
