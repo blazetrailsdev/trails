@@ -273,12 +273,12 @@ function inspect(value: unknown): string {
   if (typeof value === "function") return `[Function ${value.name || "anonymous"}]`;
   if (value instanceof Error) return describe(value);
   if (Array.isArray(value)) return `[${value.map(inspect).join(", ")}]`;
-  const record = value;
-  if (record && typeof record.attributes === "object" && record.attributes !== null) {
-    const pairs = Object.entries(record.attributes as Record<string, unknown>).map(
-      ([k, v]) => `${k}: ${inspect(v)}`,
-    );
-    return `#<${record.constructor?.name ?? "Record"} ${pairs.join(", ")}>`;
+  if (typeof value === "object" && value !== null && "attributes" in value) {
+    const attributes: unknown = value.attributes;
+    if (typeof attributes === "object" && attributes !== null) {
+      const pairs = Object.entries(attributes).map(([k, v]) => `${k}: ${inspect(v)}`);
+      return `#<${value.constructor.name} ${pairs.join(", ")}>`;
+    }
   }
   try {
     return JSON.stringify(value) ?? String(value);
