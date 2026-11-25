@@ -1,6 +1,6 @@
 import { camelize, constantize } from "@blazetrails/activesupport";
 import { ArgumentError, isCasecmp, rbInspect, rbObjRespondTo } from "@blazetrails/ruby-compat";
-import type { InboundEmail } from "../inbound-email.js";
+import type { InboundEmail } from "../app/models/action-mailbox/inbound-email.js";
 
 export type RouteAddress =
   | string

@@ -1,4 +1,4 @@
-import "./constants.inbound-email.generated.js";
+import "../../../constants.inbound-email.generated.js";
 import {
   include,
   runLoadHooks,
@@ -10,7 +10,7 @@ import type { ClassMethods as AttachedClassMethods } from "@blazetrails/activest
 import type { One } from "@blazetrails/activestorage/attached/one";
 import type { Blob } from "@blazetrails/activestorage/app/models/active-storage/blob";
 import { Mail, type Message } from "@blazetrails/mail";
-import { ActionMailbox } from "./action-mailbox.js";
+import { ActionMailbox } from "../../../action-mailbox.js";
 import { Incineratable } from "./inbound-email/incineratable.js";
 import { MessageId } from "./inbound-email/message-id.js";
 import { Routable } from "./inbound-email/routable.js";

@@ -1,3 +1,4 @@
+import { Pathname } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Trailtie as I18nTrailtie } from "../../lib/trailties/i18n.js";
 
@@ -48,7 +49,7 @@ describe("QueryLogsTrailsTest", () => {
     const savedTaggings = QueryLogs.taggings;
     setQueryTransformers([]);
     resetLoadHooks();
-    const config = new Configuration("/app");
+    const config = new Configuration(new Pathname("/app"));
     class BlogApplication {
       autoloaders = { main: { onUnload() {} } };
       config = config;

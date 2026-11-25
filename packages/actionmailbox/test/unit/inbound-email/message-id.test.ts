@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { TestCase } from "@blazetrails/activesupport/test-case";
 import { File } from "@blazetrails/ruby-compat";
 import "../../support/database/setup.js";
-import { InboundEmail } from "../../../lib/inbound-email.js";
+import { InboundEmail } from "../../../lib/app/models/action-mailbox/inbound-email.js";
 
 class MessageIdTest extends TestCase {}
 MessageIdTest.fileFixturePath = File.expandPath("../../fixtures/files", import.meta.dirname);

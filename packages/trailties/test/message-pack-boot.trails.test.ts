@@ -1,3 +1,4 @@
+import { Pathname } from "@blazetrails/ruby-compat";
 import { include, type Included } from "@blazetrails/ruby-compat";
 import { Initializable, type Collection } from "../lib/initializable.js";
 import { Autoloaders } from "../lib/autoloaders.js";
@@ -88,7 +89,7 @@ describe("active_support/message_pack is awaited at boot", () => {
   });
 
   const app = () => ({
-    config: new Configuration("/app"),
+    config: new Configuration(new Pathname("/app")),
     deprecators: new Map(),
     executor: class extends Executor {},
     reloader: class extends Reloader {},

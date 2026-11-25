@@ -1,3 +1,4 @@
+import { Pathname } from "@blazetrails/ruby-compat";
 import { BroadcastLogger, Logger } from "@blazetrails/activesupport";
 import { afterAll, beforeAll, describe, it, vi } from "vitest";
 import { Dir, env, setEnv, StringIO } from "@blazetrails/ruby-compat";
@@ -46,7 +47,7 @@ describe("ServerTest", () => {
       return { on() {} };
     }) as never);
 
-    vi.spyOn(Trails, "root").mockReturnValue(Dir.mktmpdir());
+    vi.spyOn(Trails, "root").mockReturnValue(new Pathname(Dir.mktmpdir()));
     vi.spyOn(Builder, "parseFile").mockImplementation((async () => {
       const app = await Trails.initialize();
       await app.loadServer();

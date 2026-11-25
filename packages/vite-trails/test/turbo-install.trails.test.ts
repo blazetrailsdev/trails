@@ -35,7 +35,7 @@ describe("turbo:install", () => {
       JSON.stringify({ private: true, type: "module" }),
     );
     await File.writeAsync(rootDir.join("tsconfig.json").toString(), "{}");
-    vi.spyOn(Trails, "root").mockReturnValue(rootDir.toString());
+    vi.spyOn(Trails, "root").mockReturnValue(new Pathname(rootDir.toString()));
     vi.spyOn(
       CLI.Install.prototype as unknown as { installJsPackages(): unknown },
       "installJsPackages",

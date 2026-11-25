@@ -1,10 +1,10 @@
-import "../constants.message-id.generated.js";
+import "../../../../constants.message-id.generated.js";
 import { Concern, extend } from "@blazetrails/activesupport";
 import { RecordNotUnique, type Base } from "@blazetrails/activerecord";
 import { Blob } from "@blazetrails/activestorage/app/models/active-storage/blob";
 import { Mail, MessageIdField } from "@blazetrails/mail";
 import { OpenSSL, Socket, StringIO } from "@blazetrails/ruby-compat";
-import { ActionMailbox } from "../action-mailbox.js";
+import { ActionMailbox } from "../../../../action-mailbox.js";
 
 type MessageIdHost = typeof Base & typeof ClassMethods;
 

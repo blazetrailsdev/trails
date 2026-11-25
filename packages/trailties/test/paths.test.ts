@@ -1,3 +1,4 @@
+import { Pathname } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import {
   File,
@@ -47,7 +48,7 @@ const PREV = fsAdapterConfig.adapter;
 let root: Root;
 beforeEach(() => {
   install(false);
-  root = new Root("/foo/bar");
+  root = new Root(new Pathname("/foo/bar"));
 });
 afterEach(() => {
   fsAdapterConfig.adapter = PREV;
@@ -55,8 +56,8 @@ afterEach(() => {
 
 describe("PathsTest", () => {
   test("the paths object is initialized with the root path", async () => {
-    const root = new Root("/fiz/baz");
-    expect(root.path).toEqual("/fiz/baz");
+    const root = new Root(new Pathname("/fiz/baz"));
+    expect(root.path?.toString()).toEqual("/fiz/baz");
   });
 
   test("the paths object can be initialized with nil", async () => {
@@ -66,7 +67,7 @@ describe("PathsTest", () => {
   test("a paths object initialized with nil can be updated", async () => {
     const r = new Root(null);
     r.add("app");
-    r.path = "/root";
+    r.path = new Pathname("/root");
     expect(r.get("app")!.toAry()).toEqual(["app"]);
     expect(r.get("app")!.toA()).toEqual(["/root/app"]);
   });
@@ -350,7 +351,7 @@ describe("PathsIntegrationTest", () => {
     fsAdapterConfig.adapter = "sym";
     expect(File.isSymlink("/foo/bar.rb")).toEqual(true);
 
-    root = new Root("/foo");
+    root = new Root(new Pathname("/foo"));
     root.add("bar.rb");
 
     const exception = await assertRaises([RuntimeError], {}, () => root.get("bar.rb")!.existent());

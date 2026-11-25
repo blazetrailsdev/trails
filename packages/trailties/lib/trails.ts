@@ -3,7 +3,7 @@ import "./trailties/action-dispatch.js";
 import { EnvironmentInquirer } from "@blazetrails/activesupport";
 import { getEnv } from "@blazetrails/activesupport";
 import { ActiveSupport, Autoload, extend } from "@blazetrails/activesupport";
-import { TopLevel, constSet } from "@blazetrails/ruby-compat";
+import { TopLevel, constSet, type Pathname } from "@blazetrails/ruby-compat";
 import type { ErrorReporter } from "@blazetrails/activesupport";
 import type { CacheStore, Logger } from "@blazetrails/activesupport";
 import { Application } from "./application.js";
@@ -155,7 +155,7 @@ export class Trails {
     return (_backtraceCleaner ??= new BacktraceCleaner());
   }
 
-  static root(): string | null | undefined {
+  static root(): Pathname | null | undefined {
     const app = Trails.application;
     return app?.config.root;
   }

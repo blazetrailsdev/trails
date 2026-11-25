@@ -34,6 +34,7 @@ import {
   FileUtils,
   type IPAddr,
   isPlainHash,
+  type Pathname,
   rbModName,
   rbObjAsString,
   rbObjId,
@@ -72,7 +73,7 @@ type LogLevel = "debug" | "info" | "warn" | "error" | "fatal" | "unknown";
 export const LOAD_DEFAULTS_VERSION = "8.0";
 
 export class Configuration extends EngineConfiguration {
-  constructor(root: string | null = null) {
+  constructor(root: Pathname | null = null) {
     super(root);
     this.encoding = Encoding.UTF_8;
   }
@@ -459,22 +460,22 @@ export class Configuration extends EngineConfiguration {
   }
 
   autoloadLib({ ignore }: { ignore: string | string[] }): void {
-    const lib = File.join(this.root as string, "lib");
+    const lib = this.root!.join("lib");
 
-    this.autoloadPaths.push(lib);
-    this.eagerLoadPaths.push(lib);
+    this.autoloadPaths.push(lib.toString());
+    this.eagerLoadPaths.push(lib.toString());
 
-    const ignoredAbspaths = wrap(ignore).map((path) => File.join(lib, path));
+    const ignoredAbspaths = wrap(ignore).map((path) => lib.join(path));
     Trails.autoloaders.main.ignore(ignoredAbspaths);
   }
 
   autoloadLibOnce({ ignore }: { ignore: string | string[] }): void {
-    const lib = File.join(this.root as string, "lib");
+    const lib = this.root!.join("lib");
 
-    this.autoloadOncePaths.push(lib);
-    this.eagerLoadPaths.push(lib);
+    this.autoloadOncePaths.push(lib.toString());
+    this.eagerLoadPaths.push(lib.toString());
 
-    const ignoredAbspaths = wrap(ignore).map((path) => File.join(lib, path));
+    const ignoredAbspaths = wrap(ignore).map((path) => lib.join(path));
     Trails.autoloaders.once.ignore(ignoredAbspaths);
   }
 
@@ -724,29 +725,27 @@ export class Configuration extends EngineConfiguration {
   }
 
   /** @internal */
-  private credentialsDefaults(): { contentPath: string; keyPath: string } {
-    const root = this.root as string;
-    let contentPath = getPath().join(root, `config/credentials/${Trails.env}.yml.enc`);
-    if (!File.isExist(contentPath))
-      contentPath = getPath().join(root, "config/credentials.yml.enc");
+  private credentialsDefaults(): { contentPath: Pathname; keyPath: Pathname } {
+    let contentPath = this.root!.join(`config/credentials/${Trails.env}.yml.enc`);
+    if (!contentPath.isExist()) contentPath = this.root!.join("config/credentials.yml.enc");
 
-    let keyPath = getPath().join(root, `config/credentials/${Trails.env}.key`);
-    if (!File.isExist(keyPath)) keyPath = getPath().join(root, "config/master.key");
+    let keyPath = this.root!.join(`config/credentials/${Trails.env}.key`);
+    if (!keyPath.isExist()) keyPath = this.root!.join("config/master.key");
 
     return { contentPath: contentPath, keyPath: keyPath };
   }
 
   /** @internal */
   private generateLocalSecret(): string {
-    const keyFile = getPath().join(this.root as string, "tmp/local_secret.txt");
+    const keyFile = this.root!.join("tmp/local_secret.txt");
 
     if (!File.isExist(keyFile)) {
       const randomKey = SecureRandom.hex(64);
-      FileUtils.mkdirP(File.dirname(keyFile));
-      File.binwrite(keyFile, randomKey);
+      FileUtils.mkdirP(keyFile.dirname().toString());
+      File.binwrite(keyFile.toString(), randomKey);
     }
 
-    return new TextDecoder().decode(File.binread(keyFile));
+    return new TextDecoder().decode(File.binread(keyFile.toString()));
   }
 }
 

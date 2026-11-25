@@ -12,7 +12,7 @@ import {
 import type { Message } from "@blazetrails/mail";
 import { ActionMailbox } from "./action-mailbox.js";
 import { Callbacks, type ClassMethods as CallbacksClassMethods } from "./callbacks.js";
-import type { InboundEmail } from "./inbound-email.js";
+import type { InboundEmail } from "./app/models/action-mailbox/inbound-email.js";
 import type { Router } from "./router.js";
 import { Routing, type ClassMethods as RoutingClassMethods } from "./routing.js";
 

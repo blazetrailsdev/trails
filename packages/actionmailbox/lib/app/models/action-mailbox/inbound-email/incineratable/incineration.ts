@@ -1,6 +1,6 @@
-import "../../constants.incineratable-incineration.generated.js";
+import "../../../../../constants.incineratable-incineration.generated.js";
 import type { TimeWithZone } from "@blazetrails/activesupport";
-import { ActionMailbox } from "../../action-mailbox.js";
+import { ActionMailbox } from "../../../../../action-mailbox.js";
 import type { InboundEmail } from "../../inbound-email.js";
 
 export class Incineration {

@@ -1,4 +1,4 @@
-import { File, Pathname, TopLevel } from "@blazetrails/ruby-compat";
+import { File, TopLevel } from "@blazetrails/ruby-compat";
 import type { AppGenerator } from "@blazetrails/trailties/generators";
 
 /**
@@ -6,7 +6,7 @@ import type { AppGenerator } from "@blazetrails/trailties/generators";
  * @missingRailsArgs append_to_file — PERMANENT
  */
 export default async function (this: AppGenerator): Promise<void> {
-  const jsEntrypointPath = new Pathname(TopLevel.Trails!.root()!).join(
+  const jsEntrypointPath = TopLevel.Trails!.root()!.join(
     "app/javascript/entrypoints/application.js",
   );
   if (await File.isExistAsync(jsEntrypointPath.toString())) {

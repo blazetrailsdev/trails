@@ -1,3 +1,4 @@
+import { Pathname } from "@blazetrails/ruby-compat";
 import { BroadcastLogger, Logger } from "@blazetrails/activesupport";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import fs from "node:fs";
@@ -57,7 +58,7 @@ describe("trails server environment (trails)", () => {
       runOptions.push(options);
       return { on() {} };
     }) as never);
-    vi.spyOn(Trails, "root").mockReturnValue(tmpDir);
+    vi.spyOn(Trails, "root").mockReturnValue(new Pathname(tmpDir));
     vi.spyOn(Builder, "parseFile").mockImplementation((async () => {
       const app = await Trails.initialize();
       await app.loadServer();
@@ -180,7 +181,7 @@ describe("trails server environment (trails)", () => {
     beforeEach(() => {
       vi.spyOn(Trails, "initialize").mockResolvedValue(app);
       vi.spyOn(Trails, "application", "get").mockReturnValue(app);
-      vi.spyOn(app, "root").mockReturnValue(tmpDir);
+      vi.spyOn(app, "root").mockReturnValue(new Pathname(tmpDir));
     });
 
     afterAll(() => {

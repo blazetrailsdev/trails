@@ -1,3 +1,4 @@
+import { Pathname } from "@blazetrails/ruby-compat";
 import { Configuration } from "../../lib/application/configuration.js";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Deprecators } from "@blazetrails/activesupport";
@@ -40,7 +41,7 @@ describe("ActionDispatch::Trailtie", () => {
     savedIgnoreLeadingBrackets = ParamBuilder.ignoreLeadingBrackets;
     savedIgnoreAcceptHeader = Request.ignoreAcceptHeader;
     savedAlwaysWriteCookie = CookieJar.alwaysWriteCookie;
-    app = { deprecators: new Deprecators(), config: new Configuration("/app") };
+    app = { deprecators: new Deprecators(), config: new Configuration(new Pathname("/app")) };
   });
 
   afterEach(() => {

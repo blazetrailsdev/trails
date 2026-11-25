@@ -8,7 +8,7 @@ import { resolveEnv } from "../database.js";
 export type RouteSetClass = { newWithConfig(config: Configuration): RouteSet };
 
 export class Configuration extends RailtieConfiguration {
-  private _root: string | null;
+  private _root: Pathname | null;
   protected _paths?: Root;
   private _generators?: Generators;
 
@@ -22,21 +22,19 @@ export class Configuration extends RailtieConfiguration {
   autoloadOncePaths: string[] = [];
   eagerLoadPaths: string[] = [];
 
-  constructor(root: string | null = null) {
+  constructor(root: Pathname | null = null) {
     super();
     this._root = root;
     this._generators = this.appGenerators().dup();
   }
 
-  get root(): string | null {
+  get root(): Pathname | null {
     return this._root;
   }
 
-  /** @inventedArm toString — CONVERGEABLE trails-root-is-a-pathname */
-  setRoot(value: string | null): void {
-    const expanded = value === null ? null : new Pathname(value).expandPath().toString();
-    this._root = expanded;
-    if (this._paths) this._paths.path = expanded;
+  setRoot(value: string | Pathname | null): void {
+    this._root = value === null ? null : new Pathname(value).expandPath();
+    if (this._paths) this._paths.path = this._root;
   }
 
   paths(): Root {

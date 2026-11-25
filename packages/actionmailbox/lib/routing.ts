@@ -1,5 +1,5 @@
 import { Concern, cattrAccessor, extend } from "@blazetrails/activesupport";
-import type { InboundEmail } from "./inbound-email.js";
+import type { InboundEmail } from "./app/models/action-mailbox/inbound-email.js";
 import { ActionMailbox } from "./action-mailbox.js";
 import { Router } from "./router.js";
 

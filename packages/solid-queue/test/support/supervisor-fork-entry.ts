@@ -1,3 +1,4 @@
+import { Pathname } from "@blazetrails/ruby-compat";
 import { inquiry, seconds } from "@blazetrails/activesupport";
 import {
   SystemExit,
@@ -40,7 +41,7 @@ if (capturedIo) {
 }
 
 await import(boot);
-TopLevel.Trails!.root = () => root;
+TopLevel.Trails!.root = () => new Pathname(root);
 const { ForkSupervisor, SolidQueue, Supervisor } = await import("../../lib/index.js");
 SolidQueue.supervisorPidfile = supervisorPidfile;
 SolidQueue.forkBootTimeout = seconds(forkBootTimeout);

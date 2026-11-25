@@ -1,6 +1,6 @@
 import { StandardError } from "@blazetrails/ruby-compat";
 import { ActionMailbox } from "./action-mailbox.js";
-import type { InboundEmail } from "./inbound-email.js";
+import type { InboundEmail } from "./app/models/action-mailbox/inbound-email.js";
 import { Route, type RouteAddress } from "./router/route.js";
 
 interface Mailbox {

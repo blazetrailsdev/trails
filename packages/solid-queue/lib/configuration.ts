@@ -232,7 +232,7 @@ export class Configuration {
 
   /** @internal */
   private defaultOptions(): Options {
-    const root = new Pathname(TopLevel.Trails!.root()!);
+    const root = TopLevel.Trails!.root()!;
     return {
       mode: env.SOLID_QUEUE_SUPERVISOR_MODE || "fork",
       standalone: true,

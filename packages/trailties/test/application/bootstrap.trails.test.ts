@@ -1,3 +1,4 @@
+import { Pathname } from "@blazetrails/ruby-compat";
 import { include, type Included } from "@blazetrails/ruby-compat";
 import { Initializable, type Collection } from "../../lib/initializable.js";
 import { Autoloaders } from "../../lib/autoloaders.js";
@@ -27,7 +28,7 @@ const baseConfig = (): BootstrapConfig => ({
   logFormatter: null,
   defaultLogFile: async () => ({ write() {} }),
   paths: () => ({ get: () => ({ first: () => "log/test.log" }) }),
-  middleware: new Configuration("/app").middleware,
+  middleware: new Configuration(new Pathname("/app")).middleware,
 });
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type
@@ -87,7 +88,7 @@ describe(":initialize_cache lookup_store arms", () => {
   it("inserts the store's middleware before Rack::Runtime", async () => {
     const app = new TestApp();
     const middleware = class LocalCacheMiddleware {};
-    const config = new Configuration("/app");
+    const config = new Configuration(new Pathname("/app"));
     config.cacheStore = Object.assign(new NullStore(), { middleware: () => middleware });
     const insertBefore = vi.spyOn(config.middleware as MiddlewareStackProxy, "insertBefore");
     app.config = config as unknown as BootstrapConfig;
@@ -100,7 +101,7 @@ describe(":initialize_cache lookup_store arms", () => {
     try {
       ActiveSupport.setCacheFormatVersion(7.1);
       const app = new TestApp();
-      const config = new Configuration("/app");
+      const config = new Configuration(new Pathname("/app"));
       config.loadDefaults("7.0");
       app.config = config as unknown as BootstrapConfig;
       await app.runInitializers("all");
@@ -112,6 +113,9 @@ describe(":initialize_cache lookup_store arms", () => {
   });
 
   it("defaults config.cacheStore to a file store under root", () => {
-    expect(new Configuration("/app").cacheStore).toEqual([":file_store", "/app/tmp/cache/"]);
+    expect(new Configuration(new Pathname("/app")).cacheStore).toEqual([
+      ":file_store",
+      "/app/tmp/cache/",
+    ]);
   });
 });

@@ -1,3 +1,4 @@
+import { Pathname } from "@blazetrails/ruby-compat";
 import { rbFSleep as sleep } from "@blazetrails/ruby-compat";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import "./support/dummy-application.js";
@@ -183,7 +184,7 @@ describe("ForkSupervisorTest", { timeout: 60_000 }, () => {
     SolidQueue.supervisorPidfile = pidfile;
     previousForkBootTimeout = SolidQueue.forkBootTimeout;
     startupLog = `${dummyRoot}/tmp/pids/startup_${SecureRandom.hex()}.log`;
-    vi.spyOn(AsTopLevel.Trails!, "root").mockReturnValue(dummyRoot);
+    vi.spyOn(AsTopLevel.Trails!, "root").mockReturnValue(new Pathname(dummyRoot));
   });
 
   afterEach(async () => {

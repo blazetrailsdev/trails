@@ -11,7 +11,7 @@ import { Mail, type Field } from "@blazetrails/mail";
 import { ArgumentError, File, env, setEnv } from "@blazetrails/ruby-compat";
 import "../../../test-helper.js";
 import { ActionMailbox } from "../../../../lib/action-mailbox.js";
-import { InboundEmail } from "../../../../lib/inbound-email.js";
+import { InboundEmail } from "../../../../lib/app/models/action-mailbox/inbound-email.js";
 import "../../../../lib/app/controllers/action-mailbox/ingresses/mailgun/inbound-emails-controller.js";
 
 setEnv("MAILGUN_INGRESS_SIGNING_KEY", "tbsy84uSV1Kt3ZJZELY2TmShPRs91E3yL4tzf96297vBCkDWgL");

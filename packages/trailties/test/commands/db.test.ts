@@ -1,3 +1,4 @@
+import { Pathname } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeEach, afterEach, onTestFinished, vi } from "vitest";
 import {
   env,
@@ -81,7 +82,7 @@ async function runTask(task: string, vars: Record<string, string> = {}): Promise
   for (const [k, v] of Object.entries(vars)) setEnv(k, v);
   try {
     Base.configurations(
-      (await new Configuration(process.cwd()).databaseConfiguration()) as Parameters<
+      (await new Configuration(new Pathname(process.cwd())).databaseConfiguration()) as Parameters<
         typeof Base.configurations
       >[0],
     );

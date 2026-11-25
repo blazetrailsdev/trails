@@ -26,13 +26,13 @@ await import("./dummy/app/models/page.js");
 const { Person } = await import("./dummy/app/models/person.js");
 const { Review } = await import("./dummy/app/models/review.js");
 Trails.logger = new Logger(null);
-setTrailsRoot(TopLevel.Trails!.root()!);
+setTrailsRoot(TopLevel.Trails!.root()!.toString());
 ActionController.Base.prependViewPath([File.expandPath("dummy/app/views", import.meta.dirname)]);
 ActionMailerBase.prependViewPath([File.expandPath("dummy/app/views", import.meta.dirname)]);
 await import("./dummy/app/controllers/messages-controller.js");
 await import("./dummy/app/controllers/admin/messages-controller.js");
 
-DatabaseTasks.root = TopLevel.Trails!.root()!;
+DatabaseTasks.root = TopLevel.Trails!.root()!.toString();
 
 await DatabaseTasks.purge(
   Base.configurations().configsFor({

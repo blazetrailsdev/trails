@@ -1,3 +1,4 @@
+import { Pathname } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { resetLoadHooks, runLoadHooks } from "@blazetrails/activesupport";
 import { TestCase } from "@blazetrails/activesupport/test-case";
@@ -43,7 +44,7 @@ describe("EngineTest", () => {
     engine.config.setRoot(new URL("../fixtures/boot-app", import.meta.url).pathname);
     const root = vi
       .spyOn(Trails, "root")
-      .mockReturnValue(new URL("../fixtures", import.meta.url).pathname);
+      .mockReturnValue(new Pathname(new URL("../fixtures", import.meta.url).pathname));
 
     await engine.initializers.find((i) => i.name === "add_fixture_paths")!.run();
 

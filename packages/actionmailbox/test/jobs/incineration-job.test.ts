@@ -4,7 +4,7 @@ import { assertNothingRaised } from "@blazetrails/activesupport/testing/assertio
 import type { TestHelper as ActiveJobTestHelper } from "@blazetrails/activejob/test-helper";
 import { include } from "@blazetrails/ruby-compat";
 import "../test-helper.js";
-import type { InboundEmail } from "../../lib/inbound-email.js";
+import type { InboundEmail } from "../../lib/app/models/action-mailbox/inbound-email.js";
 import { IncinerationJob } from "../../lib/incineration-job.js";
 import { TestHelper } from "../../lib/test-helper.js";
 

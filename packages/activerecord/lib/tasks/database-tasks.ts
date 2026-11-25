@@ -92,7 +92,7 @@ export class DatabaseTasks {
   private static _root: string | null = null;
 
   static get root(): string {
-    return (this._root ??= TopLevel.Trails!.root()!);
+    return (this._root ??= TopLevel.Trails!.root()!.toString());
   }
 
   static set root(value: string) {

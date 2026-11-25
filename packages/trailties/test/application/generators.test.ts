@@ -1,3 +1,4 @@
+import { Pathname } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   Dir,
@@ -20,7 +21,7 @@ import { Color } from "@blazetrails/thor/shell/color";
 type ConfiguredGenerators = Generators & Record<string, unknown>;
 
 function withBareConfig(block: (c: Configuration) => void): void {
-  block(new Configuration("/app"));
+  block(new Configuration(new Pathname("/app")));
 }
 
 function toHash(hash: Map<unknown, unknown>): Record<string, unknown> {

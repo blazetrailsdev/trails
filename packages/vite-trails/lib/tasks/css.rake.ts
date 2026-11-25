@@ -1,12 +1,5 @@
 import { DSL } from "@blazetrails/rake";
-import {
-  block,
-  File,
-  Pathname,
-  rbFSystem,
-  STDOUT as $stdout,
-  TopLevel,
-} from "@blazetrails/ruby-compat";
+import { block, File, rbFSystem, STDOUT as $stdout, TopLevel } from "@blazetrails/ruby-compat";
 
 const STYLESHEETS: Record<string, [string, string, string]> = {
   tailwind: ["tailwindcss @tailwindcss/vite", "application.css", `@import "tailwindcss";\n`],
@@ -18,7 +11,7 @@ const STYLESHEETS: Record<string, [string, string, string]> = {
 
 async function install(css: string): Promise<void> {
   const [packages, stylesheet, content] = STYLESHEETS[css];
-  const root = new Pathname(TopLevel.Trails!.root()!);
+  const root = TopLevel.Trails!.root()!;
   await rbFSystem(`pnpm add -D ${packages}`);
 
   const entrypoint = root.join("app/javascript/entrypoints", stylesheet);

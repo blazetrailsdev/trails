@@ -1,3 +1,4 @@
+import { Pathname } from "@blazetrails/ruby-compat";
 import { describe, expect, it } from "vitest";
 import { HTML } from "@blazetrails/html-sanitizer";
 import { Configuration } from "../../lib/application/configuration.js";
@@ -5,7 +6,7 @@ import { Custom } from "../../lib/application/configuration.js";
 
 describe("Configuration#loadDefaults 7.1", () => {
   it("assigns action_view and action_text sanitizer_vendor from best_supported_vendor", () => {
-    const c = new Configuration("/app");
+    const c = new Configuration(new Pathname("/app"));
     c.set("activeRecord", { encryption: {} });
     c.set("actionView", {});
     c.set("actionText", {});
@@ -22,7 +23,7 @@ describe("Configuration#loadDefaults 7.1", () => {
   });
 
   it("leaves sanitizer_vendor unset before 7.1", () => {
-    const c = new Configuration("/app");
+    const c = new Configuration(new Pathname("/app"));
     c.set("actionView", {});
 
     c.loadDefaults("7.0");
@@ -51,7 +52,7 @@ describe("prototype-chain method_missing", () => {
 
 describe("Application::Configuration#paths", () => {
   it("adds the application paths once, in configuration.rb:399-406 order", () => {
-    const c = new Configuration("/app");
+    const c = new Configuration(new Pathname("/app"));
     const keys = c.paths().keys();
     const appKeys = keys.slice(keys.indexOf("config/database"));
     expect(appKeys).toEqual([

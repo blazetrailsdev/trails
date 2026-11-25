@@ -1,3 +1,4 @@
+import { Pathname } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -147,29 +148,29 @@ describe("Trails", () => {
   it("Trails.root reflects a config.setRoot override, not the discovered source root", () => {
     class RootApp extends Application {}
     Application.register(RootApp);
-    RootApp.findRoot = () => "/discovered/source";
+    RootApp.findRoot = () => new Pathname("/discovered/source");
     const app = RootApp.instance();
     app.config.setRoot("/srv/override");
-    expect(Trails.root()).toBe("/srv/override");
+    expect(Trails.root()?.toString()).toBe("/srv/override");
   });
 
   it("Trails.root falls back to the discovered root when config.root is unset", () => {
     class DiscoveredApp extends Application {}
     Application.register(DiscoveredApp);
-    DiscoveredApp.findRoot = () => "/discovered/source";
+    DiscoveredApp.findRoot = () => new Pathname("/discovered/source");
     const app = DiscoveredApp.instance();
-    expect(Trails.root()).toBe("/discovered/source");
+    expect(Trails.root()?.toString()).toBe("/discovered/source");
   });
 
   it("Trails.root agrees with the trailsRoot seam", async () => {
     class SeamApp extends Application {}
     Application.register(SeamApp);
     const discovered = await mkdtemp(join(tmpdir(), "trails-seam-"));
-    SeamApp.findRoot = () => discovered;
+    SeamApp.findRoot = () => new Pathname(discovered);
     const app = SeamApp.instance();
     await Trails.initialize();
     app.config.setRoot("/srv/override");
-    expect(Trails.root()).toBe(trailsRoot());
+    expect(Trails.root()?.toString()).toBe(trailsRoot());
     expect(trailsRoot()).toBe("/srv/override");
   });
 
@@ -177,7 +178,7 @@ describe("Trails", () => {
     class NoRootApp extends Application {}
     Application.register(NoRootApp);
     const fs = getFs();
-    expect(Trails.root()).toBe(await fs.realpath!(fs.cwd()));
+    expect(Trails.root()?.toString()).toBe(await fs.realpath!(fs.cwd()));
   });
 
   it("Trails.publicPath honors a config.setRoot override when discovery is unresolved", async () => {
