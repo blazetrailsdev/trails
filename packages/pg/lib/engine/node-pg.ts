@@ -340,6 +340,7 @@ export function dispatch(conn: Connection, write: ProtocolWrite, cmds: ("query" 
         for (const waiter of [...conn._resultWaiters]) waiter();
         return;
       }
+      if (conn._copyOut) conn._copyDone = true;
       deliver(emptyResult(error));
       if (!pipelined()) {
         reseat();
