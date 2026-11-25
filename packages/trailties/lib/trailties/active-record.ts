@@ -363,6 +363,12 @@ export class Trailtie extends BaseTrailtie {
       for (const pool of [...pools]) {
         coldPools.delete(pool);
         try {
+          if (
+            !(await pool.dbConfig.adapterClass().databaseExists(pool.dbConfig.configurationHash))
+          ) {
+            coldPools.add(pool);
+            continue;
+          }
           await pool.schemaReflection.loadAllBang(pool);
         } catch (error) {
           if (!(error instanceof ActiveRecordError)) throw error;

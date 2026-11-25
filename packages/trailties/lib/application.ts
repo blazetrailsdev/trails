@@ -39,6 +39,7 @@ import { Bootstrap } from "./application/bootstrap.js";
 import { DefaultMiddlewareStack } from "./application/default-middleware-stack.js";
 import { Finisher } from "./application/finisher.js";
 import { Configuration } from "./application/configuration.js";
+import { DummyConfig } from "./application/dummy-config.js";
 import { RoutesReloader } from "./application/routes-reloader.js";
 import { Trails } from "./trails.js";
 import { Collection, type InitializerGroup } from "./initializable.js";
@@ -151,6 +152,7 @@ export class Application extends Engine {
   override get config(): Configuration {
     const cfg = this._config;
     if (cfg instanceof Configuration) return cfg;
+    if (cfg instanceof DummyConfig) return cfg as unknown as Configuration;
     const klass = this.constructor as typeof Application;
     const newCfg = new Configuration(klass.findRoot(klass.calledFrom()));
     this._config = newCfg;

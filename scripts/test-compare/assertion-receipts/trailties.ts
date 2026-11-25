@@ -11,6 +11,16 @@ export const trailties: Record<string, AssertionReceipt[]> = {
           'configuration_test.rb:2991 `assert_nothing_raised { add_index :posts, :non_existent }` passes only where SQLite re-enables double-quoted string literals; better-sqlite3 compiles SQLITE_DQS=0 (CLAUDE.md, "Runtime facts Node does not expose")',
       },
     ],
+  "trailties:application/rake/dbs_test.rb › RakeDbsTest › db:schema:cache:dump ignores expired version":
+    [
+      {
+        kind: "assert_equal",
+        value: "s:0",
+        as: "assert_equal",
+        reason:
+          'dbs_test.rb:558 asserts an empty schema cache after the expired dump is ignored; a booted trails app warms the cache from the database before user code runs (activerecord CLAUDE.md, "Schema reflection peeks at a warm cache")',
+      },
+    ],
   "trailties:command/base_test.rb › Rails::Command::BaseTest › ::executable integrates ::bin": [
     {
       kind: "assert_equal",

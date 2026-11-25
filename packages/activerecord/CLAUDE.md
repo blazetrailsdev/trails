@@ -126,7 +126,11 @@ path and the settled shape splits it the same way:
   `active_record.initialize_database` awaits `loadAllBang` (`SchemaCache#add_all`,
   `schema_cache.rb:396-404`) on the pool it just established, in every env but
   test (skipped for the reason `railtie.rb:159-160` gives). Like
-  `railtie.rb:175-180`, an `ActiveRecordError` only warns.
+  `railtie.rb:175-180`, an `ActiveRecordError` only warns. A pool whose
+  database does not exist yet (`database_exists?`) is skipped and stays cold,
+  so booting for `db:create` does not connect and, for SQLite, create the file
+  the task is about to create. The executor warms it once the database exists.
+  Ruled by the operator on 2026-11-25.
 - **Synchronous readers peek.** `SchemaCache#getCachedColumnsHash`,
   `#getCachedDataSourceExists`, `#getCachedPrimaryKeys`, `#setColumns` and
   `SchemaReflection#loadedCache` read or seed the memo maps and never query.
