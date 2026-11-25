@@ -1246,19 +1246,29 @@ jobs:
             files: packages/trailties/test/application/initializers/frameworks.test.ts packages/trailties/test/application/middleware/exceptions.test.ts
           - shard: multi-dbs
             files: packages/trailties/test/application/rake/multi-dbs.test.ts
+          - shard: engine
+            files: packages/trailties/test/trailties/engine.test.ts
+          - shard: test-runner
+            files: packages/trailties/test/application/test-runner.test.ts
     steps:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-pnpm
       - run: pnpm install --frozen-lockfile --prefer-offline
       - uses: ./.github/actions/cache-build
       - run: pnpm build
+      # Experiment: the isolation harness writes each test app under <repo>/tmp.
+      # Mounting it on tmpfs tells whether the lane is disk-bound.
+      - name: Mount tmp on tmpfs
+        run: |
+          mkdir -p tmp
+          sudo mount -t tmpfs -o size=4g,uid=$(id -u),gid=$(id -g) tmpfs tmp
       - if: needs.changes.outputs.thor_only != 'true' && needs.changes.outputs.actioncable_only != 'true' && !matrix.files
         env:
-          TRAILTIES_EXCLUDE: packages/trailties/test/application/configuration.test.ts,packages/trailties/test/application/routing.test.ts,packages/trailties/test/application/mailer-previews.test.ts,packages/trailties/test/application/initializers/frameworks.test.ts,packages/trailties/test/application/middleware/exceptions.test.ts,packages/trailties/test/application/rake/multi-dbs.test.ts
+          TRAILTIES_EXCLUDE: packages/trailties/test/application/configuration.test.ts,packages/trailties/test/application/routing.test.ts,packages/trailties/test/application/mailer-previews.test.ts,packages/trailties/test/application/initializers/frameworks.test.ts,packages/trailties/test/application/middleware/exceptions.test.ts,packages/trailties/test/application/rake/multi-dbs.test.ts,packages/trailties/test/trailties/engine.test.ts,packages/trailties/test/application/test-runner.test.ts
           VITEST_SHARD_DURATIONS: trailties
-        run: pnpm vitest run packages/trailties packages/thor --shard=${{ matrix.shard }}/${{ env.TRAILTIES_SHARD_TOTAL }}
+        run: /usr/bin/time -v pnpm vitest run packages/trailties packages/thor --shard=${{ matrix.shard }}/${{ env.TRAILTIES_SHARD_TOTAL }}
       - if: needs.changes.outputs.thor_only != 'true' && needs.changes.outputs.actioncable_only != 'true' && matrix.files
-        run: pnpm vitest run ${{ matrix.files }}
+        run: /usr/bin/time -v pnpm vitest run ${{ matrix.files }}
       - if: needs.changes.outputs.actioncable_only == 'true' && matrix.shard == 1
         run: >
           pnpm vitest related --run --passWithNoTests --project trailties
