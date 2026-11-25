@@ -405,15 +405,148 @@ export function nuratLoader(self: Rational, a: object): Rational {
  * @noRailsEquivalent PERMANENT — Ruby core `Kernel#Rational()`, which Rails
  * calls and does not define. */
 export function rational(
-  numv: number | bigint | Rational | { toR(): Rational },
-  denv: number | bigint = 1,
+  numv: number | bigint | string | Rational | { toR(): Rational },
+  denv: number | bigint | string = 1,
 ): Rational {
   if (numv == null) throw new TypeError("can't convert nil into Rational");
-  if (typeof numv === "object" && !(numv instanceof Rational)) numv = numv.toR();
+  if (typeof numv === "string") numv = stringToRStrict(numv);
+  else if (typeof numv === "object" && !(numv instanceof Rational)) numv = numv.toR();
+  if (typeof denv === "string") {
+    const den = stringToRStrict(denv);
+    const num = rational(numv);
+    return new Rational(num.numerator * den.denominator, num.denominator * den.numerator);
+  }
   if (numv instanceof Rational) {
     return denv === 1 || denv === 1n ? numv : numv.quo(denv);
   }
   return new Rational(numv, denv);
+}
+
+interface Cursor {
+  s: number;
+}
+
+/** @internal `vendor/ruby/v3.3.11/bignum.c:4074` `rb_int_parse_cstr` for base 10 with
+ * `RB_INT_PARSE_UNDERSCORE` and no sign or prefix: the digits at `p.s`, an
+ * underscore allowed only between two of them. */
+function rbIntParseCstr(str: string, p: Cursor): { n: bigint; count: number } | null {
+  const md = /^\d+(?:_\d+)*/.exec(str.slice(p.s));
+  if (md == null) return null;
+  p.s += md[0].length;
+  const digits = md[0].replaceAll("_", "");
+  return { n: BigInt(digits), count: digits.length };
+}
+
+/** @internal `vendor/ruby/v3.3.11/rational.c:2308` `read_sign`. */
+function readSign(str: string, p: Cursor, e: number): string {
+  let sign = "?";
+  if (p.s < e && (str[p.s] === "-" || str[p.s] === "+")) {
+    sign = str[p.s];
+    p.s++;
+  }
+  return sign;
+}
+
+/** @internal `vendor/ruby/v3.3.11/rational.c:2338` `read_num`. */
+function readNum(str: string, p: Cursor, end: number, out: { num: bigint; nexp: bigint }): boolean {
+  let fn = 0n;
+  let ok = false;
+
+  out.nexp = 0n;
+  out.num = 0n;
+  if (p.s < end && str[p.s] !== ".") {
+    const n = rbIntParseCstr(str, p);
+    if (n == null) return false;
+    out.num = n.n;
+    ok = true;
+  }
+
+  if (p.s < end && str[p.s] === ".") {
+    p.s++;
+    const fp = rbIntParseCstr(str, p);
+    if (fp == null) return true;
+    out.nexp = BigInt(fp.count);
+    const l = 10n ** out.nexp;
+    out.num = out.num === 0n ? fp.n : out.num * l + fp.n;
+    fn = BigInt(fp.count);
+    ok = true;
+  }
+
+  if (ok && p.s + 1 < end && (str[p.s] === "e" || str[p.s] === "E")) {
+    p.s++;
+    const expsign = readSign(str, p, end);
+    const parsed = rbIntParseCstr(str, p);
+    if (parsed == null) return true;
+    let exp = parsed.n;
+    if (exp !== 0n) {
+      if (expsign === "-") {
+        if (fn !== 0n) exp = exp + fn;
+      } else {
+        if (fn !== 0n) exp = exp - fn;
+        exp = -exp;
+      }
+      out.nexp = exp;
+    }
+  }
+
+  return ok;
+}
+
+/** @internal `vendor/ruby/v3.3.11/rational.c:2398` `skip_ws`. */
+function skipWs(str: string, s: number, e: number): number {
+  while (s < e && " \t\n\v\f\r".includes(str[s])) ++s;
+  return s;
+}
+
+/** @internal `vendor/ruby/v3.3.11/rational.c:2406` `parse_rat`, strict and raising. */
+function parseRat(str: string): Rational | null {
+  const e = str.length;
+  const p: Cursor = { s: skipWs(str, 0, e) };
+  const sign = readSign(str, p, e);
+
+  const n = { num: 0n, nexp: 0n };
+  if (!readNum(str, p, e, n)) return null;
+  let { num, nexp } = n;
+  let den = 1n;
+  if (p.s < e && str[p.s] === "/") {
+    p.s++;
+    const d = { num: 0n, nexp: 0n };
+    if (!readNum(str, p, e, d)) {
+      return null;
+    } else if (d.num === 0n) {
+      throw new ZeroDivisionError("divided by 0");
+    } else if (skipWs(str, p.s, e) !== e) {
+      return null;
+    } else {
+      den = d.num;
+      nexp = nexp - d.nexp;
+    }
+  } else if (skipWs(str, p.s, e) !== e) {
+    return null;
+  }
+
+  if (nexp !== 0n) {
+    if (nexp < 0n) {
+      num = num * 10n ** -nexp;
+    } else {
+      den = den * 10n ** nexp;
+    }
+  }
+
+  if (sign === "-") {
+    num = -num;
+  }
+
+  return new Rational(num, den);
+}
+
+/** @internal `vendor/ruby/v3.3.11/rational.c:2476` `string_to_r_strict`. */
+function stringToRStrict(self: string): Rational {
+  const num = parseRat(self);
+  if (num == null) {
+    throw new ArgumentError(`invalid value for convert(): ${rbInspect(self)}`);
+  }
+  return num;
 }
 
 classpaths.set(Rational, { path: "Rational", permanent: true });

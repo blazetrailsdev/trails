@@ -65,6 +65,18 @@ describe("JSON.parse comments", () => {
     expect(() => RbJSON.parse("[1/*x*/2]")).toThrow(SyntaxError);
     expect(() => RbJSON.parse("1/*")).toThrow(SyntaxError);
   });
+
+  it("raises for an unterminated block comment, as parser.rl's c_comment does", () => {
+    expect(() => JSON.parse("[1] /* x")).toThrow(SyntaxError);
+  });
+
+  it("raises for a line comment with no closing newline, as parser.rl's cpp_comment does", () => {
+    expect(() => JSON.parse("1 // x")).toThrow(SyntaxError);
+  });
+
+  it("accepts quirksMode and parses into plain values", () => {
+    expect(JSON.parse('{"a":1}', { quirksMode: true })).toEqual({ a: 1 });
+  });
 });
 
 describe("JSON.prettyGenerate", () => {

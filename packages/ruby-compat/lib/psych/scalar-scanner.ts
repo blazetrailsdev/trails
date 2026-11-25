@@ -159,7 +159,6 @@ export class ScalarScanner {
   }
 
   /**
-   * @missingRailsArgs Rational — CONVERGEABLE kernel-rational-string-arm
    * @inventedArm Number — CONVERGEABLE kernel-integer-bignum-callers-narrow-with-number
    * @noRailsEquivalent PERMANENT
    */
@@ -176,8 +175,7 @@ export class ScalarScanner {
     const md = /(\d+:\d+:\d+)(?:\.(\d*))?[ \t\r\n\f\v]*(Z|[-+]\d+(:\d\d)?)?/.exec(time)!;
 
     const [hh, mm, ss] = md[1].split(":").map((x) => Number(rbStrToI(x)));
-    const us =
-      md[2] != null ? rational(BigInt(`0${md[2]}`), 10n ** BigInt(md[2].length)).mul(1000000) : 0;
+    const us = md[2] != null ? rational(`0.${md[2]}`).mul(1000000) : 0;
 
     time = klass.utc(yy, m, dd, hh, mm, ss, us);
 
