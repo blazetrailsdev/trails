@@ -45,6 +45,24 @@ describe("PG::Connection", () => {
     await conn.exec("DROP TABLE IF EXISTS copytable2");
   });
 
+  it("correctly finishes COPY queries passed to #exec", async () => {
+    await conn.exec("COPY (SELECT 1 UNION ALL SELECT 2) TO STDOUT");
+
+    const results: unknown[] = [];
+    let data: unknown;
+    do {
+      data = await conn.getCopyData(true);
+      if (false === data) {
+        await conn.block(2.0);
+        data = await conn.getCopyData(true);
+      }
+      if (data != null && data !== false) results.push(data);
+    } while (data != null);
+
+    expect(results.length).toBe(2);
+    expect(results).toEqual(expect.arrayContaining(["1\n", "2\n"]));
+  });
+
   it("supports explicitly calling #exec_params", async () => {
     await conn.exec("CREATE TABLE students ( name TEXT, age INTEGER )");
     await conn.execParams("INSERT INTO students VALUES( $1, $2 )", ["Wally", 8]);
