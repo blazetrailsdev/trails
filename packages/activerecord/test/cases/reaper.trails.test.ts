@@ -1,4 +1,4 @@
-import { snapshotReaperState } from "../support/stop-reaper-threads.js";
+import { snapshotReaperState } from "../support/reaper-state.js";
 import { describe, it, expect, afterEach, vi, beforeEach } from "vitest";
 import { Thread, type Mutex } from "@blazetrails/ruby-compat";
 import { Reaper } from "../../lib/connection-adapters/abstract/connection-pool/reaper.js";

@@ -1,4 +1,4 @@
-import { snapshotReaperState } from "../support/stop-reaper-threads.js";
+import { snapshotReaperState } from "../support/reaper-state.js";
 import { mkdtemp, writeFile, readFile, rm } from "fs/promises";
 import { rbObjInspect, RuntimeError, Thread, ThreadPoolExecutor } from "@blazetrails/ruby-compat";
 import { tmpdir } from "os";
