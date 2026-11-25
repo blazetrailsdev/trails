@@ -7,6 +7,10 @@ export CI_BG_DIR="${CI_BG_DIR:-$(mktemp -d)}"
 pkg="${1:?usage: scoped-comparison.sh <package>}"
 
 src="packages/$pkg/lib"
+if [ ! -d "$src" ]; then
+  echo "::error::$src does not exist"
+  exit 1
+fi
 
 only="with_entries(select(.key == \"$pkg\"))"
 ALL_LIB_PATHS_JSON=$(pnpm --silent vendor:fetch --print-lib-paths)

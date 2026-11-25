@@ -77,6 +77,9 @@ describe("the gates scripts/ci/scoped-comparison.sh skips", () => {
     expect(driver).toMatch(
       /rails-private after privates-manifest: pnpm exec eslint [^\n]*--no-error-on-unmatched-pattern/,
     );
+    expect(driver).toMatch(
+      /if \[ ! -d "\$src" \]; then\n\s*echo "::error::\$src does not exist"\n\s*exit 1/,
+    );
   });
 
   it("passes a package the extra-surface ratchet does not gate", async () => {
