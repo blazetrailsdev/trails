@@ -2,7 +2,7 @@ const base = new URL("./", self.location.href).pathname;
 const previewRoot = `${base}preview/`;
 const moduleRoot = `${base}rt/`;
 const runtimePage = `${base}runtime.html`;
-const ANSWER_TIMEOUT = 30_000;
+const ANSWER_TIMEOUT = 120_000;
 
 self.addEventListener("install", () => self.skipWaiting());
 self.addEventListener("activate", (event) => event.waitUntil(self.clients.claim()));
@@ -63,8 +63,11 @@ async function forward(request, url, tab) {
     request.method === "GET" || request.method === "HEAD" ? null : await request.arrayBuffer();
   const channel = new MessageChannel();
   const reply = new Promise((resolve) => {
-    channel.port1.onmessage = (event) => resolve(event.data);
-    setTimeout(() => resolve(null), ANSWER_TIMEOUT);
+    const timer = setTimeout(() => resolve(null), ANSWER_TIMEOUT);
+    channel.port1.onmessage = (event) => {
+      clearTimeout(timer);
+      resolve(event.data);
+    };
   });
   client.postMessage(
     {

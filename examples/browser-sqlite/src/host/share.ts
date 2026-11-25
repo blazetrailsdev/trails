@@ -24,6 +24,15 @@ export function applyChanges(
   return files;
 }
 
+/** Whether a path names a file the editor can hold: absolute, with no `..` step and no trailing slash. */
+export function isFilePath(path: string): boolean {
+  return (
+    path.startsWith("/") &&
+    !path.endsWith("/") &&
+    path.split("/").every((part, i) => i === 0 || (part !== "" && part !== ".."))
+  );
+}
+
 async function pipe(bytes: Uint8Array, through: CompressionStream | DecompressionStream) {
   const stream = new Blob([bytes as BlobPart]).stream().pipeThrough(through);
   return new Uint8Array(await new Response(stream).arrayBuffer());
@@ -47,7 +56,7 @@ export async function decodeChanges(text: string): Promise<Changes> {
     throw new Error("not a set of files");
   }
   for (const [path, value] of Object.entries(changes)) {
-    if (!path.startsWith("/") || (value !== null && typeof value !== "string")) {
+    if (!isFilePath(path) || (value !== null && typeof value !== "string")) {
       throw new Error("not a set of files");
     }
   }

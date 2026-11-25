@@ -4,7 +4,7 @@ import "@fontsource-variable/fira-code";
 import { latin1 } from "../runtime/latin1.ts";
 import { goToLine, installEditing } from "./editing.ts";
 import { highlight } from "./highlight.ts";
-import { applyChanges, changesFrom, decodeChanges, encodeChanges } from "./share.ts";
+import { applyChanges, changesFrom, decodeChanges, encodeChanges, isFilePath } from "./share.ts";
 import { zip } from "./zip.ts";
 
 const TEMPLATE = import.meta.glob<string>("../../template/**/*", {
@@ -345,7 +345,7 @@ function askPath(message: string, suggestion: string): string | null {
   const answer = prompt(message, suggestion)?.trim();
   if (!answer) return null;
   const path = answer.startsWith("/") ? answer : `/${answer}`;
-  if (path.endsWith("/") || path.split("/").some((part) => part === "..")) {
+  if (!isFilePath(path)) {
     alert("That is not a file path.");
     return null;
   }
@@ -380,6 +380,10 @@ $("rename-file").onclick = () => {
   restart();
 };
 $("delete-file").onclick = () => {
+  if (Object.keys(files).length === 1) {
+    alert("This is the app's only file. Reset files brings the example back.");
+    return;
+  }
   if (!confirm(`Delete ${current}?`)) return;
   delete files[current];
   saveFiles();
