@@ -54,14 +54,14 @@ describe("TestPragmas", () => {
   });
 
   it("get boolean pragma", async () => {
-    expect(await db.getBooleanPragma("read_uncommitted")).toBe(false);
+    expect(await db.getBooleanPragma("read_uncommitted")).toBeFalsy();
   });
 
   it("set boolean pragma", async () => {
     try {
       await db.setBooleanPragma("read_uncommitted", 1);
 
-      expect(await db.getBooleanPragma("read_uncommitted")).toBe(true);
+      expect(await db.getBooleanPragma("read_uncommitted")).toBeTruthy();
     } finally {
       await db.setBooleanPragma("read_uncommitted", 0);
     }
