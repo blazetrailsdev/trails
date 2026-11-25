@@ -326,7 +326,8 @@ describe("PG::Connection", () => {
       // PERMANENT-SKIP: CLAUDE.md, "A String has no encoding tag either" — node-pg decodes each value to a JS string before `Result` sees it, so a result records no fetch-time encoding.
       it.skip("returns the results in the correct encoding even if the client_encoding has changed since the results were fetched", async () => {
         await conn.setClientEncoding("EUC-JP");
-        const res = await conn.execParams("VALUES ('世界線航跡蔵')", []);
+        const stmt = "VALUES ('世界線航跡蔵')";
+        const res = await conn.execParams(stmt, []);
         await conn.setClientEncoding("utf-8");
         const outString = res.get(0)["column1"];
         expect(outString).toBe("世界線航跡蔵");
