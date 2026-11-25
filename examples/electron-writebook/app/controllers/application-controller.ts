@@ -7,6 +7,7 @@ import {
 import { Authorization } from "../models/concerns/authorization.ts";
 import { UploadedFiles } from "./concerns/uploaded-files.ts";
 import { VersionHeaders } from "./concerns/version-headers.ts";
+import { InlineScriptHashes } from "./concerns/inline-script-hashes.ts";
 import { EmbedProvider } from "../models/embed-provider.ts";
 import { TagHelper } from "../../lib/trails-ext/action-text-tag-helper.ts";
 
@@ -16,7 +17,8 @@ export interface ApplicationController
     Included<typeof Authentication>,
     Included<typeof Authorization>,
     Included<typeof UploadedFiles>,
-    Included<typeof VersionHeaders> {}
+    Included<typeof VersionHeaders>,
+    Included<typeof InlineScriptHashes> {}
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class ApplicationController extends ActionController.Base {
@@ -32,6 +34,7 @@ export class ApplicationController extends ActionController.Base {
     include(this, Authorization);
     include(this, UploadedFiles);
     include(this, VersionHeaders);
+    include(this, InlineScriptHashes);
 
     this.helper(TagHelper);
 

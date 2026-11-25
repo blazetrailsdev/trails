@@ -35,6 +35,7 @@
     "@blazetrails/bcrypt": "workspace:*",
     "@blazetrails/globalid": "workspace:*",
     "@blazetrails/html-sanitizer": "workspace:*",
+    "@blazetrails/nokogiri": "workspace:*",
     "@blazetrails/rack": "workspace:*",
     "@blazetrails/rack-test": "workspace:*",
     "@blazetrails/rackup": "workspace:*",
