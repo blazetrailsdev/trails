@@ -113,6 +113,16 @@ tester.run("rails-error-parity", rule, {
         SI,
       ),
     },
+    {
+      filename: errorsFile,
+      code: nl(
+        'import { StandardError } from "@blazetrails/ruby-compat/standard-error";',
+        "export class ActiveRecordError extends StandardError {}",
+        AD,
+        RNF,
+        SI,
+      ),
+    },
     // Rails raises the class bare in `dump`, and so does the port.
     { filename: baseFile, code: `class S { dump() { throw new ForbiddenClass(); } }\n` },
     // The same class with a message in a method Rails does not raise it bare in.
