@@ -1,0 +1,26 @@
+diff --git a/dist/source-map.cjs b/dist/source-map.cjs
+index 3bbfc25b8587a21e343d334523a416c528226394..e106cad3d43e4dc8b524f53d5b6343f78971a22a 100644
+--- a/dist/source-map.cjs
++++ b/dist/source-map.cjs
+@@ -827,7 +827,7 @@ function wrapCallSite(frame, state) {
+ 	const source = frame.getFileName() || frame.getScriptNameOrSourceURL();
+ 	if (source) {
+ 		const line = frame.getLineNumber();
+-		let column = frame.getColumnNumber() - 1;
++		let column = Math.max(frame.getColumnNumber() - 1, 0);
+ 		// Fix position in Node where some (internal) code is prepended.
+ 		// See https://github.com/evanw/node-source-map-support/issues/36
+ 		// Header removed in node at ^10.16 || >=11.11.0
+diff --git a/dist/source-map.mjs b/dist/source-map.mjs
+index 831a137c7113b1eb8dcb73e3bbf0de2686b1ac98..e3d795e6f1d4f3a8b88896029aa2b214578a968f 100644
+--- a/dist/source-map.mjs
++++ b/dist/source-map.mjs
+@@ -825,7 +825,7 @@ function wrapCallSite(frame, state) {
+ 	const source = frame.getFileName() || frame.getScriptNameOrSourceURL();
+ 	if (source) {
+ 		const line = frame.getLineNumber();
+-		let column = frame.getColumnNumber() - 1;
++		let column = Math.max(frame.getColumnNumber() - 1, 0);
+ 		// Fix position in Node where some (internal) code is prepended.
+ 		// See https://github.com/evanw/node-source-map-support/issues/36
+ 		// Header removed in node at ^10.16 || >=11.11.0
