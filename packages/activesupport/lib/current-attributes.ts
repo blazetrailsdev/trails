@@ -1,4 +1,5 @@
 import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { NoMethodError } from "@blazetrails/ruby-compat/no-method-error";
 import { hashAref } from "@blazetrails/ruby-compat/hash";
 import { methodMissingPrototype } from "@blazetrails/ruby-compat/method-missing-proxy";
 import {
@@ -187,7 +188,9 @@ export class CurrentAttributes {
   /** @internal */
   private static currentInstancesKey(): string {
     if (!Object.hasOwn(this, "_currentInstancesKey")) {
-      (this as CurrentAttributesClass)._currentInstancesKey = rbModName(this)!;
+      const name = rbModName(this);
+      if (name == null) throw new NoMethodError("undefined method 'to_sym' for nil");
+      (this as CurrentAttributesClass)._currentInstancesKey = name;
     }
     return (this as CurrentAttributesClass)._currentInstancesKey!;
   }

@@ -31,6 +31,19 @@ describe("buildViews view scope", { timeout: 30_000 }, () => {
     expect(out).not.toContain("AdminPosts");
   });
 
+  it("types two same-named controllers in different namespaces from their own files", async () => {
+    const cwd = mkScratch();
+    write(cwd, "app/controllers/posts-controller.ts", "export class PostsController {}");
+    write(cwd, "app/controllers/admin/posts-controller.ts", "export class PostsController {}");
+    write(cwd, "app/views/posts/index.html.tse", "<p></p>");
+    write(cwd, "app/views/admin/posts/index.html.tse", "<p></p>");
+    await buildViews({ cwd });
+    expect(shim(cwd, "admin/posts/index.html.tse")).toMatch(
+      /controllers\/admin\/posts-controller\.js"\)\)\["PostsController"\]/,
+    );
+    expect(shim(cwd, "posts/index.html.tse")).not.toMatch(/controllers\/admin\//);
+  });
+
   it("types a view with the modules its controller passes to helper", async () => {
     const cwd = mkScratch();
     write(

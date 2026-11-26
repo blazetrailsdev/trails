@@ -359,6 +359,9 @@ export namespace Delegation {
   /**
    * @inventedArm then — PERMANENT
    * @inventedArm if — PERMANENT
+   * @inventedArm if — PERMANENT
+   * @inventedArm throw — PERMANENT
+   * @inventedArm if — PERMANENT
    */
   export function generateMethodMissing(
     owner: { prototype: object },
@@ -414,6 +417,7 @@ export namespace Delegation {
               ) {
                 answered = Object.getOwnPropertyDescriptor(p, prop);
               }
+              if (answered) break;
             }
             return answered === undefined || typeof answered.value === "function"
               ? () => null
@@ -423,7 +427,7 @@ export namespace Delegation {
           throw DelegationError.nilTarget(prop, target);
         }
         if (__target == null) return (...args: unknown[]) => rbFSend(null, prop, ...args);
-        if (!(prop in Object(__target)) && !rbObjRespondTo(__target, prop)) {
+        if (!rbObjRespondTo(__target, prop)) {
           const sup = Reflect.get(obj, prop, receiver);
           if (sup !== undefined) return sup;
           if (PROTOCOL_PROBES.has(prop)) return undefined;

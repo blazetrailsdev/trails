@@ -35,4 +35,9 @@ describe("CurrentAttributes (trails)", () => {
     expect(app.instance()).toBeInstanceOf(app);
     expect(storage.instance()).toBeInstanceOf(storage);
   });
+
+  it("raises on an anonymous class, as name.to_sym does on nil", () => {
+    const anonymous = [class extends CurrentAttributes {}][0];
+    expect(() => anonymous.instance()).toThrow("undefined method 'to_sym' for nil");
+  });
 });
