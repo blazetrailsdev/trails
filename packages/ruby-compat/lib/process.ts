@@ -21,39 +21,6 @@ type ExecargOpthash = {
 };
 
 /**
- * `rb_check_argv` (`vendor/ruby/v3.3.11/process.c:2469-2497`): at least one
- * argument, a two-element Array first argument read as `[program, argv0]`, and
- * every argument a String with no NUL byte.
- */
-function rbCheckArgv(argv: unknown[]): string | null {
-  if (argv.length < 1) {
-    throw new ArgumentError(`wrong number of arguments (given ${argv.length}, expected 1+)`);
-  }
-
-  let prog: string | null = null;
-  const tmp = argv[0];
-  if (Array.isArray(tmp)) {
-    if (tmp.length !== 2) {
-      throw new ArgumentError("wrong first argument");
-    }
-    prog = stringValueCStr(tmp[0]);
-    argv[0] = tmp[1];
-  }
-  for (let i = 0; i < argv.length; i++) {
-    argv[i] = stringValueCStr(argv[i]);
-  }
-  return prog;
-}
-
-function stringValueCStr(arg: unknown): string {
-  if (typeof arg !== "string") {
-    throw new TypeError(`no implicit conversion of ${rbBuiltinClassName(arg)} into String`);
-  }
-  if (arg.includes("\0")) throw new ArgumentError("string contains null byte");
-  return arg;
-}
-
-/**
  * `rb_execarg_new` (`vendor/ruby/v3.3.11/process.c:2767`): `rb_exec_getargs`
  * (`process.c:2511-2538`) takes a trailing Hash as the options and a leading
  * Hash as the env, laid over `ENV` with `nil` unsetting a name. One remaining
@@ -62,6 +29,9 @@ function stringValueCStr(arg: unknown): string {
  * (`process.c:2575-2690`) finds a shell metacharacter, a leading assignment or
  * a reserved word or special built-in as its first word; any other is split on
  * spaces and tabs and exec'd directly.
+ * The remaining arguments are checked as `rb_check_argv` (`process.c:2469-2497`)
+ * checks them: at least one, a two-element Array first argument read as
+ * `[program, argv0]`, and every argument a String with no NUL byte.
  * `unsetenv_others: true` (`process.c:2195-2200`) starts the env empty rather
  * than from `ENV`, as `rb_execarg_parent_start1` does (`process.c:2887-2892`).
  *
@@ -109,7 +79,25 @@ export function rbExecargNew(
       else env[name] = value;
     }
   }
-  const prog = rbCheckArgv(rest);
+  if (rest.length < 1) {
+    throw new ArgumentError(`wrong number of arguments (given ${rest.length}, expected 1+)`);
+  }
+
+  let prog: string | null = null;
+  const tmp = rest[0];
+  if (Array.isArray(tmp)) {
+    if (tmp.length !== 2) {
+      throw new ArgumentError("wrong first argument");
+    }
+    prog = tmp[0];
+    rest[0] = tmp[1];
+  }
+  for (const arg of prog === null ? rest : [prog, ...rest]) {
+    if (typeof arg !== "string") {
+      throw new TypeError(`no implicit conversion of ${rbBuiltinClassName(arg)} into String`);
+    }
+    if (arg.includes("\0")) throw new ArgumentError("string contains null byte");
+  }
   const [command, ...args] = rest as string[];
   if (prog !== null) return [prog, env, args, opthash, command];
   if (args.length === 0) {

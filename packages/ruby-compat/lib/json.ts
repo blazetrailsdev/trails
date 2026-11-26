@@ -7,41 +7,6 @@ import { rbObjClassname } from "./object.js";
 const globalJSON = globalThis.JSON;
 
 /**
- * The parser's `ignore = ws | comment` (`vendor/ruby/v3.3.11/ext/json/parser/parser.rl:100-108`),
- * read between tokens as the source is scanned: a C-style block comment and a `//`
- * comment, which runs to and includes its newline, each read as whitespace. A
- * comment left open raises `SyntaxError`, JS's `JSON::ParserError`.
- */
-function ignore(source: string): string {
-  let out = "";
-  let start = 0;
-  let index = 0;
-  while (index < source.length) {
-    const char = source[index];
-    if (char === '"') {
-      index++;
-      while (index < source.length && source[index] !== '"') {
-        index += source[index] === "\\" ? 2 : 1;
-      }
-      index++;
-    } else if (char === "/" && source[index + 1] === "*") {
-      const end = source.indexOf("*/", index + 2);
-      if (end === -1) throw new SyntaxError(`unexpected token at '${source.slice(index)}'`);
-      out += source.slice(start, index) + " ";
-      index = start = end + 2;
-    } else if (char === "/" && source[index + 1] === "/") {
-      const end = source.indexOf("\n", index + 2);
-      if (end === -1) throw new SyntaxError(`unexpected token at '${source.slice(index)}'`);
-      out += source.slice(start, index) + " ";
-      index = start = end + 1;
-    } else {
-      index++;
-    }
-  }
-  return start === 0 ? source : out + source.slice(start);
-}
-
-/**
  * Ruby's stdlib `JSON` module, the two entry points Rails hands to a
  * `serializer:` kwarg — `ActiveRecord::SignedId#signed_id_verifier` passes the
  * constant bare (`signed_id.rb:79`), and the module has to be nameable as
@@ -86,7 +51,10 @@ export namespace JSON {
    * options hash an object is parsed into a `Hash`, its names Symbols under
    * `symbolizeNames` and every value frozen under `freeze` (`parser.rl:742-752`),
    * or into a new `objectClass` instance filled through its `[]=`
-   * (`parser.rl:139-143,179`).
+   * (`parser.rl:139-143,179`). Between tokens the source is read through the
+   * grammar's `ignore = ws | comment` (`parser.rl:100-108`): a block comment,
+   * and a `//` comment running to and including its newline, each read as
+   * whitespace; a comment left open raises `SyntaxError`.
    *
    * @noRailsEquivalent PERMANENT — Ruby stdlib `JSON.parse`
    * (`vendor/ruby/v3.3.11/ext/json/lib/json/common.rb:219`).
@@ -122,7 +90,32 @@ export namespace JSON {
             }
             return opts.freeze ? hash.freeze() : hash;
           };
-    return globalJSON.parse(ignore(source), reviver);
+    let out = "";
+    let start = 0;
+    let index = 0;
+    while (index < source.length) {
+      const char = source[index];
+      if (char === '"') {
+        index++;
+        while (index < source.length && source[index] !== '"') {
+          index += source[index] === "\\" ? 2 : 1;
+        }
+        index++;
+      } else if (char === "/" && source[index + 1] === "*") {
+        const end = source.indexOf("*/", index + 2);
+        if (end === -1) throw new SyntaxError(`unexpected token at '${source.slice(index)}'`);
+        out += source.slice(start, index) + " ";
+        index = start = end + 2;
+      } else if (char === "/" && source[index + 1] === "/") {
+        const end = source.indexOf("\n", index + 2);
+        if (end === -1) throw new SyntaxError(`unexpected token at '${source.slice(index)}'`);
+        out += source.slice(start, index) + " ";
+        index = start = end + 1;
+      } else {
+        index++;
+      }
+    }
+    return globalJSON.parse(start === 0 ? source : out + source.slice(start), reviver);
   }
 
   /**
