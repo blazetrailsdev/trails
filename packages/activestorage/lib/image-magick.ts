@@ -50,7 +50,7 @@ ActiveStorage.ImageMagick = ImageMagick;
 ActiveStorage.MINIMAGICK_UNSECURABLE =
   ActiveStorage.MINIMAGICK_AVAILABLE && !rbObjRespondTo(MiniMagick!, "cliEnv=");
 
-ActiveStorage.requireSecurableMiniMagick = function requireSecurableMiniMagick(): void {
+export function requireSecurableMiniMagickBang(): void {
   if (ActiveStorage.MINIMAGICK_UNSECURABLE) {
     throw new RuntimeError(
       squish(`
@@ -59,7 +59,8 @@ ActiveStorage.requireSecurableMiniMagick = function requireSecurableMiniMagick()
       `),
     );
   }
-};
+}
+ActiveStorage.requireSecurableMiniMagickBang = requireSecurableMiniMagickBang;
 
 if (ActiveStorage.MINIMAGICK_AVAILABLE && !ActiveStorage.MINIMAGICK_UNSECURABLE) {
   ImageMagick.applyPolicy();

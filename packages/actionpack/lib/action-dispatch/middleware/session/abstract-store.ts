@@ -5,7 +5,6 @@ import { rbCallSuper } from "@blazetrails/ruby-compat/include";
 import { LoadError } from "@blazetrails/ruby-compat/load-error";
 import { NameError } from "@blazetrails/ruby-compat/name-error";
 import { SecureRandom } from "@blazetrails/ruby-compat/secure-random";
-import type { RackApp } from "@blazetrails/rack";
 import type { PersistedRequest } from "@blazetrails/rack-session";
 import { Persisted, PersistedSecure, SessionId } from "@blazetrails/rack-session";
 import { Request } from "../../http/request.js";
@@ -122,14 +121,6 @@ export const SessionObject = {
 };
 
 export class AbstractStore extends Persisted {
-  constructor(app?: RackApp, options: Record<string, unknown> = {}) {
-    if (options.key == null || options.key === false) options.key = "_session_id";
-    if (!("sameSite" in options || "sameSite" in new.target.DEFAULT_OPTIONS)) {
-      options = { ...options, sameSite: Compatibility.DEFAULT_SAME_SITE };
-    }
-    super(app, options);
-  }
-
   /** @internal */
   setCookie(
     request: PersistedRequest & { cookieJar(): { set(key: string, value: unknown): void } },
@@ -144,14 +135,6 @@ includeMixin(AbstractStore, StaleSessionCheck);
 includeMixin(AbstractStore, SessionObject);
 
 export class AbstractSecureStore extends PersistedSecure {
-  constructor(app?: RackApp, options: Record<string, unknown> = {}) {
-    if (options.key == null || options.key === false) options.key = "_session_id";
-    if (!("sameSite" in options || "sameSite" in new.target.DEFAULT_OPTIONS)) {
-      options = { ...options, sameSite: Compatibility.DEFAULT_SAME_SITE };
-    }
-    super(app, options);
-  }
-
   override generateSid(): SessionId {
     return new SessionId(SecureRandom.hex(16));
   }
@@ -169,5 +152,6 @@ includeMixin(AbstractSecureStore, Compatibility);
 includeMixin(AbstractSecureStore, StaleSessionCheck);
 includeMixin(AbstractSecureStore, SessionObject);
 
+Session.Compatibility = Compatibility;
 Session.AbstractStore = AbstractStore;
 Session.AbstractSecureStore = AbstractSecureStore;

@@ -418,7 +418,7 @@ describe("InflectorTest", () => {
       throw matchingError;
     });
     try {
-      expect(safeConstantize("Example.Channel::Nested")).toBeUndefined();
+      expect(safeConstantize("Example.Channel::Nested")).toBeNull();
     } finally {
       stub.mockRestore();
     }

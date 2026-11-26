@@ -48,6 +48,7 @@ import type { HtmlTableFormatter } from "./action-dispatch/routing/inspector.js"
 import type {
   AbstractSecureStore,
   AbstractStore,
+  Compatibility,
 } from "./action-dispatch/middleware/session/abstract-store.js";
 import type { CacheStore } from "./action-dispatch/middleware/session/cache-store.js";
 import type { CookieStore } from "./action-dispatch/middleware/session/cookie-store.js";
@@ -178,6 +179,7 @@ ActionDispatch.Constants = Constants;
 export const ActionPack = { name: "ActionPack", VERSION: ActionPackGemVersion.VERSION };
 
 export const Session = { name: "ActionDispatch::Session", loadPath } as AutoloadModule & {
+  Compatibility: typeof Compatibility;
   AbstractStore: typeof AbstractStore;
   AbstractSecureStore: typeof AbstractSecureStore;
   CookieStore: typeof CookieStore;

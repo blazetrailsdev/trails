@@ -61,7 +61,7 @@ describe("ActiveJob constant names", () => {
 
     expect(() => safeConstantize("Raising::Other")).toThrow("uninitialized constant Elsewhere");
     expect(() => safeConstantize("Raising::Broken")).toThrow(TypeError);
-    expect(safeConstantize("Raising::Missing")).toBeUndefined();
+    expect(safeConstantize("Raising::Missing")).toBeNull();
   });
 
   it("raises NameError for an unregistered job class", () => {
@@ -69,7 +69,7 @@ describe("ActiveJob constant names", () => {
 
     expect(() => constantize(rbModName(UnregisteredJob)!)).toThrow(NameError);
     expect(() => constantize("UnregisteredJob")).toThrow("uninitialized constant UnregisteredJob");
-    expect(safeConstantize("UnregisteredJob")).toBeUndefined();
+    expect(safeConstantize("UnregisteredJob")).toBeNull();
     expect(() => constantize("ActiveJob::Serializers::MissingSerializer")).toThrow(NameError);
   });
 });

@@ -10,7 +10,13 @@ import type { Included } from "@blazetrails/ruby-compat/include";
 import { MockRequest, MockResponse, type RackEnv } from "@blazetrails/rack";
 import { Cookies } from "../../../../lib/action-dispatch/middleware/cookies.js";
 import { CookieAssertions } from "../../../support/abstract-unit.js";
-import { AbstractStore } from "../../../../lib/action-dispatch/middleware/session/abstract-store.js";
+import { Persisted } from "@blazetrails/rack-session";
+import {
+  AbstractStore,
+  Compatibility,
+  SessionObject,
+  StaleSessionCheck,
+} from "../../../../lib/action-dispatch/middleware/session/abstract-store.js";
 import { Request } from "../../../../lib/action-dispatch/http/request.js";
 import { Session } from "../../../../lib/action-dispatch/request/session.js";
 
@@ -79,6 +85,42 @@ describe("AbstractStoreTest", () => {
     });
 
     const response = new MockResponse(...((await stack.call(env)) as [number, never, never]));
+
+    t.assertSetCookieAttributes(
+      "_session_id",
+      "SameSite=Strict",
+      response.headers["set-cookie"] as string,
+    );
+  });
+
+  it("store composed from the mixins gets same site from env", async () => {
+    class StoreClass extends Persisted {
+      override findSession(_req: unknown, sid: unknown): [unknown, Record<string, unknown>] {
+        return [sid ?? this.generateSid(), {}];
+      }
+      override async writeSession(
+        _req: unknown,
+        sid: unknown,
+        _session: unknown,
+        _options: unknown,
+      ): Promise<unknown> {
+        return sid;
+      }
+    }
+    include(StoreClass, Compatibility);
+    include(StoreClass, StaleSessionCheck);
+    include(StoreClass, SessionObject);
+    const writeSession = async (env: RackEnv) => {
+      await new Request(env).session.set("foo", "bar");
+      return [200, {}, []];
+    };
+    const env = MockRequest.envFor("/", {
+      "action_dispatch.cookies_same_site_protection": () => ":strict",
+    });
+
+    const response = new MockResponse(
+      ...((await new StoreClass(writeSession as never).call(env)) as [number, never, never]),
+    );
 
     t.assertSetCookieAttributes(
       "_session_id",

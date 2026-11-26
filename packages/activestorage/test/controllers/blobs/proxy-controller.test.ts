@@ -165,8 +165,8 @@ describe("ActiveStorage::Blobs::ProxyControllerTest", () => {
   });
 
   it("multiple Byte Ranges", async () => {
-    const previousStreamingMaxRanges = ActiveStorage.streamingMaxRanges;
-    ActiveStorage.streamingMaxRanges = 2;
+    const previousStreamingMaxRanges = ActiveStorage.streamingMaxRanges();
+    ActiveStorage.setStreamingMaxRanges(2);
 
     try {
       const boundary = SecureRandom.hex();
@@ -201,7 +201,7 @@ describe("ActiveStorage::Blobs::ProxyControllerTest", () => {
         );
       });
     } finally {
-      ActiveStorage.streamingMaxRanges = previousStreamingMaxRanges;
+      ActiveStorage.setStreamingMaxRanges(previousStreamingMaxRanges);
     }
   });
 

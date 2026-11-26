@@ -55,8 +55,8 @@ describe("ActionCable::Channel::Naming constant names", () => {
   });
 
   it("answers null for an unknown or malformed name", () => {
-    expect(safeConstantize("Chat::NoSuchChannel")).toBeUndefined();
-    expect(safeConstantize("NoSuchChannel")).toBeUndefined();
-    expect(safeConstantize("not a constant")).toBeUndefined();
+    expect(safeConstantize("Chat::NoSuchChannel")).toBeNull();
+    expect(safeConstantize("NoSuchChannel")).toBeNull();
+    expect(safeConstantize("not a constant")).toBeNull();
   });
 });

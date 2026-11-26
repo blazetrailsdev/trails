@@ -184,7 +184,7 @@ export class Engine extends TrailsEngine {
         }
 
         if (ActiveStorage.variantProcessor === "mini_magick") {
-          ActiveStorage.requireSecurableMiniMagick();
+          ActiveStorage.requireSecurableMiniMagickBang();
         }
 
         ActiveStorage.paths = (activeStorage.paths || {}) as Record<string, unknown>;

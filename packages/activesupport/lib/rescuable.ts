@@ -150,7 +150,7 @@ export const ClassMethods = {
         return constGet(this, classOrName) as ExceptionClass;
       } catch (e) {
         if (!(e instanceof NameError)) throw e;
-        return safeConstantize(classOrName) as ExceptionClass | undefined;
+        return safeConstantize(classOrName) as ExceptionClass | null;
       }
     } else {
       return classOrName;

@@ -20,8 +20,12 @@ if [ -z "$pkg_lib" ]; then
   exit 1
 fi
 mixin_keys=$(
-  { grep -rhoE '^\s*(include|extend|prepend)\s+(::)?[A-Z][A-Za-z0-9]*' "$pkg_lib" --include='*.rb' || true; } |
-    sed -E 's/.*[[:space:]](::)?//' | tr '[:upper:]' '[:lower:]' | sort -u | jq -R . | jq -sc .
+  {
+    { grep -rhoE '^\s*(include|extend|prepend)\s+(::)?[A-Z][A-Za-z0-9]*' "$pkg_lib" --include='*.rb' || true; } |
+    sed -E 's/.*[[:space:]](::)?//' | tr '[:upper:]' '[:lower:]'
+    { grep -rhoE '@inlinedFrom [A-Z][A-Za-z0-9]*' "$src" --include='*.ts' || true; } |
+      sed -E 's/.*[[:space:]]//' | tr '[:upper:]' '[:lower:]'
+  } | sort -u | jq -R . | jq -sc .
 )
 LIB_PATHS_JSON=$(echo "$ALL_LIB_PATHS_JSON" | jq -c --arg pkg "$pkg" --argjson mixins "$mixin_keys" \
   'with_entries(select(.key == $pkg or (.key as $k | $mixins | index($k))))')

@@ -12,6 +12,8 @@ import {
   eachPair,
   rbProcCall,
   hashAref,
+  TopLevel,
+  isModuleIncluded,
 } from "@blazetrails/ruby-compat";
 import { Time } from "@blazetrails/date";
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
@@ -356,7 +358,22 @@ export class Persisted {
   protected sidbits = 128;
   protected sidLength = 32;
 
+  /**
+   * @inlinedFrom ActionDispatch::Session::Compatibility#initialize rails/v8.0.5.2/actionpack/lib/action_dispatch/middleware/session/abstract_store.rb:25-31
+   * @inventedArm if — PERMANENT
+   */
   constructor(app?: RackApp, options: Record<string, unknown> = {}) {
+    const Compatibility = (
+      TopLevel as {
+        ActionDispatch?: { Session?: { Compatibility?: { DEFAULT_SAME_SITE: unknown } } };
+      }
+    ).ActionDispatch?.Session?.Compatibility;
+    if (Compatibility !== undefined && isModuleIncluded(new.target, Compatibility)) {
+      if (options.key == null || options.key === false) options.key = "_session_id";
+      if (!("sameSite" in options || "sameSite" in new.target.DEFAULT_OPTIONS)) {
+        options = { ...options, sameSite: Compatibility.DEFAULT_SAME_SITE };
+      }
+    }
     this.app = app;
     this.defaultOptions = {
       ...(this.constructor as typeof Persisted).DEFAULT_OPTIONS,

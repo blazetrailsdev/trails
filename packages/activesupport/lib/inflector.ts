@@ -193,7 +193,7 @@ export function constantize(camelCasedWord: string): unknown {
 
 export function safeConstantize<K extends keyof ConstantTable>(
   camelCasedWord: K,
-): ConstantTable[K] | undefined;
+): ConstantTable[K] | null;
 export function safeConstantize(camelCasedWord: string): unknown;
 export function safeConstantize(camelCasedWord: string): unknown {
   try {
@@ -204,14 +204,14 @@ export function safeConstantize(camelCasedWord: string): unknown {
       if (name && !(camelCasedWord.split("::").includes(name) || name === camelCasedWord)) {
         throw e;
       }
-      return undefined;
+      return null;
     } else if (e instanceof LoadError) {
       const message = rbObjRespondTo(e, "originalMessage")
         ? (e as LoadError & { originalMessage(): string }).originalMessage()
         : e.message;
       const constantName = camelCasedWord.split("::").find((part) => part !== "") ?? camelCasedWord;
       if (!message.includes(`Unable to autoload constant ${constantName}`)) throw e;
-      return undefined;
+      return null;
     }
     throw e;
   }
