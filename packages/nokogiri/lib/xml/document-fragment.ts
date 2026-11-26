@@ -33,7 +33,7 @@ export class DocumentFragment extends XmlNode {
     block?: (options: ParseOptions) => void,
   ) {
     super(
-      !(document instanceof XmlNode)
+      document.isXml()
         ? Nokogiri.LibXml2!.XmlDocument.create().createRoot("root")
         : defaultTreeAdapter.createDocumentFragment(),
       document,

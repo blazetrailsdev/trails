@@ -1,4 +1,8 @@
-import type { XmlAttribute as LibXmlAttribute, XmlTreeNode } from "libxml2-wasm";
+import type {
+  XmlAttribute as LibXmlAttribute,
+  XmlNode as LibXmlNode,
+  XmlTreeNode,
+} from "libxml2-wasm";
 import type { DefaultTreeAdapterMap } from "parse5";
 import { ArgumentError, StringIO, include, rbObjClassname } from "@blazetrails/ruby-compat";
 
@@ -36,7 +40,7 @@ export class XmlNode {
      * @internal
      * @noRailsEquivalent PERMANENT
      */
-    readonly _node: XmlTreeNode | DefaultTreeAdapterMap["node"],
+    readonly _node: XmlTreeNode | LibXmlNode | DefaultTreeAdapterMap["node"],
     public document: unknown = null,
   ) {}
 

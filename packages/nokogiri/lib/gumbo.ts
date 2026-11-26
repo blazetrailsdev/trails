@@ -1,4 +1,4 @@
-import { ArgumentError } from "@blazetrails/ruby-compat";
+import { ArgumentError, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { Parser, defaultTreeAdapter, html, type DefaultTreeAdapterMap } from "parse5";
 
 import { HTML5, Nokogiri } from "./namespaces.js";
@@ -13,6 +13,17 @@ export const DEFAULT_MAX_ERRORS = 0;
 
 export const DEFAULT_MAX_TREE_DEPTH = 400;
 
+function lookupNamespace(node: Node, requireKnownNs: boolean): html.NS | null {
+  const ns = node.namespace;
+  if (ns == null) return html.NS.HTML;
+  const href = ns.href;
+  if (href === "http://www.w3.org/1999/xhtml") return html.NS.HTML;
+  if (href === "http://www.w3.org/1998/Math/MathML") return html.NS.MATHML;
+  if (href === "http://www.w3.org/2000/svg") return html.NS.SVG;
+  if (requireKnownNs) throw new ArgumentError(`Unexpected namespace URI "${href}"`);
+  return null;
+}
+
 export function fragment(
   docFragment: DocumentFragment,
   tags: string,
@@ -24,12 +35,16 @@ export function fragment(
     parseNoscriptContentAsText?: boolean;
   } = {},
 ): void {
-  let ctxElement: DefaultTreeAdapterMap["element"];
+  let ctxTag: string;
+  let ctxNs: html.NS;
+  let encoding: string | null = null;
+  let form = false;
   if (ctx === null) {
-    ctxElement = defaultTreeAdapter.createElement("body", html.NS.HTML, []);
+    ctxTag = "body";
+    ctxNs = html.NS.HTML;
   } else if (typeof ctx === "string") {
-    let ctxTag = ctx;
-    let ctxNs = html.NS.HTML;
+    ctxTag = ctx;
+    ctxNs = html.NS.HTML;
     const colon = ctxTag.indexOf(":");
     if (colon !== -1) {
       const prefix = ctxTag.slice(0, colon).toLowerCase();
@@ -43,11 +58,46 @@ export function fragment(
     } else if (ctxTag.toLowerCase() === "math") {
       ctxNs = html.NS.MATHML;
     }
-    ctxElement = defaultTreeAdapter.createElement(ctxTag, ctxNs, []);
-  } else if (ctx.isElement()) {
-    ctxElement = ctx._node as DefaultTreeAdapterMap["element"];
+    form = ctxNs === html.NS.HTML && ctxTag.toLowerCase() === "form";
   } else {
-    ctxElement = defaultTreeAdapter.createElement(ctx.name, html.NS.HTML, []);
+    const tagName = ctx.name;
+    ctxTag = tagName;
+    ctxNs = lookupNamespace(ctx, true)!;
+    for (
+      let node: Node | null = ctx;
+      node != null;
+      node = rbObjRespondTo(node, "parent") ? node.parent : null
+    ) {
+      if (!node.isElement()) continue;
+      const elementName = node.name;
+      if (
+        elementName.length === 4 &&
+        elementName.toLowerCase() === "form" &&
+        lookupNamespace(node, false) === html.NS.HTML
+      ) {
+        form = true;
+        break;
+      }
+    }
+    if (
+      ctxNs === html.NS.MATHML &&
+      tagName.length === 14 &&
+      ctxTag.toLowerCase() === "annotation-xml"
+    ) {
+      const enc = ctx.get("encoding");
+      if (enc != null) encoding = enc;
+    }
+  }
+  const ctxElement = defaultTreeAdapter.createElement(
+    ctxTag,
+    ctxNs,
+    encoding === null ? [] : [{ name: "encoding", value: encoding }],
+  );
+  if (form) {
+    defaultTreeAdapter.appendChild(
+      defaultTreeAdapter.createElement("form", html.NS.HTML, []),
+      ctxElement,
+    );
   }
 
   const doc = docFragment.document;
