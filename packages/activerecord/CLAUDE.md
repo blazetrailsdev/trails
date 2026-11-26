@@ -678,6 +678,16 @@ This is a genuine language shortcoming, ratified here by the operator
 `resolvePoolConfig` carries `@inventedArm load — PERMANENT` against this
 section. There is no story to remove the step.
 
+`ActiveRecord::Tasks::DatabaseTasks` is loaded the same way. Rails autoloads
+it (`activerecord/lib/active_record.rb:173-179`), so `migration.rb` names it
+and the file loads on first use, including from `MigrationContext`'s and
+`Migrator`'s constructors and `Migration#connection`, which cannot await.
+`resolvePoolConfig` awaits
+`ActiveRecord.Tasks.loadPath["active_record/tasks/database_tasks"]()` beside
+`load`, so every read after `establish_connection` finds it seated, and no
+`Migration` entry point awaits it again. The same `@inventedArm load —
+PERMANENT` covers it. Ruled by the operator on 2026-11-26.
+
 ## A migration file is loaded by `Kernel#load` (`MigrationProxy#load_migration`)
 
 Rails' `MigrationProxy#load_migration`
