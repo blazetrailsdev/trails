@@ -23,11 +23,12 @@ export class SubstitutionContext {
     });
   }
 
+  /** @inventedArm rbInspect — CONVERGEABLE rails-dom-testing-regexp-substitution-css-unescape */
   private matcherFor(value: unknown, formatForPresentation: boolean): string {
     if (formatForPresentation) {
       return rbInspect(value);
     } else if (value instanceof RegExp) {
-      return `"${rbRegToS(value, "onig")}"`;
+      return rbInspect(rbRegToS(value, "onig"));
     } else {
       return rbInspect(String(value));
     }
