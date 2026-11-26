@@ -823,8 +823,14 @@ describe("PluginGeneratorTest", () => {
   });
 
   it("git name and email in gemspec file", async () => {
-    const name = await gitConfig("user.name", "TODO: Write your name");
-    const email = await gitConfig("user.email", "TODO: Write your email address");
+    const name = await rbFBackquote("git config user.name").then(
+      chomp,
+      () => "TODO: Write your name",
+    );
+    const email = await rbFBackquote("git config user.email").then(
+      chomp,
+      () => "TODO: Write your email address",
+    );
 
     await t.runGenerator();
     await t.assertFile("package.json", (contents: string) => {
@@ -834,7 +840,10 @@ describe("PluginGeneratorTest", () => {
   });
 
   it("git name in license file", async () => {
-    const name = await gitConfig("user.name", "TODO: Write your name");
+    const name = await rbFBackquote("git config user.name").then(
+      chomp,
+      () => "TODO: Write your name",
+    );
 
     await t.runGenerator();
     await t.assertFile("MIT-LICENSE", (contents: string) => {
@@ -842,14 +851,6 @@ describe("PluginGeneratorTest", () => {
     });
   });
 });
-
-async function gitConfig(key: string, fallback: string): Promise<string> {
-  try {
-    return chomp(await rbFBackquote(`git config ${key}`));
-  } catch {
-    return fallback;
-  }
-}
 
 async function withSimulatedApp(block: (gemfilePath: string) => Promise<void>): Promise<void> {
   const gemfilePath = `${tmpRoot}/package.json`;
