@@ -11,9 +11,7 @@ describe("@blazetrails/activerecord declarations and the optional adapter peers"
       'import { Base } from "@blazetrails/activerecord";\nexport const b: typeof Base = Base;\n',
       OPTIONAL_ADAPTER_PEERS,
     );
-    const missing = diagnostics.filter(
-      (d) => d.includes("TS2307") && OPTIONAL_ADAPTER_PEERS.some((p) => d.includes(`'${p}`)),
-    );
+    const missing = diagnostics.filter((d) => OPTIONAL_ADAPTER_PEERS.some((p) => d.includes(p)));
     expect(missing).toEqual([]);
   }, 120_000);
 
