@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { rbHash, rbObjInstanceVariables, rbObjIvarGet } from "@blazetrails/ruby-compat";
+import { rbObjInstanceVariables, rbObjIvarGet } from "@blazetrails/ruby-compat/object";
+import { rbHash } from "@blazetrails/ruby-compat/rb-hash";
 import { ValueType, IntegerType, FloatType, DecimalType, BigIntegerType } from "../../lib/index.js";
 
 describe("ValueType", () => {

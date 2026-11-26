@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { BigDecimal } from "@blazetrails/activesupport";
 import { assertNil } from "@blazetrails/activesupport/testing/assertions";
-import { Rational } from "@blazetrails/ruby-compat";
+import { Rational } from "@blazetrails/ruby-compat/rational";
 import { DecimalType as Decimal } from "../../lib/type/decimal.js";
 
 const bd = (value: string) => new BigDecimal(value);

@@ -7,7 +7,7 @@ import {
 } from "@blazetrails/activesupport/testing/assertions";
 import { current as dateTimeCurrent } from "@blazetrails/activesupport/core-ext/date-time/calculations";
 import { Date, Time } from "@blazetrails/date";
-import { Range } from "@blazetrails/ruby-compat";
+import { Range } from "@blazetrails/ruby-compat/range";
 import { ArgumentError } from "../../lib/attribute-assignment.js";
 import { Topic } from "../models/topic.js";
 import { Person } from "../models/person.js";

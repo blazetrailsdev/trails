@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { ArgumentError } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
 import { Attribute } from "../lib/attribute.js";
 import { ValueType } from "../lib/type/value.js";
 import { FloatType } from "../lib/type/float.js";

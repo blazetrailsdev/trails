@@ -6,12 +6,9 @@ import { describe, it, expect } from "vitest";
 import { Model, ValueType } from "../lib/index.js";
 import { Attributes, type AttributesClassHalf } from "../lib/attributes.js";
 import { include } from "@blazetrails/activesupport";
-import {
-  FrozenError,
-  rbObjInstanceVariables,
-  rbObjIvarGet,
-  hashAref,
-} from "@blazetrails/ruby-compat";
+import { FrozenError } from "@blazetrails/ruby-compat/frozen-error";
+import { hashAref } from "@blazetrails/ruby-compat/hash";
+import { rbObjInstanceVariables, rbObjIvarGet } from "@blazetrails/ruby-compat/object";
 
 describe("Attributes#attribute_names", () => {
   class User extends Model {

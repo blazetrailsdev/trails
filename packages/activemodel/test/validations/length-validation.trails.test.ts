@@ -7,7 +7,7 @@ import { include } from "@blazetrails/activesupport";
 import { Model, NoMethodError } from "../../lib/index.js";
 import { Attributes, type AttributesClassHalf } from "../../lib/attributes.js";
 import { LengthValidator } from "../../lib/validations/length.js";
-import { Range } from "@blazetrails/ruby-compat";
+import { Range } from "@blazetrails/ruby-compat/range";
 
 class Person extends Model {
   declare static attribute: AttributesClassHalf["attribute"];

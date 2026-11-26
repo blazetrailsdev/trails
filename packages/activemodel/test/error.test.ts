@@ -4,7 +4,8 @@ import {
   assertNotRespondTo,
   assertNothingRaised,
 } from "@blazetrails/activesupport/testing/assertions";
-import { constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
 import { Errors } from "../lib/errors.js";
 import { I18n } from "../lib/i18n.js";
 import { Naming, type ModelName, type ModelLike } from "../lib/naming.js";

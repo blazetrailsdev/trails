@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { constSet } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
 import { Nodes, Visitors } from "../../lib/index.js";
 
 describe("DispatchContaminationTest", () => {

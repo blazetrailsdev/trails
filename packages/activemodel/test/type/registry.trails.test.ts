@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import * as Types from "../../lib/index.js";
 import { defaultValue } from "../../lib/index.js";
-import { rbObjDup } from "@blazetrails/ruby-compat";
+import { rbObjDup } from "@blazetrails/ruby-compat/include";
 import { TypeRegistry } from "../../lib/type/registry.js";
 
 describe("TypeRegistry", () => {

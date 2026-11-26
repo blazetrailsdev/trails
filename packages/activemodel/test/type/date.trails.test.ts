@@ -3,7 +3,7 @@ import { Date as RubyDate } from "@blazetrails/date";
 import { plainDate } from "@blazetrails/activesupport/testing/temporal-helpers";
 import * as Types from "../../lib/index.js";
 import { ValueType } from "../../lib/index.js";
-import { include } from "@blazetrails/ruby-compat";
+import { include } from "@blazetrails/ruby-compat/include";
 import { AcceptsMultiparameterTime } from "../../lib/type/helpers/accepts-multiparameter-time.js";
 
 describe("DateType assert_valid_value", () => {

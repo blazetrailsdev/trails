@@ -12,7 +12,8 @@ import { Validations } from "../lib/validations.js";
 import { BlockValidator } from "../lib/validator.js";
 import { resetI18n } from "./support/i18n.js";
 import { Attributes, type AttributesClassHalf } from "../lib/attributes.js";
-import { Range, block } from "@blazetrails/ruby-compat";
+import { block } from "@blazetrails/ruby-compat/hash";
+import { Range } from "@blazetrails/ruby-compat/range";
 
 describe("ValidationsTest (trails)", () => {
   describe("presence", () => {

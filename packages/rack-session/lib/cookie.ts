@@ -1,19 +1,18 @@
 import type { RackApp } from "@blazetrails/rack";
 import { RACK_ERRORS, Utils } from "@blazetrails/rack";
-import * as RubyCompat from "@blazetrails/ruby-compat";
-import {
-  DelegateClass,
-  StandardError,
-  OpenSSL,
-  Zlib,
-  hashAref,
-  hashAset,
-  rbFArray,
-  rbFCaller,
-  rbStrRpartition,
-  warn,
-  constSet,
-} from "@blazetrails/ruby-compat";
+import * as RubyCompatBase64 from "@blazetrails/ruby-compat/base64";
+import * as RubyCompatJSON from "@blazetrails/ruby-compat/json";
+import * as RubyCompatMarshal from "@blazetrails/ruby-compat/marshal";
+import { rbFArray } from "@blazetrails/ruby-compat/array";
+import { rbFCaller } from "@blazetrails/ruby-compat/backtrace-location";
+import { DelegateClass } from "@blazetrails/ruby-compat/delegate";
+import { hashAref, hashAset } from "@blazetrails/ruby-compat/hash";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { warn } from "@blazetrails/ruby-compat/kernel-warn";
+import { OpenSSL } from "@blazetrails/ruby-compat/openssl";
+import { StandardError } from "@blazetrails/ruby-compat/standard-error";
+import { rbStrRpartition } from "@blazetrails/ruby-compat/string/sub";
+import { Zlib } from "@blazetrails/ruby-compat/zlib";
 
 import { isTruthy, PersistedSecure, type PersistedRequest } from "./abstract/id.js";
 import * as Session from "./abstract/id.js";
@@ -32,22 +31,22 @@ interface RackErrors {
 export class Cookie extends PersistedSecure {
   static Base64 = class Base64 {
     encode(str: string | Uint8Array): string {
-      return RubyCompat.Base64.strictEncode64(str);
+      return RubyCompatBase64.Base64.strictEncode64(str);
     }
 
     decode(str: string): unknown {
-      return RubyCompat.Base64.decode64(str);
+      return RubyCompatBase64.Base64.decode64(str);
     }
 
     static Marshal = class Marshal extends Base64 {
       override encode(str: unknown): string {
-        return super.encode(RubyCompat.Marshal.dump(str));
+        return super.encode(RubyCompatMarshal.Marshal.dump(str));
       }
 
       override decode(str: string | null): unknown {
         if (!isTruthy(str)) return null;
         try {
-          return RubyCompat.Marshal.load(super.decode(str!));
+          return RubyCompatMarshal.Marshal.load(super.decode(str!));
         } catch (error) {
           if (!(error instanceof StandardError)) throw error;
           return null;
@@ -57,13 +56,13 @@ export class Cookie extends PersistedSecure {
 
     static JSON = class JSON extends Base64 {
       override encode(obj: unknown): string {
-        return super.encode(RubyCompat.JSON.dump(obj));
+        return super.encode(RubyCompatJSON.JSON.dump(obj));
       }
 
       override decode(str: string | null): unknown {
         if (!isTruthy(str)) return null;
         try {
-          return RubyCompat.JSON.parse(super.decode(str!) as string);
+          return RubyCompatJSON.JSON.parse(super.decode(str!) as string);
         } catch (error) {
           if (!(error instanceof StandardError || error instanceof SyntaxError)) throw error;
           return null;
@@ -73,13 +72,13 @@ export class Cookie extends PersistedSecure {
 
     static ZipJSON = class ZipJSON extends Base64 {
       override encode(obj: unknown): string {
-        return super.encode(Zlib.Deflate.deflate(RubyCompat.JSON.dump(obj)));
+        return super.encode(Zlib.Deflate.deflate(RubyCompatJSON.JSON.dump(obj)));
       }
 
       override decode(str: string | null): unknown {
         try {
           if (!isTruthy(str)) return null;
-          return RubyCompat.JSON.parse(Zlib.Inflate.inflate(super.decode(str!) as string));
+          return RubyCompatJSON.JSON.parse(Zlib.Inflate.inflate(super.decode(str!) as string));
         } catch (error) {
           if (!(error instanceof StandardError || error instanceof SyntaxError)) throw error;
           return null;
@@ -99,11 +98,11 @@ export class Cookie extends PersistedSecure {
 
   static Marshal = class Marshal {
     encode(str: unknown): Uint8Array {
-      return RubyCompat.Marshal.dump(str);
+      return RubyCompatMarshal.Marshal.dump(str);
     }
 
     decode(str: string | null): unknown {
-      if (isTruthy(str)) return RubyCompat.Marshal.load(str);
+      if (isTruthy(str)) return RubyCompatMarshal.Marshal.load(str);
       return null;
     }
   };

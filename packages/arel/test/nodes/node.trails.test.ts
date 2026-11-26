@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { rbObjDup } from "@blazetrails/ruby-compat";
+import { rbObjDup } from "@blazetrails/ruby-compat/include";
 import { fakeRecordConnection } from "../support/connection.js";
 import { Table, Nodes, Visitors, type ArelEngine } from "../../lib/index.js";
 import { assertNotSame } from "../support/assertions.js";

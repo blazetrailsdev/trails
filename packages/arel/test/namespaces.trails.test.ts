@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import * as Arel from "../lib/index.js";
 import * as NodesModule from "../lib/nodes/index.js";
 import { Collectors, Nodes, Visitors } from "../lib/namespaces.js";
-import { rbModName } from "@blazetrails/ruby-compat";
+import { rbModName } from "@blazetrails/ruby-compat/object";
 
 describe("Arel namespaces", () => {
   it("public Nodes and Visitors are the objects constants resolve against", () => {

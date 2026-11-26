@@ -9,7 +9,7 @@ import { Topic } from "../models/topic.js";
 import { PersonWithValidator } from "../models/person-with-validator.js";
 import "../support/validators/namespace/email-validator.js";
 import { ArgumentError } from "../../lib/attribute-assignment.js";
-import { Range } from "@blazetrails/ruby-compat";
+import { Range } from "@blazetrails/ruby-compat/range";
 
 describe("ValidatesTest", () => {
   const resetCallbacks = () => {

@@ -1,5 +1,6 @@
 import { extend } from "@blazetrails/activesupport";
-import { constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
 import { Model } from "../../lib/index.js";
 import { Translation, type TranslationClassMethods } from "../../lib/translation.js";
 import type { ModelName } from "../../lib/naming.js";

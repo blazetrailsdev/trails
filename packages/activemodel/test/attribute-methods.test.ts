@@ -9,7 +9,7 @@ import {
   assertRaises,
   assertRespondTo,
 } from "@blazetrails/activesupport/testing/assertions";
-import { rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { rbObjRespondTo } from "@blazetrails/ruby-compat/object";
 import { NoMethodError } from "../lib/attribute-assignment.js";
 import {
   AttributeMethods,

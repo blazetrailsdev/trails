@@ -1,4 +1,4 @@
-import { hashAref } from "@blazetrails/ruby-compat";
+import { hashAref } from "@blazetrails/ruby-compat/hash";
 import { describe, it, expect } from "vitest";
 import { YAMLEncoder } from "../../lib/attribute-set/yaml-encoder.js";
 import { AttributeSet } from "../../lib/attribute-set.js";

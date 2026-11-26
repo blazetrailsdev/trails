@@ -2,8 +2,8 @@ import { describe, it, expect } from "vitest";
 import { Time as RubyTime, strftime } from "@blazetrails/date";
 import { TimeZone, setZoneDefault } from "@blazetrails/activesupport";
 import { assertNil } from "@blazetrails/activesupport/testing/assertions";
-import { rbObjAsString as toS } from "@blazetrails/ruby-compat";
-import { ArgumentError } from "@blazetrails/ruby-compat";
+import { rbObjAsString as toS } from "@blazetrails/ruby-compat/object";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
 import * as Types from "../../lib/index.js";
 
 describe("DateTimeTest", () => {

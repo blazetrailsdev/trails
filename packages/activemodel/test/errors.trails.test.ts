@@ -13,7 +13,9 @@ import {
   BlockValidator,
 } from "../lib/index.js";
 import { Error as ActiveModelError } from "../lib/error.js";
-import { FrozenError, Hash, NoMethodError } from "@blazetrails/ruby-compat";
+import { FrozenError } from "@blazetrails/ruby-compat/frozen-error";
+import { Hash } from "@blazetrails/ruby-compat/hash";
+import { NoMethodError } from "@blazetrails/ruby-compat/no-method-error";
 import type { ValidatableRecord } from "../lib/validator.js";
 import { resetI18n } from "./support/i18n.js";
 import { Attributes, type AttributesClassHalf } from "../lib/attributes.js";

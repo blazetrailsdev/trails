@@ -4,7 +4,8 @@ import {
   assertDifference,
   assertPredicate,
 } from "@blazetrails/activesupport/testing/assertions";
-import { includedModules, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { includedModules } from "@blazetrails/ruby-compat/include";
+import { rbObjRespondTo } from "@blazetrails/ruby-compat/object";
 import { Model } from "../../lib/index.js";
 import { Topic } from "../models/topic.js";
 import { Person } from "../models/person.js";

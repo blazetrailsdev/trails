@@ -4,7 +4,10 @@ import { Attribute } from "../../lib/attribute.js";
 import { AttributeSet } from "../../lib/attribute-set.js";
 import { registry } from "../../lib/type.js";
 import { ValueType } from "../../lib/type/value.js";
-import { Hash, Marshal, hashAref, keys, rbEqual, rbObjDup } from "@blazetrails/ruby-compat";
+import { Hash, hashAref, keys } from "@blazetrails/ruby-compat/hash";
+import { rbObjDup } from "@blazetrails/ruby-compat/include";
+import { Marshal } from "@blazetrails/ruby-compat/marshal";
+import { rbEqual } from "@blazetrails/ruby-compat/rb-equal";
 
 const typeRegistry = registry();
 

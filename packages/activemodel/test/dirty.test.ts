@@ -1,4 +1,5 @@
-import { Hash, hashAref, rbEqual } from "@blazetrails/ruby-compat";
+import { Hash, hashAref } from "@blazetrails/ruby-compat/hash";
+import { rbEqual } from "@blazetrails/ruby-compat/rb-equal";
 import { HashWithIndifferentAccess } from "@blazetrails/activesupport";
 import { describe, it, expect, beforeEach } from "vitest";
 import { include, ToJsonWithActiveSupportEncoder, type Included } from "@blazetrails/activesupport";

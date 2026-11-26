@@ -7,7 +7,7 @@ import { FloatType } from "../lib/type/float.js";
 import { IntegerType } from "../lib/type/integer.js";
 import { StringType } from "../lib/type/string.js";
 import { assertNil } from "@blazetrails/activesupport/testing/assertions";
-import { rbObjDup } from "@blazetrails/ruby-compat";
+import { rbObjDup } from "@blazetrails/ruby-compat/include";
 
 describe("AttributeSetTest", () => {
   it("building a new set from raw attributes", () => {

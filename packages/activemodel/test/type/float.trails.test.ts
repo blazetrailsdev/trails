@@ -5,7 +5,9 @@
 import { BigDecimal, include } from "@blazetrails/activesupport";
 import { Dirty } from "../../lib/dirty.js";
 import { describe, it, expect } from "vitest";
-import { cmp, rbEql, rbEqual, rbObjAsString, rbObjClassname } from "@blazetrails/ruby-compat";
+import { cmp } from "@blazetrails/ruby-compat/comparable";
+import { rbObjAsString, rbObjClassname } from "@blazetrails/ruby-compat/object";
+import { rbEql, rbEqual } from "@blazetrails/ruby-compat/rb-equal";
 import * as Types from "../../lib/index.js";
 import { Model } from "../../lib/index.js";
 import { Attributes, type AttributesClassHalf } from "../../lib/attributes.js";

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { TypeError } from "@blazetrails/ruby-compat";
+import { TypeError } from "@blazetrails/ruby-compat/type-error";
 import { Attribute as ModelAttribute, ValueType } from "@blazetrails/activemodel";
 import {
   Collectors,

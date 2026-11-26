@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Gem } from "@blazetrails/ruby-compat";
+import { Gem } from "@blazetrails/ruby-compat/gem";
 import { VERSION, gemVersion, version } from "../lib/index.js";
 
 describe("ActiveModel.version", () => {

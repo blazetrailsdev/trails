@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
 import * as Types from "../../lib/index.js";
 import { BinaryData } from "../../lib/index.js";
-import { rbEqual, rbInspect } from "@blazetrails/ruby-compat";
+import { rbInspect } from "@blazetrails/ruby-compat/object";
+import { rbEqual } from "@blazetrails/ruby-compat/rb-equal";
 
 describe("BinaryTypeTrails", () => {
   it("serialize returns null for nil rather than wrapping it", () => {

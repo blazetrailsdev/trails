@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Nodes } from "../../lib/index.js";
-import { rbInspect } from "@blazetrails/ruby-compat";
+import { rbInspect } from "@blazetrails/ruby-compat/object";
 import { BindError } from "../../lib/errors.js";
 
 describe("BoundSqlLiteralTest", () => {

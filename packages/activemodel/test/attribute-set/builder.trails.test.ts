@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Builder, LazyAttributeSet, LazyAttributeHash } from "../../lib/attribute-set/builder.js";
 import { Attribute } from "../../lib/attribute.js";
-import { Hash, hasKey, hashAref, keys } from "@blazetrails/ruby-compat";
+import { Hash, hasKey, hashAref, keys } from "@blazetrails/ruby-compat/hash";
 import { registry } from "../../lib/type.js";
 
 const typeRegistry = registry();

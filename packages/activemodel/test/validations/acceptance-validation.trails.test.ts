@@ -1,4 +1,4 @@
-import { hashAref } from "@blazetrails/ruby-compat";
+import { hashAref } from "@blazetrails/ruby-compat/hash";
 /* eslint-disable @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type --
    Each model below spells `include ActiveModel::Attributes` in its class body; the empty
    class/interface merge beside it is how `include()` surfaces those members on the type side. */

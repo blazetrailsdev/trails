@@ -237,7 +237,9 @@ async function unionTarget(app: Measurement, map: Awaited<ReturnType<typeof sccM
   }
   return {
     target: await rcLoaded(modules),
-    withWholeBarrelImports: await rcLoaded(new Set([...modules, "index.js"])),
+    withWholeBarrelImports: wholeBarrel.size
+      ? await rcLoaded(new Set([...modules, "index.js"]))
+      : await rcLoaded(modules),
     wholeBarrelImports: [...wholeBarrel].sort(),
   };
 }

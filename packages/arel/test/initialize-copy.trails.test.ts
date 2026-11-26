@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Table, Nodes, SelectManager } from "../lib/index.js";
-import { rbObjClone } from "@blazetrails/ruby-compat";
+import { rbObjClone } from "@blazetrails/ruby-compat/include";
 
 describe("Arel clone", () => {
   const users = new Table("users");

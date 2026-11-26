@@ -11,16 +11,14 @@ import {
   assertNil,
 } from "@blazetrails/activesupport/testing/assertions";
 import { Date as RubyDate } from "@blazetrails/date";
-import {
-  ArgumentError,
-  FrozenError,
-  Marshal,
-  constSet,
-  rbEqual,
-  rbObjIvarGet,
-  hashAref,
-  constGet,
-} from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { FrozenError } from "@blazetrails/ruby-compat/frozen-error";
+import { hashAref } from "@blazetrails/ruby-compat/hash";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { Marshal } from "@blazetrails/ruby-compat/marshal";
+import { rbObjIvarGet } from "@blazetrails/ruby-compat/object";
+import { rbEqual } from "@blazetrails/ruby-compat/rb-equal";
+import { constGet } from "@blazetrails/ruby-compat/variable";
 import { Model } from "../lib/index.js";
 import { UnknownAttributeError } from "../lib/errors.js";
 import {

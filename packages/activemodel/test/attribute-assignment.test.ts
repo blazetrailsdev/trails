@@ -5,7 +5,9 @@
 import { describe, it, expect } from "vitest";
 import { include } from "@blazetrails/activesupport";
 import { assertRaises } from "@blazetrails/activesupport/testing/assertions";
-import { ArgumentError, StandardError, isEmpty } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { isEmpty } from "@blazetrails/ruby-compat/ruby-empty";
+import { StandardError } from "@blazetrails/ruby-compat/standard-error";
 import {
   type AttributeAssignment,
   assignAttributes,

@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { BigDecimal } from "@blazetrails/activesupport";
 import { assertPredicate, assertNotPredicate } from "@blazetrails/activesupport/testing/assertions";
-import { Range } from "@blazetrails/ruby-compat";
+import { Range } from "@blazetrails/ruby-compat/range";
 import { ArgumentError } from "../../lib/attribute-assignment.js";
 import { Topic } from "../models/topic.js";
 import { Person } from "../models/person.js";
