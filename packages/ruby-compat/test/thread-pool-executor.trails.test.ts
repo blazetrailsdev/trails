@@ -8,6 +8,25 @@ import {
 } from "../lib/thread-pool-executor.js";
 
 describe("ThreadPoolExecutor", () => {
+  it("does not count a task handed to a worker against maxQueue", async () => {
+    const executor = new ThreadPoolExecutor({
+      minThreads: 1,
+      maxThreads: 1,
+      maxQueue: 1,
+      fallbackPolicy: "discard",
+    });
+    const ran: string[] = [];
+    executor.post(() => ran.push("warm"));
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    expect(executor.post(() => ran.push("handed"))).toBe(true);
+    expect(executor.post(() => ran.push("queued"))).toBe(true);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(ran).toEqual(["warm", "handed", "queued"]);
+    expect(executor.completedTaskCount).toBe(executor.scheduledTaskCount);
+    executor.shutdown();
+  });
+
   it("starts tasks in post order when an idle worker and a new worker share the work", async () => {
     const executor = new ThreadPoolExecutor({ minThreads: 1, maxThreads: 10, maxQueue: 0 });
     const order: string[] = [];

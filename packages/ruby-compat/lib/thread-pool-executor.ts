@@ -48,6 +48,7 @@ export class ThreadPoolExecutor {
   completedTaskCount = 0;
   private _running = 0;
   private readonly _queue: (() => unknown)[] = [];
+  private readonly _handoff: (() => unknown)[] = [];
   private readonly _ready: ((task: (() => unknown) | undefined) => void)[] = [];
   private _stopped = false;
   private readonly _stoppedEvent: (() => void)[] = [];
@@ -101,12 +102,12 @@ export class ThreadPoolExecutor {
       return this._fallbackAction(task);
     } else if (this._running >= this.minLength && this._ready.length > 0) {
       this.scheduledTaskCount += 1;
-      this._queue.push(task);
+      this._handoff.push(task);
       this._ready.pop()!(this._shiftTask);
     } else if (this._running < this.maxLength) {
       this._running += 1;
       this.scheduledTaskCount += 1;
-      this._queue.push(task);
+      this._handoff.push(task);
       this._runWorker(this._shiftTask);
     } else if (this.maxQueue === 0 || this._queue.length < this.maxQueue) {
       this._queue.push(task);
@@ -186,7 +187,7 @@ export class ThreadPoolExecutor {
     for (const set of this._stoppedEvent.splice(0)) set();
   }
 
-  private _shiftTask = (): unknown => this._queue.shift()?.();
+  private _shiftTask = (): unknown => this._handoff.shift()!();
 
   private _runWorker(first: () => unknown): void {
     new Thread(async () => {
