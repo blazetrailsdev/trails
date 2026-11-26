@@ -237,10 +237,14 @@ it("releaseConnection during a pending checkout keeps the lease's checkout", asy
 it("withConnection on a sticky lease retries after its checkout rejects", async () => {
   const pool = makePool(2);
   vi.spyOn(pool, "checkout").mockRejectedValueOnce(new Error("boom"));
-  const conn = await pool.leaseConnection().catch(() => null);
-  expect(conn).toBeNull();
-  await expect(pool.withConnection(() => undefined)).resolves.toBeUndefined();
-  expect(pool.stat().busy).toBe(0);
+  const lease = (
+    pool as unknown as { connectionLease(): { sticky: boolean | null } }
+  ).connectionLease();
+  lease.sticky = true;
+  await expect(pool.withConnection(() => undefined)).rejects.toThrow("boom");
+  expect(pool.isActiveConnection()).toBeNull();
+  const conn = await pool.withConnection((c) => c);
+  expect(pool.isActiveConnection()).toBe(conn);
 });
 
 it("leaseConnection overlapping on an empty lease checks out one connection", async () => {
