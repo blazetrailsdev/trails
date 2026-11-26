@@ -313,6 +313,7 @@ export class Application extends Engine {
     }
   }
 
+  /** @inventedArm if — PERMANENT */
   async initializeBang(group: InitializerGroup = "default"): Promise<this> {
     if (this._initialized) throw new Error("Application has been already initialized.");
     setSourceMapsSupport(true);

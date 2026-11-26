@@ -43,12 +43,25 @@ Trails.application.routes().draw(function () {
     );
     write(`${root}/config/initializers/inflections.${ext}`, record);
     write(
-      `${root}/boot.mjs`,
-      `await import("./config/environment.${ext}");
-console.log(JSON.stringify(globalThis.__stacks ?? []));
+      `${root}/app/controllers/pings-controller.${ext}`,
+      `import { ActionController } from "@blazetrails/actionpack";
+
+export class PingsController extends ActionController.Base {
+  async show() {
+    await this.render({ plain: "pong" });
+  }
+}
 `,
     );
-    const env = { TRAILS_ENV: "production" };
+    write(
+      `${root}/boot.mjs`,
+      `const { MockRequest } = await import("@blazetrails/rack");
+const app = (await import("./config/environment.${ext}")).default;
+const response = await new MockRequest(app).get("/up");
+console.log(JSON.stringify({ stacks: globalThis.__stacks ?? [], status: response.status, body: response.body }));
+`,
+    );
+    const env = { TRAILS_ENV: "production", SECRET_KEY_BASE: "compiled-root" };
     const node = getProcessAdapter().execPath!();
     const cli = decodeURIComponent(
       new URL("../../trails-tsc/bin/trails-tsc-views.js", import.meta.url).pathname,
@@ -68,8 +81,9 @@ console.log(JSON.stringify(globalThis.__stacks ?? []));
     const flags = ext === "js" ? ["--no-experimental-strip-types"] : [];
     const [stdout, stderr] = await Open3.capture3(env, node, ...flags, `${root}/boot.mjs`);
     expect(stderr).toBe("");
-    const stacks: string[] = JSON.parse(String(stdout).trim().split("\n").at(-1)!);
-    return { root, stacks, cleanup: () => FileUtils.rmRf(base) };
+    const { stacks, status, body } = JSON.parse(String(stdout).trim().split("\n").at(-1)!);
+    expect([status, body]).toEqual([200, "pong"]);
+    return { root, stacks: stacks as string[], cleanup: () => FileUtils.rmRf(base) };
   } catch (error) {
     FileUtils.rmRf(base);
     throw error;
