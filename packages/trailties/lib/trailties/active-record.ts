@@ -29,6 +29,7 @@ import { Callbacks, type ActionController } from "@blazetrails/actionpack";
 import * as ActiveRecord from "@blazetrails/activerecord";
 import { DatabaseTasks } from "@blazetrails/activerecord/tasks/database-tasks.js";
 import { Fixture } from "@blazetrails/activerecord/fixtures.js";
+import { JobRuntime } from "@blazetrails/activerecord/trailties/job-runtime.js";
 import "@blazetrails/activerecord/destroy-association-async-job";
 import type { Base as ActiveJobBase } from "@blazetrails/activejob";
 import {
@@ -38,7 +39,6 @@ import {
   Base,
   ConnectionPool,
   ControllerRuntime,
-  JobRuntime,
   LogSubscriber,
   QueryCache,
   SchemaReflection,

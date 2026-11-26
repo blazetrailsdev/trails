@@ -1,5 +1,6 @@
 import { Base, Migration } from "@blazetrails/activerecord";
 import "@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js";
+import "@blazetrails/activerecord/tasks/database-tasks.js";
 import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 
 class CreateSmoke extends Migration.Current {

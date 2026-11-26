@@ -75,6 +75,7 @@ const LAZY_DIRS: Record<string, string[]> = {
     "encryption/read-only-null-encryptor.ts",
     "test-databases.ts",
     "testing/query-assertions.ts",
+    "trailties/job-runtime.ts",
   ],
   actioncable: [
     "channel/test-case.ts",

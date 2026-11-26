@@ -1,3 +1,4 @@
+import "../constants.job-runtime.generated.js";
 import { rbCallSuper } from "@blazetrails/ruby-compat";
 import * as RuntimeRegistry from "../runtime-registry.js";
 
