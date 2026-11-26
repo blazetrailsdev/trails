@@ -231,7 +231,6 @@ export const Scrub = {
     attrNode.value = values.join(" ");
   },
 
-  /** @missingRailsCall isValidEncoding — PERMANENT */
   isAllowedUri(uriString: string): boolean {
     uriString = CGI.unescapeHTML(this.decodeNumericCharacterReferences(uriString));
     uriString = uriString.replace(CONTROL_CHARACTERS, "");
