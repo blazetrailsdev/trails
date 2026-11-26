@@ -3,6 +3,7 @@ import {
   LOADED_FEATURES,
   NotImplementedError,
   loadingTable,
+  loadedFileExports,
   getAsyncContext,
   getPath,
   getProcessAdapter,
@@ -140,12 +141,19 @@ declare module "@blazetrails/ruby-compat" {
 export const zeitwerkOriginalRequire = Kernel.require;
 Kernel.zeitwerkOriginalRequire = zeitwerkOriginalRequire;
 
-/** @missingRailsCall __on_file_autoloaded — CONVERGEABLE zeitwerk-kernel-require-load-path-feature-arm */
 Kernel.require = async function (path: string): Promise<boolean> {
   const loader = Registry.autoloads.isRegistered(path);
   if (loader != null) {
     return require(path);
   } else {
-    return zeitwerkOriginalRequire(path);
+    const required = await zeitwerkOriginalRequire(path);
+    if (required) {
+      const abspath = LOADED_FEATURES.at(-1)!;
+      const loader = Registry.autoloads.isRegistered(abspath);
+      if (loader != null) {
+        await loader.__onFileAutoloaded(abspath, loadedFileExports(abspath)!);
+      }
+    }
+    return required;
   }
 };
