@@ -595,8 +595,6 @@ export function rbModToS(klass: abstract new (...args: never) => unknown): strin
  * @noRailsEquivalent PERMANENT
  */
 export function rbModName(klass: object): string | null {
-  if (Object.getOwnPropertyDescriptor(klass, "name")?.get)
-    return (klass as { name: string | null }).name;
   const path = rbClassPath(klass);
   if (path !== undefined) return path;
   const name = (klass as { name?: string | null }).name;

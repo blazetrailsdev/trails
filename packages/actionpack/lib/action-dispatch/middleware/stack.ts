@@ -18,6 +18,21 @@ export type MiddlewareFactory =
   | (new (app: any, ...args: any[]) => unknown)
   | { name: string; "new"(app: unknown, ...args: unknown[]): unknown };
 
+/** @noRailsEquivalent PERMANENT */
+function _name(klass: object): string | null {
+  if (typeof klass === "function") {
+    for (
+      let k: object | null = klass;
+      k && k !== Function.prototype;
+      k = Object.getPrototypeOf(k)
+    ) {
+      const getter = Object.getOwnPropertyDescriptor(k, "name")?.get;
+      if (getter) return getter.call(klass) as string | null;
+    }
+  }
+  return rbModName(klass);
+}
+
 export class Middleware {
   constructor(
     readonly klass: MiddlewareFactory,
@@ -26,7 +41,7 @@ export class Middleware {
   ) {}
 
   get name(): string | null {
-    return rbModName(this.klass);
+    return _name(this.klass);
   }
 
   equals(middleware: unknown): boolean | undefined {
@@ -156,7 +171,7 @@ export class MiddlewareStack implements Iterable<Middleware> {
   delete(target: MiddlewareClass | MiddlewareFactory): Middleware[] | null {
     let rejected = false;
     for (let i = this.entries.length - 1; i >= 0; i--) {
-      if (this.entries[i].name === rbModName(target)) {
+      if (this.entries[i].name === _name(target)) {
         this.entries.splice(i, 1);
         rejected = true;
       }
@@ -246,6 +261,6 @@ export class MiddlewareStack implements Iterable<Middleware> {
 
   /** @internal */
   indexOf(klass: MiddlewareFactory): number {
-    return this.entries.findIndex((m) => m.name === rbModName(klass));
+    return this.entries.findIndex((m) => m.name === _name(klass));
   }
 }
