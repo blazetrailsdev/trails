@@ -479,6 +479,16 @@ export class Dir {
     return getFs().readdirSync(dirname);
   }
 
+  /**
+   * `vendor/ruby/v3.3.11/dir.c:3590` `rb_dir_s_empty_p`: raises, as `children` does,
+   * when the directory is missing.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `Dir.empty?` (`vendor/ruby/v3.3.11/dir.c:3590`).
+   */
+  static isEmpty(dirname: string): boolean {
+    return Dir.children(dirname).length === 0;
+  }
+
   /** {@link Dir.children} over the backend's async `readdir`, or its `readdirSync`.
    * @noRailsEquivalent PERMANENT — Ruby core `Dir.children` (`vendor/ruby/v3.3.11/dir.c:3421`).
    */

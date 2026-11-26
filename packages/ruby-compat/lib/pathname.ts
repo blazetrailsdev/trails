@@ -110,16 +110,11 @@ export class Pathname {
   }
 
   /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/ext/pathname/pathname.c:1055` `path_empty_p` */
-  async isEmpty(): Promise<boolean> {
-    if (await File.isDirectoryAsync(this._path)) {
-      return (await Dir.childrenAsync(this._path)).length === 0;
+  isEmpty(): boolean {
+    if (File.isDirectory(this._path)) {
+      return Dir.isEmpty(this._path);
     } else {
-      const fs = getFs();
-      try {
-        return (await fs.stat!(this._path)).size === 0;
-      } catch {
-        return false;
-      }
+      return File.isEmpty(this._path);
     }
   }
 

@@ -91,7 +91,7 @@ export class XmlDocument extends XmlNode {
       stringOrIo == null ||
       (typeof stringOrIo === "string"
         ? stringOrIo === ""
-        : stringOrIo.isEmpty !== undefined && stringOrIo.isEmpty() === true) ||
+        : stringOrIo.isEmpty !== undefined && stringOrIo.isEmpty()) ||
       (typeof stringOrIo === "object" &&
         "isEof" in stringOrIo &&
         stringOrIo.isEof !== undefined &&

@@ -529,6 +529,20 @@ export class File extends IO {
   }
 
   /**
+   * `vendor/ruby/v3.3.11/file.c:2028` `rb_file_zero_p`, which answers `false`
+   * rather than raising when the stat fails.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `FileTest.empty?` (`vendor/ruby/v3.3.11/file.c:7368`).
+   */
+  static isEmpty(fileName: string): boolean {
+    try {
+      return File.stat(fileName).size === 0;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
    * `vendor/ruby/v3.3.11/file.c:1305` `rb_file_s_size` — the byte size of the named
    * file, which is `File.stat(file_name).size`.
    *

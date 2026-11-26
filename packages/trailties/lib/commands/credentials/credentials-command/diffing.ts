@@ -39,7 +39,7 @@ export const Diffing = defineModule(
         await this.gitattributes().write(
           (await this.gitattributes().read()).replaceAll(GITATTRIBUTES_ENTRY, ""),
         );
-        if (await this.gitattributes().isEmpty()) await this.gitattributes().delete();
+        if (this.gitattributes().isEmpty()) await this.gitattributes().delete();
 
         this.say("Disenrolled project from credentials file diffing!");
       } else {
