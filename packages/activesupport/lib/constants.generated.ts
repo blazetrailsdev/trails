@@ -117,6 +117,7 @@ defineConstants([
   [() => m21, "BigDecimalWithDefaultFormat", "ActiveSupport::BigDecimalWithDefaultFormat"],
   [() => m5, "BroadcastLogger", "ActiveSupport::BroadcastLogger"],
   [() => m6, "Coder", "ActiveSupport::Cache::Coder"],
+  [() => m6, "LazyEntry", "ActiveSupport::Cache::Coder::LazyEntry"],
   [() => m7, "Entry", "ActiveSupport::Cache::Entry"],
   [() => m8, "MemoryStore", "ActiveSupport::Cache::MemoryStore"],
   [() => m8, "DupCoder", "ActiveSupport::Cache::MemoryStore::DupCoder"],

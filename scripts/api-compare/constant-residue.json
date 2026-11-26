@@ -694,7 +694,7 @@
     }
   },
   "activesupport": {
-    "rows": 201,
+    "rows": 202,
     "excluded": [
       "cache/deserialization-error.ts::DeserializationError",
       "cache/store.ts::Store",
@@ -1273,7 +1273,9 @@
   },
   "solid-queue": {
     "rows": 102,
-    "excluded": [],
+    "excluded": [
+      "generators/solid-queue/update/templates/db/add_batches_to_solid_queue.ts::AddBatchesToSolidQueue"
+    ],
     "unwalked": [],
     "residue": {
       "active-job/batch-id.ts::BatchId": "ActiveJob::BatchId",
