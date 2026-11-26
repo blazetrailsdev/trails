@@ -3,7 +3,8 @@ import * as fs from "fs/promises";
 import * as os from "os";
 import * as path from "path";
 import { fileURLToPath } from "url";
-import { type BodyPin, serializeShard } from "./body-pins.js";
+import { type BodyPin, comparePinKeys, serializeShard } from "./body-pins.js";
+import { type LedgerRow, LEDGER_DIR, serializeLedger } from "./bump-ledger.js";
 import {
   findEmptyBaselines,
   findNonCanonicalBaselines,
@@ -142,6 +143,16 @@ describe("committed api-compare baselines", () => {
     for (const name of await fs.readdir(dir)) {
       const text = await fs.readFile(path.join(dir, name), "utf-8");
       expect(text, name).toBe(serializeShard(JSON.parse(text) as BodyPin[]));
+    }
+  });
+
+  it("bump-ledger files are one row per line, pair rows in pin order", async () => {
+    for (const name of await fs.readdir(LEDGER_DIR)) {
+      if (!name.endsWith(".json") || name.endsWith(".stories.json")) continue;
+      const text = await fs.readFile(path.join(LEDGER_DIR, name), "utf-8");
+      const rows = JSON.parse(text) as LedgerRow[];
+      const ordered = name.endsWith(".tests.json") ? rows : [...rows].sort(comparePinKeys);
+      expect(text, name).toBe(serializeLedger(ordered));
     }
   });
 

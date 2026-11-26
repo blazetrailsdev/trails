@@ -18,7 +18,7 @@ import { Packer } from "./packer.js";
 
 export const CoreExt = {
   name: "MessagePack::CoreExt",
-  /** @missingRailsCall to_msgpack_with_packer — CONVERGEABLE msgpack-core-ext-to-msgpack-sends-with-packer */
+  /** @missingRailsCall to_msgpack_with_packer — PERMANENT */
   toMsgpack(this: unknown, packerOrIo: unknown = null): Uint8Array | Packer | null {
     if (packerOrIo != null && packerOrIo !== false) {
       if (rbObjIsKindOf(packerOrIo, Packer)) {
