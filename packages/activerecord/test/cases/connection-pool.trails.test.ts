@@ -191,6 +191,16 @@ it("withConnection overlapping on an empty lease checks out one connection", asy
   expect(pool.isActiveConnection()).toBeNull();
 });
 
+it("leaseConnection joining a pending withConnection checkout keeps the lease", async () => {
+  const pool = makePool(2);
+  const checkout = vi.spyOn(pool, "checkout");
+  const [, leased] = await Promise.all([pool.withConnection(() => 1), pool.leaseConnection()]);
+  expect(checkout).toHaveBeenCalledTimes(1);
+  expect(pool.isActiveConnection()).toBe(leased);
+  expect(pool.isPermanentLease()).toBe(false);
+  expect(pool.stat().busy).toBe(1);
+});
+
 it("withConnection keeps the lease for a joiner that outlives the checkout's owner", async () => {
   const pool = makePool(2);
   const checkout = vi.spyOn(pool, "checkout");

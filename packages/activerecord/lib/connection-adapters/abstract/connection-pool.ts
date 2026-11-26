@@ -349,16 +349,23 @@ export class ConnectionPool implements ReapablePool {
       lease.sticky = true;
       return checkout;
     }
-    let connection: DatabaseAdapter;
+    let hold = leaseHolds.get(lease);
+    if (!hold) leaseHolds.set(lease, (hold = { holders: 0, release: false }));
+    hold.holders++;
     try {
-      connection = await checkout;
+      const connection = await checkout;
+      if (lease.connection === checkout) lease.connection = connection;
+      lease.sticky = true;
+      return connection;
     } catch (error) {
       if (lease.connection === checkout) lease.connection = null;
       throw error;
+    } finally {
+      if (--hold.holders === 0) {
+        if (leaseHolds.get(lease) === hold) leaseHolds.delete(lease);
+        if (hold.release && !lease.sticky) this.releaseConnection(lease);
+      }
     }
-    if (lease.connection === checkout) lease.connection = connection;
-    lease.sticky = true;
-    return connection;
   }
 
   isPermanentLease(): boolean {
