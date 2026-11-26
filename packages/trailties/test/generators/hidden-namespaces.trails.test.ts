@@ -1,7 +1,13 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import { Generators } from "../../lib/generators.js";
 
 describe("Generators.hiddenNamespaces (trails-only)", () => {
+  const original = { ...Generators.options().trails };
+
+  afterEach(() => {
+    Object.assign(Generators.options().trails, original);
+  });
+
   it("spells the configured orm, test framework and template engine in kebab-case", () => {
     Object.assign(Generators.options().trails, {
       orm: "active_record",
