@@ -265,6 +265,7 @@ export class ConnectionHandler {
   ): Promise<PoolConfig> {
     const dbConfig = ActiveRecord.Base.configurations().resolve(config)!;
     await ConnectionAdapters.load(dbConfig.adapter);
+    await ActiveRecord.Tasks.loadPath["active_record/tasks/database_tasks"]();
     dbConfig.validateBang();
     if (!dbConfig.adapter) {
       throw new AdapterNotSpecified("database configuration does not specify adapter");
