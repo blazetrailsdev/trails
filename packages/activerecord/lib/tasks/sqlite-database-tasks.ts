@@ -1,13 +1,11 @@
 import "../constants.sqlite-database-tasks.generated.js";
-import {
-  Errno,
-  RuntimeError,
-  getChildProcessAsync,
-  rbEqq,
-  rbFSystem,
-  File,
-  FileUtils,
-} from "@blazetrails/ruby-compat";
+import { getChildProcessAsync } from "@blazetrails/ruby-compat/child-process-adapter";
+import { Errno } from "@blazetrails/ruby-compat/errno";
+import { File } from "@blazetrails/ruby-compat/file";
+import { FileUtils } from "@blazetrails/ruby-compat/file-utils";
+import { rbFSystem } from "@blazetrails/ruby-compat/kernel-system";
+import { rbEqq } from "@blazetrails/ruby-compat/rb-equal";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
 import { kernelArray } from "@blazetrails/activesupport";
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 import type { SQLite3Adapter } from "../connection-adapters/sqlite3-adapter.js";

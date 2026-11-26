@@ -1,14 +1,11 @@
 import { isPresent } from "@blazetrails/activesupport";
-import {
-  Encoding as RbEncoding,
-  EncodingError,
-  OpenSSL,
-  encode,
-  forceEncoding,
-  rbObjClassname,
-  rbObjEncoding,
-  type Bytes,
-} from "@blazetrails/ruby-compat";
+import { Encoding as RbEncoding } from "@blazetrails/ruby-compat/encoding";
+import { EncodingError } from "@blazetrails/ruby-compat/encoding-error";
+import type { Bytes } from "@blazetrails/ruby-compat/fs-adapter";
+import { rbObjClassname } from "@blazetrails/ruby-compat/object";
+import { OpenSSL } from "@blazetrails/ruby-compat/openssl";
+import { encode } from "@blazetrails/ruby-compat/string/encode";
+import { forceEncoding, rbObjEncoding } from "@blazetrails/ruby-compat/string/force-encoding";
 import { Message } from "./message.js";
 import type { Properties } from "./properties.js";
 import type { MessageSerializerLike } from "./message-serializer.js";

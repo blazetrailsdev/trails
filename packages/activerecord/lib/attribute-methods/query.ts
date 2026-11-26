@@ -1,5 +1,5 @@
 import { included, isBlank } from "@blazetrails/activesupport";
-import { toI } from "@blazetrails/ruby-compat";
+import { toI } from "@blazetrails/ruby-compat/numeric";
 import { BooleanType, type ValueType } from "@blazetrails/activemodel";
 import { AttributeMethods } from "../namespaces.js";
 

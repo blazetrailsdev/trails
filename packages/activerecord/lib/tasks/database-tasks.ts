@@ -15,29 +15,23 @@ import {
   toSentence,
   trailsRoot,
 } from "@blazetrails/activesupport";
-import {
-  ArgumentError,
-  excToS,
-  isEmpty,
-  StandardError,
-  rbFSend,
-  rbStrToI,
-  sort,
-  union,
-  getCryptoAsync,
-  stdout,
-  stderr,
-  puts,
-  Kernel,
-  File,
-  FileUtils,
-  rbEqual,
-  rbFLoad,
-  constGet,
-  constSet,
-  RuntimeError,
-  resolveTsThenJs,
-} from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { sort, union } from "@blazetrails/ruby-compat/array";
+import { getCryptoAsync } from "@blazetrails/ruby-compat/crypto-adapter";
+import { excToS } from "@blazetrails/ruby-compat/exc-to-s";
+import { File } from "@blazetrails/ruby-compat/file";
+import { FileUtils } from "@blazetrails/ruby-compat/file-utils";
+import { Kernel, constSet } from "@blazetrails/ruby-compat/include";
+import { puts } from "@blazetrails/ruby-compat/io";
+import { rbFLoad, resolveTsThenJs } from "@blazetrails/ruby-compat/load";
+import { rbFSend } from "@blazetrails/ruby-compat/object";
+import { stdout, stderr } from "@blazetrails/ruby-compat/process-adapter";
+import { rbEqual } from "@blazetrails/ruby-compat/rb-equal";
+import { isEmpty } from "@blazetrails/ruby-compat/ruby-empty";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
+import { StandardError } from "@blazetrails/ruby-compat/standard-error";
+import { rbStrToI } from "@blazetrails/ruby-compat/string/convert";
+import { constGet } from "@blazetrails/ruby-compat/variable";
 import { Base } from "../base.js";
 import { dumpSchemaAfterMigration } from "../active-record.js";
 import { ActiveRecord } from "../namespaces.js";

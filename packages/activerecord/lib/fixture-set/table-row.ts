@@ -1,4 +1,5 @@
-import { hashDelete, rtest } from "@blazetrails/ruby-compat";
+import { hashDelete } from "@blazetrails/ruby-compat/hash";
+import { rtest } from "@blazetrails/ruby-compat/object";
 import type { Base } from "../base.js";
 import { FixtureSet, type Fixture } from "../fixtures.js";
 import type { TableRows } from "./table-rows.js";

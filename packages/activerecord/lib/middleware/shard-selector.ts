@@ -1,5 +1,6 @@
 import type { RackApp, RackResponse } from "@blazetrails/rack";
-import { fetch, rbProcCall } from "@blazetrails/ruby-compat";
+import { fetch } from "@blazetrails/ruby-compat/hash";
+import { rbProcCall } from "@blazetrails/ruby-compat/object";
 import { Base } from "../base.js";
 import { TopLevel } from "@blazetrails/activesupport";
 import { Middleware } from "../namespaces.js";

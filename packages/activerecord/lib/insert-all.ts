@@ -8,17 +8,11 @@ import type { Base } from "./base.js";
 import { isFinderNeedsTypeCondition } from "./inheritance.js";
 import type { Relation } from "./relation.js";
 import { Result } from "./result.js";
-import {
-  isSymbol,
-  rbEqual,
-  rbFArray,
-  rbObjAsString,
-  rtest,
-  sort,
-  symbolToS,
-  toSym,
-  filterMap,
-} from "@blazetrails/ruby-compat";
+import { rbFArray, sort } from "@blazetrails/ruby-compat/array";
+import { filterMap } from "@blazetrails/ruby-compat/enumerable";
+import { rbObjAsString, rtest, toSym } from "@blazetrails/ruby-compat/object";
+import { rbEqual } from "@blazetrails/ruby-compat/rb-equal";
+import { isSymbol, symbolToS } from "@blazetrails/ruby-compat/symbol";
 import {
   indexWith,
   isPresent,
@@ -28,8 +22,9 @@ import {
   stringifyKeys,
   transformKeys,
 } from "@blazetrails/activesupport";
-import { except } from "@blazetrails/ruby-compat";
-import { Enumerable, aryJoin } from "@blazetrails/ruby-compat";
+import { except } from "@blazetrails/ruby-compat/hash";
+import { aryJoin } from "@blazetrails/ruby-compat/array";
+import { Enumerable } from "@blazetrails/ruby-compat/enumerable";
 import { withConnection } from "./connection-handling.js";
 
 type ModelClass = typeof Base;

@@ -1,6 +1,8 @@
 import { ArgumentError, type ValueType } from "@blazetrails/activemodel";
 import * as Type from "../type.js";
-import { Concurrent, block as blockPass, rbEqq } from "@blazetrails/ruby-compat";
+import { Concurrent } from "@blazetrails/ruby-compat/concurrent/map";
+import { block as blockPass } from "@blazetrails/ruby-compat/hash";
+import { rbEqq } from "@blazetrails/ruby-compat/rb-equal";
 
 export class TypeMap {
   private _mapping: Map<string | RegExp, (...args: string[]) => ValueType> = new Map();

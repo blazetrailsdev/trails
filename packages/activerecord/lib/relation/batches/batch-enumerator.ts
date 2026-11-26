@@ -1,4 +1,5 @@
-import { AsyncEnumerable, type AsyncEnumerator, include } from "@blazetrails/ruby-compat";
+import { AsyncEnumerable, type AsyncEnumerator } from "@blazetrails/ruby-compat/enumerable";
+import { include } from "@blazetrails/ruby-compat/include";
 import type { TouchAllArgs } from "../../timestamp.js";
 
 interface BatchRelation {

@@ -2,7 +2,7 @@ import { ExplainRegistry } from "./explain-registry.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import type { ExplainOption } from "./connection-adapters/abstract/database-statements.js";
 import { Attribute } from "@blazetrails/activemodel";
-import { rbInspect, rbObjAsString } from "@blazetrails/ruby-compat";
+import { rbInspect, rbObjAsString } from "@blazetrails/ruby-compat/object";
 
 /** @internal */
 export interface ExplainHost {

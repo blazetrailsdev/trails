@@ -1,4 +1,6 @@
-import { DelegateClass, rtest, rbCallSuper } from "@blazetrails/ruby-compat";
+import { DelegateClass } from "@blazetrails/ruby-compat/delegate";
+import { rbCallSuper } from "@blazetrails/ruby-compat/include";
+import { rtest } from "@blazetrails/ruby-compat/object";
 import { classAttribute, included } from "@blazetrails/activesupport";
 import type { Base } from "../base.js";
 import { StaleObjectError } from "../errors.js";

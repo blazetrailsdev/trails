@@ -1,4 +1,4 @@
-import { DelegateClass } from "@blazetrails/ruby-compat";
+import { DelegateClass } from "@blazetrails/ruby-compat/delegate";
 import { Time as RubyTime } from "@blazetrails/date";
 import { TimeWithZone } from "@blazetrails/activesupport";
 import { TimeType as ActiveModelTime } from "@blazetrails/activemodel";

@@ -4,7 +4,9 @@ import {
   threadMattrAccessor,
   threadMattrKey,
 } from "@blazetrails/activesupport";
-import { included, rbEnsure, rbFSend, rbObjDup } from "@blazetrails/ruby-compat";
+import { rbEnsure } from "@blazetrails/ruby-compat/ensure";
+import { included, rbObjDup } from "@blazetrails/ruby-compat/include";
+import { rbFSend } from "@blazetrails/ruby-compat/object";
 import { Encryption } from "../namespaces.js";
 import { Context } from "./context.js";
 import { NullEncryptor } from "./null-encryptor.js";
