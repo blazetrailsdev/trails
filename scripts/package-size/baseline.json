@@ -56,7 +56,8 @@
       "value": 1630101
     },
     "entries": {
-      "value": 29
+      "value": 32,
+      "reason": "RFC 0252: bun-temporal module seats the Temporal polyfill under Bun (.js, .d.ts, map)"
     }
   },
   "i18n": {

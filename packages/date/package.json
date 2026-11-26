@@ -24,6 +24,7 @@
   ],
   "sideEffects": [
     "./dist/acts-like.js",
+    "./dist/bun-temporal.js",
     "./dist/constants.generated.js",
     "./dist/date.js",
     "./dist/index.js",
