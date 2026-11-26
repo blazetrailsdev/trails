@@ -331,6 +331,7 @@ describe.runIf(currentAdapter("SQLite3Adapter"))("SqliteStructureDumpTest", () =
       expect.anything(),
       ["--noop", database, ".schema --nosys"],
       { out: filename },
+      null,
     );
     expect(message).toMatch("failed to execute:");
   });
