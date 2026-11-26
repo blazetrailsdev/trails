@@ -709,7 +709,12 @@ function _outputNode(node: _OutputNode, preserveNewline: boolean): string {
     case "#document-fragment":
       for (const child of _children(node)) out += _outputNode(child, preserveNewline);
       return out;
-    default: {
+    default:
+      if (node.tagName === undefined) {
+        throw new RuntimeError(
+          `Unsupported document node (${node.nodeName}); this is a bug in Nokogiri`,
+        );
+      }
       out += `<${node.tagName}`;
       for (const attr of node.attrs ?? []) {
         out += ` ${_outputAttrName(attr)}="${_outputEscapedString(attr.value, true)}"`;
@@ -721,7 +726,6 @@ function _outputNode(node: _OutputNode, preserveNewline: boolean): string {
         out += `</${node.tagName}>`;
       }
       return out;
-    }
   }
 }
 HTML5.Node = Node;

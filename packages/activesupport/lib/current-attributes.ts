@@ -203,7 +203,13 @@ export class CurrentAttributes {
 
     if (!rbModMethodDefined(this, name)) return;
 
-    if (name in this) return;
+    for (
+      let klass: object | null = this;
+      klass && klass !== Function.prototype;
+      klass = Object.getPrototypeOf(klass)
+    ) {
+      if (Object.hasOwn(klass, name)) return;
+    }
 
     Delegation.generate(this, [name], { to: "instance", as: this, nilable: false });
   }
