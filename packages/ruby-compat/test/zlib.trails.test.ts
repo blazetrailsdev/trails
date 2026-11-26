@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { File } from "../lib/file.js";
+import { StringIO } from "../lib/string-io.js";
 import { Zlib } from "../lib/zlib.js";
 import { GzipWriter } from "../lib/zlib-adapter.js";
 
@@ -137,5 +138,58 @@ describe("Zlib::GzipFile.open", () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+});
+
+/**
+ * `gzfile_write` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:2808-2820`), `gzfile_read`
+ * (`zlib.c:2894`) and `gzfile_check_footer` (`zlib.c:2780-2805`), checked against
+ * `ruby -rzlib -rstringio`.
+ */
+describe("Zlib::GzipWriter and GzipReader streaming", () => {
+  const gzipped = (payload: string): Uint8Array => {
+    const io = new StringIO(new Uint8Array(0));
+    const gz = new Zlib.GzipWriter(io);
+    gz.write(payload);
+    gz.finish();
+    return io.string();
+  };
+
+  it("hands the io the compressed bytes when a sync write returns", () => {
+    const io = new StringIO(new Uint8Array(0));
+    const gz = new Zlib.GzipWriter(io);
+    gz.sync = true;
+    gz.write("hello");
+    const written = io.string().length;
+    gz.write(" world");
+
+    expect(written > 10).toBe(true);
+    expect(io.string().length > written).toBe(true);
+  });
+
+  it("reads a length at a time, answering nil at the end", async () => {
+    const gz = new Zlib.GzipReader(new StringIO(gzipped("hello world")));
+
+    expect([gz.read(5), gz.read(100), gz.read(1)]).toEqual(["hello", " world", null]);
+    await gz.close();
+  });
+
+  it("raises NoFooter, CRCError and LengthError at the footer", async () => {
+    const bytes = gzipped("hello world");
+    const truncated = bytes.slice(0, bytes.length - 8);
+    const badCrc = bytes.slice();
+    badCrc[bytes.length - 8] ^= 0xff;
+    const badLength = bytes.slice();
+    badLength[bytes.length - 4] ^= 0xff;
+
+    const noFooter = new Zlib.GzipReader(new StringIO(truncated));
+    expect(noFooter.read(100)).toBe("hello world");
+    expect(() => noFooter.read(1)).toThrow(new Zlib.GzipFile.NoFooter("footer is not found"));
+    const crcError = new Zlib.GzipReader(new StringIO(badCrc));
+    expect(crcError.read(100)).toBe("hello world");
+    expect(() => crcError.read(1)).toThrow(Zlib.GzipFile.CRCError);
+    const gz = new Zlib.GzipReader(new StringIO(badLength));
+    gz.read();
+    await expect(async () => gz.close()).rejects.toThrow("invalid compressed data -- length error");
   });
 });
