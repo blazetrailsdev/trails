@@ -7,7 +7,9 @@ import { Comment } from "../../models/comment.js";
 import { Customer } from "../../models/customer.js";
 import { Company } from "../../models/company.js";
 import "../../models/categorization.js";
-import { Range, constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
+import { Range } from "@blazetrails/ruby-compat/range";
 
 constSet(TopLevel, "Post", Post);
 constSet(TopLevel, "Author", Author);

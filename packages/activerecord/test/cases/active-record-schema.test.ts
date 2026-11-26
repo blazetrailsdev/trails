@@ -4,7 +4,7 @@ import {
   assertDifference,
   assertNothingRaised,
 } from "@blazetrails/activesupport/testing/assertions";
-import { isModuleIncluded } from "@blazetrails/ruby-compat";
+import { isModuleIncluded } from "@blazetrails/ruby-compat/include";
 import { Base, Migration, Schema, TableDefinition } from "../../lib/index.js";
 import { Definition } from "../../lib/schema.js";
 import { Migrator } from "../../lib/migration.js";

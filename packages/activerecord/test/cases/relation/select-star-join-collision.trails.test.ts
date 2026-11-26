@@ -2,7 +2,9 @@ import { describe, it, expect } from "vitest";
 import { fixtures } from "../../support/use-fixtures.js";
 import { Person } from "../../models/person.js";
 import { Friendship } from "../../models/friendship.js";
-import { regexpEscape, constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
+import { regexpEscape } from "@blazetrails/ruby-compat/regexp";
 
 constSet(TopLevel, "Friendship", Friendship);
 

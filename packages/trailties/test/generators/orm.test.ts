@@ -1,11 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import {
-  TopLevel,
-  constGet,
-  constSet,
-  constDefined,
-  rbModRemoveConst,
-} from "@blazetrails/ruby-compat";
+import { constSet, constDefined } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
+import { constGet, rbModRemoveConst } from "@blazetrails/ruby-compat/variable";
 import { ActiveModel } from "../../lib/generators/active-model.js";
 import { ScaffoldControllerGenerator } from "../../lib/generators/trails/scaffold-controller/scaffold-controller-generator.js";
 

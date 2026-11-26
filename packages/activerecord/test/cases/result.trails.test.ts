@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { ArgumentError, KeyError } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { KeyError } from "@blazetrails/ruby-compat/key-error";
 import { Result } from "../../lib/result.js";
 
 describe("Result::IndexedRow", () => {

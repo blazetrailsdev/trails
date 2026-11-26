@@ -5,7 +5,7 @@ import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
 import { Isolation } from "@blazetrails/activesupport/testing/isolation";
 import { ActiveRecord } from "@blazetrails/activerecord";
 import { setVerboseQueryLogs } from "@blazetrails/activerecord/active-record";
-import { include } from "@blazetrails/ruby-compat";
+import { include } from "@blazetrails/ruby-compat/include";
 import type { Generation, Rack } from "../../support/isolation/abstract-unit.js";
 import "../../support/isolation/abstract-unit.js";
 

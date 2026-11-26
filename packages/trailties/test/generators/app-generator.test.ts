@@ -1,13 +1,11 @@
-import {
-  Bundler,
-  Dir,
-  File,
-  FileUtils,
-  Gem,
-  Process,
-  env,
-  rbFBackquote,
-} from "@blazetrails/ruby-compat";
+import { Bundler } from "@blazetrails/ruby-compat/bundler";
+import { Dir } from "@blazetrails/ruby-compat/dir";
+import { File } from "@blazetrails/ruby-compat/file";
+import { FileUtils } from "@blazetrails/ruby-compat/file-utils";
+import { Gem } from "@blazetrails/ruby-compat/gem";
+import { rbFBackquote } from "@blazetrails/ruby-compat/kernel-system";
+import { Process } from "@blazetrails/ruby-compat/process";
+import { env } from "@blazetrails/ruby-compat/process-adapter";
 import { buildTemplates } from "@blazetrails/trails-tsc";
 import { assertNoChanges, assertNoMatch } from "@blazetrails/activesupport/testing/assertions";
 import { capture, quietly } from "@blazetrails/activesupport/testing/stream";

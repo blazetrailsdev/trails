@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Rake } from "@blazetrails/rake";
-import { File, STDOUT, rbFLoad } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat/file";
+import { STDOUT } from "@blazetrails/ruby-compat/io";
+import { rbFLoad } from "@blazetrails/ruby-compat/load";
 
 describe("tasks/misc", () => {
   afterEach(() => {

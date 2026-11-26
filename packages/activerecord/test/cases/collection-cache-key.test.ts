@@ -1,4 +1,5 @@
-import { constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
 import { Time as RubyTime } from "@blazetrails/date";
 import { assertNotPredicate } from "@blazetrails/activesupport/testing/assertions";
 import { describe, it, expect } from "vitest";

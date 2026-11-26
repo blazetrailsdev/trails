@@ -8,14 +8,11 @@ import { assertCalledWith } from "@blazetrails/activesupport/testing/method-call
 import { Base as ThorBase } from "@blazetrails/thor/shell";
 import { Basic } from "@blazetrails/thor/shell/basic";
 import { Color } from "@blazetrails/thor/shell/color";
-import {
-  Dir,
-  File,
-  FileUtils,
-  LOAD_PATH,
-  SystemExit,
-  getProcessAdapter,
-} from "@blazetrails/ruby-compat";
+import { Dir } from "@blazetrails/ruby-compat/dir";
+import { File } from "@blazetrails/ruby-compat/file";
+import { FileUtils } from "@blazetrails/ruby-compat/file-utils";
+import { LOAD_PATH } from "@blazetrails/ruby-compat/load";
+import { SystemExit, getProcessAdapter } from "@blazetrails/ruby-compat/process-adapter";
 import { Base } from "../lib/generators/base.js";
 import { assertFile } from "../lib/generators/testing/assertions.js";
 import { ModelGenerator as TestUnitModelGenerator } from "../lib/generators/test-unit/model/model-generator.js";

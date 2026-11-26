@@ -8,7 +8,7 @@ import {
 import { seconds, TopLevel } from "@blazetrails/activesupport";
 import { Resolver, type ResolverContext } from "../../lib/middleware/database-selector/resolver.js";
 import { Session } from "../../lib/middleware/database-selector/resolver/session.js";
-import { Hash } from "@blazetrails/ruby-compat";
+import { Hash } from "@blazetrails/ruby-compat/hash";
 import { Time } from "@blazetrails/date";
 
 class TestRequest {

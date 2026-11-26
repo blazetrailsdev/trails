@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Handler } from "@blazetrails/rackup";
 import type { RackApp } from "@blazetrails/rack";
-import { getHttpAsync } from "@blazetrails/ruby-compat";
-import type { HttpServer } from "@blazetrails/ruby-compat";
+import { getHttpAsync } from "@blazetrails/ruby-compat/http-adapter";
+import type { HttpServer } from "@blazetrails/ruby-compat/http-adapter";
 import { Base } from "@blazetrails/activerecord";
 
 await Handler.get("node");

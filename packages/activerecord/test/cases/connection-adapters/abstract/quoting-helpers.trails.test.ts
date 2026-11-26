@@ -1,4 +1,4 @@
-import { NoMethodError } from "@blazetrails/ruby-compat";
+import { NoMethodError } from "@blazetrails/ruby-compat/no-method-error";
 import { quotingHost } from "../../../support/quoting-host.js";
 import { NotImplementedError } from "../../../../lib/errors.js";
 import { describe, expect, it } from "vitest";

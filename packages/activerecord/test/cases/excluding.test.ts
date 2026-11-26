@@ -5,7 +5,10 @@ import {
   assertNotEmpty,
   assertRaises,
 } from "@blazetrails/activesupport/testing/assertions";
-import { ArgumentError, regexpEscape, constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
+import { regexpEscape } from "@blazetrails/ruby-compat/regexp";
 import { assertQueriesCount } from "../../lib/testing/query-assertions.js";
 import { fixtures } from "../support/use-fixtures.js";
 import type { Relation } from "../../lib/relation.js";

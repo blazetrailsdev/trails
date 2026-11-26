@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
 import { Base, _loadSerializedAttributes } from "../../lib/index.js";
 import { fixtures } from "../support/use-fixtures.js";
 import { YAML } from "@blazetrails/ruby-compat/yaml";

@@ -3,7 +3,10 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import { API } from "typescript/unstable/sync";
-import { registerChildProcessAdapter, childProcessAdapterConfig } from "@blazetrails/ruby-compat";
+import {
+  registerChildProcessAdapter,
+  childProcessAdapterConfig,
+} from "@blazetrails/ruby-compat/child-process-adapter";
 import { AuthenticationGenerator } from "../../../../lib/generators/trails/authentication/authentication-generator.js";
 import { Application } from "../../../../lib/application.js";
 import { Trails } from "../../../../lib/trails.js";

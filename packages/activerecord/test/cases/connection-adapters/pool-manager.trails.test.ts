@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { Enumerator } from "@blazetrails/ruby-compat";
+import { Enumerator } from "@blazetrails/ruby-compat/enumerator";
 import { PoolManager } from "../../../lib/connection-adapters/pool-manager.js";
 import { PoolConfig } from "../../../lib/connection-adapters/pool-config.js";
 import { ConnectionDescriptor } from "../../../lib/connection-adapters/abstract/connection-handler.js";

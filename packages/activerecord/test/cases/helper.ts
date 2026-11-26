@@ -2,7 +2,7 @@ import "../../lib/associations/collection-proxy.js";
 import "../../lib/association-relation.js";
 import "../../lib/associations/disable-joins-association-scope.js";
 import { afterAll, afterEach, expect } from "vitest";
-import { Timeout } from "@blazetrails/ruby-compat";
+import { Timeout } from "@blazetrails/ruby-compat/timeout";
 import { Base } from "../../lib/base.js";
 import "./test-case.js";
 import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";

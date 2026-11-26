@@ -1,12 +1,9 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import {
-  Dir,
-  FileUtils,
-  File as RubyFile,
-  include,
-  constSet,
-  TopLevel,
-} from "@blazetrails/ruby-compat";
+import { Dir } from "@blazetrails/ruby-compat/dir";
+import { File as RubyFile } from "@blazetrails/ruby-compat/file";
+import { FileUtils } from "@blazetrails/ruby-compat/file-utils";
+import { include, constSet } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
 import { Notifications, onLoad } from "@blazetrails/activesupport";
 import { Minitest } from "@blazetrails/activesupport/testing/assertions";
 import { Base } from "../../lib/base.js";

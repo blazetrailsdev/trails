@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { MessagePackMessageSerializer } from "../../../lib/encryption/message-pack-message-serializer.js";
 import { Message } from "../../../lib/encryption/message.js";
 import { Decryption, ForbiddenClass } from "../../../lib/encryption/errors.js";
-import { TypeError } from "@blazetrails/ruby-compat";
+import { TypeError } from "@blazetrails/ruby-compat/type-error";
 
 describe("ActiveRecord::Encryption::MessagePackMessageSerializerTest", () => {
   let serializer: MessagePackMessageSerializer;

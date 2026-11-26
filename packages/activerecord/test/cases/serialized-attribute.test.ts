@@ -1,20 +1,16 @@
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { Hash, hashAref, hashAset } from "@blazetrails/ruby-compat/hash";
+import { include, constSet, rbObjDup } from "@blazetrails/ruby-compat/include";
 import {
-  ArgumentError,
-  Hash,
-  Struct,
-  hashAref,
-  hashAset,
-  include,
   rbCClass,
   rbCString,
   rbCSymbol,
-  rbEqual,
   rbInspect,
-  constSet,
   rbObjClass,
-  rbObjDup,
   TopLevel,
-} from "@blazetrails/ruby-compat";
+} from "@blazetrails/ruby-compat/object";
+import { rbEqual } from "@blazetrails/ruby-compat/rb-equal";
+import { Struct } from "@blazetrails/ruby-compat/struct";
 import { Time as RubyTime } from "@blazetrails/date";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { assertRaises } from "@blazetrails/activesupport/testing/assertions";

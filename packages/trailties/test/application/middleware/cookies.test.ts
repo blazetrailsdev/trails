@@ -4,17 +4,15 @@ import { Isolation } from "@blazetrails/activesupport/testing/isolation";
 import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
 import { MessageEncryptor } from "@blazetrails/activesupport/message-encryptor";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
-import { JSON, Marshal } from "@blazetrails/ruby-compat";
+import { JSON } from "@blazetrails/ruby-compat/json";
+import { Marshal } from "@blazetrails/ruby-compat/marshal";
 import { CookieJar } from "@blazetrails/actionpack";
 import { Methods } from "@blazetrails/rack-test";
-import {
-  File,
-  FileUtils,
-  include,
-  rbInspect,
-  rbModRemoveConst,
-  TopLevel,
-} from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat/file";
+import { FileUtils } from "@blazetrails/ruby-compat/file-utils";
+import { include } from "@blazetrails/ruby-compat/include";
+import { rbInspect, TopLevel } from "@blazetrails/ruby-compat/object";
+import { rbModRemoveConst } from "@blazetrails/ruby-compat/variable";
 import { Application } from "../../../lib/application.js";
 import { Trails } from "../../../lib/trails.js";
 import type { Generation } from "../../support/isolation/abstract-unit.js";

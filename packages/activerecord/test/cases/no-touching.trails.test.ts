@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Thread } from "@blazetrails/ruby-compat";
+import { Thread } from "@blazetrails/ruby-compat/thread";
 import { IsolatedExecutionState } from "@blazetrails/activesupport";
 import { Base } from "../../lib/index.js";
 import { applyTo, isAppliedTo } from "../../lib/no-touching.js";

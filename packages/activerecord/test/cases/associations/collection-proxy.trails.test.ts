@@ -1,7 +1,11 @@
 import { DescendantsTracker } from "@blazetrails/activesupport";
 import type { AssociationProxy } from "../../../lib/associations/collection-proxy.js";
 import type { CollectionAssociation } from "../../../lib/associations/collection-association.js";
-import { Enumerable, Range, kernelThrow, constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { Enumerable } from "@blazetrails/ruby-compat/enumerable";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { kernelThrow } from "@blazetrails/ruby-compat/kernel-catch";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
+import { Range } from "@blazetrails/ruby-compat/range";
 import { Time as RubyTime } from "@blazetrails/date";
 import { describe, it, expect } from "vitest";
 import { Base, RecordNotFound } from "../../../lib/index.js";

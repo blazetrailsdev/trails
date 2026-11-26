@@ -1,10 +1,12 @@
 import { describe, it, expect, beforeEach, afterEach, vi, type MockInstance } from "vitest";
 import {
-  getOsAsync,
   getChildProcessAsync,
   type ChildProcessAdapter,
-} from "@blazetrails/ruby-compat";
-import { stdout, stderr, File, FileUtils } from "@blazetrails/ruby-compat";
+} from "@blazetrails/ruby-compat/child-process-adapter";
+import { getOsAsync } from "@blazetrails/ruby-compat/os-adapter";
+import { File } from "@blazetrails/ruby-compat/file";
+import { FileUtils } from "@blazetrails/ruby-compat/file-utils";
+import { stdout, stderr } from "@blazetrails/ruby-compat/process-adapter";
 import { DatabaseTasks } from "../../../../lib/tasks/database-tasks.js";
 import "../../../../lib/tasks/postgresql-database-tasks.js";
 import { HashConfig } from "../../../../lib/database-configurations/hash-config.js";

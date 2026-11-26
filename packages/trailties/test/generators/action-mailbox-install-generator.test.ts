@@ -1,4 +1,6 @@
-import { Dir, File, FileUtils } from "@blazetrails/ruby-compat";
+import { Dir } from "@blazetrails/ruby-compat/dir";
+import { File } from "@blazetrails/ruby-compat/file";
+import { FileUtils } from "@blazetrails/ruby-compat/file-utils";
 import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import "@blazetrails/actionmailbox/engine";

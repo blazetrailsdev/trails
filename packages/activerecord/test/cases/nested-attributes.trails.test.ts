@@ -1,5 +1,7 @@
 import { DescendantsTracker } from "@blazetrails/activesupport";
-import { constSet, hashAref, TopLevel } from "@blazetrails/ruby-compat";
+import { hashAref } from "@blazetrails/ruby-compat/hash";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
 import type { Base } from "../../lib/index.js";
 import { describe, it, expect } from "vitest";
 import { fixtures } from "../support/use-fixtures.js";

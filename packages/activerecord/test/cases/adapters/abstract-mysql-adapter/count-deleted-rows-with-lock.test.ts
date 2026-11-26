@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { Thread, constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
+import { Thread } from "@blazetrails/ruby-compat/thread";
 import { fixtures } from "../../../support/use-fixtures.js";
 import { currentAdapter } from "../../../support/adapter-helper.js";
 import { Bulb } from "../../../models/bulb.js";

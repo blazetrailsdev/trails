@@ -7,8 +7,8 @@ import {
   isEmpty,
   NameError,
   rbFBinding,
-  rbFSystem,
 } from "@blazetrails/ruby-compat";
+import { rbFSystem } from "@blazetrails/ruby-compat/kernel-system";
 import { capture, isWindows, silenceWarnings, sourceRoot } from "../support/helper.js";
 import { MyCounter } from "../fixtures/group.js";
 import { Error as ThorError } from "../../lib/error.js";
@@ -19,7 +19,7 @@ vi.mock("../../lib/line-editor.js", async (importOriginal) => ({
   ...(await importOriginal<object>()),
   readline,
 }));
-vi.mock("@blazetrails/ruby-compat", async (importOriginal) => ({
+vi.mock("@blazetrails/ruby-compat/kernel-system", async (importOriginal) => ({
   ...(await importOriginal<object>()),
   rbFSystem: vi.fn(),
 }));

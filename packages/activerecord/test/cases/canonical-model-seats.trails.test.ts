@@ -1,10 +1,7 @@
 import { describe, it, expect } from "vitest";
-import {
-  rbClassInheritedP,
-  rbClassSuperclass,
-  rbModName,
-  constGet,
-} from "@blazetrails/ruby-compat";
+import { rbClassInheritedP } from "@blazetrails/ruby-compat/include";
+import { rbClassSuperclass, rbModName } from "@blazetrails/ruby-compat/object";
+import { constGet } from "@blazetrails/ruby-compat/variable";
 import { Base } from "../../lib/base.js";
 import * as models from "../models/index.js";
 

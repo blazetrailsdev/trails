@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { File as RubyFile, Tempfile } from "@blazetrails/ruby-compat";
+import { File as RubyFile } from "@blazetrails/ruby-compat/file";
+import { Tempfile } from "@blazetrails/ruby-compat/tempfile";
 
 import { File } from "../../../lib/fixture-set/file.js";
 import { FixtureSet, FormatError } from "../../../lib/fixtures.js";

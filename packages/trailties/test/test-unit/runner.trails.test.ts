@@ -1,14 +1,11 @@
 import { Formatter } from "@blazetrails/did-you-mean";
-import {
-  Dir,
-  File,
-  LoadError,
-  STDOUT,
-  StringIO,
-  env,
-  getFs,
-  setEnv,
-} from "@blazetrails/ruby-compat";
+import { Dir } from "@blazetrails/ruby-compat/dir";
+import { File } from "@blazetrails/ruby-compat/file";
+import { getFs } from "@blazetrails/ruby-compat/fs-adapter";
+import { STDOUT } from "@blazetrails/ruby-compat/io";
+import { LoadError } from "@blazetrails/ruby-compat/load-error";
+import { env, setEnv } from "@blazetrails/ruby-compat/process-adapter";
+import { StringIO } from "@blazetrails/ruby-compat/string-io";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TestUnitReporter } from "../../lib/test-unit/reporter.js";
 import { CompositeFilter, Filter, InvalidTestError, Runner } from "../../lib/test-unit/runner.js";

@@ -17,15 +17,11 @@ import {
   TimeType,
   UnknownAttributeError as AMUnknownAttributeError,
 } from "@blazetrails/activemodel";
-import {
-  ArgumentError,
-  Hash,
-  basicObjRespondTo,
-  NoMethodError,
-  hashAref,
-  constSet,
-  TopLevel,
-} from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { Hash, hashAref } from "@blazetrails/ruby-compat/hash";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { NoMethodError } from "@blazetrails/ruby-compat/no-method-error";
+import { basicObjRespondTo, TopLevel } from "@blazetrails/ruby-compat/object";
 import { Base, DangerousAttributeError, Type, UnknownAttributeError } from "../../lib/index.js";
 
 import { TimeZoneConverter } from "../../lib/attribute-methods/time-zone-conversion.js";

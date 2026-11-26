@@ -1,7 +1,11 @@
-import { Dir, File, constDefined, rbModRemoveConst } from "@blazetrails/ruby-compat";
+import { Dir } from "@blazetrails/ruby-compat/dir";
+import { File } from "@blazetrails/ruby-compat/file";
+import { constDefined } from "@blazetrails/ruby-compat/include";
+import { rbModRemoveConst } from "@blazetrails/ruby-compat/variable";
 import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
 import { capture } from "@blazetrails/activesupport/testing/stream";
-import { TopLevel, constSet } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
 import { beforeEach, describe, expect, it } from "vitest";
 import { HelperGenerator } from "../../lib/generators/trails/helper/helper-generator.js";
 import { TestCase } from "../../lib/generators/test-case.js";

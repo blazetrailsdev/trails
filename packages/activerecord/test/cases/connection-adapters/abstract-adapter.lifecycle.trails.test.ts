@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { Thread } from "@blazetrails/ruby-compat";
+import { Thread } from "@blazetrails/ruby-compat/thread";
 import { AbstractAdapter } from "../../../lib/connection-adapters/abstract-adapter.js";
 import { TypeMap } from "../../../lib/type/type-map.js";
 import { ConnectionPool } from "../../../lib/connection-adapters/abstract/connection-pool.js";

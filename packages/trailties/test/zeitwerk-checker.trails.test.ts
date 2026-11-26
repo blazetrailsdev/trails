@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { Dependencies } from "@blazetrails/activesupport";
-import { Dir, File, FileUtils } from "@blazetrails/ruby-compat";
+import { Dir } from "@blazetrails/ruby-compat/dir";
+import { File } from "@blazetrails/ruby-compat/file";
+import { FileUtils } from "@blazetrails/ruby-compat/file-utils";
 import { ZeitwerkChecker } from "../lib/zeitwerk-checker.js";
 
 describe("Trails::ZeitwerkChecker", () => {

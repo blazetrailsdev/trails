@@ -28,7 +28,7 @@ import { EncryptedAttributeType } from "../../../lib/encryption/encrypted-attrib
 import { Serialized } from "../../../lib/type/serialized.js";
 import { Base } from "../../../lib/base.js";
 import { LengthValidator } from "@blazetrails/activemodel";
-import type { Hash } from "@blazetrails/ruby-compat";
+import type { Hash } from "@blazetrails/ruby-compat/hash";
 import { BinaryType } from "@blazetrails/activemodel";
 
 describe("ActiveRecord::Encryption::EncryptableRecordTest (trails)", () => {

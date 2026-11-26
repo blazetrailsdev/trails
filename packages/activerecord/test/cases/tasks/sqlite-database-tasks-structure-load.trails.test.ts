@@ -1,5 +1,8 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
-import { getChildProcess, getChildProcessAsync } from "@blazetrails/ruby-compat";
+import {
+  getChildProcess,
+  getChildProcessAsync,
+} from "@blazetrails/ruby-compat/child-process-adapter";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";

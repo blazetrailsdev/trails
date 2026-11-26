@@ -1,5 +1,6 @@
 import { DescendantsTracker } from "@blazetrails/activesupport";
-import { constSet, rbModName, TopLevel } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { rbModName, TopLevel } from "@blazetrails/ruby-compat/object";
 import type { CollectionAssociation } from "../../lib/associations/collection-association.js";
 import {
   indexNestedAttributeErrors,

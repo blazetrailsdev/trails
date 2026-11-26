@@ -1,12 +1,9 @@
 import { DescendantsTracker } from "@blazetrails/activesupport";
 import { Admin } from "../../models/admin.js";
-import {
-  kernelThrow,
-  constDefined,
-  constSet,
-  TopLevel,
-  rbModRemoveConst,
-} from "@blazetrails/ruby-compat";
+import { constDefined, constSet } from "@blazetrails/ruby-compat/include";
+import { kernelThrow } from "@blazetrails/ruby-compat/kernel-catch";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
+import { rbModRemoveConst } from "@blazetrails/ruby-compat/variable";
 import type { AssociationProxy } from "../../../lib/associations/collection-proxy.js";
 import type { Category } from "../../models/category.js";
 import { Notifications, type NotificationEvent } from "@blazetrails/activesupport";

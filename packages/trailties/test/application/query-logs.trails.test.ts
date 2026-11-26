@@ -1,4 +1,4 @@
-import { Pathname } from "@blazetrails/ruby-compat";
+import { Pathname } from "@blazetrails/ruby-compat/pathname";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Trailtie as I18nTrailtie } from "../../lib/trailties/i18n.js";
 

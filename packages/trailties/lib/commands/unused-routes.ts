@@ -15,7 +15,7 @@ import {
 } from "@blazetrails/activesupport";
 import { getPath, publicInstanceMethods, toA } from "@blazetrails/ruby-compat";
 import { glob } from "@blazetrails/activesupport/glob";
-import { exit } from "@blazetrails/ruby-compat";
+import { exit } from "@blazetrails/ruby-compat/process-adapter";
 import type { ThorClass } from "@blazetrails/thor";
 import { Base } from "../command/base.js";
 import { Trails } from "../trails.js";

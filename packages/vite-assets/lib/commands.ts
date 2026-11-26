@@ -10,8 +10,8 @@ import {
   StandardError,
   STDOUT as $stdout,
   TopLevel,
-  warn,
 } from "@blazetrails/ruby-compat";
+import { warn } from "@blazetrails/ruby-compat/kernel-warn";
 import type { Builder } from "./builder.js";
 import { CompatibilityCheck } from "./compatibility-check.js";
 import type { Config } from "./config.js";

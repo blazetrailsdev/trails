@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
-import { ArgumentError, include, type Included } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { include, type Included } from "@blazetrails/ruby-compat/include";
 import {
   ClassMethods,
   Initializable,

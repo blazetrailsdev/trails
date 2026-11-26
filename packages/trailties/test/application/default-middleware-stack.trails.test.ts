@@ -1,6 +1,7 @@
-import { Pathname } from "@blazetrails/ruby-compat";
+import { Pathname } from "@blazetrails/ruby-compat/pathname";
 import type { RackResponse } from "@blazetrails/rack";
-import { LoadError, rbFSend } from "@blazetrails/ruby-compat";
+import { LoadError } from "@blazetrails/ruby-compat/load-error";
+import { rbFSend } from "@blazetrails/ruby-compat/object";
 import { describe, it, expect } from "vitest";
 import {
   Callbacks,

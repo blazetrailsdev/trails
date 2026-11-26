@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Hash } from "@blazetrails/ruby-compat";
+import { Hash } from "@blazetrails/ruby-compat/hash";
 import { fixtures } from "../../support/use-fixtures.js";
 import "../../models/bulb.js";
 import { Car } from "../../models/car.js";

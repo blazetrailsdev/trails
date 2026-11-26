@@ -1,12 +1,13 @@
 import { describe, it, expect, vi } from "vitest";
-import { encode, Range, warn } from "@blazetrails/ruby-compat";
+import { encode, Range } from "@blazetrails/ruby-compat";
+import { warn } from "@blazetrails/ruby-compat/kernel-warn";
 import * as Utils from "../lib/utils.js";
 import { Lint } from "../lib/lint.js";
 import { MockRequest } from "../lib/mock-request.js";
 import { Params, QueryParser } from "../lib/query-parser.js";
 
-vi.mock("@blazetrails/ruby-compat", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@blazetrails/ruby-compat")>();
+vi.mock("@blazetrails/ruby-compat/kernel-warn", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@blazetrails/ruby-compat/kernel-warn")>();
   return { ...actual, warn: vi.fn(actual.warn) };
 });
 

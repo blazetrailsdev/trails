@@ -3,8 +3,8 @@ import { File, FileUtils, Pathname, TopLevel } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const commands = vi.hoisted(() => [] as string[]);
-vi.mock("@blazetrails/ruby-compat", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@blazetrails/ruby-compat")>()),
+vi.mock("@blazetrails/ruby-compat/kernel-system", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@blazetrails/ruby-compat/kernel-system")>()),
   rbFSystem: async (command: string) => {
     commands.push(command);
     return true;

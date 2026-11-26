@@ -13,7 +13,7 @@ import { ViteTrails } from "../lib/index.js";
 import "../lib/cli.js";
 
 const exec = vi.hoisted(() => vi.fn());
-vi.mock("@blazetrails/ruby-compat", async (importOriginal) => ({
+vi.mock("@blazetrails/ruby-compat/process-adapter", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   exec,
 }));

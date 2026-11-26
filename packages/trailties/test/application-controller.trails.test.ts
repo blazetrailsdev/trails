@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { RouteSet } from "@blazetrails/actionpack";
 import { TestCase } from "@blazetrails/actionpack/testing";
 import { LookupContext, type Template } from "@blazetrails/actionview";
-import { File } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat/file";
 import { ApplicationController } from "../lib/application-controller.js";
 import { Application } from "../lib/application.js";
 import { InfoController } from "../lib/info-controller.js";

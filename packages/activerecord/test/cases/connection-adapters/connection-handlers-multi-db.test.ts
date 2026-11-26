@@ -1,5 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { Concurrent, Tempfile, Thread, setEnv } from "@blazetrails/ruby-compat";
+import { Concurrent } from "@blazetrails/ruby-compat/concurrent/map";
+import { setEnv } from "@blazetrails/ruby-compat/process-adapter";
+import { Tempfile } from "@blazetrails/ruby-compat/tempfile";
+import { Thread } from "@blazetrails/ruby-compat/thread";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { getEnv } from "@blazetrails/activesupport";
 import { assertNotNil, assertRaises } from "@blazetrails/activesupport/testing/assertions";

@@ -1,4 +1,5 @@
-import { Dir, File } from "@blazetrails/ruby-compat";
+import { Dir } from "@blazetrails/ruby-compat/dir";
+import { File } from "@blazetrails/ruby-compat/file";
 import { assertMatch } from "@blazetrails/activesupport/testing/assertions";
 import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
 import { afterEach, beforeAll, beforeEach, describe, it } from "vitest";

@@ -2,7 +2,10 @@ import type { RackResponse } from "@blazetrails/rack";
 import { afterEach, describe, expect, it } from "vitest";
 import { Base } from "@blazetrails/activerecord";
 import { MockRequest } from "@blazetrails/rack";
-import { env, getFs, getOsAsync, getPath, rbProcCall, setEnv } from "@blazetrails/ruby-compat";
+import { getFs, getPath } from "@blazetrails/ruby-compat/fs-adapter";
+import { rbProcCall } from "@blazetrails/ruby-compat/object";
+import { getOsAsync } from "@blazetrails/ruby-compat/os-adapter";
+import { env, setEnv } from "@blazetrails/ruby-compat/process-adapter";
 import { Application } from "../lib/application.js";
 import { Trails, _resetTrailsEnv } from "../lib/trails.js";
 

@@ -7,7 +7,9 @@ import { BigDecimal, TimeWithZone } from "@blazetrails/activesupport";
 import { assertNotCalled } from "@blazetrails/activesupport/testing/method-call-assertions";
 import { DateTimeType } from "@blazetrails/activemodel";
 import { Time } from "@blazetrails/date";
-import { rbObjClassname, keys, constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { keys } from "@blazetrails/ruby-compat/hash";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { rbObjClassname, TopLevel } from "@blazetrails/ruby-compat/object";
 import { TimeZoneConverter } from "../../lib/attribute-methods/time-zone-conversion.js";
 
 import { loadSchemaFromAdapter } from "../../lib/model-schema.js";

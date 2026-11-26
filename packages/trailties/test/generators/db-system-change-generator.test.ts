@@ -1,6 +1,8 @@
 import { capture } from "@blazetrails/activesupport/testing/stream";
 import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
-import { Dir, File, type Hash } from "@blazetrails/ruby-compat";
+import { Dir } from "@blazetrails/ruby-compat/dir";
+import { File } from "@blazetrails/ruby-compat/file";
+import type { Hash } from "@blazetrails/ruby-compat/hash";
 import { beforeEach, describe, expect, it } from "vitest";
 import { TestCase } from "../../lib/generators/test-case.js";
 import {

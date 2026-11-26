@@ -42,9 +42,9 @@ import {
   include,
   rbObjDup,
   toEnum,
-  warn,
   strNew,
 } from "@blazetrails/ruby-compat";
+import { warn } from "@blazetrails/ruby-compat/kernel-warn";
 import { MediaType } from "./media-type.js";
 import * as Multipart from "./multipart.js";
 import { Rack } from "./namespaces.js";

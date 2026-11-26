@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { Thread, rbInspect, constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { rbInspect, TopLevel } from "@blazetrails/ruby-compat/object";
+import { Thread } from "@blazetrails/ruby-compat/thread";
 import { ExplainRegistry, Base } from "../../lib/index.js";
 import { renderBind } from "../../lib/explain.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../../lib/connection-adapters/abstract-adapter.js";

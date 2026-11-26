@@ -13,16 +13,9 @@ import { TestCase } from "@blazetrails/activesupport/test-case";
 import { TestDatabases } from "@blazetrails/activerecord/test-databases";
 import type { FixtureSetAccessor } from "@blazetrails/activerecord/test-fixtures";
 import { QueryAssertions } from "@blazetrails/activerecord/testing/query-assertions";
-import {
-  env,
-  include,
-  includedModules,
-  rbCallSuper,
-  rbModName,
-  setEnv,
-  TopLevel,
-  constSet,
-} from "@blazetrails/ruby-compat";
+import { include, includedModules, rbCallSuper, constSet } from "@blazetrails/ruby-compat/include";
+import { rbModName, TopLevel } from "@blazetrails/ruby-compat/object";
+import { env, setEnv } from "@blazetrails/ruby-compat/process-adapter";
 import { Application } from "../lib/application.js";
 import { Trails } from "../lib/trails.js";
 

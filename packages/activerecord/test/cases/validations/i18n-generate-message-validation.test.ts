@@ -1,4 +1,4 @@
-import { include } from "@blazetrails/ruby-compat";
+import { include } from "@blazetrails/ruby-compat/include";
 import { describe, it, expect, beforeEach } from "vitest";
 import { I18n } from "@blazetrails/activemodel";
 import { RecordInvalid } from "../../../lib/validations.js";

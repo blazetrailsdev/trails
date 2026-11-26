@@ -12,7 +12,9 @@ import { SQLite3Adapter } from "../../lib/connection-adapters/sqlite3-adapter.js
 import { BooleanType, IntegerType, StringType } from "@blazetrails/activemodel";
 import { establishConnectionTo } from "../support/adapter-double.js";
 import { compactBlank, DescendantsTracker, isBlank } from "@blazetrails/activesupport";
-import { rbCheckArrayType, rbHash, rbModToS, rbObjRespondTo, uniq } from "@blazetrails/ruby-compat";
+import { rbCheckArrayType, uniq } from "@blazetrails/ruby-compat/array";
+import { rbModToS, rbObjRespondTo } from "@blazetrails/ruby-compat/object";
+import { rbHash } from "@blazetrails/ruby-compat/rb-hash";
 import { _allocation, equals as coreEquals, hash as coreHash } from "../../lib/core.js";
 import { hasQueryConstraints, queryConstraints } from "../../lib/persistence.js";
 import { DestroyAssociationAsyncJob } from "../../lib/destroy-association-async-job.js";

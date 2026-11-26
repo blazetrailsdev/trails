@@ -10,7 +10,6 @@ import {
   RuntimeError,
   Shellwords,
   env,
-  exit,
   include,
   type Included,
   rbFBackquote,
@@ -18,6 +17,7 @@ import {
   rbObjRespondTo,
   regexpEscape,
 } from "@blazetrails/ruby-compat";
+import { exit } from "@blazetrails/ruby-compat/process-adapter";
 import { dasherize, isPresent, underscore } from "@blazetrails/activesupport";
 import { Error as ThorError } from "@blazetrails/thor/error";
 import { Trails } from "../trails.js";

@@ -58,17 +58,13 @@ import { Bird } from "../models/bird.js";
 import { LoosePerson, LooseDescendant } from "../models/person.js";
 import "../support/canonical-model-index.js";
 import { MultiparameterAssignmentErrors, type AttributeAssignmentError } from "../../lib/errors.js";
-import {
-  Hash,
-  Range as ArRange,
-  RuntimeError,
-  sort,
-  constSet,
-  TopLevel,
-  constGet,
-  constDefined,
-  rbModRemoveConst,
-} from "@blazetrails/ruby-compat";
+import { sort } from "@blazetrails/ruby-compat/array";
+import { Hash } from "@blazetrails/ruby-compat/hash";
+import { constSet, constDefined } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
+import { Range as ArRange } from "@blazetrails/ruby-compat/range";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
+import { constGet, rbModRemoveConst } from "@blazetrails/ruby-compat/variable";
 import {
   raiseOnAssignToAttrReadonly,
   setRaiseOnAssignToAttrReadonly,

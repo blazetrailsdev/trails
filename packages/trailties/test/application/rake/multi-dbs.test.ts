@@ -4,16 +4,14 @@ import { Isolation } from "@blazetrails/activesupport/testing/isolation";
 import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
 import { assertRaises } from "@blazetrails/activesupport/testing/assertions";
 import { Base } from "@blazetrails/activerecord";
-import {
-  constGet,
-  Dir,
-  env,
-  File,
-  FileUtils,
-  include,
-  RuntimeError,
-  TopLevel,
-} from "@blazetrails/ruby-compat";
+import { Dir } from "@blazetrails/ruby-compat/dir";
+import { File } from "@blazetrails/ruby-compat/file";
+import { FileUtils } from "@blazetrails/ruby-compat/file-utils";
+import { include } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
+import { env } from "@blazetrails/ruby-compat/process-adapter";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
+import { constGet } from "@blazetrails/ruby-compat/variable";
 import { Trails } from "../../../lib/trails.js";
 import type { Generation } from "../../support/isolation/abstract-unit.js";
 import "../../support/isolation/abstract-unit.js";

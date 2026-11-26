@@ -1,10 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
-  type ChildProcessAdapter,
   getChildProcessAsync,
-  stdout,
-  stderr,
-} from "@blazetrails/ruby-compat";
+  type ChildProcessAdapter,
+} from "@blazetrails/ruby-compat/child-process-adapter";
+import { stdout, stderr } from "@blazetrails/ruby-compat/process-adapter";
 import { DatabaseTasks } from "../../../../lib/tasks/database-tasks.js";
 import "../../../../lib/tasks/mysql-database-tasks.js";
 import { HashConfig } from "../../../../lib/database-configurations/hash-config.js";

@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { capture } from "@blazetrails/activesupport/testing/stream";
-import { Dir, File, FileUtils, stdin } from "@blazetrails/ruby-compat";
+import { Dir } from "@blazetrails/ruby-compat/dir";
+import { File } from "@blazetrails/ruby-compat/file";
+import { FileUtils } from "@blazetrails/ruby-compat/file-utils";
+import { stdin } from "@blazetrails/ruby-compat/process-adapter";
 import { ChangeGenerator } from "../../lib/generators/trails/db/system/change/change-generator.js";
 import { DATABASES } from "../../lib/generators/database.js";
 import { invoke } from "../../lib/command.js";

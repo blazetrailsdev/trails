@@ -1,5 +1,6 @@
 import { DescendantsTracker } from "@blazetrails/activesupport";
-import { constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { File as FixtureFile } from "../../lib/fixture-set/file.js";
 import { FIXTURES_ROOT as TS_FIXTURES_ROOT } from "../config.js";

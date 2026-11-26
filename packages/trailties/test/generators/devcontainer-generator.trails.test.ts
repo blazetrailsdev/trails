@@ -1,4 +1,4 @@
-import { Dir } from "@blazetrails/ruby-compat";
+import { Dir } from "@blazetrails/ruby-compat/dir";
 import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
 import { beforeEach, describe, expect, it } from "vitest";
 import { DevcontainerGenerator } from "../../lib/generators/trails/devcontainer/devcontainer-generator.js";

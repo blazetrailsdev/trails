@@ -1,6 +1,8 @@
 import { DescendantsTracker } from "@blazetrails/activesupport";
 import type { CollectionAssociation } from "../../../lib/associations/collection-association.js";
-import { kernelThrow, constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { kernelThrow } from "@blazetrails/ruby-compat/kernel-catch";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
 import { describe, it, expect } from "vitest";
 import { Base } from "../../../lib/index.js";
 import type { Base as BaseRecord } from "../../../lib/base.js";

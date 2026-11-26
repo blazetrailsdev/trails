@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { fixtures } from "../support/use-fixtures.js";
 import { Comment } from "../models/comment.js";
-import { rbClearMethodCache, rbObjSingletonClass } from "@blazetrails/ruby-compat";
+import { rbClearMethodCache } from "@blazetrails/ruby-compat/method-cache";
+import { rbObjSingletonClass } from "@blazetrails/ruby-compat/object";
 import { _virtualAttributePrototypeCache } from "../../lib/persistence.js";
 
 describe("select alias dynamic reader (trails)", () => {

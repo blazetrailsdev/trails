@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Enumerable } from "@blazetrails/ruby-compat";
+import { Enumerable } from "@blazetrails/ruby-compat/enumerable";
 import type { ValueType } from "@blazetrails/activemodel";
 import { Array as OidArray } from "../../../../../lib/connection-adapters/postgresql/oid/array.js";
 import { Enum } from "../../../../../lib/connection-adapters/postgresql/oid/enum.js";

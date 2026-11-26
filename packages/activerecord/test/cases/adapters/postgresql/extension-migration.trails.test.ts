@@ -1,4 +1,4 @@
-import { StringIO } from "@blazetrails/ruby-compat";
+import { StringIO } from "@blazetrails/ruby-compat/string-io";
 import { it, expect, beforeEach, afterEach } from "vitest";
 import { Migration } from "../../../../lib/index.js";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_CONFIG } from "./test-helper.js";

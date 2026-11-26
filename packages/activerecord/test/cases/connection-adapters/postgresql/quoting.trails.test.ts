@@ -29,7 +29,7 @@ import {
   typeCast as typeCastFn,
   unescapeBytea,
 } from "../../../../lib/connection-adapters/postgresql/quoting.js";
-import { Range } from "@blazetrails/ruby-compat";
+import { Range } from "@blazetrails/ruby-compat/range";
 
 const HOST = quotingHost({
   quotedDate: quotedDateFn,

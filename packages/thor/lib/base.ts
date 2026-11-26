@@ -4,7 +4,6 @@ import {
   aryDeleteIf,
   env,
   Errno,
-  exit,
   extend,
   File,
   Hash,
@@ -31,10 +30,11 @@ import {
   RuntimeError,
   stringSplit,
   TypeError,
-  warn,
   rbGvGet,
   rbClearMethodCache,
 } from "@blazetrails/ruby-compat";
+import { warn } from "@blazetrails/ruby-compat/kernel-warn";
+import { exit } from "@blazetrails/ruby-compat/process-adapter";
 import type { Command } from "./command.js";
 import { Invocation } from "./invocation.js";
 import { Error as ThorError, InvocationError, UndefinedCommandError } from "./error.js";

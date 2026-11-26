@@ -1,6 +1,9 @@
 import { capture } from "@blazetrails/activesupport/testing/stream";
 import { describe, it, expect, vi } from "vitest";
-import { Dir, File, FileUtils, SecureRandom } from "@blazetrails/ruby-compat";
+import { Dir } from "@blazetrails/ruby-compat/dir";
+import { File } from "@blazetrails/ruby-compat/file";
+import { FileUtils } from "@blazetrails/ruby-compat/file-utils";
+import { SecureRandom } from "@blazetrails/ruby-compat/secure-random";
 import { Base, type GeneratorConfig } from "../../lib/generators/base.js";
 import { Generators, type GeneratorClass } from "../../lib/generators.js";
 

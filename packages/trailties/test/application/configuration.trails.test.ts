@@ -1,4 +1,4 @@
-import { Pathname } from "@blazetrails/ruby-compat";
+import { Pathname } from "@blazetrails/ruby-compat/pathname";
 import { describe, expect, it } from "vitest";
 import { HTML } from "@blazetrails/html-sanitizer";
 import { Configuration } from "../../lib/application/configuration.js";

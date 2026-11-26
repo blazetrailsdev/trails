@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll } from "vitest";
-import { RuntimeError } from "@blazetrails/ruby-compat";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
 import { ActiveRecordError, MultiparameterAssignmentErrors } from "../../lib/index.js";
 import { baseClass } from "../../lib/inheritance.js";
 import { fixtures } from "../support/use-fixtures.js";

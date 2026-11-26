@@ -1,5 +1,6 @@
 import { HashWithIndifferentAccess } from "@blazetrails/activesupport";
-import { Fiber, kernelThrow } from "@blazetrails/ruby-compat";
+import { Fiber } from "@blazetrails/ruby-compat/fiber";
+import { kernelThrow } from "@blazetrails/ruby-compat/kernel-catch";
 import { describe, it, expect, afterEach, afterAll, vi } from "vitest";
 import {
   IsolatedExecutionState,

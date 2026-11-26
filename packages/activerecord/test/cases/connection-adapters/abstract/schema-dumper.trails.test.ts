@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { StringIO } from "@blazetrails/ruby-compat";
+import { StringIO } from "@blazetrails/ruby-compat/string-io";
 import { ValueType } from "@blazetrails/activemodel";
 import { SchemaDumper } from "../../../../lib/connection-adapters/abstract/schema-dumper.js";
 import { IntegerType, DecimalType, BooleanType, StringType } from "@blazetrails/activemodel";

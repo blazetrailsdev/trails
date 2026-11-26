@@ -8,7 +8,7 @@ import { loadSchemaFromAdapter } from "../../../lib/model-schema.js";
 import { Array as ArrayType } from "../../../lib/connection-adapters/postgresql/oid/array.js";
 import { RangeType } from "../../../lib/connection-adapters/postgresql/oid/range.js";
 import { TimeZoneConverter } from "../../../lib/attribute-methods/time-zone-conversion.js";
-import { Range } from "@blazetrails/ruby-compat";
+import { Range } from "@blazetrails/ruby-compat/range";
 import { adapterDouble, establishConnectionTo } from "../../support/adapter-double.js";
 
 fixtures({});

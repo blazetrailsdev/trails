@@ -1,4 +1,5 @@
-import { OpenSSL, b } from "@blazetrails/ruby-compat";
+import { OpenSSL } from "@blazetrails/ruby-compat/openssl";
+import { b } from "@blazetrails/ruby-compat/string/b";
 import { Time as RubyTime } from "@blazetrails/date";
 import { describe, it, expect, beforeAll, beforeEach, afterAll, afterEach } from "vitest";
 import {

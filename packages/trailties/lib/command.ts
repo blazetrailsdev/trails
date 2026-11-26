@@ -7,7 +7,6 @@ import {
   Pathname,
   StandardError,
   env,
-  exit,
   prepend,
   rbArgv,
   rbAryReplace,
@@ -15,6 +14,7 @@ import {
   rbObjDup,
   stdout,
 } from "@blazetrails/ruby-compat";
+import { exit } from "@blazetrails/ruby-compat/process-adapter";
 import { APP_PATH, ENGINE_ROOT } from "./app-path.js";
 import type { ThorClass } from "@blazetrails/thor";
 import type { Base } from "./command/base.js";

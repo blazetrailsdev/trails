@@ -1,5 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { Dir, File, FileUtils, rbFLoad } from "@blazetrails/ruby-compat";
+import { Dir } from "@blazetrails/ruby-compat/dir";
+import { File } from "@blazetrails/ruby-compat/file";
+import { FileUtils } from "@blazetrails/ruby-compat/file-utils";
+import { rbFLoad } from "@blazetrails/ruby-compat/load";
 import { APP_PATH, setAppPath, setEngineRoot } from "../../lib/app-path.js";
 
 vi.mock("../../lib/commands.js", () => ({}));

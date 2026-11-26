@@ -1,4 +1,6 @@
-import { rbFLoad, StringIO, type IO } from "@blazetrails/ruby-compat";
+import type { IO } from "@blazetrails/ruby-compat/io";
+import { rbFLoad } from "@blazetrails/ruby-compat/load";
+import { StringIO } from "@blazetrails/ruby-compat/string-io";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";

@@ -1,5 +1,7 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { Dir, File, extend, include } from "@blazetrails/ruby-compat";
+import { Dir } from "@blazetrails/ruby-compat/dir";
+import { File } from "@blazetrails/ruby-compat/file";
+import { extend, include } from "@blazetrails/ruby-compat/include";
 import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
 import { capture, quietly } from "@blazetrails/activesupport/testing/stream";
 import { Error as GeneratorsError } from "../../lib/generators/base.js";

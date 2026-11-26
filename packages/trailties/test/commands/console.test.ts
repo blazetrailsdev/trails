@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { capture } from "@blazetrails/activesupport/testing/stream";
-import { TSREPL, env, setEnv } from "@blazetrails/ruby-compat";
+import { env, setEnv } from "@blazetrails/ruby-compat/process-adapter";
+import { TSREPL } from "@blazetrails/ruby-compat/repl-adapter";
 import { Trails } from "../../lib/trails.js";
 import { Console, ConsoleCommand } from "../../lib/commands/console.js";
 import { TSREPLConsole } from "../../lib/commands/console/tsrepl-console.js";

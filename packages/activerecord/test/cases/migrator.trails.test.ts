@@ -8,7 +8,7 @@ import {
   vi,
   type MockInstance,
 } from "vitest";
-import { stdout } from "@blazetrails/ruby-compat";
+import { stdout } from "@blazetrails/ruby-compat/process-adapter";
 import {
   MigrationContext,
   Migrator,

@@ -1,13 +1,10 @@
 import { DescendantsTracker } from "@blazetrails/activesupport";
-import {
-  kernelCatch,
-  kernelThrow,
-  FrozenError,
-  RuntimeError,
-  StandardError,
-  constSet,
-  TopLevel,
-} from "@blazetrails/ruby-compat";
+import { FrozenError } from "@blazetrails/ruby-compat/frozen-error";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { kernelCatch, kernelThrow } from "@blazetrails/ruby-compat/kernel-catch";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
+import { StandardError } from "@blazetrails/ruby-compat/standard-error";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { transaction, Rollback, RecordInvalid } from "../../lib/index.js";
 import { afterAllTransactionsCommit } from "../../lib/active-record.js";

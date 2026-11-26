@@ -3,7 +3,9 @@ import "../../../lib/index.js";
 import { fixtures } from "../../support/use-fixtures.js";
 import { Owner } from "../../models/owner.js";
 import { Pet } from "../../models/pet.js";
-import { Range, constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
+import { Range } from "@blazetrails/ruby-compat/range";
 
 describe("LengthValidationTest", () => {
   fixtures([]);

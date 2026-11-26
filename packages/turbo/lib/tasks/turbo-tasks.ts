@@ -1,12 +1,6 @@
 import { DSL, Task } from "@blazetrails/rake";
-import {
-  File,
-  RbConfig,
-  STDOUT as $stdout,
-  TopLevel,
-  block,
-  rbFSystem,
-} from "@blazetrails/ruby-compat";
+import { File, RbConfig, STDOUT as $stdout, TopLevel, block } from "@blazetrails/ruby-compat";
+import { rbFSystem } from "@blazetrails/ruby-compat/kernel-system";
 import { Turbo } from "../turbo-trails.js";
 
 export const Tasks = {

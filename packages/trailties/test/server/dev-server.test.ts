@@ -4,7 +4,7 @@ import { connect } from "node:net";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { RackApp } from "@blazetrails/rack";
-import type { TCPSocket } from "@blazetrails/ruby-compat";
+import type { TCPSocket } from "@blazetrails/ruby-compat/socket";
 import { build } from "vite";
 import { AppGenerator } from "../../lib/generators/trails/app/app-generator.js";
 import { DevServer } from "../../lib/server/dev-server.js";

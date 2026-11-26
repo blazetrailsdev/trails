@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { rbCString } from "@blazetrails/ruby-compat";
+import { rbCString } from "@blazetrails/ruby-compat/object";
 import { ColumnSerializer } from "../../../lib/coders/column-serializer.js";
 import { JSON as JsonCoder } from "../../../lib/coders/json.js";
 import { SerializationTypeMismatch } from "../../../lib/errors.js";

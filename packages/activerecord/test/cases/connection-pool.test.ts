@@ -1,19 +1,15 @@
 import { afterEach, beforeEach, describe, it, expect } from "vitest";
-import {
-  Concurrent,
-  Enumerator,
-  Mutex,
-  Process,
-  Timeout,
-  block,
-  rbObjSingletonClass,
-  rbFSend,
-  rbObjIvarSet,
-  RuntimeError,
-  StandardError,
-  Thread,
-  ThreadError,
-} from "@blazetrails/ruby-compat";
+import { Concurrent } from "@blazetrails/ruby-compat/concurrent/map";
+import { Enumerator } from "@blazetrails/ruby-compat/enumerator";
+import { block } from "@blazetrails/ruby-compat/hash";
+import { Mutex } from "@blazetrails/ruby-compat/mutex";
+import { rbObjSingletonClass, rbFSend, rbObjIvarSet } from "@blazetrails/ruby-compat/object";
+import { Process } from "@blazetrails/ruby-compat/process";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
+import { StandardError } from "@blazetrails/ruby-compat/standard-error";
+import { Thread } from "@blazetrails/ruby-compat/thread";
+import { ThreadError } from "@blazetrails/ruby-compat/thread-error";
+import { Timeout } from "@blazetrails/ruby-compat/timeout";
 import { IsolatedExecutionState, Notifications, NullLock } from "@blazetrails/activesupport";
 import {
   assertRaise,

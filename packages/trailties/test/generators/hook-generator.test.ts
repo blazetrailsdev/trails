@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { rbObjRespondTo } from "@blazetrails/ruby-compat/object";
 import { Base } from "../../lib/generators/base.js";
 
 class GeneratorWithHook extends Base {

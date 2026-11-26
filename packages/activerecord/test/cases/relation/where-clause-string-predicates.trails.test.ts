@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { Table, Nodes } from "@blazetrails/arel";
-import { Hash, constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { Hash } from "@blazetrails/ruby-compat/hash";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
 import { WhereClause } from "../../../lib/relation/where-clause.js";
 import "../../../lib/index.js";
 import { fixtures } from "../../support/use-fixtures.js";

@@ -9,7 +9,9 @@ import {
   MissingClassError,
 } from "@blazetrails/activesupport/message-pack";
 import { Factory } from "@blazetrails/msgpack";
-import { Marshal, constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { Marshal } from "@blazetrails/ruby-compat/marshal";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
 import { BinaryData } from "@blazetrails/activemodel";
 import { Base } from "../../lib/index.js";
 import { Extensions } from "../../lib/message-pack.js";

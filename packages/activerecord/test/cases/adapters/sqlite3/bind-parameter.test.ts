@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { fixtures } from "../../../support/use-fixtures.js";
 import { currentAdapter } from "../../../support/adapter-helper.js";
 import { BigDecimal } from "@blazetrails/activesupport";
-import { Rational } from "@blazetrails/ruby-compat";
+import { Rational } from "@blazetrails/ruby-compat/rational";
 import { Post } from "../../../models/post.js";
 
 describe.runIf(currentAdapter("SQLite3Adapter"))("SQLite3Adapter", () => {

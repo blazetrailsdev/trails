@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type {} from "@blazetrails/vitest-matchers";
-import { isAny } from "@blazetrails/ruby-compat";
+import { isAny } from "@blazetrails/ruby-compat/enumerable";
 import { Base } from "../../lib/index.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../../lib/connection-adapters/abstract-adapter.js";
 import { adapterType } from "../support/test-adapter.js";

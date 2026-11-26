@@ -5,7 +5,7 @@ import {
   type RawConfigurations,
 } from "../../../lib/database-configurations.js";
 import { InheritableOptions, getEnv } from "@blazetrails/activesupport";
-import { setEnv } from "@blazetrails/ruby-compat";
+import { setEnv } from "@blazetrails/ruby-compat/process-adapter";
 import { protocolAdapters, setProtocolAdapters } from "../../../lib/active-record.js";
 
 const DEFAULT_ENV = "default_env";

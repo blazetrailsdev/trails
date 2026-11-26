@@ -1,5 +1,7 @@
 import { afterAll, beforeAll, describe, it, expect, onTestFinished, vi } from "vitest";
-import { Dir, File, getFs } from "@blazetrails/ruby-compat";
+import { Dir } from "@blazetrails/ruby-compat/dir";
+import { File } from "@blazetrails/ruby-compat/file";
+import { getFs } from "@blazetrails/ruby-compat/fs-adapter";
 import { buildTemplates } from "@blazetrails/trails-tsc";
 import { GemHelpCommand } from "../lib/commands/gem-help.js";
 

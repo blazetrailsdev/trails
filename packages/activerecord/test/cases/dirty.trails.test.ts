@@ -1,6 +1,6 @@
-import { Hash } from "@blazetrails/ruby-compat";
+import { Hash } from "@blazetrails/ruby-compat/hash";
 import { describe, it, expect, beforeAll } from "vitest";
-import { hashAref, hasKey } from "@blazetrails/ruby-compat";
+import { hashAref, hasKey } from "@blazetrails/ruby-compat/hash";
 import type { HashWithIndifferentAccess } from "@blazetrails/activesupport";
 import { fixtures } from "../support/use-fixtures.js";
 import { Topic } from "../models/topic.js";

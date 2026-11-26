@@ -1,5 +1,7 @@
 import { assertRaises } from "@blazetrails/activesupport/testing/assertions";
-import { ArgumentError, constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
 import { describe, it, expect } from "vitest";
 import "../../../lib/index.js";
 import { StatementInvalid } from "../../../lib/index.js";
@@ -7,7 +9,7 @@ import { MissingAttributeError } from "@blazetrails/activemodel";
 import { fixtures } from "../../support/use-fixtures.js";
 import { Post, PostWithDefaultSelect } from "../../models/post.js";
 import { Comment } from "../../models/comment.js";
-import { regexpEscape } from "@blazetrails/ruby-compat";
+import { regexpEscape } from "@blazetrails/ruby-compat/regexp";
 
 function assertNonSelectColumnsWontBeLoaded(post: { title: string; body: unknown }) {
   expect(post.title).toBe("WELCOME TO THE WEBLOG");

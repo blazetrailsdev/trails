@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { ArgumentError } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
 import { LegacyPoint } from "../../../../../lib/connection-adapters/postgresql/oid/legacy-point.js";
 
 describe("OID::LegacyPoint#cast", () => {
