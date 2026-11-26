@@ -39,10 +39,28 @@ function post(message: Record<string, unknown>, transfer: Transferable[] = []): 
   parent.postMessage(message, location.origin, transfer);
 }
 
+/** Separates an error's app frames from the framework's, which the console folds away as Rails' debug page does. */
+const FRAMEWORK_TRACE = "\n\u0000framework\n";
+
+/**
+ * An error and its trace. App frames name the file in the app
+ * (`/app/models/post.ts:6:3`, through the module's inline source map);
+ * framework frames come from bundle chunks, so they follow
+ * {@link FRAMEWORK_TRACE} and the console shows them as "Framework Trace".
+ */
 function describe(e: Error): string {
   const head = `${e.name}: ${e.message}`;
   if (!e.stack) return head;
-  return e.stack.includes(e.message) ? e.stack : `${head}\n${e.stack}`;
+  const stack = e.stack.includes(e.message) ? e.stack : `${head}\n${e.stack}`;
+  const app: string[] = [];
+  const framework: string[] = [];
+  const base = new URL(moduleBase, location.href).href;
+  for (const line of stack.split("\n")) {
+    const frame = /^\s+at |@/.test(line) && /:\d+:\d+\)?$/.test(line);
+    if (!frame || line.includes(base)) app.push(line.replaceAll(base, "/"));
+    else framework.push(line);
+  }
+  return framework.length ? `${app.join("\n")}${FRAMEWORK_TRACE}${framework.join("\n")}` : stack;
 }
 
 function format(args: unknown[]): string {
@@ -141,6 +159,7 @@ for (const [p, source] of Object.entries(info)) {
   vfs.write(`${FRAMEWORK_ROOT}/trailties/dist${relative}`, source as string, false);
 }
 const { rackEnv, rackResult } = await import("./rack-bridge.ts");
+const { generate, generatorModule } = await import("./generate.ts");
 
 const { CookieJar } = await import("./cookie-jar.ts");
 const cookies = new CookieJar(files.cookies ?? {});
@@ -172,7 +191,7 @@ async function handle(request: SwRequest, port: MessagePort): Promise<void> {
   if (url.pathname.startsWith(moduleBase)) {
     const path = `/${decodeURIComponent(url.pathname.slice(moduleBase.length))}`;
     try {
-      const js = transpile(vfs.readText(path), path, pkgBase);
+      const js = (await generatorModule(path)) ?? transpile(vfs.readText(path), path, pkgBase);
       respond(port, 200, [["content-type", "text/javascript; charset=utf-8"]], js);
     } catch (e) {
       respond(port, 404, [["content-type", "text/plain"]], String(e));
@@ -245,7 +264,8 @@ for (const [request, port] of waiting.splice(0)) answer(request, port);
 type HostRequest =
   | { type: "host:eval"; id: number; code: string }
   | { type: "host:tables"; id: number }
-  | { type: "host:rows"; id: number; table: string };
+  | { type: "host:rows"; id: number; table: string }
+  | { type: "host:generate"; id: number; args: string[] };
 
 addEventListener("message", (event: MessageEvent) => {
   if (event.origin !== location.origin || event.source !== parent) return;
@@ -258,6 +278,11 @@ addEventListener("message", (event: MessageEvent) => {
         const bytes = sqlite.exportDatabase("browser.db");
         if (bytes) post({ type: "db", bytes }, [bytes.buffer]);
       },
+      (e: unknown) => reply({ error: e instanceof Error ? `${e.name}: ${e.message}` : String(e) }),
+    );
+  } else if (request.type === "host:generate") {
+    serially(() => generate(vfs, Trails as Parameters<typeof generate>[1], request.args)).then(
+      (written) => reply({ files: written }),
       (e: unknown) => reply({ error: e instanceof Error ? `${e.name}: ${e.message}` : String(e) }),
     );
   } else if (request.type === "host:tables") {

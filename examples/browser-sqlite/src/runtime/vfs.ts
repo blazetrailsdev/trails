@@ -45,8 +45,11 @@ export class VirtualFs {
     for (const [p, data] of Object.entries(files)) this.write(p, data);
   }
 
+  /** The working directory a relative path resolves against; `Dir.chdir` moves it. */
+  cwd = "/";
+
   norm(p: string): string {
-    return path.resolve("/", p);
+    return path.resolve(this.cwd, p);
   }
 
   get(p: string): Entry | undefined {
@@ -250,7 +253,7 @@ export class VirtualFs {
         return vfs.stat(handle.path);
       },
       copyFileSync: (src, dest) => vfs.write(dest, vfs.read(src)),
-      cwd: () => "/",
+      cwd: () => vfs.cwd,
       exists: async (p) => vfs.get(p) !== undefined,
       accessAsync: async (p) => void vfs.stat(p),
       stat: async (p) => vfs.stat(p),
