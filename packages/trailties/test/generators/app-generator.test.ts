@@ -1264,7 +1264,7 @@ describe("AppGeneratorTest", () => {
   });
 });
 
-describe("AppGenerator", () => {
+describe("AppGeneratorTest", () => {
   it("creates application directory structure", async () => {
     await t.runGenerator();
 

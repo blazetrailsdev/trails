@@ -14,6 +14,7 @@ import {
 } from "@blazetrails/activesupport";
 import {
   File,
+  getPath,
   block,
   rbFLoad,
   getFs,
@@ -317,6 +318,15 @@ export class Application extends Engine {
     setSourceMapsSupport(true);
     setTrailsRoot(() => this.config.root?.toString() ?? null);
     this._resetAutoloadState();
+    const root = this.config.root?.toString();
+    if (
+      root != null &&
+      (await File.isExistAsync(`${root}/config.js`)) &&
+      !(await File.isExistAsync(`${root}/config.ts`)) &&
+      (await File.isExistAsync(`${root}/.trails/entry.generated.js`))
+    ) {
+      await import(getPath().pathToFileURL!(`${root}/.trails/entry.generated.js`).href);
+    }
     await this.runInitializers(group, this);
     this._initialized = true;
     return this;

@@ -3,6 +3,7 @@ import {
   File,
   Pathname,
   rbInspect,
+  isCompiledFile,
   resolveTsThenJs,
   RuntimeError,
 } from "@blazetrails/ruby-compat";
@@ -230,9 +231,10 @@ export class Path {
     return Array.from(new Set(result));
   }
 
+  /** @inventedArm isCompiledFile — PERMANENT */
   existent(): string[] {
     return this.expanded().filter((f) => {
-      const doesExist = File.isExist(f);
+      const doesExist = File.isExist(f) || isCompiledFile(f);
 
       if (!doesExist && File.isSymlink(f)) {
         throw new RuntimeError(
