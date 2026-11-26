@@ -1,4 +1,4 @@
-import { CGI, stringSplit } from "@blazetrails/ruby-compat";
+import { CGI } from "@blazetrails/ruby-compat";
 import { usesLibxml, type Html5Document, type Html5Node } from "@blazetrails/nokogiri";
 
 import { Crass } from "../../crass.js";
@@ -9,7 +9,7 @@ import { SafeList } from "./safelist.js";
 type Attr = Html5Node["attributeNodes"][number];
 
 // eslint-disable-next-line no-control-regex
-const CONTROL_CHARACTERS = /[`\u0000- \u007f\u0080-ā]/g;
+const CONTROL_CHARACTERS = /[`\u0000-\u0020\u007f\u0080-\u0101]/g;
 const CSS_KEYWORDISH =
   /^(#[0-9a-fA-F]+|rgb\(\d+%?,\d*%?,?\d*%?\)?|-?\d{0,3}\.?\d{0,10}(ch|cm|r?em|ex|in|lh|mm|pc|pt|px|Q|vmax|vmin|vw|vh|%|,|\))?)$/;
 const CRASS_SEMICOLON = { node: "semicolon", raw: ";" };
@@ -242,7 +242,7 @@ export const Scrub = {
     );
     uriString = uriString.toLowerCase();
     if (URI_PROTOCOL_REGEX.test(uriString)) {
-      const protocol = stringSplit(uriString, SafeList.PROTOCOL_SEPARATOR)[0];
+      const protocol = uriString.split(SafeList.PROTOCOL_SEPARATOR)[0];
       if (!SafeList.ALLOWED_PROTOCOLS.has(protocol)) return false;
 
       if (protocol === "data") {
@@ -321,11 +321,11 @@ export const Scrub = {
 
   /** @internal */
   dataUriMediatype(uriString: string): string | null {
-    const metadataAndData = uriString.startsWith("data:") ? uriString.slice(5) : uriString;
-    const comma = metadataAndData.indexOf(",");
-    if (comma === -1) return null;
+    const rest = uriString.startsWith("data:") ? uriString.slice("data:".length) : uriString;
+    const at = rest.indexOf(",");
+    const [metadata, comma] = at === -1 ? [rest, ""] : [rest.slice(0, at), ","];
+    if (comma === "") return null;
 
-    const metadata = metadataAndData.slice(0, comma);
     const mediatype = (
       metadata.endsWith(";base64") ? metadata.slice(0, -";base64".length) : metadata
     )
