@@ -1433,9 +1433,11 @@ describe("AppGeneratorTest", () => {
     });
     await t.assertFile("my-app/bin/trails", (trails: string) => {
       expect(trails).toContain(
-        'const APP_PATH = join(import.meta.dirname, "../config/application.ts");',
+        'const APP_PATH = join(import.meta.dirname, "../config/application");',
       );
-      expect(trails).toContain("setAppPath(APP_PATH);");
+      expect(trails).toContain(
+        "await access(`${APP_PATH}.ts`).then(\n    () => `${APP_PATH}.ts`,\n    () => `${APP_PATH}.js`,\n  ),",
+      );
       expect(trails).toContain('await import("@blazetrails/trailties/commands");');
     });
     await t.assertFile("my-app/bin/setup", /bin\/trails/);

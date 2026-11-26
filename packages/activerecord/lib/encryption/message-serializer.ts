@@ -1,14 +1,11 @@
 import { Encryption } from "../namespaces.js";
 import { isPlainObject } from "@blazetrails/activesupport";
-import {
-  ArgumentError,
-  b,
-  Base64,
-  JSON,
-  transformValues,
-  type Bytes,
-  type Hash,
-} from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { Base64 } from "@blazetrails/ruby-compat/base64";
+import type { Bytes } from "@blazetrails/ruby-compat/fs-adapter";
+import { transformValues, type Hash } from "@blazetrails/ruby-compat/hash";
+import { JSON } from "@blazetrails/ruby-compat/json";
+import { b } from "@blazetrails/ruby-compat/string/b";
 import { Message } from "./message.js";
 import { Properties } from "./properties.js";
 import { Decryption, Encoding, ForbiddenClass } from "./errors.js";

@@ -114,6 +114,28 @@ describe("AppGenerator (trails-only)", () => {
     expect(await read("Dockerfile")).toContain("ARG NODE_VERSION=1.2.3\n");
   });
 
+  it("writes a Dockerfile whose runtime stage runs the compiled server without dev dependencies", async () => {
+    await new AppGenerator(
+      ["my-app"],
+      { skipInstall: true },
+      { destinationRoot: tmpDir },
+    ).invokeAll();
+    const dockerfile = await File.readAsync(File.join(tmpDir, "my-app/Dockerfile"));
+    expect(dockerfile).toContain("cd dist && ../node_modules/.bin/trails build");
+    expect(dockerfile).toContain("RUN pnpm prune --prod");
+    expect(dockerfile).toContain("COPY --from=build /app/dist /app\n");
+    expect(dockerfile).toContain("COPY --from=build /app/node_modules /app/node_modules\n");
+    expect(dockerfile).toContain(
+      'CMD ["node", "--no-experimental-strip-types", "node_modules/@blazetrails/rackup/bin/rackup.js", "config.js"]',
+    );
+    expect(dockerfile).not.toContain("config.ts");
+    expect(dockerfile.indexOf("assets:precompile")).toBeLessThan(dockerfile.indexOf("-C dist"));
+    const entrypoint = await File.readAsync(File.join(tmpDir, "my-app/bin/docker-entrypoint"));
+    expect(entrypoint).toContain(
+      '[ "${@: -2:1}" == "node_modules/@blazetrails/rackup/bin/rackup.js" ] && [ "${@: -1:1}" == "config.js" ]',
+    );
+  });
+
   it("generates action cable files by default", async () => {
     await new AppGenerator(
       ["my-app"],
@@ -251,7 +273,7 @@ describe("AppGenerator (trails-only)", () => {
     ).invokeAll();
 
     const pkg = JSON.parse(File.read(File.join(tmpDir, "my-app", "package.json")));
-    expect(pkg.scripts.build).toBe("trails-tsc --schema db/schema.ts && trails build");
+    expect(pkg.scripts.build).toBe("trails-tsc --schema db/schema.ts && cp -R bin dist/");
     expect(pkg.devDependencies["@blazetrails/activerecord-cli"]).toBeDefined();
     expect(File.isExist(File.join(tmpDir, "my-app", "db", "schema.ts"))).toBe(false);
   });

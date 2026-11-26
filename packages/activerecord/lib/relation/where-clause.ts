@@ -1,12 +1,10 @@
 import { extractBang, rbEqual } from "@blazetrails/activesupport";
-import {
-  Hash,
-  eachWithObject,
-  isEmpty,
-  isModuleIncluded,
-  rbHash,
-  rbObjRespondTo,
-} from "@blazetrails/ruby-compat";
+import { eachWithObject } from "@blazetrails/ruby-compat/enumerable";
+import { Hash } from "@blazetrails/ruby-compat/hash";
+import { isModuleIncluded } from "@blazetrails/ruby-compat/include";
+import { rbObjRespondTo } from "@blazetrails/ruby-compat/object";
+import { rbHash } from "@blazetrails/ruby-compat/rb-hash";
+import { isEmpty } from "@blazetrails/ruby-compat/ruby-empty";
 
 import * as Arel from "@blazetrails/arel";
 import { Nodes, Predications, fetchAttribute, sql } from "@blazetrails/arel";

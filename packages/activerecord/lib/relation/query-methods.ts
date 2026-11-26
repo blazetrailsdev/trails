@@ -1,33 +1,21 @@
+import { flatten, union, uniq, toA } from "@blazetrails/ruby-compat/array";
+import { eachWithIndex, partition, filterMap } from "@blazetrails/ruby-compat/enumerable";
+import { eachPair, fetch, Hash, merge, rbBlockGivenP } from "@blazetrails/ruby-compat/hash";
+import { extend, isModuleIncluded, rbObjIsKindOf } from "@blazetrails/ruby-compat/include";
+import { rbClearMethodCache } from "@blazetrails/ruby-compat/method-cache";
+import { toI } from "@blazetrails/ruby-compat/numeric";
 import {
-  eachWithIndex,
-  eachPair,
-  extend,
-  fetch,
-  flatten,
-  Hash,
-  isModuleIncluded,
-  isSymbol,
-  merge,
-  rbBlockGivenP,
-  partition,
   rbFSend,
   rbInspect,
   rbObjAsString,
   rbObjClassname,
   rbObjRespondTo,
-  RuntimeError,
-  strCount,
-  symbolToS,
-  toI,
   toS,
-  union,
-  uniq,
-  TypeError,
-  filterMap,
-  rbObjIsKindOf,
-  toA,
-  rbClearMethodCache,
-} from "@blazetrails/ruby-compat";
+} from "@blazetrails/ruby-compat/object";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
+import { strCount } from "@blazetrails/ruby-compat/string/tr";
+import { isSymbol, symbolToS } from "@blazetrails/ruby-compat/symbol";
+import { TypeError } from "@blazetrails/ruby-compat/type-error";
 import * as Arel from "@blazetrails/arel";
 import {
   Nodes,

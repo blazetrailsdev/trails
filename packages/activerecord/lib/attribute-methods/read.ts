@@ -1,7 +1,7 @@
 import type { AttributeSet } from "@blazetrails/activemodel";
 import { AttrNames, completeHalfAccessor } from "@blazetrails/activemodel";
 import type { CodeGenerator } from "@blazetrails/activesupport";
-import { rbFCaller } from "@blazetrails/ruby-compat";
+import { rbFCaller } from "@blazetrails/ruby-compat/backtrace-location";
 import { AttributeMethods as AttributeMethodsNamespace } from "../namespaces.js";
 
 export interface Read {

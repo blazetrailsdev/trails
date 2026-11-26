@@ -56,12 +56,20 @@ RUN <%= this.usingBun() ? "bun" : "pnpm" %> run build
 RUN SECRET_KEY_BASE_DUMMY=1 ./bin/trails assets:precompile
 
 <% } -%>
+# Copy the files tsc does not emit into the compiled tree, then build its entry
+RUN tar --exclude=./dist --exclude=./node_modules --exclude="*.ts" -cf - . | tar -xf - -C dist && \
+    cd dist && ../node_modules/.bin/trails build
+
+# Keep only production dependencies, so tsx and typescript stay out of the runtime image
+RUN <%= this.usingBun() ? "rm -rf node_modules && bun install --frozen-lockfile --production" : "pnpm prune --prod" %>
+
 FROM base
 
-COPY --from=build /app /app
+COPY --from=build /app/dist /app
+COPY --from=build /app/node_modules /app/node_modules
 
 ENTRYPOINT ["/app/bin/docker-entrypoint"]
 
 EXPOSE 3000
-# Start the server through config.ts, so production never loads the trails command dispatcher
-CMD ["npx", "rackup", "config.ts"]
+# Start the compiled server through config.js, so production never loads TypeScript or the trails command dispatcher
+CMD ["node", "--no-experimental-strip-types", "node_modules/@blazetrails/rackup/bin/rackup.js", "config.js"]

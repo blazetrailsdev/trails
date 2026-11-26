@@ -1,4 +1,4 @@
-import { chromium } from "playwright";
+import * as playwright from "playwright";
 import { createServer, preview } from "vite";
 
 let server;
@@ -18,7 +18,12 @@ if (dist) {
   url = "http://localhost:4179/";
 }
 const shots = process.env.SCREENSHOTS;
-const browser = await chromium.launch();
+const engine = process.env.BROWSER ?? "chromium";
+if (!["chromium", "firefox", "webkit"].includes(engine)) {
+  throw new Error(`BROWSER must be chromium, firefox or webkit, not ${engine}`);
+}
+const browser = await playwright[engine].launch();
+console.log("browser:", engine);
 const colorScheme = process.env.COLOR_SCHEME === "dark" ? "dark" : "light";
 const context = await browser.newContext({ viewport: { width: 1600, height: 900 }, colorScheme });
 const page = await context.newPage();
@@ -138,12 +143,14 @@ try {
   await see("h1", "Edited posts");
   console.log("a syntax error names its file and line over the preview, and fixing it recovers");
 
-  const cdp = await context.newCDPSession(page);
-  await cdp.send("ServiceWorker.enable");
-  await cdp.send("ServiceWorker.stopAllWorkers");
-  await page.locator("#reload").click();
-  await see("h1", "Edited posts");
-  console.log("the preview survives the browser stopping the service worker");
+  if (engine === "chromium") {
+    const cdp = await context.newCDPSession(page);
+    await cdp.send("ServiceWorker.enable");
+    await cdp.send("ServiceWorker.stopAllWorkers");
+    await page.locator("#reload").click();
+    await see("h1", "Edited posts");
+    console.log("the preview survives the browser stopping the service worker");
+  }
 
   const other = await context.newPage();
   await other.goto(url);

@@ -1,19 +1,15 @@
 import { DSL } from "@blazetrails/rake";
 import { isBlank, isPresent } from "@blazetrails/activesupport";
 import { ConfigurationFile } from "@blazetrails/activesupport/configuration-file";
-import {
-  Dir,
-  File,
-  RuntimeError,
-  STDOUT,
-  abort,
-  sprintf,
-  TopLevel,
-  block,
-  env as ENV,
-  rbObjRespondTo,
-  rbStrToI,
-} from "@blazetrails/ruby-compat";
+import { Dir } from "@blazetrails/ruby-compat/dir";
+import { File } from "@blazetrails/ruby-compat/file";
+import { block } from "@blazetrails/ruby-compat/hash";
+import { STDOUT } from "@blazetrails/ruby-compat/io";
+import { sprintf } from "@blazetrails/ruby-compat/kernel-format";
+import { TopLevel, rbObjRespondTo } from "@blazetrails/ruby-compat/object";
+import { abort, env as ENV } from "@blazetrails/ruby-compat/process-adapter";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
+import { rbStrToI } from "@blazetrails/ruby-compat/string/convert";
 import { Base } from "../base.js";
 import { EnvironmentStorageError, Migration, Migrator, type MigrationProxy } from "../migration.js";
 import { Schema } from "../schema.js";

@@ -1,12 +1,8 @@
 import { ArgumentError } from "@blazetrails/activemodel";
 import { isPresent } from "@blazetrails/activesupport";
-import {
-  type Hash,
-  Module,
-  basicObjRespondTo,
-  rbInspect,
-  rbObjSingletonClass,
-} from "@blazetrails/ruby-compat";
+import type { Hash } from "@blazetrails/ruby-compat/hash";
+import { Module } from "@blazetrails/ruby-compat/include";
+import { basicObjRespondTo, rbInspect, rbObjSingletonClass } from "@blazetrails/ruby-compat/object";
 import { AssociationNotFoundError } from "./associations/errors.js";
 import { ActiveRecord } from "./namespaces.js";
 import * as Marshalling from "./marshalling.js";

@@ -20,7 +20,7 @@
       },
     },
     scripts: {
-      build: "trails-tsc --schema db/schema.ts && trails build",
+      build: "trails-tsc --schema db/schema.ts && cp -R bin dist/",
       test: this.dependsOnSystemTest() ? "vitest run --project unit" : "vitest run",
       trails: "trails",
       dev: "trails server",

@@ -1,5 +1,5 @@
-export { NotImplementedError } from "@blazetrails/ruby-compat";
-import { StandardError } from "@blazetrails/ruby-compat";
+export { NotImplementedError } from "@blazetrails/ruby-compat/not-implemented-error";
+import { StandardError } from "@blazetrails/ruby-compat/standard-error";
 import { ActiveRecord } from "./namespaces.js";
 import type { Column } from "./connection-adapters/column.js";
 

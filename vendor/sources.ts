@@ -717,9 +717,9 @@ export const SOURCES: readonly UpstreamSource[] = [
     origin: {
       type: "git",
       url: "https://github.com/sparklemotion/nokogiri.git",
-      // vendor/rails/v8.0.2/Gemfile.lock:398; a read-anchor for
+      // vendor/rails/v8.0.5.2/Gemfile.lock:399; a read-anchor for
       // packages/nokogiri, like rails-dom-testing.
-      ref: "v1.18.3",
+      ref: "v1.19.7",
     },
     packages: [
       {
@@ -753,7 +753,7 @@ export const SOURCES: readonly UpstreamSource[] = [
       type: "git",
       url: "https://github.com/ruby/racc.git",
       // The runtime nokogiri's generated CSS parser runs on
-      // (vendor/nokogiri/v1.18.3/lib/nokogiri/css/parser.rb:4 names Racc 1.8.0);
+      // (vendor/nokogiri/v1.19.7/lib/nokogiri/css/parser.rb:4 names Racc 1.8.1);
       // a read-anchor for packages/ruby-compat/lib/racc.
       ref: "v1.8.1",
     },

@@ -2465,10 +2465,11 @@ const POST_MODEL = `
   }
 `;
 
-const postsController = (body: string, parent = "ApplicationController"): string => `
+const postsController = (body: string, parent = "ApplicationController", imports = ""): string => `
   import { ApplicationController } from "./application-controller.ts";
   import { ActionController } from "@blazetrails/actionpack";
   import { Post } from "../models/post.ts";
+  ${imports}
   export class PostsController extends ${parent} {
     ${body}
   }
@@ -2875,6 +2876,126 @@ describe("ApplicationTests::ConfigurationTest", { concurrent: true, timeout: 120
     expect(t.lastResponse().body).toMatch(/csrf-param/);
   });
 
+  it("default form builder specified as a string", async () => {
+    await t.appFile(
+      "config/initializers/form-builder.ts",
+      `
+        import { Trails } from "@blazetrails/trailties";
+        import { FormBuilder } from "@blazetrails/actionview";
+        import { constSet, TopLevel } from "@blazetrails/ruby-compat";
+        class CustomFormBuilder extends FormBuilder {
+          textField(attribute, ...args) {
+            return this.label(attribute) + super.textField(attribute, ...args);
+          }
+        }
+        constSet(TopLevel, "CustomFormBuilder", CustomFormBuilder);
+        Trails.configuration.actionView.defaultFormBuilder = "CustomFormBuilder";
+`,
+    );
+    await t.appFile("app/models/post.ts", POST_MODEL);
+    await t.appFile(
+      "app/controllers/posts-controller.ts",
+      postsController(`
+        async index() {
+          await this.render({ inline: "<%= await (async () => { try { return await formFor(new Post(), {}, (f) => f.textField('name')); } catch (e) { return e.toString(); } })() %>", locals: { Post } });
+        }
+`),
+    );
+    await t.addToConfig(POSTS_ROUTES);
+
+    await app("development");
+
+    await t.get("/posts");
+    expect(t.lastResponse().body).toMatch(/label/);
+  });
+
+  it("default method for update can be changed", async () => {
+    await t.appFile(
+      "app/models/post.ts",
+      `
+  import { Model } from "@blazetrails/activemodel";
+  export class Post extends Model {
+    toKey() { return [1]; }
+    isPersisted() { return true; }
+  }
+`,
+    );
+
+    const token = "cf50faa3fe97702ca1ae";
+
+    await t.appFile(
+      "app/controllers/posts-controller.ts",
+      postsController(`
+        async show() {
+          await this.render({ inline: "<%= await (async () => { try { return await formFor(new Post(), {}, () => {}); } catch (e) { return e.toString(); } })() %>", locals: { Post } });
+        }
+
+        async update() {
+          await this.render({ plain: "update" });
+        }
+
+        formAuthenticityToken() { return ${JSON.stringify(token)}; }
+`),
+    );
+    await t.addToConfig(POSTS_ROUTES);
+
+    await app("development");
+
+    const params = { authenticity_token: token };
+
+    await t.get("/posts/1");
+    expect(t.lastResponse().body).toMatch(/patch/);
+
+    await t.patch("/posts/1", params);
+    expect(t.lastResponse().body).toMatch(/update/);
+
+    await t.patch("/posts/1", params);
+    expect(t.lastResponse().status).toBe(200);
+
+    await t.put("/posts/1", params);
+    expect(t.lastResponse().body).toMatch(/update/);
+
+    await t.put("/posts/1", params);
+    expect(t.lastResponse().status).toBe(200);
+  });
+
+  it("config.action_controller.wrap_parameters is set in ActionController::Base", async () => {
+    await t.appFile(
+      "config/initializers/wrap-parameters.ts",
+      `import { ActionController } from "@blazetrails/actionpack";\nActionController.Base.wrapParameters({ format: [":json"] });\n`,
+    );
+    await t.appFile(
+      "app/models/post.ts",
+      `export class Post {\n  static attributeNames() { return ["title"]; }\n}\n`,
+    );
+    await t.appFile(
+      "app/controllers/application-controller.ts",
+      `import { ActionController } from "@blazetrails/actionpack";\nexport class ApplicationController extends ActionController.Base {\n  static {\n    this.protectFromForgery({ with: "reset_session" });\n  }\n}\n`,
+    );
+    await t.appFile(
+      "app/controllers/posts-controller.ts",
+      postsController(
+        `
+        async create() {
+          await this.render({ plain: rbInspect(this.params.get("post")) });
+        }
+`,
+        undefined,
+        `import { rbInspect } from "@blazetrails/ruby-compat";`,
+      ),
+    );
+    await t.addToConfig(POSTS_ROUTES);
+
+    await app("development");
+
+    await t.post("/posts.json", '{ "title": "foo", "name": "bar" }', {
+      CONTENT_TYPE: "application/json",
+    });
+    expect(t.lastResponse().body).toBe(
+      `#<ActionController::Parameters ${rbInspect({ title: "foo" })} permitted: false>`,
+    );
+  });
+
   it("form_with outputs ids by default", async () => {
     await t.appFile("app/models/post.ts", POST_MODEL);
     await t.appFile(
@@ -3260,6 +3381,62 @@ ${POSTS_ROUTES}
 
     await t.post("/posts", { post: { title: "zomg" }, format: "json" });
     expect(t.lastResponse().status).toBe(200);
+  });
+
+  it("config.action_controller.action_on_unpermitted_parameters = :raise", async () => {
+    await t.appFile(
+      "app/controllers/posts-controller.ts",
+      postsController(
+        `
+        async create() {
+          await this.render({ plain: this.params.permit({ post: ["name"] }) });
+        }
+`,
+        "ActionController.Base",
+      ),
+    );
+    await t.addToConfig(`
+      this.routes().prepend(function () {
+        this.resources("posts");
+      });
+      this.config.actionController.actionOnUnpermittedParameters = "raise";
+`);
+
+    await app("development");
+
+    expect(ActionController.Parameters.actionOnUnpermittedParameters).toBe("raise");
+
+    await t.post("/posts", { post: { title: "zomg" } });
+    expect(t.lastResponse().body).toMatch("We’re sorry, but something went wrong");
+  });
+
+  it("config.action_controller.action_on_unpermitted_parameters = :raise is ignored with expect", async () => {
+    await t.appFile(
+      "app/controllers/posts-controller.ts",
+      postsController(
+        `
+        async create() {
+          await this.render({ plain: this.params.expect({ post: ["name"] }) });
+        }
+`,
+        "ActionController.Base",
+      ),
+    );
+    await t.addToConfig(`
+      this.routes().prepend(function () {
+        this.resources("posts");
+      });
+      this.config.actionController.actionOnUnpermittedParameters = "raise";
+`);
+
+    await app("development");
+
+    expect(ActionController.Parameters.actionOnUnpermittedParameters).toBe("raise");
+
+    await t.post("/posts", { post: { title: "zomg" } });
+    expect(t.lastResponse().body).toMatch(
+      "The server cannot process the request due to a client error",
+    );
   });
 
   it("config.action_controller.action_on_unpermitted_parameters is :log by default in development", async () => {

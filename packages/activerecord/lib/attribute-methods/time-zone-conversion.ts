@@ -6,14 +6,10 @@ import {
 } from "@blazetrails/activesupport/core-ext/date-and-time/zones";
 import { type Time as RubyTime } from "@blazetrails/date";
 import { classAttribute, included } from "@blazetrails/activesupport";
-import {
-  ArgumentError,
-  DelegateClass,
-  rbEqual,
-  rbFSend,
-  rbObjRespondTo,
-  rtest,
-} from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { DelegateClass } from "@blazetrails/ruby-compat/delegate";
+import { rbFSend, rbObjRespondTo, rtest } from "@blazetrails/ruby-compat/object";
+import { rbEqual } from "@blazetrails/ruby-compat/rb-equal";
 import { AttributeMethods } from "../namespaces.js";
 type ValueTypeInstance = InstanceType<typeof ValueType>;
 

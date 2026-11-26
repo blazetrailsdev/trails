@@ -1,5 +1,6 @@
 import { mattrAccessor, mattrReader } from "@blazetrails/activesupport";
-import { included, rbFSend, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { included } from "@blazetrails/ruby-compat/include";
+import { rbFSend, rbObjRespondTo } from "@blazetrails/ruby-compat/object";
 import { Config } from "./config.js";
 import { Encryption } from "../namespaces.js";
 import { Context } from "./context.js";

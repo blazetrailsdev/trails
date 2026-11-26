@@ -1,5 +1,5 @@
 import { createHighlighterCore, type HighlighterCore, type LanguageRegistration } from "shiki/core";
-import { createOnigurumaEngine } from "shiki/engine/oniguruma";
+import { createJavaScriptRegexEngine } from "shiki/engine/javascript";
 
 const tse: LanguageRegistration = {
   name: "tse",
@@ -32,7 +32,7 @@ function load(): Promise<HighlighterCore> {
       import("shiki/langs/json.mjs"),
       tse,
     ],
-    engine: createOnigurumaEngine(import("shiki/wasm")),
+    engine: createJavaScriptRegexEngine({ forgiving: true }),
   }));
 }
 

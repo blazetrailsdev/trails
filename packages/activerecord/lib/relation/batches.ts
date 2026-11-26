@@ -1,15 +1,11 @@
 import type { Nodes } from "@blazetrails/arel";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { defineModule, kernelArray as Array, pluck } from "@blazetrails/activesupport";
-import {
-  cmp,
-  isEmpty,
-  rbCmpint,
-  rbInspect,
-  rtest,
-  slice,
-  eachSlice,
-} from "@blazetrails/ruby-compat";
+import { cmp, rbCmpint } from "@blazetrails/ruby-compat/comparable";
+import { eachSlice } from "@blazetrails/ruby-compat/enumerable";
+import { slice } from "@blazetrails/ruby-compat/hash";
+import { rbInspect, rtest } from "@blazetrails/ruby-compat/object";
+import { isEmpty } from "@blazetrails/ruby-compat/ruby-empty";
 import { stripThenable } from "@blazetrails/activesupport";
 import { BatchEnumerator } from "./batches/batch-enumerator.js";
 import type { Base } from "../base.js";

@@ -1,5 +1,7 @@
 import { _loadSerializedAttributes } from "../type/serialized.js";
-import { RuntimeError, rbObjAsString, rbCallSuper } from "@blazetrails/ruby-compat";
+import { rbCallSuper } from "@blazetrails/ruby-compat/include";
+import { rbObjAsString } from "@blazetrails/ruby-compat/object";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
 import {
   classAttribute,
   type HashWithIndifferentAccess,

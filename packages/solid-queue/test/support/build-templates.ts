@@ -7,7 +7,7 @@ export default async function setup(): Promise<void> {
     decodeURIComponent(new URL("../../lib/generators", import.meta.url).pathname),
     decodeURIComponent(
       new URL(
-        "../../lib/generators/solid-queue/update/templates/db/add_batches_to_solid_queue.ts",
+        "../../lib/generators/solid-queue/update/templates/db/add-batches-to-solid-queue.ts",
         import.meta.url,
       ).pathname,
     ),

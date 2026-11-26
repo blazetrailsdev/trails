@@ -1,4 +1,6 @@
-import { Encoding, forceEncoding, rbObjEncoding, type Bytes } from "@blazetrails/ruby-compat";
+import { Encoding } from "@blazetrails/ruby-compat/encoding";
+import type { Bytes } from "@blazetrails/ruby-compat/fs-adapter";
+import { forceEncoding, rbObjEncoding } from "@blazetrails/ruby-compat/string/force-encoding";
 import { Autoload, extend, kernelArray as Array, type Extended } from "@blazetrails/activesupport";
 
 import { Aes256Gcm as AesGcmCipher } from "./cipher/aes256-gcm.js";
