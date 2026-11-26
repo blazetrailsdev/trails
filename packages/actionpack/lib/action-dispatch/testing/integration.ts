@@ -386,8 +386,8 @@ export class Session {
       rbObjRespondTo(stream, "each")
     ) {
       const parts: unknown[] = [];
-      await (stream as unknown as { each(block: (part: unknown) => unknown): unknown }).each(
-        (part) => parts.push(part),
+      await (stream as { each?(block: (part: unknown) => unknown): unknown }).each!((part) =>
+        parts.push(part),
       );
       await controllerResponse!.setBody(parts);
     }
