@@ -61,6 +61,16 @@ describe.runIf(currentAdapter("SQLite3Adapter"))("SQLite3 bigint round-trip", ()
     expect(intType.cast(rows[0].count)).toBe(42);
   });
 
+  it("IntegerType.deserialize keeps a bigint read past 2^53 from a plain INTEGER column", async () => {
+    await adapter.execInsert(`INSERT INTO "big_items" ("score", "count") VALUES (?, ?)`, null, [
+      BIG,
+      9007199254740993n,
+    ]);
+    const rows = (await adapter.execute(`SELECT "count" FROM "big_items"`))!;
+    expect(rows[0].count).toBe(9007199254740993n);
+    expect(intType.deserialize(rows[0].count)).toBe(9007199254740993n);
+  });
+
   it("BooleanType.cast handles 0n/1n from safeIntegers mode correctly", async () => {
     await adapter.execInsert(`INSERT INTO "big_items" ("score", "active") VALUES (?, ?)`, null, [
       BIG,

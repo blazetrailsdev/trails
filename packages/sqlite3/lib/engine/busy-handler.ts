@@ -9,33 +9,37 @@ import type { BusyHandler, EngineErrors } from "../database.js";
 export function withBusyHandler<T>(
   errors: EngineErrors,
   handler: () => BusyHandler | null,
-  attempt: () => T,
+  attempt: () => T | Promise<T>,
 ): T | Promise<T> {
   let count = 0;
   const isBusy = (e: unknown) =>
-    handler() != null && errors.errcode(e) === SQLite3.Constants.ErrorCode.BUSY;
-  const resume = async (error: unknown, wait: Promise<unknown>): Promise<T> => {
+    handler() != null &&
+    errors.errcode(e) === SQLite3.Constants.ErrorCode.BUSY &&
+    errors.isDeadlock?.(e) !== true;
+  const resume = async (error: unknown, wait: unknown): Promise<T> => {
+    if ((await wait) === false) throw error;
+    return run();
+  };
+  const run = (): T | Promise<T> => {
     for (;;) {
-      if ((await wait) === false) throw error;
+      let result: T | Promise<T>;
       try {
-        return attempt();
+        result = attempt();
       } catch (e) {
         if (!isBusy(e)) throw e;
-        error = e;
-        wait = Promise.resolve(handler()!(count++));
+        const wait = handler()!(count++);
+        if (wait instanceof Promise) return resume(e, wait);
+        if (wait === false) throw e;
+        continue;
       }
+      if (!(result instanceof Promise)) return result;
+      return result.catch((e: unknown) => {
+        if (!isBusy(e)) throw e;
+        return resume(e, handler()!(count++));
+      });
     }
   };
-  for (;;) {
-    try {
-      return attempt();
-    } catch (e) {
-      if (!isBusy(e)) throw e;
-      const result = handler()!(count++);
-      if (result instanceof Promise) return resume(e, result);
-      if (result === false) throw e;
-    }
-  }
+  return run();
 }
 
 /**
@@ -67,4 +71,17 @@ export function drive<T>(body: Generator<unknown, T, unknown>): T | Promise<T> {
     step = body.next(value);
   }
   return step.value;
+}
+
+/** @internal */
+export type LockKind = "read" | "write" | null;
+
+/** @internal */
+export function lockKind(sql: string, reader: boolean): LockKind {
+  if (/^\s*begin\s+(immediate|exclusive)\b/i.test(sql)) return "write";
+  if (/^\s*(begin|commit|end|rollback|savepoint|release)\b/i.test(sql)) return null;
+  if (!reader || /\breturning\b/i.test(sql)) return "write";
+  if (/^\s*pragma\b/i.test(sql)) return null;
+  if (/\bfrom\s+pragma_\w+/i.test(sql) && !/\bjoin\b/i.test(sql)) return null;
+  return "read";
 }

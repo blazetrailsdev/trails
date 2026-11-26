@@ -1,14 +1,31 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import "./support/dummy-application.js";
 import "./test-helper.js";
 import { SQLite3Adapter } from "@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js";
 import { Process, Record, RecurringTask, Scheduler } from "../lib/index.js";
 import "./support/add-to-buffer-job.js";
+import { loadAppSchema } from "./support/queue-schema.js";
 import { waitForRegisteredProcesses } from "./support/processes-test-helper.js";
+import { TestCase } from "@blazetrails/activesupport/test-case";
+import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
+
+class SchedulerFileDatabaseTest extends TestCase {
+  static {
+    (this as unknown as { useTransactionalTests: boolean }).useTransactionalTests = false;
+  }
+}
+registerSpecType(
+  (desc: string) => desc === "Scheduler on a file SQLite queue database",
+  SchedulerFileDatabaseTest,
+);
 
 describe.runIf(Record.connectionDbConfig().adapter === "sqlite3")(
   "Scheduler on a file SQLite queue database",
   () => {
+    beforeAll(async () => {
+      await loadAppSchema();
+    });
+
     afterEach(async () => {
       await Process.destroyAll();
       await RecurringTask.deleteAll();

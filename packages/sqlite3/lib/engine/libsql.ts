@@ -9,7 +9,7 @@ import type { SqliteBindValue } from "../driver.js";
 import { closedStatement, statementTail } from "./statement-tail.js";
 import { drive, withBusyHandler } from "./busy-handler.js";
 import { bindParameterIndex, bindParameterNames } from "./bind-parameter-index.js";
-import { columnText } from "./column-text.js";
+import { columnIntegers, columnText } from "./column-text.js";
 import { databaseListFilename, libversionNumber } from "./aggregator.js";
 
 const CONNECTION_FAILED = /^ConnectionFailed\(".*: (\d+)"\)$/;
@@ -80,7 +80,7 @@ function prepareStatement(
 ): EngineStatement {
   const stmt = raw.prepare(sql);
   const reader = stmt.reader;
-  if (reader) stmt.raw(true);
+  if (reader) stmt.raw(true).safeIntegers(true);
   const positional: SqliteBindValue[] = [];
   const named: Record<string, SqliteBindValue> = {};
   let rows: Iterator<unknown[]> | null = null;
@@ -146,14 +146,13 @@ function prepareStatement(
         done = true;
         return null;
       }
-      return r.value;
+      return columnIntegers(r.value);
     },
     isDone: () => done,
     bindParameterCount: () => bindParameterNames(sql).length,
     columnCount: () => (reader ? stmt.columns().length : 0),
     columnName: (index) => (reader ? (stmt.columns()[index]?.name ?? null) : null),
     columnDecltype: (index) => (reader ? (stmt.columns()[index]?.type ?? null) : null),
-    setReadBigInts: (toggle) => void stmt.safeIntegers(toggle),
   };
 }
 

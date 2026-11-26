@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { File, RuntimeError, getOs } from "@blazetrails/ruby-compat";
+import { File, NotImplementedError, RuntimeError, getOs } from "@blazetrails/ruby-compat";
 import { SQLite3 } from "../lib/index.js";
 import { engine, remoteEngine, replicaEngine } from "../lib/engine/libsql.js";
 
@@ -17,6 +17,12 @@ describe("SQLite3::Database over the libsql engine", () => {
     const stmt = await db.prepare("SELECT 1; SELECT 2");
     expect(stmt.remainder).toBe(" SELECT 2");
     await stmt.close();
+  });
+
+  it("raises NotImplementedError for the function, aggregate and authorizer hooks", () => {
+    const db = new SQLite3.Database(":memory:", { engine });
+    expect(() => db.defineFunctionWithFlags("f", 0, () => 1)).toThrow(NotImplementedError);
+    expect(() => db.setAuthorizer(() => true)).toThrow(NotImplementedError);
   });
 
   it("closed db behavior", async () => {

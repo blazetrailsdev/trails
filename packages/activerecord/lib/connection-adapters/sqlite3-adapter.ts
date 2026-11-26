@@ -1150,28 +1150,6 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
     return this._config.strict as boolean;
   }
 
-  /** @internal */
-  async _maybeEnableReadBigInts(sql: string, stmt: SQLite3Statement): Promise<void> {
-    if (this.isWriteQuery(sql) || stmt.columnCount() === 0) return;
-    if ((await stmt.types()).some((t) => t != null && /bigint/i.test(t))) {
-      stmt.setReadBigInts(true);
-    }
-  }
-
-  /** @internal */
-  async _narrowSpilledBigInts(stmt: SQLite3Statement, rows: unknown[][]): Promise<unknown[][]> {
-    if (!(await stmt.types()).some((t) => t != null && /bigint/i.test(t))) return rows;
-    return rows.map((row) =>
-      row.map((value) =>
-        typeof value === "bigint" &&
-        value >= BigInt(Number.MIN_SAFE_INTEGER) &&
-        value <= BigInt(Number.MAX_SAFE_INTEGER)
-          ? Number(value)
-          : value,
-      ),
-    );
-  }
-
   private static readonly FK_REGEX =
     /.*FOREIGN KEY\s+\("([^"]+)"\)\s+REFERENCES\s+"(\w+)"\s+\("(\w+)"\)/;
   private static readonly DEFERRABLE_REGEX = /DEFERRABLE INITIALLY (\w+)/;

@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import BetterSqlite3 from "better-sqlite3";
+import { NotImplementedError } from "@blazetrails/ruby-compat";
 import { SQLite3 } from "../lib/index.js";
 import type { EngineOpenV2 } from "../lib/database.js";
 
@@ -148,32 +149,23 @@ describe("SQLite3::Database over the expo-sqlite engine", () => {
     expect((error as InstanceType<typeof SQLite3.SQLException>).sql).toBe("SELECT * FROM nope");
   });
 
-  it("reads an INTEGER past 2^53 exactly as a bigint with read-bigints on", async () => {
+  it("reads an INTEGER as a number when safe and as a bigint past 2^53", async () => {
     const stmt = await db.prepare(
-      "SELECT 9007199254740993, 'x', 1.5, CAST(? AS INTEGER); -- c /* x */",
+      "SELECT 9007199254740993, -9007199254740993, 'x', 1.5, CAST(? AS INTEGER); -- c /* x */",
     );
-    stmt.setReadBigInts(true);
     await stmt.bindParam(1, 2);
-    expect(await stmt.step()).toEqual([9007199254740993n, "x", 1.5, 2n]);
-    await stmt.close();
-  });
-
-  it("reads a negative INTEGER past -2^53 exactly, and honors a toggle between executions", async () => {
-    const stmt = await db.prepare("SELECT -9007199254740993");
-    expect(await stmt.step()).toEqual([-9007199254740992]);
-    await stmt.resetBang();
-    stmt.setReadBigInts(true);
-    expect(await stmt.step()).toEqual([-9007199254740993n]);
-    await stmt.resetBang();
-    stmt.setReadBigInts(false);
-    expect(await stmt.step()).toEqual([-9007199254740992]);
+    expect(await stmt.step()).toEqual([9007199254740993n, -9007199254740993n, "x", 1.5, 2]);
     await stmt.close();
   });
 
   it("falls back to number reads for a statement a CTE cannot wrap", async () => {
     const stmt = await db.prepare("INSERT INTO t VALUES (9007199254740993, 'r') RETURNING a");
-    stmt.setReadBigInts(true);
     expect(await stmt.step()).toEqual([9007199254740992]);
     await stmt.close();
+  });
+
+  it("raises NotImplementedError for the function, aggregate and authorizer hooks", () => {
+    expect(() => db.defineFunctionWithFlags("f", 0, () => 1)).toThrow(NotImplementedError);
+    expect(() => db.setAuthorizer(() => true)).toThrow(NotImplementedError);
   });
 });

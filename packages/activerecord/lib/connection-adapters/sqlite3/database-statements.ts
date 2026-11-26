@@ -128,8 +128,6 @@ interface PerformQueryHost {
     get(sql: string): SQLite3Statement | null | undefined;
     set(sql: string, stmt: SQLite3Statement): unknown;
   };
-  _maybeEnableReadBigInts(sql: string, stmt: SQLite3Statement): Promise<void>;
-  _narrowSpilledBigInts(stmt: SQLite3Statement, rows: unknown[][]): Promise<unknown[][]>;
   verifiedBang(): void;
   _lastAffectedRows: number;
 }
@@ -182,11 +180,7 @@ export async function internalBeginTransaction(
   }
 }
 
-/**
- * @internal
- * @inventedArm _maybeEnableReadBigInts — PERMANENT
- * @inventedArm _narrowSpilledBigInts — PERMANENT
- */
+/** @internal */
 export async function performQuery(
   this: PerformQueryHost,
   rawConnection: SQLite3Database,
@@ -210,7 +204,6 @@ export async function performQuery(
     let stmt = this._statements.get(sql);
     if (stmt == null) {
       stmt = await rawConnection.prepare(sql);
-      await this._maybeEnableReadBigInts(sql, stmt);
       await this._statements.set(sql, stmt);
     }
     await stmt.resetBang();
@@ -220,10 +213,7 @@ export async function performQuery(
       await stmt.step();
       result = Result.empty();
     } else {
-      result = new Result(
-        (await stmt.columns()) as string[],
-        await this._narrowSpilledBigInts(stmt, await stmt.toA()),
-      );
+      result = new Result((await stmt.columns()) as string[], await stmt.toA());
     }
   } else {
     const stmt = await rawConnection.prepare(sql);
@@ -231,15 +221,11 @@ export async function performQuery(
       if (!(binds == null || binds.length === 0)) {
         await stmt.bindParams(typeCastedBinds);
       }
-      await this._maybeEnableReadBigInts(sql, stmt);
       if (stmt.columnCount() === 0) {
         await stmt.step();
         result = Result.empty();
       } else {
-        result = new Result(
-          (await stmt.columns()) as string[],
-          await this._narrowSpilledBigInts(stmt, await stmt.toA()),
-        );
+        result = new Result((await stmt.columns()) as string[], await stmt.toA());
       }
     } finally {
       await stmt.close();

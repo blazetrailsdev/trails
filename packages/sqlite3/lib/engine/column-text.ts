@@ -12,3 +12,14 @@ export function columnText(value: unknown): string | null {
   const text = String(Number(value.toPrecision(15)));
   return /^-?\d+$/.test(text) ? `${text}.0` : text;
 }
+
+/** @internal */
+export function columnIntegers(row: unknown[]): unknown[] {
+  return row.map((value) =>
+    typeof value === "bigint" &&
+    value >= BigInt(Number.MIN_SAFE_INTEGER) &&
+    value <= BigInt(Number.MAX_SAFE_INTEGER)
+      ? Number(value)
+      : value,
+  );
+}

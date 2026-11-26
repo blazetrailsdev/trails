@@ -13,7 +13,7 @@ import type { SqliteBindValue } from "../driver.js";
 import { closedStatement, statementTail } from "./statement-tail.js";
 import { drive, withBusyHandler } from "./busy-handler.js";
 import { bindParameterIndex, bindParameterNames } from "./bind-parameter-index.js";
-import { columnText } from "./column-text.js";
+import { columnIntegers, columnText } from "./column-text.js";
 import { databaseListFilename, libversionNumber } from "./aggregator.js";
 
 /** @internal */
@@ -105,6 +105,7 @@ function prepareStatement(raw: BunDatabase, sql: string, finalize: () => void): 
   const stmt = raw.prepare(sql);
   const columns = stmt.columnNames;
   const reader = columns.length > 0;
+  if (reader) stmt.safeIntegers(true);
   const names = bindParameterNames(sql);
   const positional: SqliteBindValue[] = [];
   const named: Record<string, SqliteBindValue> = {};
@@ -162,14 +163,13 @@ function prepareStatement(raw: BunDatabase, sql: string, finalize: () => void): 
         done = true;
         return null;
       }
-      return rows[cursor++];
+      return columnIntegers(rows[cursor++]);
     },
     isDone: () => done,
     bindParameterCount: () => names.length,
     columnCount: () => columns.length,
     columnName: (index) => columns[index] ?? null,
     columnDecltype: (index) => stmt.declaredTypes[index] ?? null,
-    setReadBigInts: (toggle) => void stmt.safeIntegers(toggle),
   };
 }
 

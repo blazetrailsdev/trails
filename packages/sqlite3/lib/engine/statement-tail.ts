@@ -81,5 +81,4 @@ export const closedStatement: EngineStatement = {
   columnName: () => null,
   columnDecltype: () => null,
   bindParameterCount: () => 0,
-  setReadBigInts: () => {},
 };

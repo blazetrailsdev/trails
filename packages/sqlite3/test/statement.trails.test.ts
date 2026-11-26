@@ -35,7 +35,6 @@ function fakeDatabase(rows: unknown[][], names: string[], async: boolean) {
     columnName: (index) => wrap(names[index] ?? null),
     columnDecltype: () => wrap(null),
     bindParameterCount: () => 0,
-    setReadBigInts: () => undefined,
   };
   const engineDb: EngineDatabase = {
     isClosed: () => false,
