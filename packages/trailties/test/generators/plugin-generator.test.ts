@@ -1,12 +1,13 @@
-import { Dir, File, FileUtils } from "@blazetrails/ruby-compat";
+import { Dir, File, FileUtils, Gem, chomp, rbFBackquote } from "@blazetrails/ruby-compat";
 import { assertNoMatch } from "@blazetrails/activesupport/testing/assertions";
 import { capture } from "@blazetrails/activesupport/testing/stream";
 import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
-import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PluginGenerator } from "../../lib/generators/trails/plugin/plugin-generator.js";
 import { TestCase } from "../../lib/generators/test-case.js";
 import { Application } from "../../lib/application.js";
 import { Trails } from "../../lib/trails.js";
+import { setAppPath } from "../../lib/app-path.js";
 
 class PluginGeneratorApp extends Application {}
 const tmpRoot = Dir.mktmpdir();
@@ -728,4 +729,146 @@ describe("PluginGeneratorTest", () => {
       assertNoMatch(new RegExp(`${year}`), contents);
     });
   });
+  // PERMANENT-SKIP: packages/trailties/CLAUDE.md, "A Gemfile is a package.json (`GemfileEntry`, `bundle install`, gemspec)" — the debug gem has no trails npm package.
+  it.skip("inclusion of a debugger", async () => {
+    await t.runGenerator([t.destinationRoot, "--full"]);
+    await t.assertFile("Gemfile", /# gem "debug"/);
+  });
+
+  // PERMANENT-SKIP: packages/trailties/CLAUDE.md, "A Gemfile is a package.json (`GemfileEntry`, `bundle install`, gemspec)" — a package.json has one manifest, so the Gemfile's development gems and the gemspec's runtime gems share it.
+  it.skip("no development dependencies in gemspec", async () => {
+    await t.runGenerator();
+    await t.assertFile("package.json", (contents: string) => {
+      assertNoMatch(/devDependencies/, contents);
+    });
+  });
+
+  it("gemspec uses optimistic rails version constraint", async () => {
+    const railsVersion = "1.2.3.4.pre5";
+
+    const stub = vi.spyOn(Trails, "gemVersion").mockReturnValue(new Gem.Version(railsVersion));
+    try {
+      await t.runGenerator();
+    } finally {
+      stub.mockRestore();
+    }
+
+    await t.assertFile(
+      "package.json",
+      new RegExp(
+        `"@blazetrails/trailties": ">= ${railsVersion.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"`,
+      ),
+    );
+  });
+
+  // PERMANENT-SKIP: CLAUDE.md, "importmap-rails and propshaft are out of scope; JavaScript is served by Vite (`vite_rails`)"
+  it.skip("dummy application skips asset pipeline when simple railtie", async () => {
+    await t.runGenerator();
+    await t.assertFile("package.json", (content: string) =>
+      assertNoMatch(/"propshaft": /, content),
+    );
+    t.assertNoFile("test/dummy/config/initializers/assets.ts");
+    await t.assertFile("test/dummy/config/environments/development.ts", (content: string) => {
+      assertNoMatch(/config\.assets/, content);
+    });
+  });
+
+  // PERMANENT-SKIP: CLAUDE.md, "importmap-rails and propshaft are out of scope; JavaScript is served by Vite (`vite_rails`)"
+  it.skip("dummy application configures asset pipeline when mountable", async () => {
+    await t.runGenerator([t.destinationRoot, "--mountable"]);
+    await t.assertFile("package.json", /"propshaft": /);
+    await t.assertFile("test/dummy/config/initializers/assets.ts");
+  });
+
+  // PERMANENT-SKIP: CLAUDE.md, "importmap-rails and propshaft are out of scope; JavaScript is served by Vite (`vite_rails`)"
+  it.skip("dummy application configures asset pipeline when full", async () => {
+    await t.runGenerator([t.destinationRoot, "--full"]);
+    await t.assertFile("package.json", /"propshaft": /);
+    await t.assertFile("test/dummy/config/initializers/assets.ts");
+    await t.assertFile("test/dummy/config/environments/development.ts", (content: string) => {
+      assertNoMatch(/config\.assets/, content);
+    });
+  });
+
+  // PERMANENT-SKIP: CLAUDE.md, "importmap-rails and propshaft are out of scope; JavaScript is served by Vite (`vite_rails`)"
+  it.skip("dummy application skips asset pipeline when flag skip asset pipeline", async () => {
+    await t.runGenerator([t.destinationRoot, "--mountable", "--skip-asset-pipeline"]);
+    await t.assertFile("package.json", (content: string) =>
+      assertNoMatch(/"propshaft": /, content),
+    );
+    t.assertNoFile("test/dummy/config/initializers/assets.ts");
+    await t.assertFile("test/dummy/config/environments/development.ts", (content: string) => {
+      assertNoMatch(/config\.assets/, content);
+    });
+  });
+
+  // PERMANENT-SKIP: CLAUDE.md, "importmap-rails and propshaft are out of scope; JavaScript is served by Vite (`vite_rails`)"
+  it.skip("no asset pipeline gem when no dummy application", async () => {
+    await t.runGenerator([t.destinationRoot, "--mountable", "--skip-test"]);
+    await t.assertFile("package.json", (content: string) =>
+      assertNoMatch(/"propshaft": /, content),
+    );
+    t.assertNoDirectory("test/dummy");
+  });
+
+  it("creating plugin in app directory adds gemfile entry", async () => {
+    await withSimulatedApp(async (gemfilePath) => {
+      await File.writeAsync(gemfilePath, "{}");
+
+      await t.runGenerator();
+
+      await t.assertFile(gemfilePath, /"bukkits": "file:bukkits"/);
+    });
+  });
+
+  it("skipping gemfile entry", async () => {
+    await withSimulatedApp(async (gemfilePath) => {
+      await t.runGenerator([t.destinationRoot, "--skip-gemfile-entry"]);
+
+      await t.assertFile(gemfilePath, (contents: string) => {
+        assertNoMatch(/"bukkits": "file:bukkits"/, contents);
+      });
+    });
+  });
+
+  it("git name and email in gemspec file", async () => {
+    const name = await rbFBackquote("git config user.name").then(
+      chomp,
+      () => "TODO: Write your name",
+    );
+    const email = await rbFBackquote("git config user.email").then(
+      chomp,
+      () => "TODO: Write your email address",
+    );
+
+    await t.runGenerator();
+    await t.assertFile("package.json", (contents: string) => {
+      expect(contents).toMatch(name);
+      expect(contents).toMatch(email);
+    });
+  });
+
+  it("git name in license file", async () => {
+    const name = await rbFBackquote("git config user.name").then(
+      chomp,
+      () => "TODO: Write your name",
+    );
+
+    await t.runGenerator();
+    await t.assertFile("MIT-LICENSE", (contents: string) => {
+      expect(contents).toMatch(name);
+    });
+  });
 });
+
+async function withSimulatedApp(block: (gemfilePath: string) => Promise<void>): Promise<void> {
+  const gemfilePath = `${tmpRoot}/package.json`;
+  setAppPath(`${tmpRoot}/config/application`);
+  await FileUtils.touchAsync(gemfilePath);
+  try {
+    await block(gemfilePath);
+  } finally {
+    setAppPath(undefined);
+    await FileUtils.rmAsync(gemfilePath);
+  }
+}

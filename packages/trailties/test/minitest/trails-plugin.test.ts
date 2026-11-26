@@ -58,4 +58,51 @@ describe("Minitest::TrailsPluginTest", () => {
       expect(Minitest.backtraceFilter).toBe(backtraceFilter);
     });
   });
+  // PERMANENT-SKIP: packages/trailties/CLAUDE.md, "`TestUnitReporter` has no `Minitest::StatisticsReporter` superclass (`test_unit/reporter.rb:7`)" — `trails test` reports through Vitest, so there is no `Minitest.reporter` for `plugin_rails_init` to rewrite.
+  it.skip("replaces Minitest::SummaryReporter reporter", () => {
+    withPlugin({}, new BacktraceFilter(), () => {
+      const reporters = (Minitest as unknown as { reporter: { reporters: object[] } }).reporter
+        .reporters;
+      expect(
+        reporters.filter((reporter) => reporter.constructor.name === "SummaryReporter"),
+      ).toEqual([]);
+      expect(
+        reporters.filter((reporter) => reporter.constructor.name === "SuppressedSummaryReporter"),
+      ).not.toEqual([]);
+    });
+  });
+
+  // PERMANENT-SKIP: packages/trailties/CLAUDE.md, "`TestUnitReporter` has no `Minitest::StatisticsReporter` superclass (`test_unit/reporter.rb:7`)" — `trails test` reports through Vitest, so there is no `Minitest.reporter` for `plugin_rails_init` to rewrite.
+  it.skip("replaces Minitest::ProgressReporter reporter", () => {
+    withPlugin({}, new BacktraceFilter(), () => {
+      const reporters = (Minitest as unknown as { reporter: { reporters: object[] } }).reporter
+        .reporters;
+      expect(
+        reporters.filter((reporter) => reporter.constructor.name === "ProgressReporter"),
+      ).toEqual([]);
+      expect(
+        reporters.filter((reporter) => reporter.constructor.name === "TestUnitReporter"),
+      ).not.toEqual([]);
+    });
+  });
+
+  // PERMANENT-SKIP: packages/trailties/CLAUDE.md, "`TestUnitReporter` has no `Minitest::StatisticsReporter` superclass (`test_unit/reporter.rb:7`)" — `trails test` reports through Vitest, so there is no `Minitest.reporter` for `plugin_rails_init` to rewrite.
+  it.skip("keeps non-default reporters", () => {
+    const customReporter = {};
+
+    withPlugin({}, new BacktraceFilter(), () => {
+      expect(
+        (Minitest as unknown as { reporter: { reporters: object[] } }).reporter.reporters,
+      ).toContain(customReporter);
+    });
+  });
+
+  // PERMANENT-SKIP: packages/trailties/CLAUDE.md, "`TestUnitReporter` has no `Minitest::StatisticsReporter` superclass (`test_unit/reporter.rb:7`)" — `trails test` reports through Vitest, so there is no `Minitest.reporter` for `plugin_rails_init` to rewrite.
+  it.skip("does not add reporters when not replacing reporters", () => {
+    withPlugin({}, new BacktraceFilter(), () => {
+      expect(
+        (Minitest as unknown as { reporter: { reporters: object[] } }).reporter.reporters,
+      ).toEqual([]);
+    });
+  });
 });
