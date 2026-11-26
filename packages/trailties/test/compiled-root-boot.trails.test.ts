@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 const record = "(globalThis.__stacks ??= []).push(new Error().stack);\nexport {};\n";
 
-async function bootFixture(ext: "js" | "ts", { stale = false } = {}) {
+async function bootFixture(ext: "js" | "ts", { stale = false, recompiled = false } = {}) {
   const here = decodeURIComponent(new URL("./fixtures/boot-file-map", import.meta.url).pathname);
   const base = File.realpath(Dir.mktmpdir("compiled", here));
   const root = `${base}/app`;
@@ -107,6 +107,7 @@ console.log(JSON.stringify({ stacks: globalThis.__stacks ?? [], scanned, status:
     expect(buildErr).toBe("");
     expect(build.isSuccess()).toBe(true);
     if (stale) expect(File.isExist(`${root}/.trails/entry.generated.js`)).toBe(true);
+    if (recompiled) write(`${root}/config.${ext}`, "export {};\n");
 
     const flags = ext === "js" ? ["--no-experimental-strip-types"] : [];
     const [stdout, stderr] = await Open3.capture3(env, node, ...flags, `${root}/boot.mjs`);
@@ -142,6 +143,17 @@ describe("a compiled root boots from trails build's entry", () => {
 
   it("ignores a stale entry beside a source tree and boots through the autoloader", async () => {
     const { stacks, scanned, cleanup } = await bootFixture("ts", { stale: true });
+    try {
+      expect(scanned).not.toEqual([]);
+      expect(stacks.length).toBe(2);
+      expect(stacks.some((stack) => stack.includes("/.trails/compiled/"))).toBe(false);
+    } finally {
+      cleanup();
+    }
+  }, 120_000);
+
+  it("boots a compiled root through the autoloader when its entry is older than config.js", async () => {
+    const { stacks, scanned, cleanup } = await bootFixture("js", { recompiled: true });
     try {
       expect(scanned).not.toEqual([]);
       expect(stacks.length).toBe(2);

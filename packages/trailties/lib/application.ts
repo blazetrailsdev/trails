@@ -313,20 +313,22 @@ export class Application extends Engine {
     }
   }
 
-  /** @inventedArm if — PERMANENT */
+  /** @inventedArm if — CONVERGEABLE compiled-root-entry-import-placement-ruling */
   async initializeBang(group: InitializerGroup = "default"): Promise<this> {
     if (this._initialized) throw new Error("Application has been already initialized.");
     setSourceMapsSupport(true);
     setTrailsRoot(() => this.config.root?.toString() ?? null);
     this._resetAutoloadState();
     const root = this.config.root?.toString();
+    const entry = `${root}/.trails/entry.generated.js`;
     if (
       root != null &&
-      (await File.isExistAsync(`${root}/config.js`)) &&
       !(await File.isExistAsync(`${root}/config.ts`)) &&
-      (await File.isExistAsync(`${root}/.trails/entry.generated.js`))
+      (await File.isExistAsync(`${root}/config.js`)) &&
+      (await File.isExistAsync(entry)) &&
+      (await File.mtimeAsync(entry)) >= (await File.mtimeAsync(`${root}/config.js`))
     ) {
-      await import(getPath().pathToFileURL!(`${root}/.trails/entry.generated.js`).href);
+      await import(getPath().pathToFileURL!(entry).href);
     }
     await this.runInitializers(group, this);
     this._initialized = true;
