@@ -1,10 +1,5 @@
 name: Playground
 
-# ci.yml's `changes` job classes a PR that touches only examples/ as docs-only,
-# so System Tests (which runs this smoke in chromium) skips it. This runs the
-# playground's smoke walk on such a PR, before the Pages build on main is the
-# first to see it. Firefox and WebKit are `BROWSER=` options of the smoke and
-# are not run here until playground-smoke-firefox-service-worker-bypass lands.
 on:
   pull_request:
     paths:
