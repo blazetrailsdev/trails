@@ -12,5 +12,3 @@ import { StandardError } from "./standard-error.js";
  * inherits rather than defines.
  */
 export class RuntimeError extends StandardError {}
-
-RuntimeError.prototype.message = "RuntimeError";

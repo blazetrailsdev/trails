@@ -2,30 +2,31 @@ import { eachKey } from "@blazetrails/ruby-compat/hash";
 import { NoMethodError } from "@blazetrails/ruby-compat/no-method-error";
 import { rbObjAsString, rbObjId, rbObjRespondTo, toSym } from "@blazetrails/ruby-compat/object";
 import { Psych } from "@blazetrails/ruby-compat/psych";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
+import { excSetupMessage } from "@blazetrails/ruby-compat/exception";
 import { EncryptedFile, MissingContentError } from "./encrypted-file.js";
 import { presence } from "./core-ext/object/blank.js";
 import { deepTransformKeys } from "./hash-utils.js";
 import { delegateMissingTo } from "./module-ext.js";
 import { OrderedOptions } from "./ordered-options.js";
 
-export class InvalidContentError extends Error {
-  constructor(contentPath: string, options: { cause?: unknown } = {}) {
-    const message = `Invalid YAML in '${contentPath}'.`;
-    const cause = options.cause;
-    super(
-      cause instanceof Psych.SyntaxError ? `${message}\n\n  ${cause.message}` : message,
-      options,
-    );
-    this.name = "InvalidContentError";
+export class InvalidContentError extends RuntimeError {
+  constructor(contentPath: string) {
+    super(`Invalid YAML in '${contentPath}'.`);
+  }
+
+  override get message(): string {
+    return this.cause instanceof Psych.SyntaxError
+      ? `${super.message}\n\n  ${this.cause.message}`
+      : super.message;
   }
 }
 
-export class InvalidKeyError extends Error {
+export class InvalidKeyError extends RuntimeError {
   constructor(contentPath: string, key: unknown) {
     super(
       `Key '${rbObjAsString(key)}' is invalid, it must respond to '#to_sym' from configuration in '${contentPath}'.`,
     );
-    this.name = "InvalidKeyError";
   }
 }
 
@@ -122,7 +123,7 @@ export class EncryptedConfiguration extends EncryptedFile {
         : Psych.load(content, { filename: this.contentPath });
     } catch (e) {
       if (e instanceof Psych.SyntaxError) {
-        throw new InvalidContentError(this.contentPath, { cause: e });
+        throw excSetupMessage(new InvalidContentError(this.contentPath), e);
       }
       throw e;
     }
