@@ -217,6 +217,40 @@ parity:api skips these Ruby methods, but only within the listed files — they
 have a real TS surface elsewhere, so the skip is file-scoped to avoid silencing
 a genuine gap:
 
+- not called by trails (RFC 0259 § "Scoping nokogiri and libxml-ruby"). PERMANENT.
+  - `scan_str`, `load_file`, `scan_file` (only in: `css/tokenizer.rb`)
+- not called by trails (RFC 0259 § "Scoping nokogiri and libxml-ruby"). PERMANENT.
+  - `meta_encoding`, `meta_encoding=` (only in: `html4/document.rb`)
+- not called by trails (RFC 0259 § "Scoping nokogiri and libxml-ruby"). PERMANENT.
+  - `block?` (only in: `html4/element_description.rb`)
+- not called by trails (RFC 0259 § "Scoping nokogiri and libxml-ruby"). PERMANENT.
+  - `implied_start_tag?`, `implied_end_tag?`, `save_end_tag?`, `deprecated?`, `default_sub_element`, `optional_attributes`, `deprecated_attributes`, `required_attributes`, `name`, `name=`, `startTag`, `startTag=`, `endTag`, `endTag=`, `saveEndTag`, `saveEndTag=`, `empty`, `empty=`, `depr`, `depr=`, `dtd`, `dtd=`, `isinline`, `isinline=`, `desc`, `desc=`, `subelts`, `subelts=`, `defaultsubelt`, `defaultsubelt=`, `attrs_opt`, `attrs_opt=`, `attrs_depr`, `attrs_depr=`, `attrs_req`, `attrs_req=`, `initialize` (only in: `html4/element_description_defaults.rb`)
+- not called by trails (RFC 0259 § "Scoping nokogiri and libxml-ruby"). PERMANENT.
+  - `encoding_found` (only in: `html4/encoding_reader.rb`)
+- not called by trails (RFC 0259 § "Scoping nokogiri and libxml-ruby"). PERMANENT.
+  - `finish` (only in: `html4/sax/push_parser.rb`)
+- not called by trails (RFC 0259 § "Scoping nokogiri and libxml-ruby"). PERMANENT.
+  - `HTML5` (only in: `html5.rb`)
+- not called by trails (RFC 0259 § "Scoping nokogiri and libxml-ruby"). PERMANENT.
+  - `libxml2_using_system?`, `to_markdown` (only in: `version/info.rb`)
+- not called by trails (RFC 0259 § "Scoping nokogiri and libxml-ruby"). PERMANENT.
+  - `Reader` (only in: `xml.rb`)
+- not called by trails (RFC 0259 § "Scoping nokogiri and libxml-ruby"). PERMANENT.
+  - `deconstruct_keys` (only in: `xml/attr.rb`)
+- not called by trails (RFC 0259 § "Scoping nokogiri and libxml-ruby"). PERMANENT.
+  - `namespace_inheritance`, `namespace_inheritance=`, `create_comment`, `collect_namespaces`, `validate`, `slop!`, `deconstruct_keys` (only in: `xml/document.rb`)
+- not called by trails (RFC 0259 § "Scoping nokogiri and libxml-ruby"). PERMANENT.
+  - `html_dtd?`, `html5_dtd?` (only in: `xml/dtd.rb`)
+- not called by trails (RFC 0259 § "Scoping nokogiri and libxml-ruby"). PERMANENT.
+  - `decorate!`, `swap`, `default_namespace=`, `previous`, `previous=`, `add_namespace`, `classes`, `add_class`, `append_class`, `remove_class`, `kwattr_values`, `kwattr_add`, `kwattr_append`, `kwattr_remove`, `has_attribute?`, `read_only?`, `elem?`, `css_path`, `write_html_to`, `write_xhtml_to`, `write_xml_to`, `deconstruct_keys`, `keywordify`, `write_format_to`, `related_class` (only in: `xml/node.rb`)
+- not called by trails (RFC 0259 § "Scoping nokogiri and libxml-ruby"). PERMANENT.
+  - `add_class`, `append_class`, `remove_class`, `remove_attr` (only in: `xml/node_set.rb`)
+- not called by trails (RFC 0259 § "Scoping nokogiri and libxml-ruby"). PERMANENT.
+  - `xmldecl`, `start_element_namespace`, `end_element_namespace`, `comment`, `processing_instruction` (only in: `xml/sax/document.rb`)
+- not called by trails (RFC 0259 § "Scoping nokogiri and libxml-ruby"). PERMANENT.
+  - `parse_file`, `related_class`, `localname`, `localname=`, `prefix`, `prefix=`, `uri`, `uri=`, `value`, `value=` (only in: `xml/sax/parser.rb`)
+- not called by trails (RFC 0259 § "Scoping nokogiri and libxml-ruby"). PERMANENT.
+  - `str2`, `str3`, `int1` (only in: `xml/syntax_error.rb`)
 - PERMANENT: the non-MRI `WeakSet` arm (`RUBY_ENGINE != "ruby"`, descendants_tracker.rb:27-53); trails ports the MRI arm, a `WeakSet < ObjectSpace::WeakMap`.
   - `initialize`, `include?` (only in: `descendants_tracker.rb`)
 - PERMANENT: `require_rexml` (xml_mini/rexml.rb:41-46) loads the rexml gem on first parse; trails' REXML port is a static ES import, so `defined?(REXML::Document)` always holds and there is nothing to load.
