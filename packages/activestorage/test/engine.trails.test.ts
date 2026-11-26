@@ -202,6 +202,37 @@ describe("ActiveStorage::Engine", () => {
     }
   });
 
+  it("active_storage.services reads config/storage.js in a compiled root", async () => {
+    const trails = TopLevel.Trails!;
+    const activeStorage = (
+      trails.configuration as unknown as { activeStorage: { serviceConfigurations?: unknown } }
+    ).activeStorage;
+    const configs = activeStorage.serviceConfigurations;
+    const services = Blob.services;
+    const tmp = Dir.mktmpdir("compiled_storage_js");
+    FileUtils.mkdirP(`${tmp}/config`);
+    File.write(
+      `${tmp}/config/storage.js`,
+      `export default { local: { service: "Disk", root: ${JSON.stringify(`${tmp}/storage`)} } };\n`,
+    );
+    const root = vi.spyOn(trails, "root").mockReturnValue(new Pathname(tmp));
+    activeStorage.serviceConfigurations = undefined;
+    try {
+      const initializer = Engine.initializers.find((i) => i.name === "active_storage.services")!;
+      await initializer.bind(Engine.instance()).run(app);
+      runLoadHooks("active_storage_blob", Blob);
+
+      expect(activeStorage.serviceConfigurations).toEqual({
+        local: { service: "Disk", root: `${tmp}/storage` },
+      });
+    } finally {
+      root.mockRestore();
+      activeStorage.serviceConfigurations = configs;
+      Blob.services = services;
+      FileUtils.rmRf(tmp);
+    }
+  });
+
   it("does not load Blob when the engine loads", async () => {
     vi.resetModules();
     const { ActiveStorage: fresh } = await import("../lib/active-storage.js");
