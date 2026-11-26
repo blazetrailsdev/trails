@@ -4,6 +4,8 @@ import { rbClearMethodCache } from "@blazetrails/ruby-compat/method-cache";
 import { NameError } from "@blazetrails/ruby-compat/name-error";
 import { NilClass } from "@blazetrails/ruby-compat/nil-class";
 import { NoMethodError } from "@blazetrails/ruby-compat/no-method-error";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
+import { Thread } from "@blazetrails/ruby-compat/thread";
 import {
   rbModName,
   rbModToS,
@@ -346,6 +348,12 @@ export namespace Delegation {
     }
   }
 
+  /** @noRailsEquivalent PERMANENT */
+  export interface DelegateMissingToOptions {
+    allowNil?: boolean;
+    nilTargetClasses?: () => readonly { prototype: object }[];
+  }
+
   const methodMissingLayers = new WeakSet<object>();
 
   /**
@@ -355,7 +363,7 @@ export namespace Delegation {
   export function generateMethodMissing(
     owner: { prototype: object },
     target: string,
-    { allowNil }: { allowNil?: boolean } = {},
+    { allowNil, nilTargetClasses }: DelegateMissingToOptions = {},
   ): void {
     if (RESERVED_METHOD_NAMES.has(target) || target === "__target") target = `self.${target}`;
 
@@ -391,12 +399,31 @@ export namespace Delegation {
           return Reflect.get(obj, prop, receiver);
         }
         const __target = (receiver as Record<string, unknown>)[targetName];
+        if (__target instanceof Promise) {
+          new Thread(() => __target);
+          throw new RuntimeError(`${prop} needs ${targetName} loaded; \`await\` it first.`);
+        }
         if (__target == null && !rbObjRespondTo(null, prop)) {
+          if (allowNil && nilTargetClasses) {
+            let answered: PropertyDescriptor | undefined;
+            for (const klass of nilTargetClasses()) {
+              for (
+                let p: object | null = klass.prototype;
+                p && !answered;
+                p = Object.getPrototypeOf(p)
+              ) {
+                answered = Object.getOwnPropertyDescriptor(p, prop);
+              }
+            }
+            return answered === undefined || typeof answered.value === "function"
+              ? () => null
+              : null;
+          }
           if (allowNil) return undefined;
           throw DelegationError.nilTarget(prop, target);
         }
         if (__target == null) return (...args: unknown[]) => rbFSend(null, prop, ...args);
-        if (!(prop in Object(__target))) {
+        if (!(prop in Object(__target)) && !rbObjRespondTo(__target, prop)) {
           const sup = Reflect.get(obj, prop, receiver);
           if (sup !== undefined) return sup;
           if (PROTOCOL_PROBES.has(prop)) return undefined;

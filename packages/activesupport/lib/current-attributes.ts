@@ -187,7 +187,7 @@ export class CurrentAttributes {
   /** @internal */
   private static currentInstancesKey(): string {
     if (!Object.hasOwn(this, "_currentInstancesKey")) {
-      (this as CurrentAttributesClass)._currentInstancesKey = rbModName(this) ?? this.name;
+      (this as CurrentAttributesClass)._currentInstancesKey = rbModName(this)!;
     }
     return (this as CurrentAttributesClass)._currentInstancesKey!;
   }

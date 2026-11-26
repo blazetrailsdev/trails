@@ -1,12 +1,5 @@
-import { isPresent } from "@blazetrails/activesupport";
-import {
-  KERNEL_METHODS,
-  PROTOCOL_PROBES,
-  RuntimeError,
-  Thread,
-  rbFSend,
-  rbObjRespondTo,
-} from "@blazetrails/ruby-compat";
+import { delegateMissingTo, isPresent } from "@blazetrails/activesupport";
+import { RuntimeError, Thread, rbFSend } from "@blazetrails/ruby-compat";
 import { ActiveStorage } from "../active-storage.js";
 import { Attached } from "../attached.js";
 import type { Attachment } from "../app/models/active-storage/attachment.js";
@@ -101,12 +94,6 @@ export class One extends Attached {
   }
 
   /** @internal */
-  respondToMissing(name: string, _includePrivate = false): boolean {
-    if (name === "marshalDump" || name === "_dump") return false;
-    return rbObjRespondTo(this.loadedAttachment(name), name);
-  }
-
-  /** @internal */
   private async purgeOne(): Promise<PurgeOne> {
     return new PurgeOne(this.name, this.record, await this.attachment);
   }
@@ -117,43 +104,14 @@ export class One extends Attached {
   }
 }
 
-Object.setPrototypeOf(
-  One.prototype,
-  new Proxy(Object.create(Object.getPrototypeOf(One.prototype) as object) as object, {
-    get(target, prop, receiver: One) {
-      const value = Reflect.get(target, prop, receiver);
-      if (
-        value !== undefined ||
-        typeof prop === "symbol" ||
-        prop.startsWith("_") ||
-        Reflect.has(target, prop) ||
-        PROTOCOL_PROBES.has(prop) ||
-        KERNEL_METHODS.has(prop) ||
-        receiver === One.prototype
-      ) {
-        return value;
-      }
-      const attachment = receiver.loadedAttachment(prop) as unknown as {
-        [k: string]: unknown;
-      } | null;
-      if (attachment == null) {
-        let answered: PropertyDescriptor | undefined;
-        for (const klass of [ActiveStorage.Attachment!, ActiveStorage.Blob!]) {
-          klass.defineAttributeMethods();
-          for (
-            let p: object | null = klass.prototype;
-            p && !answered;
-            p = Object.getPrototypeOf(p)
-          ) {
-            answered = Object.getOwnPropertyDescriptor(p, prop);
-          }
-        }
-        return answered === undefined || typeof answered.value === "function" ? () => null : null;
-      }
-      const member = attachment[prop];
-      return typeof member === "function" ? member.bind(attachment) : member;
-    },
-  }),
-);
+/** @missingRailsArgs delegate_missing_to — PERMANENT */
+delegateMissingTo.call(One, "attachment", {
+  allowNil: true,
+  nilTargetClasses: () =>
+    [ActiveStorage.Attachment!, ActiveStorage.Blob!].map((klass) => {
+      klass.defineAttributeMethods();
+      return klass;
+    }),
+});
 
 Attached.One = One;

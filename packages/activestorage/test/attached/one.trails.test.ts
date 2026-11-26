@@ -177,7 +177,7 @@ describe("ActiveStorage::Attached::One", () => {
     const reloaded = (await Member.find(user.id)) as AvatarUser;
     expect(() => isBlank(reloaded.avatar)).toThrow("await avatar.load()");
     expect(() => (reloaded.avatar as unknown as { blobId: unknown }).blobId).toThrow(
-      "await avatar.load()",
+      "blobId needs attachment loaded",
     );
     await reloaded.avatar.load();
     expect(isBlank(reloaded.avatar)).toBe(false);

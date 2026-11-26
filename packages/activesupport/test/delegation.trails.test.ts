@@ -1,8 +1,8 @@
 import { describe, it, expect, vi } from "vitest";
-import { classModule, NameError, NoMethodError } from "@blazetrails/ruby-compat";
+import { classModule, NameError, NoMethodError, rbObjRespondTo } from "@blazetrails/ruby-compat";
 
 import { Delegation, DelegationError } from "../lib/delegation.js";
-import { delegate } from "../lib/module-ext.js";
+import { delegate, delegateMissingTo } from "../lib/module-ext.js";
 
 describe("Delegation.generate", () => {
   it("delegates where code generation from strings raises EvalError", () => {
@@ -437,5 +437,59 @@ describe("Delegation.generateMethodMissing writer", () => {
     wrapper.content = 42;
     expect(wrapper.box.value).toBe(42);
     expect(Object.hasOwn(wrapper, "content")).toBe(false);
+  });
+});
+
+describe("Delegation.generateMethodMissing", () => {
+  it("forwards a name the target answers only through its own respond_to_missing?", () => {
+    class Inner {
+      size = 3;
+    }
+    class Middle {
+      inner = new Inner();
+    }
+    delegateMissingTo.call(Middle, "inner");
+    class Outer {
+      middle = new Middle();
+    }
+    delegateMissingTo.call(Outer, "middle");
+    expect((new Outer() as unknown as { size: number }).size).toBe(3);
+    expect(rbObjRespondTo(new Outer(), "size")).toBe(true);
+  });
+
+  it("raises when the target is still a pending promise", async () => {
+    const pending = Promise.resolve({ size: 3 });
+    class Lazy {
+      get target() {
+        return pending;
+      }
+    }
+    delegateMissingTo.call(Lazy, "target");
+    expect(() => (new Lazy() as unknown as { size: number }).size).toThrow(
+      "size needs target loaded",
+    );
+    await pending;
+  });
+
+  it("answers a nil target's reader with null and its method with a nil-returning function", () => {
+    class Target {
+      declare size: number;
+      grow(): number {
+        return 1;
+      }
+    }
+    Object.defineProperty(Target.prototype, "size", { get: () => 1 });
+    class Holder {
+      target: Target | null = null;
+    }
+    delegateMissingTo.call(Holder, "target", { allowNil: true, nilTargetClasses: () => [Target] });
+    const holder = new Holder() as unknown as {
+      size: unknown;
+      grow: () => unknown;
+      other: () => unknown;
+    };
+    expect(holder.size).toBeNull();
+    expect(holder.grow()).toBeNull();
+    expect(holder.other()).toBeNull();
   });
 });
