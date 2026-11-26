@@ -173,14 +173,14 @@ export class WeakThreadKeyMap<V> {
 }
 
 export class Lease {
-  connection: DatabaseAdapter | null = null;
+  connection: DatabaseAdapter | Promise<DatabaseAdapter> | null = null;
   sticky: boolean | null = null;
 
   release(): DatabaseAdapter | null {
     const conn = this.connection;
     this.connection = null;
     this.sticky = null;
-    return conn;
+    return conn instanceof Promise ? null : conn;
   }
 
   clear(connection: DatabaseAdapter): boolean {
@@ -193,12 +193,7 @@ export class Lease {
   }
 }
 
-const pendingCheckouts = new WeakMap<
-  Lease,
-  { connection: Promise<DatabaseAdapter>; holders: number }
->();
-
-const pendingLeases = new WeakMap<Lease, Promise<DatabaseAdapter>>();
+const syncHolds = new WeakMap<Lease, { holders: number; release: boolean }>();
 
 export class LeaseRegistry {
   private _map = new WeakMap<object, Lease>();
@@ -345,20 +340,16 @@ export class ConnectionPool implements ReapablePool {
     return new InternalMetadata(this);
   }
 
-  /** @inventedArm if — CONVERGEABLE with-connection-pending-checkout-join-needs-ruling */
   async leaseConnection(): Promise<DatabaseAdapter> {
     const lease = this.connectionLease();
-    if (!lease.connection) {
-      const checkout = pendingLeases.get(lease) ?? this.checkout();
-      pendingLeases.set(lease, checkout);
-      try {
-        lease.connection ||= await checkout;
-      } finally {
-        if (pendingLeases.get(lease) === checkout) pendingLeases.delete(lease);
-      }
-    }
+    lease.connection ||= this.checkout();
     lease.sticky = true;
-    return lease.connection;
+    try {
+      return (lease.connection = await lease.connection);
+    } catch (error) {
+      lease.release();
+      throw error;
+    }
   }
 
   isPermanentLease(): boolean {
@@ -368,7 +359,9 @@ export class ConnectionPool implements ReapablePool {
   /** @inventedArm if — PERMANENT */
   async pinConnectionBang(lockThread = false): Promise<void> {
     const connection =
-      this._pinnedConnection || this.connectionLease()?.connection || (await this.checkout());
+      this._pinnedConnection ||
+      (await this.connectionLease()?.connection) ||
+      (await this.checkout());
     if (this._pinnedConnection != null && this._pinnedConnection !== connection) {
       this.checkin(connection);
     }
@@ -420,7 +413,8 @@ export class ConnectionPool implements ReapablePool {
   }
 
   isActiveConnection(): DatabaseAdapter | null {
-    return this.connectionLease().connection;
+    const connection = this.connectionLease().connection;
+    return connection instanceof Promise ? null : connection;
   }
 
   get activeConnection(): DatabaseAdapter | null {
@@ -436,7 +430,7 @@ export class ConnectionPool implements ReapablePool {
     return false;
   }
 
-  /** @inventedArm if — CONVERGEABLE with-connection-pending-checkout-join-needs-ruling */
+  /** @inventedArm if — CONVERGEABLE lease-connection-holds-pending-checkout */
   async withConnection<T>(
     fn: (conn: DatabaseAdapter) => T | Promise<T>,
     options: { preventPermanentCheckout?: boolean } = {},
@@ -446,29 +440,21 @@ export class ConnectionPool implements ReapablePool {
     const stickyWas = lease.sticky;
     if (preventPermanentCheckout) lease.sticky = false;
 
-    const pending = pendingCheckouts.get(lease);
-    if (lease.connection && !pending) {
+    if (lease.connection) {
       try {
-        return await fn(lease.connection);
+        return await fn(await lease.connection);
       } finally {
         if (preventPermanentCheckout && !stickyWas) lease.sticky = stickyWas;
       }
     } else {
-      const checkout = pending ?? { connection: this.checkout(), holders: 0 };
-      if (!pending) {
-        pendingCheckouts.set(lease, checkout);
-        checkout.connection.catch(() => {
-          if (pendingCheckouts.get(lease) === checkout) pendingCheckouts.delete(lease);
-        });
-      }
-      checkout.holders++;
       try {
-        return await fn((lease.connection = await checkout.connection));
+        return await fn((lease.connection = await (lease.connection = this.checkout())));
       } finally {
         if (preventPermanentCheckout && !stickyWas) lease.sticky = stickyWas;
-        if (--checkout.holders === 0) {
-          if (pendingCheckouts.get(lease) === checkout) pendingCheckouts.delete(lease);
-          if (!lease.sticky) this.releaseConnection(lease);
+        if (!lease.sticky) {
+          const hold = syncHolds.get(lease);
+          if (hold) hold.release = true;
+          else this.releaseConnection(lease);
         }
       }
     }
@@ -724,23 +710,17 @@ export class ConnectionPool implements ReapablePool {
 
     const ensure = (release: boolean, result?: T): T => {
       if (result instanceof Promise) {
-        const pending = pendingCheckouts.get(lease);
-        const checkout = release
-          ? pending
-            ? null
-            : { connection: Promise.resolve(lease.connection!), holders: 0 }
-          : (pending ?? null);
-        if (checkout) {
-          if (!pending) pendingCheckouts.set(lease, checkout);
-          checkout.holders++;
-          return result.finally(() => {
-            if (preventPermanentCheckout && !stickyWas) lease.sticky = stickyWas;
-            if (--checkout.holders === 0) {
-              if (pendingCheckouts.get(lease) === checkout) pendingCheckouts.delete(lease);
-              if (!lease.sticky) this.releaseConnection(lease);
-            }
-          }) as T;
-        }
+        let hold = syncHolds.get(lease);
+        if (!hold) syncHolds.set(lease, (hold = { holders: 0, release: false }));
+        hold.holders++;
+        hold.release ||= release;
+        return result.finally(() => {
+          if (preventPermanentCheckout && !stickyWas) lease.sticky = stickyWas;
+          if (--hold.holders === 0) {
+            syncHolds.delete(lease);
+            if (hold.release && !lease.sticky) this.releaseConnection(lease);
+          }
+        }) as T;
       }
       const restore = () => {
         if (preventPermanentCheckout && !stickyWas) lease.sticky = stickyWas;
@@ -754,7 +734,9 @@ export class ConnectionPool implements ReapablePool {
     let result: T;
     const release = !lease.connection;
     try {
-      if (lease.connection) {
+      if (lease.connection instanceof Promise) {
+        throw new RuntimeError("withConnectionSync reached a lease whose checkout is pending");
+      } else if (lease.connection) {
         result = fn(lease.connection);
       } else {
         const pinned = this._pinnedConnection;
@@ -1104,13 +1086,12 @@ async function adoptConnection(this: Pool, conn: DatabaseAdapter): Promise<void>
 
   if (this._boundSchemaCache == null && lazilyLoadSchemaCache()) {
     const lease = this.connectionLease();
-    const pending = pendingCheckouts.get(lease);
-    pendingCheckouts.delete(lease);
+    const pending = lease.connection;
+    lease.connection = null;
     try {
       await this.schemaCache.loadBang();
     } finally {
-      if (pending !== undefined && !pendingCheckouts.has(lease))
-        pendingCheckouts.set(lease, pending);
+      lease.connection ||= pending;
     }
   }
 }
