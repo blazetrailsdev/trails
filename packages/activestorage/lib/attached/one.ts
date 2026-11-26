@@ -5,6 +5,7 @@ import {
   RuntimeError,
   Thread,
   rbFSend,
+  rbObjRespondTo,
 } from "@blazetrails/ruby-compat";
 import { ActiveStorage } from "../active-storage.js";
 import { Attached } from "../attached.js";
@@ -97,6 +98,12 @@ export class One extends Attached {
     throw new RuntimeError(
       `${method} needs ${this.name}'s attachment loaded; \`await ${this.name}.load()\` first.`,
     );
+  }
+
+  /** @internal */
+  respondToMissing(name: string, _includePrivate = false): boolean {
+    if (name === "marshalDump" || name === "_dump") return false;
+    return rbObjRespondTo(this.loadedAttachment(name), name);
   }
 
   /** @internal */

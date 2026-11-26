@@ -25,10 +25,10 @@ export class Topic extends Base {
 }
 declare module "@blazetrails/activerecord" {
   interface RelationScopes<T extends import("@blazetrails/activerecord").Base> {
-    withKwargs(this: import("@blazetrails/activerecord").Relation<Topic>, approved?: boolean): import("@blazetrails/activerecord").Relation<Topic>;
-    limited(this: import("@blazetrails/activerecord").Relation<Topic>, limit: number, offset?: number): import("@blazetrails/activerecord").Relation<Topic>;
-    named(this: import("@blazetrails/activerecord").Relation<Topic>, name?: string): import("@blazetrails/activerecord").Relation<Topic>;
-    typedRest(this: import("@blazetrails/activerecord").Relation<Topic>, ...ids: number[]): import("@blazetrails/activerecord").Relation<Topic>;
-    untypedRest(this: import("@blazetrails/activerecord").Relation<Topic>, ...args: unknown[]): import("@blazetrails/activerecord").Relation<Topic>;
+    withKwargs(this: import("@blazetrails/activerecord").Relation<Topic, boolean> | import("@blazetrails/activerecord").CollectionProxy<Topic>, approved?: boolean): import("@blazetrails/activerecord").Relation<Topic>;
+    limited(this: import("@blazetrails/activerecord").Relation<Topic, boolean> | import("@blazetrails/activerecord").CollectionProxy<Topic>, limit: number, offset?: number): import("@blazetrails/activerecord").Relation<Topic>;
+    named(this: import("@blazetrails/activerecord").Relation<Topic, boolean> | import("@blazetrails/activerecord").CollectionProxy<Topic>, name?: string): import("@blazetrails/activerecord").Relation<Topic>;
+    typedRest(this: import("@blazetrails/activerecord").Relation<Topic, boolean> | import("@blazetrails/activerecord").CollectionProxy<Topic>, ...ids: number[]): import("@blazetrails/activerecord").Relation<Topic>;
+    untypedRest(this: import("@blazetrails/activerecord").Relation<Topic, boolean> | import("@blazetrails/activerecord").CollectionProxy<Topic>, ...args: unknown[]): import("@blazetrails/activerecord").Relation<Topic>;
   }
 }

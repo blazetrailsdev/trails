@@ -84,6 +84,6 @@ export class Server {
 
   /** @internal */
   private setPort(): void {
-    vite.url = vite.server!.resolvedUrls!.local[0];
+    vite.url = vite.server!.resolvedUrls!.local[0].replace(/\/$/, "");
   }
 }

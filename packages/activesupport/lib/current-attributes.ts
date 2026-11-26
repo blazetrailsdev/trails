@@ -1,7 +1,12 @@
 import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
 import { hashAref } from "@blazetrails/ruby-compat/hash";
 import { methodMissingPrototype } from "@blazetrails/ruby-compat/method-missing-proxy";
-import { rbFSend, rbModMethodDefined, rbObjRespondTo } from "@blazetrails/ruby-compat/object";
+import {
+  rbFSend,
+  rbModMethodDefined,
+  rbModName,
+  rbObjRespondTo,
+} from "@blazetrails/ruby-compat/object";
 import { Callbacks } from "./callbacks.js";
 import { classAttribute } from "./class-attribute.js";
 import { CodeGenerator } from "./code-generator.js";
@@ -182,7 +187,7 @@ export class CurrentAttributes {
   /** @internal */
   private static currentInstancesKey(): string {
     if (!Object.hasOwn(this, "_currentInstancesKey")) {
-      (this as CurrentAttributesClass)._currentInstancesKey = this.name;
+      (this as CurrentAttributesClass)._currentInstancesKey = rbModName(this) ?? this.name;
     }
     return (this as CurrentAttributesClass)._currentInstancesKey!;
   }

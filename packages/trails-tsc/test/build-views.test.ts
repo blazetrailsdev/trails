@@ -328,7 +328,7 @@ describe("buildViews", { timeout: 30_000 }, () => {
     );
     expect(shim).toContain("render<P extends string>");
     expect(shim).toContain("P extends keyof TemplateRegistry");
-    expect(shim).toContain("{ partial: P } &");
+    expect(shim).toContain("{ partial: P; collection?: C;");
     expect(shim).toContain("{} extends TemplateLocals<TemplateRegistry[P]>");
     expect(shim).toContain("{ locals: TemplateLocals<TemplateRegistry[P]> }");
   });
@@ -356,8 +356,8 @@ describe("buildViews", { timeout: 30_000 }, () => {
       [
         "export interface TemplateRegistry {}",
         "export type TemplateLocals<T> = T;",
-        "export declare const TopLevel: {};",
-        "export declare class Base { render(...args: unknown[]): string; }\nexport declare const TopLevel: {};",
+        "export declare const TopLevel: {};\nexport interface ConstantTable {}\nexport type ControllerDelegate = never;",
+        "export declare class Base { render(...args: unknown[]): string; }\nexport declare const TopLevel: {};\nexport interface ConstantTable {}\nexport type ControllerDelegate = never;",
       ].join("\n"),
     );
     write(cwd, "app/models/post.ts", 'export class Post { title = ""; }');
@@ -411,7 +411,7 @@ describe("buildViews", { timeout: 30_000 }, () => {
         "export interface TemplateRegistry {}",
         "export type TemplateLocals<T> = T;",
         "export declare class Base { render(...args: unknown[]): string; }",
-        "export declare const TopLevel: {};",
+        "export declare const TopLevel: {};\nexport interface ConstantTable {}\nexport type ControllerDelegate = never;",
       ].join("\n"),
     );
     write(
@@ -475,7 +475,7 @@ describe("buildViews", { timeout: 30_000 }, () => {
       [
         "export interface TemplateRegistry {}",
         "export type TemplateLocals<T> = T;",
-        "export declare const TopLevel: {};",
+        "export declare const TopLevel: {};\nexport interface ConstantTable {}\nexport type ControllerDelegate = never;",
         "export declare class Base {}",
       ].join("\n"),
     );
@@ -506,7 +506,7 @@ describe("buildViews", { timeout: 30_000 }, () => {
       ],
       [
         "actionview",
-        "export interface TemplateRegistry {}\nexport type TemplateLocals<T> = T;\nexport declare const TopLevel: {};\nexport declare class Base {}",
+        "export interface TemplateRegistry {}\nexport type TemplateLocals<T> = T;\nexport declare const TopLevel: {};\nexport interface ConstantTable {}\nexport type ControllerDelegate = never;\nexport declare class Base {}",
       ],
       ["actionmailer", "export declare class Base {}"],
     ]) {
@@ -557,7 +557,7 @@ describe("buildViews", { timeout: 30_000 }, () => {
       ],
       [
         "actionview",
-        "export interface TemplateRegistry {}\nexport type TemplateLocals<T> = T;\nexport declare const TopLevel: {};\nexport declare class Base {}",
+        "export interface TemplateRegistry {}\nexport type TemplateLocals<T> = T;\nexport declare const TopLevel: {};\nexport interface ConstantTable {}\nexport type ControllerDelegate = never;\nexport declare class Base {}",
       ],
       ["actionmailer", "export declare class Base {}"],
     ]) {
@@ -695,7 +695,7 @@ describe("runCli", { timeout: 30_000 }, () => {
   it("scopes a view to app/helpers, the controller's declared ivars and the partial's model", async () => {
     const cwd = mkScratch();
     write(cwd, "app/helpers/posts-helper.ts", "export const PostsHelper = {};");
-    write(cwd, "app/helpers/admin/users-helper.ts", "export const AdminUsersHelper = {};");
+    write(cwd, "app/helpers/admin/users-helper.ts", "export const UsersHelper = {};");
     write(
       cwd,
       "app/controllers/posts-controller.ts",
@@ -714,9 +714,9 @@ describe("runCli", { timeout: 30_000 }, () => {
     write(
       cwd,
       "app/controllers/admin/blog-posts-controller.ts",
-      "export class AdminBlogPostsController { declare posts: string[]; }",
+      "export class BlogPostsController { declare posts: string[]; }",
     );
-    write(cwd, "app/models/admin/blog-post.ts", "export class AdminBlogPost {}");
+    write(cwd, "app/models/admin/blog-post.ts", "export class BlogPost {}");
     write(cwd, "app/views/admin/blog_posts/_blog_post.html.tse", "<%= blog_post %>");
     write(
       cwd,
@@ -738,7 +738,7 @@ describe("runCli", { timeout: 30_000 }, () => {
       '(typeof import("../../../app/helpers/posts-helper.js"))["PostsHelper"]',
     );
     expect(shim).toContain(
-      '(typeof import("../../../app/helpers/admin/users-helper.js"))["AdminUsersHelper"]',
+      '(typeof import("../../../app/helpers/admin/users-helper.js"))["UsersHelper"]',
     );
     expect(shim).toContain('{ "currentPost": () => string; "tracked": () => number }');
     expect(shim).toContain(
@@ -927,7 +927,7 @@ describe("runCli", { timeout: 30_000 }, () => {
       [
         "export interface TemplateRegistry {}",
         "export type TemplateLocals<T> = T;",
-        "export declare const TopLevel: {};",
+        "export declare const TopLevel: {};\nexport interface ConstantTable {}\nexport type ControllerDelegate = never;",
         "export declare class Base { csrfMetaTags(): string; }",
       ].join("\n"),
     );
@@ -1052,7 +1052,7 @@ describe("runCli", { timeout: 30_000 }, () => {
     write(
       cwd,
       "node_modules/@blazetrails/actionview/index.d.ts",
-      "export declare class Base { render(...args: unknown[]): string; }\nexport declare const TopLevel: {};",
+      "export declare class Base { render(...args: unknown[]): string; }\nexport declare const TopLevel: {};\nexport interface ConstantTable {}\nexport type ControllerDelegate = never;",
     );
     write(cwd, "app/models/post.ts", 'export class Post { title = ""; }');
     write(
@@ -1115,7 +1115,7 @@ describe("runCli", { timeout: 30_000 }, () => {
     for (const [file, name, field] of [
       ["comments", "CommentsController", "declare items: string[];"],
       ["posts", "PostsController", "private declare items: number[];"],
-      ["admin/posts", "AdminPostsController", "declare items: boolean[];"],
+      ["admin/posts", "PostsController", "declare items: boolean[];"],
       ["story-pages", "StoryPagesController", "declare items: Date[];"],
     ]) {
       write(

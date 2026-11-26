@@ -93,7 +93,7 @@ describe("buildViews initializers", () => {
     );
     write(
       "node_modules/@blazetrails/actionview/index.d.ts",
-      "export interface TemplateRegistry {}\nexport type TemplateLocals<T> = T;\nexport declare class Base { render(...args: unknown[]): string; }\nexport declare const TopLevel: {};",
+      "export interface TemplateRegistry {}\nexport type TemplateLocals<T> = T;\nexport declare class Base { render(...args: unknown[]): string; }\nexport declare const TopLevel: {};\nexport interface ConstantTable {}\nexport type ControllerDelegate = never;",
     );
     write("app/views/audits/show.html.tse", "<%= this.auditsPath() %><%= this.reportsPath() %>");
     global.TrailsTscBase = class {};

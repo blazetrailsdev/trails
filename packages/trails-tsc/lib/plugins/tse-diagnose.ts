@@ -5,6 +5,7 @@ const DEFAULT_STUB = [
   "export type TemplateLocals<T> = T;",
   "export type NoExtraKeys<T> = T & { [K in Exclude<string, keyof T>]?: never };",
   "export declare const TopLevel: {};",
+  "export interface ConstantTable {}",
   "export declare function hashAref(hash: object, key: unknown): unknown;",
   "export declare function keys(hash: object): string[];",
 ].join("\n");

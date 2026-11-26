@@ -13,7 +13,7 @@ export class Post extends Base {
 }
 declare module "@blazetrails/activerecord" {
   interface RelationScopes<T extends import("@blazetrails/activerecord").Base> {
-    published(this: import("@blazetrails/activerecord").Relation<Post>): import("@blazetrails/activerecord").Relation<Post>;
-    recent(this: import("@blazetrails/activerecord").Relation<Post>, limit: number): import("@blazetrails/activerecord").Relation<Post>;
+    published(this: import("@blazetrails/activerecord").Relation<Post, boolean> | import("@blazetrails/activerecord").CollectionProxy<Post>): import("@blazetrails/activerecord").Relation<Post>;
+    recent(this: import("@blazetrails/activerecord").Relation<Post, boolean> | import("@blazetrails/activerecord").CollectionProxy<Post>, limit: number): import("@blazetrails/activerecord").Relation<Post>;
   }
 }

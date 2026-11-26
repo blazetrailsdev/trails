@@ -25,8 +25,8 @@ export class User extends Base {
 }
 declare module "@blazetrails/activerecord" {
   interface RelationScopes<T extends import("@blazetrails/activerecord").Base> {
-    withAttachedAvatar(this: import("@blazetrails/activerecord").Relation<User>): import("@blazetrails/activerecord").Relation<User>;
-    withAttachedCoverPhoto(this: import("@blazetrails/activerecord").Relation<User>): import("@blazetrails/activerecord").Relation<User>;
-    withAttachedHighlights(this: import("@blazetrails/activerecord").Relation<User>): import("@blazetrails/activerecord").Relation<User>;
+    withAttachedAvatar(this: import("@blazetrails/activerecord").Relation<User, boolean> | import("@blazetrails/activerecord").CollectionProxy<User>): import("@blazetrails/activerecord").Relation<User>;
+    withAttachedCoverPhoto(this: import("@blazetrails/activerecord").Relation<User, boolean> | import("@blazetrails/activerecord").CollectionProxy<User>): import("@blazetrails/activerecord").Relation<User>;
+    withAttachedHighlights(this: import("@blazetrails/activerecord").Relation<User, boolean> | import("@blazetrails/activerecord").CollectionProxy<User>): import("@blazetrails/activerecord").Relation<User>;
   }
 }

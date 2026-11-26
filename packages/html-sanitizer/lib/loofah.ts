@@ -8,7 +8,15 @@ import { Scrub } from "./loofah/html5/scrub.js";
 import { MetaHelpers } from "./loofah/metahelpers.js";
 import { Scrubber, ScrubberNotFound } from "./loofah/scrubber.js";
 import { Scrubbers } from "./loofah/scrubbers.js";
-export const Loofah = {
+interface LoofahConstants {
+  HTML5: { SafeList: typeof SafeList; Scrub: typeof Scrub };
+  LibxmlWorkarounds: typeof LibxmlWorkarounds;
+  MetaHelpers: typeof MetaHelpers;
+  ScrubBehavior: typeof ScrubBehavior;
+  Scrubbers: typeof Scrubbers;
+}
+
+const _Loofah = {
   Scrubber,
   ScrubberNotFound,
 
@@ -25,6 +33,8 @@ export const Loofah = {
     return ScrubBehavior.Node.scrubBang(HTML5.DocumentFragment.parse(stringOrIo), method);
   },
 };
+
+export const Loofah = _Loofah as typeof _Loofah & LoofahConstants;
 
 constSet(TopLevel, "Loofah", Loofah);
 constSet(Loofah, "HTML5", { SafeList, Scrub });

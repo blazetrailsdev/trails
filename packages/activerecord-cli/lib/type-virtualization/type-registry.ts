@@ -50,10 +50,10 @@ export const ATTRIBUTE_CAST_INPUT_MAP: Record<string, string> = {
   decimal: "string | bigint",
   boolean: "string | number",
   date: "string | { toDate(): unknown }",
-  datetime: "string",
+  datetime: `string | ${TIME}`,
   timestamp: "string",
   timestamptz: "string",
-  time: "string",
+  time: `string | ${TIME}`,
   json: "",
   jsonb: "",
   hstore: "",
@@ -65,5 +65,7 @@ export const ATTRIBUTE_CAST_INPUT_MAP: Record<string, string> = {
 export function writerTsTypeFor(trailsType: string, readerType: string): string {
   if (!Object.hasOwn(ATTRIBUTE_TYPE_MAP, trailsType) || readerType === "unknown") return "unknown";
   const extra = ATTRIBUTE_CAST_INPUT_MAP[trailsType];
-  return extra ? `${readerType} | ${extra}` : readerType;
+  if (!extra) return readerType;
+  const reader = readerType.split(" | ");
+  return [...reader, ...extra.split(" | ").filter((t) => !reader.includes(t))].join(" | ");
 }
