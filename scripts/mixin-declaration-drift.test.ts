@@ -98,14 +98,27 @@ describe("mixin declaration drift", () => {
     expect(requiredInterfaceMethodNames("adapter.ts", source, "Adapter")).toEqual(["addIndex"]);
   });
 
-  it("names a destructured kwargs parameter by its rest, which an interface can spell", () => {
+  it("erases a destructured element's default, which an interface cannot spell", () => {
     const mixinSource = [
       "export class Mixin {",
-      "  remove({ force = false, to: target = { a: 1 }, ...options }: Options = {}): void {}",
+      "  remove({ force = false, to: target = { a: 1 } }: Options = {}): void {}",
+      "}",
+    ].join("\n");
+    expect(mixinSignatures("mixin.ts", mixinSource, "Mixin")).toEqual([
+      { name: "remove", signature: "({ force, to: target }?: Options): void" },
+    ]);
+  });
+
+  it("names a trailing kwargs pattern by its rest, which an interface can spell", () => {
+    const mixinSource = [
+      "export class Mixin {",
+      "  remove({ force = false, ...options }: Options = {}): void {}",
+      "  move({ force, ...options }: Options, to: string): void {}",
       "}",
     ].join("\n");
     expect(mixinSignatures("mixin.ts", mixinSource, "Mixin")).toEqual([
       { name: "remove", signature: "(options?: Options): void" },
+      { name: "move", signature: "({ force, ...options }: Options, to: string): void" },
     ]);
   });
 
