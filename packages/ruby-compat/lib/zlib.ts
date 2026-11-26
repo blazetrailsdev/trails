@@ -130,18 +130,29 @@ class GzipFile<IO extends { close(): void } = File> {
   }
 
   /** `rb_gzfile_close` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:3446`). */
-  close(): void {
+  close(): IO | null {
     if (!this.zstreamReady) {
-      return;
+      return null;
     }
+    const io = this.io;
     this.gzfileClose(true);
+    return io;
   }
 
   /** `rb_gzfile_finish` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:3468`): ends the stream and answers the io, unclosed. */
   finish(): IO {
+    this.getGzfile();
     const io = this.io;
     this.gzfileClose(false);
     return io;
+  }
+
+  /** `get_gzfile` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:3100`). */
+  protected getGzfile(): this {
+    if (!this.zstreamReady) {
+      throw new GzError("closed gzip stream");
+    }
+    return this;
   }
 
   /** `gzfile_close` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:2482`). */
@@ -212,6 +223,7 @@ class GzipReader extends GzipFile<File | StringIO<Uint8Array>> {
   read(len?: null): string;
   read(len: number): string | null;
   read(len: number | null = null): string | null {
+    this.getGzfile();
     if (len == null) {
       return this.gzfileReadAll();
     }
@@ -491,6 +503,7 @@ class GzipWriter extends GzipFile<File | Tempfile | StringIO<Uint8Array>> {
    * `Uint8Array` is an ASCII-8BIT String's bytes, as for `IO#write`.
    */
   write(string: string | Uint8Array): number {
+    this.getGzfile();
     const str = typeof string === "string" ? new TextEncoder().encode(string) : string;
     this.gzfileWrite(str);
     return str.length;
@@ -498,6 +511,7 @@ class GzipWriter extends GzipFile<File | Tempfile | StringIO<Uint8Array>> {
 
   /** `rb_gzwriter_flush` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:3721`). */
   async flush(flush: number = Zlib.SYNC_FLUSH): Promise<this> {
+    this.getGzfile();
     if (flush !== Zlib.NO_FLUSH) {
       this.zstreamRun(new Uint8Array(), flush);
     }
@@ -646,7 +660,7 @@ class Inflate {
 /** `gzfile_ensure_close` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:3165-3175`). */
 function gzfileEnsureClose(gz: GzipReader | GzipWriter): void {
   if (gz["zstreamReady"]) {
-    return gz.close();
+    gz.close();
   }
 }
 
@@ -657,7 +671,7 @@ async function gzfileWrap<G extends GzipReader | GzipWriter, T>(
   try {
     return await block(gz);
   } finally {
-    await gzfileEnsureClose(gz);
+    gzfileEnsureClose(gz);
   }
 }
 

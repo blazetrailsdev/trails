@@ -243,3 +243,17 @@ describe("Zlib::GzipReader at a read boundary", () => {
     expect(new Zlib.GzipFile.NoFooter("x")).toBeInstanceOf(Zlib.Error);
   });
 });
+
+describe("Zlib::GzipFile#close and #finish", () => {
+  it("answers the io from close, then nil, and refuses a second finish", () => {
+    const io = new StringIO(new Uint8Array(0));
+    const gz = new Zlib.GzipWriter(io);
+    gz.finish();
+    expect(() => gz.finish()).toThrow(new Zlib.GzipFile.Error("closed gzip stream"));
+
+    const other = new StringIO(new Uint8Array(0));
+    const gz2 = new Zlib.GzipWriter(other);
+    expect(gz2.close()).toBe(other);
+    expect(gz2.close()).toBeNull();
+  });
+});
