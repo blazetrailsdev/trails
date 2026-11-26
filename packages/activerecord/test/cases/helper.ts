@@ -88,16 +88,18 @@ function writingPoolCensus(): Map<string, Map<string, number>> {
   return census;
 }
 
-let baselineWritingPools = new Map<string, Map<string, number>>();
+const baselineHolder = globalThis as typeof globalThis & {
+  __arWritingPoolBaseline?: Map<string, Map<string, number>>;
+};
 
 export function captureWritingPoolBaseline(): void {
-  baselineWritingPools = writingPoolCensus();
+  baselineHolder.__arWritingPoolBaseline = writingPoolCensus();
 }
 
 export function writingPoolsLeakedSinceBaseline(): string[] {
   const leaked: string[] = [];
   for (const [name, bySignature] of writingPoolCensus()) {
-    const baseline = baselineWritingPools.get(name);
+    const baseline = baselineHolder.__arWritingPoolBaseline?.get(name);
     for (const [signature, count] of bySignature) {
       const before = baseline?.get(signature) ?? 0;
       if (count <= before) continue;

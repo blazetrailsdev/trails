@@ -456,18 +456,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - shard: activerecord
-            paths: packages/activerecord
-          - shard: rails-and-scripts
-            paths: packages/activemodel packages/actionpack packages/trailties scripts
-          - shard: rest
-            paths: >-
-              . --ignore-pattern packages/activerecord/**
-              --ignore-pattern packages/activemodel/**
-              --ignore-pattern packages/actionpack/**
-              --ignore-pattern packages/trailties/**
-              --ignore-pattern scripts/**
+        shard: [activerecord, rails-and-scripts, rest-a, rest-b, rest]
     env:
       LINT_FILES: ${{ needs.changes.outputs.lint_files }}
       ACTIVE: ${{ matrix.shard == 'rest' || needs.changes.outputs.lint_files == '__ALL__' }}
@@ -487,11 +476,12 @@ jobs:
       - name: ESLint
         if: env.ACTIVE == 'true'
         env:
-          SHARD_PATHS: ${{ matrix.paths }}
+          SHARD: ${{ matrix.shard }}
         run: |
           set -euo pipefail
           if [ "$LINT_FILES" = "__ALL__" ]; then
-            read -r -a shard_paths <<<"$SHARD_PATHS"
+            paths=$(scripts/ci/lint-shard-paths.sh "$SHARD")
+            mapfile -t shard_paths <<<"$paths"
             pnpm run lint:shard "${shard_paths[@]}"
           elif [ -z "$LINT_FILES" ]; then
             echo "No changed files to lint."
@@ -1456,8 +1446,13 @@ jobs:
       - if: needs.changes.outputs.ar_scope == '' || contains(needs.changes.outputs.ar_scope, 'packages/activestorage')
         uses: ./.github/actions/activestorage-media-binaries
       - if: needs.changes.outputs.ar_scope == ''
+        run: scripts/ci/ar-non-isolated-cases.sh ${{ matrix.shard }}/${{ strategy.job-total }}
+        env:
+          VITEST_SHARD_DURATIONS: sqlite3
+      - if: needs.changes.outputs.ar_scope == ''
         run: pnpm vitest run packages/activerecord/ packages/solid-queue/ packages/solid-cable/ packages/solid-cache/ packages/activestorage/ packages/actionmailbox/ packages/actiontext/ packages/turbo/ --project '!system' --shard=${{ matrix.shard }}/${{ strategy.job-total }}
         env:
+          AR_SPLIT: rest
           VITEST_SHARD_DURATIONS: sqlite3
           VITEST_SHARD_ONE_EXTRA_MS: "110000"
       - if: needs.changes.outputs.ar_scope != ''
@@ -1809,8 +1804,17 @@ jobs:
           PGUSER: rails
           PG_TEST_URL: postgres://rails@localhost:5432/activerecord_unittest
       - if: needs.changes.outputs.ar_scope == ''
+        run: scripts/ci/ar-non-isolated-cases.sh ${{ matrix.shard }}/${{ strategy.job-total }}
+        env:
+          VITEST_SHARD_DURATIONS: postgresql
+          ARCONN: postgresql
+          PGHOST: localhost
+          PGPORT: "5432"
+          PGUSER: rails
+      - if: needs.changes.outputs.ar_scope == ''
         run: pnpm vitest run packages/activerecord/ packages/solid-queue/ packages/solid-cable/ packages/solid-cache/ packages/activestorage/ packages/actionmailbox/ packages/actiontext/ packages/turbo/ --project '!system' --shard=${{ matrix.shard }}/${{ strategy.job-total }}
         env:
+          AR_SPLIT: rest
           VITEST_SHARD_DURATIONS: postgresql
           VITEST_SHARD_ONE_EXTRA_MS: "110000"
           ARCONN: postgresql
@@ -2185,8 +2189,16 @@ jobs:
           MYSQL_PORT: "3306"
           MYSQL_TEST_URL: mysql://rails@localhost:3306/activerecord_unittest
       - if: needs.changes.outputs.ar_scope == ''
+        run: scripts/ci/ar-non-isolated-cases.sh ${{ matrix.shard }}/${{ strategy.job-total }}
+        env:
+          VITEST_SHARD_DURATIONS: mysql2
+          ARCONN: mysql2
+          MYSQL_HOST: localhost
+          MYSQL_PORT: "3306"
+      - if: needs.changes.outputs.ar_scope == ''
         run: pnpm vitest run packages/activerecord/ packages/solid-queue/ packages/solid-cable/ packages/solid-cache/ packages/activestorage/ packages/actionmailbox/ packages/actiontext/ packages/turbo/ --project '!system' --shard=${{ matrix.shard }}/${{ strategy.job-total }}
         env:
+          AR_SPLIT: rest
           VITEST_SHARD_DURATIONS: mysql2
           VITEST_SHARD_ONE_EXTRA_MS: "110000"
           ARCONN: mysql2
