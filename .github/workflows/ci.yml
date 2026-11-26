@@ -461,23 +461,7 @@ jobs:
             paths: packages/activerecord
           - shard: rails-and-scripts
             paths: packages/activemodel packages/actionpack packages/trailties scripts
-          - shard: rest
-            paths: >-
-              . --ignore-pattern packages/activerecord/**
-              --ignore-pattern packages/activemodel/**
-              --ignore-pattern packages/actionpack/**
-              --ignore-pattern packages/trailties/**
-              --ignore-pattern scripts/**
-          - shard: rest-full
-            force: true
-            paths: >-
-              . --ignore-pattern packages/activerecord/**
-              --ignore-pattern packages/activemodel/**
-              --ignore-pattern packages/actionpack/**
-              --ignore-pattern packages/trailties/**
-              --ignore-pattern scripts/**
           - shard: rest-a
-            force: true
             paths: >-
               packages/actiontext packages/activejob packages/activerecord-cli
               packages/builder packages/chronic packages/et-orbi packages/listen
@@ -486,32 +470,62 @@ jobs:
               packages/ruby-compat packages/solid-cache packages/sqlite3
               packages/vitest-matchers packages/website
           - shard: rest-b
-            force: true
             paths: >-
               packages/actioncable packages/actionmailbox packages/actionmailer
-              packages/actionview packages/bcrypt packages/date
-              packages/did-you-mean packages/fugit packages/i18n
-              packages/image-processing packages/libxml-ruby packages/mini-magick
-              packages/raabro packages/rack-cache packages/rack-cors
-              packages/solid-queue packages/turbo packages/tzinfo
-              packages/vite-trails
-          - shard: rest-c
-            force: true
+              packages/actionview packages/bcrypt packages/date packages/did-you-mean
+              packages/fugit packages/i18n packages/image-processing
+              packages/libxml-ruby packages/mini-magick packages/raabro
+              packages/rack-cache packages/rack-cors packages/solid-queue
+              packages/turbo packages/tzinfo packages/vite-trails
+          - shard: rest
             paths: >-
-              packages/activestorage packages/activesupport packages/arel
-              packages/globalid packages/html-sanitizer packages/mail
-              packages/marcel packages/mini-mime packages/msgpack
-              packages/net-smtp packages/nokogiri packages/rackup
-              packages/solid-cable packages/stimulus packages/thor
-              packages/trails packages/trails-tsc packages/tse-compiler
-              packages/vite-assets packages/zeitwerk
-          - shard: rest-root
-            force: true
-            paths: >-
-              . --ignore-pattern packages/** --ignore-pattern scripts/**
+              .
+              --ignore-pattern packages/activerecord/**
+              --ignore-pattern packages/activemodel/**
+              --ignore-pattern packages/actionpack/**
+              --ignore-pattern packages/trailties/**
+              --ignore-pattern scripts/**
+              --ignore-pattern packages/actiontext/**
+              --ignore-pattern packages/activejob/**
+              --ignore-pattern packages/activerecord-cli/**
+              --ignore-pattern packages/builder/**
+              --ignore-pattern packages/chronic/**
+              --ignore-pattern packages/et-orbi/**
+              --ignore-pattern packages/listen/**
+              --ignore-pattern packages/mysql2/**
+              --ignore-pattern packages/pg/**
+              --ignore-pattern packages/rack/**
+              --ignore-pattern packages/rack-proxy/**
+              --ignore-pattern packages/rack-session/**
+              --ignore-pattern packages/rack-test/**
+              --ignore-pattern packages/rake/**
+              --ignore-pattern packages/ruby-compat/**
+              --ignore-pattern packages/solid-cache/**
+              --ignore-pattern packages/sqlite3/**
+              --ignore-pattern packages/vitest-matchers/**
+              --ignore-pattern packages/website/**
+              --ignore-pattern packages/actioncable/**
+              --ignore-pattern packages/actionmailbox/**
+              --ignore-pattern packages/actionmailer/**
+              --ignore-pattern packages/actionview/**
+              --ignore-pattern packages/bcrypt/**
+              --ignore-pattern packages/date/**
+              --ignore-pattern packages/did-you-mean/**
+              --ignore-pattern packages/fugit/**
+              --ignore-pattern packages/i18n/**
+              --ignore-pattern packages/image-processing/**
+              --ignore-pattern packages/libxml-ruby/**
+              --ignore-pattern packages/mini-magick/**
+              --ignore-pattern packages/raabro/**
+              --ignore-pattern packages/rack-cache/**
+              --ignore-pattern packages/rack-cors/**
+              --ignore-pattern packages/solid-queue/**
+              --ignore-pattern packages/turbo/**
+              --ignore-pattern packages/tzinfo/**
+              --ignore-pattern packages/vite-trails/**
     env:
-      LINT_FILES: ${{ matrix.force && '__ALL__' || needs.changes.outputs.lint_files }}
-      ACTIVE: ${{ matrix.force || matrix.shard == 'rest' || needs.changes.outputs.lint_files == '__ALL__' }}
+      LINT_FILES: ${{ needs.changes.outputs.lint_files }}
+      ACTIVE: ${{ matrix.shard == 'rest' || needs.changes.outputs.lint_files == '__ALL__' }}
     steps:
       - uses: actions/checkout@v5
         if: env.ACTIVE == 'true'
@@ -1497,16 +1511,7 @@ jobs:
       - if: needs.changes.outputs.ar_scope == '' || contains(needs.changes.outputs.ar_scope, 'packages/activestorage')
         uses: ./.github/actions/activestorage-media-binaries
       - if: needs.changes.outputs.ar_scope == ''
-        run: |
-          set -uo pipefail
-          report="$RUNNER_TEMP/ar-cases.json"
-          AR_SPLIT=cases pnpm vitest run packages/activerecord/ --project activerecord --shard=${{ matrix.shard }}/${{ strategy.job-total }} --reporter=default --reporter=json --outputFile.json="$report" && exit 0
-          [ -s "$report" ] || exit 1
-          mapfile -t failed < <(node -e 'const r = JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8")); for (const f of r.testResults) if (f.status === "failed") console.log(require("node:path").relative(process.cwd(), f.name));' "$report")
-          [ "${#failed[@]}" -gt 0 ] || exit 1
-          printf 'Re-running in isolated forks:\n'
-          printf '  %s\n' "${failed[@]}"
-          pnpm vitest run "${failed[@]}" --project activerecord
+        run: scripts/ci/ar-non-isolated-cases.sh ${{ matrix.shard }}/${{ strategy.job-total }}
         env:
           VITEST_SHARD_DURATIONS: sqlite3
       - if: needs.changes.outputs.ar_scope == ''
@@ -1864,8 +1869,17 @@ jobs:
           PGUSER: rails
           PG_TEST_URL: postgres://rails@localhost:5432/activerecord_unittest
       - if: needs.changes.outputs.ar_scope == ''
+        run: scripts/ci/ar-non-isolated-cases.sh ${{ matrix.shard }}/${{ strategy.job-total }}
+        env:
+          VITEST_SHARD_DURATIONS: postgresql
+          ARCONN: postgresql
+          PGHOST: localhost
+          PGPORT: "5432"
+          PGUSER: rails
+      - if: needs.changes.outputs.ar_scope == ''
         run: pnpm vitest run packages/activerecord/ packages/solid-queue/ packages/solid-cable/ packages/solid-cache/ packages/activestorage/ packages/actionmailbox/ packages/actiontext/ packages/turbo/ --project '!system' --shard=${{ matrix.shard }}/${{ strategy.job-total }}
         env:
+          AR_SPLIT: rest
           VITEST_SHARD_DURATIONS: postgresql
           VITEST_SHARD_ONE_EXTRA_MS: "110000"
           ARCONN: postgresql
@@ -2240,8 +2254,16 @@ jobs:
           MYSQL_PORT: "3306"
           MYSQL_TEST_URL: mysql://rails@localhost:3306/activerecord_unittest
       - if: needs.changes.outputs.ar_scope == ''
+        run: scripts/ci/ar-non-isolated-cases.sh ${{ matrix.shard }}/${{ strategy.job-total }}
+        env:
+          VITEST_SHARD_DURATIONS: mysql2
+          ARCONN: mysql2
+          MYSQL_HOST: localhost
+          MYSQL_PORT: "3306"
+      - if: needs.changes.outputs.ar_scope == ''
         run: pnpm vitest run packages/activerecord/ packages/solid-queue/ packages/solid-cable/ packages/solid-cache/ packages/activestorage/ packages/actionmailbox/ packages/actiontext/ packages/turbo/ --project '!system' --shard=${{ matrix.shard }}/${{ strategy.job-total }}
         env:
+          AR_SPLIT: rest
           VITEST_SHARD_DURATIONS: mysql2
           VITEST_SHARD_ONE_EXTRA_MS: "110000"
           ARCONN: mysql2

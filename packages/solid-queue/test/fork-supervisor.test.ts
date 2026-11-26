@@ -279,7 +279,7 @@ describe("ForkSupervisorTest", { timeout: 60_000 }, () => {
     await File.writeAsync(pidfile, RbProcess.pid.toString());
 
     const [pid, , err] = await runWithCapturedIo();
-    await waitForRegisteredProcesses(4, { timeout: 10, whileAlive: pid });
+    await waitForRegisteredProcesses(4, { timeout: 10 });
 
     expect(await File.isExistAsync(pidfile)).toBeTruthy();
     expect(parseInt((await File.readAsync(pidfile)).trim(), 10)).not.toEqual(pid);
@@ -297,7 +297,7 @@ describe("ForkSupervisorTest", { timeout: 60_000 }, () => {
     expect(await File.isExistAsync(pidfile)).toBeTruthy();
     expect(parseInt((await File.readAsync(pidfile)).trim(), 10)).toEqual(pid);
 
-    await waitForRegisteredProcesses(0);
+    await waitForRegisteredProcesses(0, { timeout: 10 });
 
     pid = run();
     await waitForRegisteredProcesses(4, { timeout: 10 });
