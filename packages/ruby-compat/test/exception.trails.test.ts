@@ -92,5 +92,14 @@ describe("SignalException.new", () => {
     expect(new SignalException(64).message).toBe("SIG64");
     expect(() => new SignalException(99)).toThrow(ArgumentError);
     expect(new SignalException("SIGINT").message).toBe("SIGINT");
+    const int = new SignalException("INT");
+    expect([int.message, int.signo()]).toEqual(["SIGINT", 2]);
+    expect(() => new SignalException("BOGUS")).toThrow(ArgumentError);
+    const { Interrupt } = await import("../lib/index.js");
+    expect([new Interrupt().message, new Interrupt().signo(), new Interrupt("x").message]).toEqual([
+      "Interrupt",
+      2,
+      "x",
+    ]);
   });
 });

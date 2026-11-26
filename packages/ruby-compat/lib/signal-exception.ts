@@ -1,6 +1,6 @@
 import { ArgumentError } from "./argument-error.js";
 import { Exception } from "./exception.js";
-import { NSIG, signo2signm } from "./process-adapter.js";
+import { NSIG, signo2signm, trapSignm } from "./process-adapter.js";
 
 /**
  * Ruby's core `SignalException` (`vendor/ruby/v3.3.11/error.c:3318`
@@ -16,7 +16,8 @@ export class SignalException extends Exception {
   /**
    * `esignal_init` (`vendor/ruby/v3.3.11/signal.c:344-379`): an Integer is a
    * signal number, named by `rb_signo2signm` (`:323-332`, `SIG%s` or `SIG%u`)
-   * unless a name follows it.
+   * unless a name follows it; a name is looked up by `signm2signo` and given
+   * its `SIG` prefix.
    */
   constructor(...argv: unknown[]) {
     let argnum = 1;
@@ -40,6 +41,10 @@ export class SignalException extends Exception {
         const signm = signo2signm(signo);
         sig = signm != null ? `SIG${signm}` : `SIG${signo}`;
       }
+    } else if (sig != null) {
+      const signm = String(sig);
+      signo = trapSignm(signm);
+      if (!signm.startsWith("SIG")) sig = `SIG${signm}`;
     }
     super(...((sig == null ? [] : [sig]) as [string?]));
     this._signo = signo;
@@ -58,4 +63,9 @@ export class SignalException extends Exception {
  * @noRailsEquivalent PERMANENT — Ruby core `Interrupt`, which Rails inherits
  * rather than defines.
  */
-export class Interrupt extends SignalException {}
+export class Interrupt extends SignalException {
+  /** `interrupt_init` (`vendor/ruby/v3.3.11/signal.c:397-405`): `SIGINT`, and the message given. */
+  constructor(mesg: unknown = null) {
+    super(2, mesg);
+  }
+}
