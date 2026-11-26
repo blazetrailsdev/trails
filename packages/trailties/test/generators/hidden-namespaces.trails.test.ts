@@ -5,7 +5,9 @@ describe("Generators.hiddenNamespaces (trails-only)", () => {
   const original = { ...Generators.options().trails };
 
   afterEach(() => {
-    Object.assign(Generators.options().trails, original);
+    const trails = Generators.options().trails;
+    for (const key of Object.keys(trails)) delete trails[key];
+    Object.assign(trails, original);
   });
 
   it("spells the configured orm, test framework and template engine in kebab-case", () => {
