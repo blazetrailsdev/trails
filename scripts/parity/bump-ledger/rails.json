@@ -1,34 +1,6 @@
 [
-  {
-    "package": "actionview",
-    "rubyFile": "helpers/sanitize_helper.rb",
-    "rubyName": "strip_tags",
-    "kind": "drift",
-    "from": "v8.0.2",
-    "to": "v8.0.5.2"
-  },
-  {
-    "package": "actionview",
-    "rubyFile": "helpers/text_helper.rb",
-    "rubyName": "excerpt",
-    "kind": "drift",
-    "from": "v8.0.2",
-    "to": "v8.0.5.2"
-  },
-  {
-    "package": "actionview",
-    "rubyFile": "helpers/text_helper.rb",
-    "rubyName": "highlight",
-    "kind": "drift",
-    "from": "v8.0.2",
-    "to": "v8.0.5.2"
-  },
-  {
-    "package": "actionview",
-    "rubyFile": "helpers/text_helper.rb",
-    "rubyName": "strip_tags",
-    "kind": "drift",
-    "from": "v8.0.2",
-    "to": "v8.0.5.2"
-  }
+{"package":"actionview","rubyFile":"helpers/sanitize_helper.rb","rubyName":"strip_tags","kind":"drift","from":"v8.0.2","to":"v8.0.5.2"},
+{"package":"actionview","rubyFile":"helpers/text_helper.rb","rubyName":"excerpt","kind":"drift","from":"v8.0.2","to":"v8.0.5.2"},
+{"package":"actionview","rubyFile":"helpers/text_helper.rb","rubyName":"highlight","kind":"drift","from":"v8.0.2","to":"v8.0.5.2"},
+{"package":"actionview","rubyFile":"helpers/text_helper.rb","rubyName":"strip_tags","kind":"drift","from":"v8.0.2","to":"v8.0.5.2"}
 ]

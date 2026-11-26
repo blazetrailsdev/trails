@@ -65,6 +65,7 @@ import {
   type BumpReport,
 } from "./report.js";
 import { LEDGERED_STEPS, NOT_EXERCISED, STEPS, TSX, parseArgs } from "./steps.js";
+import { serializeLedger } from "../../api-compare/bump-ledger.js";
 
 /** Every parameter-name and block-parameter row of an api output directory. */
 async function signatureRows(dir: string): Promise<PairKey[]> {
@@ -399,7 +400,7 @@ async function main(argv: string[], env: Env): Promise<number> {
       ),
     );
     await fs.mkdir(path.dirname(ledgerFile), { recursive: true });
-    await fs.writeFile(ledgerFile, JSON.stringify(pairRows, null, 2) + "\n");
+    await fs.writeFile(ledgerFile, serializeLedger(pairRows));
     const candidateComparison = path.join(outDir, "candidate/test/convention-comparison.json");
     const missing = await missingOf(candidateComparison);
     const mergedTests = await readJson<RubyTestManifest>(
@@ -432,7 +433,7 @@ async function main(argv: string[], env: Env): Promise<number> {
         d.moved.length,
       ]);
     }
-    await fs.writeFile(testLedgerFile, JSON.stringify(testRows, null, 2) + "\n");
+    await fs.writeFile(testLedgerFile, serializeLedger(testRows));
     ledgeredSteps = await runSteps(
       childEnv,
       "ledgered",

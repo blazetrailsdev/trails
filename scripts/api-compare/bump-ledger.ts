@@ -12,7 +12,6 @@
 import * as fs from "fs/promises";
 import * as path from "path";
 import { SOURCES } from "../../vendor/sources.js";
-import { serializeBaseline } from "./baseline-json.js";
 import { ROOT_DIR } from "./config.js";
 import { rubyFileToTs, rubyMethodToTs } from "../parity/conventions.js";
 import { type BodyPin, type PinKey, comparePinKeys, currentDigests, keyOf } from "./body-pins.js";
@@ -57,12 +56,20 @@ export async function loadLedgered(dir = LEDGER_DIR): Promise<(k: PinKey) => boo
   return (k) => keys.has(keyOf(k));
 }
 
+/**
+ * One compact row per line, so two burndown PRs deleting neighbouring rows do
+ * not conflict (as `serializeShard` writes the body pins).
+ */
+export function serializeLedger(rows: readonly object[]): string {
+  return rows.length === 0 ? "[]\n" : `[\n${rows.map((r) => JSON.stringify(r)).join(",\n")}\n]\n`;
+}
+
 export async function saveLedgerFile(file: string, rows: LedgerRow[]): Promise<void> {
   if (rows.length === 0) {
     await fs.rm(file, { force: true });
     return;
   }
-  await fs.writeFile(file, serializeBaseline([...rows].sort(comparePinKeys)));
+  await fs.writeFile(file, serializeLedger([...rows].sort(comparePinKeys)));
 }
 
 /**
