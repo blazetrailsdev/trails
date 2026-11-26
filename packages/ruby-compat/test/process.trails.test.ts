@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ArgumentError } from "../lib/argument-error.js";
+import { NotImplementedError } from "../lib/not-implemented-error.js";
 import { Process } from "../lib/process.js";
 import { getProcessAdapter } from "../lib/process-adapter.js";
 import { Errno } from "../lib/errno.js";
@@ -40,6 +41,18 @@ describe("Process", () => {
     expect(Process.pid).toBe(getProcessAdapter().pid());
     expect(Number.isInteger(Process.pid)).toBe(true);
     expect(Process.pid).toBeGreaterThan(0);
+  });
+
+  it("uid answers the real user id, and raises NotImplementedError where the adapter has none", () => {
+    const adapter = getProcessAdapter();
+    expect(Process.uid).toBe(adapter.uid!());
+    const uid = adapter.uid;
+    adapter.uid = undefined;
+    try {
+      expect(() => Process.uid).toThrow(NotImplementedError);
+    } finally {
+      adapter.uid = uid;
+    }
   });
 
   it("carries the clock ids Rails names", () => {

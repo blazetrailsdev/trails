@@ -150,7 +150,7 @@ export class Application extends Engine {
 
   override get config(): Configuration {
     const cfg = this._config;
-    if (cfg instanceof Configuration) return cfg;
+    if (cfg != null) return cfg as Configuration;
     const klass = this.constructor as typeof Application;
     const newCfg = new Configuration(klass.findRoot(klass.calledFrom()));
     this._config = newCfg;

@@ -1103,7 +1103,15 @@ async function adoptConnection(this: Pool, conn: DatabaseAdapter): Promise<void>
   this._connections.push(conn);
 
   if (this._boundSchemaCache == null && lazilyLoadSchemaCache()) {
-    await this.schemaCache.loadBang();
+    const lease = this.connectionLease();
+    const pending = pendingCheckouts.get(lease);
+    pendingCheckouts.delete(lease);
+    try {
+      await this.schemaCache.loadBang();
+    } finally {
+      if (pending !== undefined && !pendingCheckouts.has(lease))
+        pendingCheckouts.set(lease, pending);
+    }
   }
 }
 

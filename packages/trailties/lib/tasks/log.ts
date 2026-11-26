@@ -38,7 +38,11 @@ async function clearLogFile(file: string): Promise<void> {
 }
 
 async function allEnvironments(): Promise<string[]> {
-  return (await Dir.globAsync("config/environments/*.ts")).map((fname) =>
-    File.basename(fname, ".*"),
-  );
+  return [
+    ...new Set(
+      (await Dir.globAsync("config/environments/*.{ts,js}"))
+        .filter((fname) => !fname.endsWith(".d.ts"))
+        .map((fname) => File.basename(fname, ".*")),
+    ),
+  ];
 }

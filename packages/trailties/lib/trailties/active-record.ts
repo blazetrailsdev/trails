@@ -22,6 +22,7 @@ import {
   STDOUT,
   rbModGt,
   rbModName,
+  resolveTsThenJs,
 } from "@blazetrails/ruby-compat";
 import { prepend } from "@blazetrails/ruby-compat/include";
 import { Callbacks, type ActionController } from "@blazetrails/actionpack";
@@ -362,6 +363,12 @@ export class Trailtie extends BaseTrailtie {
       for (const pool of [...pools]) {
         coldPools.delete(pool);
         try {
+          if (
+            !(await pool.dbConfig.adapterClass().databaseExists(pool.dbConfig.configurationHash))
+          ) {
+            coldPools.add(pool);
+            continue;
+          }
           await pool.schemaReflection.loadAllBang(pool);
         } catch (error) {
           if (!(error instanceof ActiveRecordError)) throw error;
@@ -391,7 +398,10 @@ export class Trailtie extends BaseTrailtie {
 
     this.initializer("active_record.add_watchable_files", async (app) => {
       const path = await app.paths().get("db")!.first();
-      this.config.watchableFiles.push(`${path}/schema.ts`, `${path}/structure.sql`);
+      this.config.watchableFiles.push(
+        resolveTsThenJs(`${path}/schema.ts`),
+        `${path}/structure.sql`,
+      );
     });
 
     this.initializer("active_record.clear_active_connections", () => {

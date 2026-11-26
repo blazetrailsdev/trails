@@ -37,7 +37,7 @@ import {
   type Block,
 } from "@blazetrails/ruby-compat/hash";
 import { extend, include, rbCallSuper } from "@blazetrails/ruby-compat/include";
-import { loadedFileExports } from "@blazetrails/ruby-compat/load";
+import { loadedFileExports, resolveTsThenJs } from "@blazetrails/ruby-compat/load";
 import { rbObjMethod } from "@blazetrails/ruby-compat/method";
 import {
   rbInspect,
@@ -1384,10 +1384,11 @@ export class Mapper {
   /**
    * @missingRailsCall read — PERMANENT
    * @missingRailsCall exist? — PERMANENT
+   * @inventedArm resolveTsThenJs — PERMANENT
    */
   draw(name: string): void {
     const path = this._drawPaths.find(
-      (_path) => loadedFileExports(`${_path}/${name}.ts`) !== undefined,
+      (_path) => loadedFileExports(resolveTsThenJs(`${_path}/${name}.ts`)) !== undefined,
     );
 
     if (path == null) {
@@ -1398,7 +1399,7 @@ export class Mapper {
       throw new ArgumentError(msg);
     }
 
-    const routePath = `${path}/${name}.ts`;
+    const routePath = resolveTsThenJs(`${path}/${name}.ts`);
     const { drawRoutes } = loadedFileExports(routePath)!;
     (drawRoutes as DrawCallback | undefined)?.call(this);
   }

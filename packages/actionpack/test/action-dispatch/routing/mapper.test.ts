@@ -135,6 +135,24 @@ describe("Mapper public DSL additions", () => {
     expect(set.routes().routes.map((r) => r.path.spec.toString())).toContain("/external(.:format)");
   });
 
+  it("draws a sub-routes .js file a compiled tree ships", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "trails-draw-js-"));
+    await writeFile(
+      join(dir, "external.js"),
+      'export function drawRoutes() { this.get("/external-js", { to: "external#index" }); }\n',
+    );
+    const set = new RouteSet();
+    const m = new Mapper(set);
+    m._drawPaths.push(dir);
+    await loadIseqEval(join(dir, "external.js"), true);
+
+    m.draw("external");
+
+    expect(set.routes().routes.map((r) => r.path.spec.toString())).toContain(
+      "/external-js(.:format)",
+    );
+  });
+
   it("draws a sub-routes file through its registered compiled thunk", async () => {
     const dir = await mkdtemp(join(tmpdir(), "trails-draw-compiled-"));
     await writeFile(

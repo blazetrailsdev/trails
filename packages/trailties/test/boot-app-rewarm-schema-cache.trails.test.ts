@@ -24,6 +24,7 @@ describe("a booted app whose boot schema warm failed", () => {
     savedUrl = env.DATABASE_URL;
     setEnv("TRAILS_ENV", "development");
     setEnv("DATABASE_URL", `sqlite3:${dir}/development.sqlite3`);
+    await getFs().writeFile!(`${dir}/development.sqlite3`, "");
     _resetTrailsEnv();
     const loadAll = vi
       .spyOn(SchemaReflection.prototype, "loadAllBang")

@@ -288,6 +288,19 @@ export class Process {
   }
 
   /**
+   * `Process.uid`, the real user id (`proc_getuid`,
+   * `vendor/ruby/v3.3.11/process.c:6264`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  static get uid(): number {
+    const uid = getProcessAdapter().uid;
+    if (uid === undefined)
+      throw new NotImplementedError("uid() function is unimplemented on this machine");
+    return uid();
+  }
+
+  /**
    * `proc_daemon` (`vendor/ruby/v3.3.11/process.c:6973`) forks, and a host
    * with no `fork(2)` defines it as `rb_f_notimplement`, which raises
    * `NotImplementedError`.

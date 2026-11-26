@@ -40,10 +40,15 @@ export const EnvironmentArgument = defineModule(
       return this._environmentSpecified!;
     },
 
+    /** @inventedArm filter — PERMANENT */
     availableEnvironments(this: EnvironmentArgumentHost): string[] {
-      return (this._availableEnvironments ||= Dir.glob("config/environments/*.ts").map((filename) =>
-        File.basename(filename, ".*"),
-      ));
+      return (this._availableEnvironments ||= [
+        ...new Set(
+          Dir.glob("config/environments/*.{ts,js}")
+            .filter((filename) => !filename.endsWith(".d.ts"))
+            .map((filename) => File.basename(filename, ".*")),
+        ),
+      ]);
     },
 
     expandEnvironmentName(this: EnvironmentArgumentHost, name: string): string {
