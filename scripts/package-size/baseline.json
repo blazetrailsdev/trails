@@ -95,11 +95,11 @@
   },
   "ruby-compat": {
     "tarball": {
-      "value": 934958,
+      "value": 927700,
       "reason": "Zlib::GzipFile framing (trails#10772), and Errno classes for every spawn errno (rb_syserr_fail_str) with rb_check_argv and the one-pass JSON ignore"
     },
     "unpacked": {
-      "value": 4507602,
+      "value": 4469500,
       "reason": "Zlib::GzipFile framing (trails#10772), and Errno classes for every spawn errno (rb_syserr_fail_str) with rb_check_argv and the one-pass JSON ignore"
     },
     "entries": {
