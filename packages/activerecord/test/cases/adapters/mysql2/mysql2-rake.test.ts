@@ -315,7 +315,6 @@ describe.runIf(currentAdapter("Mysql2Adapter"))("MySQLStructureDumpTest", () => 
       expect.anything(),
       ["--result-file", filename, "--no-data", "--routines", "--skip-comments", "test-db"],
       {},
-      null,
     );
   });
 
@@ -333,7 +332,7 @@ describe.runIf(currentAdapter("Mysql2Adapter"))("MySQLStructureDumpTest", () => 
 
     await DatabaseTasks.structureDump(configurationDb, filename);
 
-    expect(system).toHaveBeenCalledWith("mysqldump", expect.anything(), expectedCommand, {}, null);
+    expect(system).toHaveBeenCalledWith("mysqldump", expect.anything(), expectedCommand, {});
   });
 
   it("structure dump with hash extra flags for a different driver", async () => {
@@ -349,7 +348,7 @@ describe.runIf(currentAdapter("Mysql2Adapter"))("MySQLStructureDumpTest", () => 
 
     await DatabaseTasks.structureDump(configurationDb, filename);
 
-    expect(system).toHaveBeenCalledWith("mysqldump", expect.anything(), expectedCommand, {}, null);
+    expect(system).toHaveBeenCalledWith("mysqldump", expect.anything(), expectedCommand, {});
   });
 
   it("structure dump with hash extra flags for the correct driver", async () => {
@@ -366,7 +365,7 @@ describe.runIf(currentAdapter("Mysql2Adapter"))("MySQLStructureDumpTest", () => 
 
     await DatabaseTasks.structureDump(configurationDb, filename);
 
-    expect(system).toHaveBeenCalledWith("mysqldump", expect.anything(), expectedCommand, {}, null);
+    expect(system).toHaveBeenCalledWith("mysqldump", expect.anything(), expectedCommand, {});
   });
 
   it("structure dump with ignore tables", async () => {
@@ -397,7 +396,6 @@ describe.runIf(currentAdapter("Mysql2Adapter"))("MySQLStructureDumpTest", () => 
         "test-db",
       ],
       {},
-      null,
     );
   });
 
@@ -417,7 +415,6 @@ describe.runIf(currentAdapter("Mysql2Adapter"))("MySQLStructureDumpTest", () => 
       expect.anything(),
       ["--result-file", filename, "--no-data", "--routines", "--skip-comments", "test-db"],
       {},
-      null,
     );
     expect(message).toMatch(/^failed to execute: `mysqldump`$/m);
   });
@@ -444,7 +441,6 @@ describe.runIf(currentAdapter("Mysql2Adapter"))("MySQLStructureDumpTest", () => 
         "test-db",
       ],
       {},
-      null,
     );
   });
 
@@ -470,7 +466,6 @@ describe.runIf(currentAdapter("Mysql2Adapter"))("MySQLStructureDumpTest", () => 
         "test-db",
       ],
       {},
-      null,
     );
   });
 });
@@ -504,7 +499,7 @@ describe.runIf(currentAdapter("Mysql2Adapter"))("MySQLStructureLoadTest", () => 
 
     await DatabaseTasks.structureLoad(configuration, filename);
 
-    expect(system).toHaveBeenCalledWith("mysql", expect.anything(), expectedCommand, {}, null);
+    expect(system).toHaveBeenCalledWith("mysql", expect.anything(), expectedCommand, {});
   });
 
   it("structure load with hash extra flags for a different driver", async () => {
@@ -513,7 +508,7 @@ describe.runIf(currentAdapter("Mysql2Adapter"))("MySQLStructureLoadTest", () => 
 
     await DatabaseTasks.structureLoad(configuration, filename);
 
-    expect(system).toHaveBeenCalledWith("mysql", expect.anything(), expectedCommand, {}, null);
+    expect(system).toHaveBeenCalledWith("mysql", expect.anything(), expectedCommand, {});
   });
 
   it("structure load with hash extra flags for the correct driver", async () => {
@@ -522,6 +517,6 @@ describe.runIf(currentAdapter("Mysql2Adapter"))("MySQLStructureLoadTest", () => 
 
     await DatabaseTasks.structureLoad(configuration, filename);
 
-    expect(system).toHaveBeenCalledWith("mysql", expect.anything(), expectedCommand, {}, null);
+    expect(system).toHaveBeenCalledWith("mysql", expect.anything(), expectedCommand, {});
   });
 });
