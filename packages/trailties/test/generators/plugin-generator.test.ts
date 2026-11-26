@@ -768,6 +768,9 @@ describe("PluginGeneratorTest", () => {
       assertNoMatch(/"propshaft": /, content),
     );
     t.assertNoFile("test/dummy/config/initializers/assets.ts");
+    await t.assertFile("test/dummy/config/environments/development.ts", (content: string) => {
+      assertNoMatch(/config\.assets/, content);
+    });
   });
 
   // PERMANENT-SKIP: CLAUDE.md, "importmap-rails and propshaft are out of scope; JavaScript is served by Vite (`vite_rails`)"
@@ -782,6 +785,9 @@ describe("PluginGeneratorTest", () => {
     await t.runGenerator([t.destinationRoot, "--full"]);
     await t.assertFile("package.json", /"propshaft": /);
     await t.assertFile("test/dummy/config/initializers/assets.ts");
+    await t.assertFile("test/dummy/config/environments/development.ts", (content: string) => {
+      assertNoMatch(/config\.assets/, content);
+    });
   });
 
   // PERMANENT-SKIP: CLAUDE.md, "importmap-rails and propshaft are out of scope; JavaScript is served by Vite (`vite_rails`)"
@@ -791,6 +797,9 @@ describe("PluginGeneratorTest", () => {
       assertNoMatch(/"propshaft": /, content),
     );
     t.assertNoFile("test/dummy/config/initializers/assets.ts");
+    await t.assertFile("test/dummy/config/environments/development.ts", (content: string) => {
+      assertNoMatch(/config\.assets/, content);
+    });
   });
 
   // PERMANENT-SKIP: CLAUDE.md, "importmap-rails and propshaft are out of scope; JavaScript is served by Vite (`vite_rails`)"
