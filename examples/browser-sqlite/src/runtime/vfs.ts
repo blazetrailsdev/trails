@@ -48,6 +48,14 @@ export class VirtualFs {
   /** The working directory a relative path resolves against; `Dir.chdir` moves it. */
   cwd = "/";
 
+  /** `Dir.chdir`: raises `ENOENT` for a missing directory and `ENOTDIR` for a file, as `dir_s_chdir` does. */
+  chdir(p: string): void {
+    const entry = this.get(p);
+    if (!entry) throw fsError("ENOENT", "chdir", p);
+    if (entry.kind !== "dir") throw fsError("ENOTDIR", "chdir", p);
+    this.cwd = this.norm(p);
+  }
+
   norm(p: string): string {
     return path.resolve(this.cwd, p);
   }

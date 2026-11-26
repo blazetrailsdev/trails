@@ -13,7 +13,11 @@ export function installFind(editor: HTMLTextAreaElement, bar: HTMLElement): void
     const needle = query.value;
     const at: number[] = [];
     if (!needle) return at;
-    for (let i = editor.value.indexOf(needle); i >= 0; i = editor.value.indexOf(needle, i + 1))
+    for (
+      let i = editor.value.indexOf(needle);
+      i >= 0;
+      i = editor.value.indexOf(needle, i + needle.length)
+    )
       at.push(i);
     return at;
   };

@@ -423,14 +423,25 @@ $("generate").onclick = async () => {
   if (!line) return;
   log("input", `$ bin/trails generate ${line}`);
   try {
-    const { files: written } = await ask<{ files: Record<string, string> }>("host:generate", {
-      args: line.split(/\s+/),
-    });
+    const { files: written } = await ask<{ files: Record<string, string | null> }>(
+      "host:generate",
+      {
+        args: line.split(/\s+/),
+      },
+    );
     const paths = Object.keys(written).sort();
     if (!paths.length) return log("system", "The generator wrote no files.");
-    Object.assign(files, written);
+    for (const path of paths) {
+      if (written[path] === null) delete files[path];
+      else files[path] = written[path];
+    }
     saveFiles();
-    open(paths.find((p) => p.startsWith("/app/")) ?? paths[0]);
+    const added = paths.filter((p) => written[p] !== null);
+    open(
+      added.find((p) => p.startsWith("/app/")) ??
+        added[0] ??
+        (current in files ? current : Object.keys(files).sort()[0]),
+    );
     restart();
   } catch (error) {
     log("error", error instanceof Error ? error.message : String(error));
@@ -864,8 +875,8 @@ async function start(): Promise<void> {
       return;
     }
   }
-  await migrateLegacyStorage();
   owner = await holdExample();
+  if (owner && example === "blog") await migrateLegacyStorage();
   if (!owner) {
     log(
       "warn",

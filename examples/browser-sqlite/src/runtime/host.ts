@@ -35,9 +35,7 @@ export function installHost(vfs: VirtualFs, moduleBase: string, sink: ConsoleSin
     envSnapshot: () => ({ ...env }),
     argvSnapshot: () => ["browser", "trails"],
     cwd: () => vfs.cwd,
-    chdir(dir) {
-      if (vfs.stat(dir).isDirectory()) vfs.cwd = vfs.norm(dir);
-    },
+    chdir: (dir) => vfs.chdir(dir),
     platform: () => "browser",
     pid: () => 1,
     setEnv(key, value) {

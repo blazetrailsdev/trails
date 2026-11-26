@@ -77,7 +77,7 @@ let configured = false;
 
 /**
  * Runs `bin/trails generate <args>` against the virtual filesystem and
- * answers every app file it wrote. `Engine#load_generators`'s `require
+ * answers every app file it wrote, with `null` for one it removed. `Engine#load_generators`'s `require
  * "rails/generators"` is this module's import of `generators.js`, since a
  * bundle cannot resolve that file by name at run time.
  */
@@ -85,7 +85,7 @@ export async function generate(
   vfs: VirtualFs,
   trails: { Generators?: Generators; application: Application },
   args: string[],
-): Promise<Record<string, string>> {
+): Promise<Record<string, string | null>> {
   await import("../../../../packages/trailties/dist/generators.js");
   const { Base } = await import("../../../../packages/trailties/dist/generators/base.js");
   const generators = trails.Generators!;
@@ -97,11 +97,19 @@ export async function generate(
   const skip = [...(await seat(vfs, Base.baseRoot())), "/tmp/", "/log/", "/node_modules/"];
   const before = vfs.files();
   const [namespace, ...rest] = args;
-  await generators.invoke(namespace, rest, { behavior: "invoke" });
-  const written: Record<string, string> = {};
-  for (const [path, data] of Object.entries(vfs.files())) {
+  const cwd = vfs.cwd;
+  try {
+    await generators.invoke(namespace, rest, { behavior: "invoke" });
+  } finally {
+    vfs.cwd = cwd;
+  }
+  const after = vfs.files();
+  const written: Record<string, string | null> = {};
+  for (const path of new Set([...Object.keys(before), ...Object.keys(after)])) {
+    const data = after[path];
     if (before[path] === data || skip.some((prefix) => path.startsWith(prefix))) continue;
-    written[path] = typeof data === "string" ? data : new TextDecoder().decode(data);
+    written[path] =
+      data === undefined ? null : typeof data === "string" ? data : new TextDecoder().decode(data);
   }
   return written;
 }
