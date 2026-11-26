@@ -324,7 +324,7 @@ try {
   await import(/* @vite-ignore */ `${moduleBase}config/environment.ts`);
   status("Running migrations…");
   const activerecord = await import("@blazetrails/activerecord");
-  const { DatabaseTasks } = activerecord;
+  const { DatabaseTasks } = await import("@blazetrails/activerecord/tasks/database-tasks.js");
   Base = activerecord.Base;
   const pool = activerecord.Base.connectionPool();
   await pool.migrationContext.migrate();
