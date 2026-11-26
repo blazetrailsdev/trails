@@ -15,18 +15,18 @@ import { destroyRecords } from "./test-helper.js";
 
 const template = decodeURIComponent(
   new URL(
-    "../lib/generators/solid-queue/update/templates/db/add_batches_to_solid_queue.ts",
+    "../lib/generators/solid-queue/update/templates/db/add-batches-to-solid-queue.ts",
     import.meta.url,
   ).pathname,
 );
 const tmpDir = decodeURIComponent(new URL("./support/dummy/tmp", import.meta.url).pathname);
 await FileUtils.mkdirPAsync(tmpDir);
 await File.writeAsync(
-  File.join(tmpDir, "add_batches_to_solid_queue.ts"),
+  File.join(tmpDir, "add-batches-to-solid-queue.ts"),
   await File.readAsync(template),
 );
 const { AddBatchesToSolidQueue } = (await loadIseqEval(
-  File.join(tmpDir, "add_batches_to_solid_queue.ts"),
+  File.join(tmpDir, "add-batches-to-solid-queue.ts"),
 )) as { AddBatchesToSolidQueue: new () => Migration };
 
 class BatchPendingMigrationsTest extends TestCase {

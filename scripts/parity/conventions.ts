@@ -493,8 +493,6 @@ export const RUBY_FILE_TS_OVERRIDES: Record<string, string> = {
   "trailties:generators/mailer/mailer_generator.rb": "generators/trails/mailer/mailer-generator.ts",
   "trailties:generators/test_unit/channel_generator.rb":
     "generators/test-unit/channel/channel-generator.ts",
-  "solid-queue:generators/solid_queue/update/templates/db/add_batches_to_solid_queue.rb":
-    "generators/solid-queue/update/templates/db/add_batches_to_solid_queue.ts",
 };
 
 /** The explicit TS mapping for `rubyFile` in `pkg`, or undefined when unmapped. */

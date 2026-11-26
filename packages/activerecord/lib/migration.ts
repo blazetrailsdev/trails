@@ -1067,7 +1067,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     this._disableDdlTransaction = true;
   }
 
-  static readonly MigrationFilenameRegexp = /^([0-9]+)_([_a-z0-9]*)\.?([_a-z0-9]*)\.(?:ts|js)$/;
+  static readonly MigrationFilenameRegexp = /^([0-9]+)_([-_a-z0-9]*)\.?([-_a-z0-9]*)\.(?:ts|js)$/;
 
   static isValidVersionFormat(versionString: string): boolean {
     return [Migration.MigrationFilenameRegexp, /^\d(_?\d)*$/].some((pattern) =>
@@ -1648,7 +1648,7 @@ export class MigrationContext<
         throw new InvalidMigrationTimestampError(version, name);
       }
       version = toInteger(version);
-      name = camelize(name);
+      name = camelize(name.replaceAll("-", "_"));
       return new MigrationProxy(name, version, file, scope);
     });
 

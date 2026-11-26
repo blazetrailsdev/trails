@@ -25,7 +25,7 @@ mixin_keys=$(
     sed -E 's/.*[[:space:]](::)?//' | tr '[:upper:]' '[:lower:]'
     { grep -rhoE '@inlinedFrom [A-Z][A-Za-z0-9]*' "$src" --include='*.ts' || true; } |
       sed -E 's/.*[[:space:]]//' | tr '[:upper:]' '[:lower:]'
-    { grep -rhoE '@inlinedFrom [^ ]+ [a-z_]+/' "$src" --include='*.ts' || true; } |
+    { grep -rhoE '@inlinedFrom [^ ]+ [a-z_]+/' "$src" --include='*.ts' | grep -v ' rails/$' || true; } |
       sed -E 's/.*[[:space:]]//; s#/$##; s/_/-/g'
   } | sort -u | jq -R . | jq -sc .
 )
