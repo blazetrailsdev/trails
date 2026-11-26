@@ -759,25 +759,7 @@ export class ConnectionPool implements ReapablePool {
     let result: T;
     const release = !lease.connection;
     try {
-      /** @inventedArm if — CONVERGEABLE with-connection-sync-is-a-lease-no-claude-md-section-ratifies */
-      if (lease.connection instanceof Promise) {
-        const conn = this.acquireConnectionSync(this.checkoutTimeout);
-        let value: T;
-        try {
-          value = fn(conn);
-        } catch (error) {
-          if (preventPermanentCheckout && !stickyWas) lease.sticky = stickyWas;
-          this.checkin(conn);
-          throw error;
-        }
-        const restore = () => {
-          if (preventPermanentCheckout && !stickyWas) lease.sticky = stickyWas;
-          this.checkin(conn);
-        };
-        if (value instanceof Promise) return value.finally(restore) as T;
-        restore();
-        return value;
-      } else if (lease.connection) {
+      if (lease.connection && !(lease.connection instanceof Promise)) {
         result = fn(lease.connection);
       } else {
         const pinned = this._pinnedConnection;
@@ -806,9 +788,25 @@ export class ConnectionPool implements ReapablePool {
           }
           return ensure(false, value);
         }
-        result = fn(
-          (lease.connection = pinned ?? this.acquireConnectionSync(this.checkoutTimeout)),
-        );
+        const conn = pinned ?? this.acquireConnectionSync(this.checkoutTimeout);
+        /** @inventedArm if — CONVERGEABLE with-connection-sync-is-a-lease-no-claude-md-section-ratifies */
+        if (lease.connection instanceof Promise) {
+          const restore = () => {
+            if (preventPermanentCheckout && !stickyWas) lease.sticky = stickyWas;
+            this.checkin(conn);
+          };
+          let value: T;
+          try {
+            value = fn(conn);
+          } catch (error) {
+            restore();
+            throw error;
+          }
+          if (value instanceof Promise) return value.finally(restore) as T;
+          restore();
+          return value;
+        }
+        result = fn((lease.connection = conn));
       }
     } catch (error) {
       ensure(release);
