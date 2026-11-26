@@ -142,15 +142,14 @@ export const zeitwerkOriginalRequire = Kernel.require;
 Kernel.zeitwerkOriginalRequire = zeitwerkOriginalRequire;
 
 Kernel.require = async function (path: string): Promise<boolean> {
-  const loader = Registry.autoloads.isRegistered(path);
+  let loader = Registry.autoloads.isRegistered(path);
   if (loader != null) {
     return require(path);
   } else {
     const required = await zeitwerkOriginalRequire(path);
     if (required) {
       const abspath = LOADED_FEATURES.at(-1)!;
-      const loader = Registry.autoloads.isRegistered(abspath);
-      if (loader != null) {
+      if ((loader = Registry.autoloads.isRegistered(abspath)) != null) {
         await loader.__onFileAutoloaded(abspath, loadedFileExports(abspath)!);
       }
     }
