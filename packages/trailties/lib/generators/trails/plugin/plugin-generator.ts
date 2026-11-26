@@ -1,6 +1,9 @@
 import "../../../constants.trails-plugin-plugin-generator.generated.js";
 import type { ThorClass } from "@blazetrails/thor";
-import { File, chomp, constDefined, rbFBackquote } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat/file";
+import { constDefined } from "@blazetrails/ruby-compat/include";
+import { rbFBackquote } from "@blazetrails/ruby-compat/kernel-system";
+import { chomp } from "@blazetrails/ruby-compat/string/chomp";
 import {
   TopLevel,
   camelize,

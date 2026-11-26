@@ -3,7 +3,7 @@ import { Time as RubyTime } from "@blazetrails/date";
 import { TimeWithZone, useZone } from "@blazetrails/activesupport";
 import * as Types from "../../lib/index.js";
 import { ValueType } from "../../lib/index.js";
-import { include } from "@blazetrails/ruby-compat";
+import { include } from "@blazetrails/ruby-compat/include";
 import { AcceptsMultiparameterTime } from "../../lib/type/helpers/accepts-multiparameter-time.js";
 
 function timeUtc(year: number, mon: number, mday: number, hour = 0, min = 0, sec = 0): RubyTime {

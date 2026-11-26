@@ -1,8 +1,6 @@
 import { describe, it, expect } from "vitest";
-import {
-  ArgumentError as RubyCompatArgumentError,
-  TypeError as RubyCompatTypeError,
-} from "@blazetrails/ruby-compat";
+import { ArgumentError as RubyCompatArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { TypeError as RubyCompatTypeError } from "@blazetrails/ruby-compat/type-error";
 import { ArgumentError as DateArgumentError, Date as RubyDate } from "@blazetrails/date";
 import { ArgumentError as ActiveSupportArgumentError } from "@blazetrails/activesupport";
 import { ArgumentError, TypeError } from "../lib/attribute-assignment.js";

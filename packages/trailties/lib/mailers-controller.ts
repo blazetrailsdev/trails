@@ -2,7 +2,9 @@ import "./constants.mailers-controller.generated.js";
 import { I18n, indexBy, toQuery } from "@blazetrails/activesupport";
 import { AbstractController, DebugView, Mime, MimeType } from "@blazetrails/actionpack";
 import { ActionMailer, Preview } from "@blazetrails/actionmailer";
-import { Base64, File, rbModName, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { Base64 } from "@blazetrails/ruby-compat/base64";
+import { File } from "@blazetrails/ruby-compat/file";
+import { rbModName, rbObjRespondTo } from "@blazetrails/ruby-compat/object";
 import { ApplicationController } from "./application-controller.js";
 import { Trails } from "./trails.js";
 

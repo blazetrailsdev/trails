@@ -9,7 +9,9 @@ import {
 } from "@blazetrails/activesupport";
 import { Error } from "../../base.js";
 import { ModelHelpers } from "../../model-helpers.js";
-import { File, format, partition } from "@blazetrails/ruby-compat";
+import { partition } from "@blazetrails/ruby-compat/enumerable";
+import { File } from "@blazetrails/ruby-compat/file";
+import { format } from "@blazetrails/ruby-compat/kernel-format";
 import { dasherize, type Base, type GeneratorConfig, type GeneratorOptions } from "../../base.js";
 import { NamedBase } from "../../named-base.js";
 import type { ModelHelpersOptions } from "../../model-helpers.js";

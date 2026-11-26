@@ -1,5 +1,8 @@
 import { DSL } from "@blazetrails/rake";
-import { STDOUT, abort, block, regexpEscape } from "@blazetrails/ruby-compat";
+import { block } from "@blazetrails/ruby-compat/hash";
+import { STDOUT } from "@blazetrails/ruby-compat/io";
+import { abort } from "@blazetrails/ruby-compat/process-adapter";
+import { regexpEscape } from "@blazetrails/ruby-compat/regexp";
 import { NameError } from "@blazetrails/zeitwerk";
 import { Trails } from "../trails.js";
 import { ZeitwerkChecker } from "../zeitwerk-checker.js";

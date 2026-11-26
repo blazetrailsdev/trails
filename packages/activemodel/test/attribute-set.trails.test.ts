@@ -5,14 +5,10 @@ import { registry } from "../lib/type.js";
 import { Builder, LazyAttributeHash } from "../lib/attribute-set/builder.js";
 import { IntegerType } from "../lib/type/integer.js";
 import { StringType } from "../lib/type/string.js";
-import {
-  FrozenError,
-  Hash,
-  KeyError,
-  NoMethodError,
-  block,
-  hashAref,
-} from "@blazetrails/ruby-compat";
+import { FrozenError } from "@blazetrails/ruby-compat/frozen-error";
+import { Hash, block, hashAref } from "@blazetrails/ruby-compat/hash";
+import { KeyError } from "@blazetrails/ruby-compat/key-error";
+import { NoMethodError } from "@blazetrails/ruby-compat/no-method-error";
 
 const typeRegistry = registry();
 

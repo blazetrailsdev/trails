@@ -1,5 +1,5 @@
 import "../../../constants.trails-encrypted-file-encrypted-file-generator.generated.js";
-import { File } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat/file";
 import { EncryptedFile } from "@blazetrails/activesupport/encrypted-file";
 import { Base } from "../../base.js";
 

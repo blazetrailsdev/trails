@@ -1,6 +1,10 @@
 import "../../../constants.credentials-credentials-command-diffing.generated.js";
 import { root } from "../../../command.js";
-import { Dir, File, Pathname, defineModule, rbFSystem } from "@blazetrails/ruby-compat";
+import { Dir } from "@blazetrails/ruby-compat/dir";
+import { File } from "@blazetrails/ruby-compat/file";
+import { defineModule } from "@blazetrails/ruby-compat/include";
+import { rbFSystem } from "@blazetrails/ruby-compat/kernel-system";
+import { Pathname } from "@blazetrails/ruby-compat/pathname";
 
 export const GITATTRIBUTES_ENTRY = `config/credentials/*.yml.enc diff=trails_credentials
 config/credentials.yml.enc diff=trails_credentials

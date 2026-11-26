@@ -11,7 +11,8 @@ import {
 import { Error } from "../../base.js";
 import { ModelHelpers, type ModelHelpersOptions } from "../../model-helpers.js";
 import type { GeneratorOptions, GeneratorConfig } from "../../base.js";
-import { format, File } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat/file";
+import { format } from "@blazetrails/ruby-compat/kernel-format";
 import { Base } from "../../tse.js";
 import { ResourceHelpers } from "../../resource-helpers.js";
 

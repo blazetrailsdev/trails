@@ -4,7 +4,7 @@ import { AbstractController, ActionDispatch } from "@blazetrails/actionpack";
 import type { Base } from "@blazetrails/actionmailer";
 import { ActionMailer } from "@blazetrails/actionmailer/namespaces";
 import { deprecator } from "@blazetrails/actionmailer/deprecator";
-import { rbFSend, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { rbFSend, rbObjRespondTo } from "@blazetrails/ruby-compat/object";
 import { Mail } from "@blazetrails/mail";
 import { Trailtie as BaseTrailtie } from "../trailtie.js";
 

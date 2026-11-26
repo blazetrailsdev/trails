@@ -4,7 +4,7 @@ import {
   assertNothingRaised,
 } from "@blazetrails/activesupport/testing/assertions";
 import { ArgumentError } from "../../lib/attribute-assignment.js";
-import { Range } from "@blazetrails/ruby-compat";
+import { Range } from "@blazetrails/ruby-compat/range";
 import { Topic } from "../models/topic.js";
 import { Person } from "../models/person.js";
 

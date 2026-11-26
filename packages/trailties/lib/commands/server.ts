@@ -1,26 +1,17 @@
 import "../constants.server.generated.js";
 /* eslint-disable @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include EnvironmentArgument` (`server_command.rb:94`); the class/interface merge is how a mixin surfaces on the type side. */
 import { type BroadcastLogger, getEnv, isBlank, Logger } from "@blazetrails/activesupport";
-import {
-  atExit,
-  block,
-  Dir,
-  fetch,
-  File,
-  FileUtils,
-  Hash,
-  exit,
-  include,
-  LoadError,
-  NameError,
-  trap,
-  setEnv,
-  STDERR,
-  STDOUT,
-  toI,
-  type Included,
-  resolveTsThenJs,
-} from "@blazetrails/ruby-compat";
+import { Dir } from "@blazetrails/ruby-compat/dir";
+import { File } from "@blazetrails/ruby-compat/file";
+import { FileUtils } from "@blazetrails/ruby-compat/file-utils";
+import { block, fetch, Hash } from "@blazetrails/ruby-compat/hash";
+import { include, type Included } from "@blazetrails/ruby-compat/include";
+import { STDERR, STDOUT } from "@blazetrails/ruby-compat/io";
+import { resolveTsThenJs } from "@blazetrails/ruby-compat/load";
+import { LoadError } from "@blazetrails/ruby-compat/load-error";
+import { NameError } from "@blazetrails/ruby-compat/name-error";
+import { toI } from "@blazetrails/ruby-compat/numeric";
+import { atExit, exit, trap, setEnv } from "@blazetrails/ruby-compat/process-adapter";
 import {
   Server as RackupServer,
   type ServerOptions as RackupServerOptions,

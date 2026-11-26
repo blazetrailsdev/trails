@@ -15,7 +15,10 @@ import {
   assertSame,
   assertNil,
 } from "@blazetrails/activesupport/testing/assertions";
-import { FrozenError, Marshal, constSet, rbObjIvarGet, TopLevel } from "@blazetrails/ruby-compat";
+import { FrozenError } from "@blazetrails/ruby-compat/frozen-error";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { Marshal } from "@blazetrails/ruby-compat/marshal";
+import { rbObjIvarGet, TopLevel } from "@blazetrails/ruby-compat/object";
 import { Psych } from "@blazetrails/ruby-compat/psych";
 import { Errors } from "../lib/errors.js";
 import { Error as ModelError } from "../lib/error.js";

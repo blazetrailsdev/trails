@@ -1,4 +1,5 @@
-import { Dir, getFs, getPath } from "@blazetrails/ruby-compat";
+import { Dir } from "@blazetrails/ruby-compat/dir";
+import { getFs, getPath } from "@blazetrails/ruby-compat/fs-adapter";
 import { Handler } from "@blazetrails/rackup";
 import { createServer, type ViteDevServer } from "vite";
 import type { RackApp, RackMiddleware } from "@blazetrails/rack";

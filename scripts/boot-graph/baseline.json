@@ -42,10 +42,7 @@
     "mini-mime": 3
   },
   "rubyCompatTarget": 180,
-  "rubyCompatTargetWithWholeBarrelImports": 205,
-  "wholeBarrelImports": [
-    "packages/activerecord/dist/relation/spawn-methods.js",
-    "packages/rack-session/dist/cookie.js"
-  ],
+  "rubyCompatTargetWithWholeBarrelImports": 180,
+  "wholeBarrelImports": [],
   "appTarget": 1868
 }

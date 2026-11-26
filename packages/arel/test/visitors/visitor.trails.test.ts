@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { NoMethodError, TypeError, rbObjClass, rbFSend } from "@blazetrails/ruby-compat";
+import { NoMethodError } from "@blazetrails/ruby-compat/no-method-error";
+import { rbObjClass, rbFSend } from "@blazetrails/ruby-compat/object";
+import { TypeError } from "@blazetrails/ruby-compat/type-error";
 import { Node } from "../../lib/nodes/node.js";
 import { SqlLiteral } from "../../lib/nodes/sql-literal.js";
 import { Not } from "../../lib/nodes/unary.js";

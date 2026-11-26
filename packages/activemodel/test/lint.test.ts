@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include` (lint_test.rb:9-10); the class/interface merge is how `include()` surfaces those members on the type side. */
 import { beforeEach, describe, it } from "vitest";
 import { extend, include } from "@blazetrails/activesupport";
-import { Hash } from "@blazetrails/ruby-compat";
+import { Hash } from "@blazetrails/ruby-compat/hash";
 import { Conversion } from "../lib/conversion.js";
 import { Tests } from "../lib/lint.js";
 import { Naming } from "../lib/naming.js";

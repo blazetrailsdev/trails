@@ -4,7 +4,7 @@ import { assertNil } from "@blazetrails/activesupport/testing/assertions";
 import * as Types from "../../lib/index.js";
 import { IntegerType as Integer } from "../../lib/type/integer.js";
 import { RangeError } from "../../lib/errors.js";
-import { Range } from "@blazetrails/ruby-compat";
+import { Range } from "@blazetrails/ruby-compat/range";
 
 describe("IntegerTest", () => {
   it("simple values", () => {

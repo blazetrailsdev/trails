@@ -1,11 +1,8 @@
-import {
-  Dir,
-  File,
-  LOAD_PATH,
-  LoadError,
-  loadIseqEval,
-  regexpEscape,
-} from "@blazetrails/ruby-compat";
+import { Dir } from "@blazetrails/ruby-compat/dir";
+import { File } from "@blazetrails/ruby-compat/file";
+import { LOAD_PATH, loadIseqEval } from "@blazetrails/ruby-compat/load";
+import { LoadError } from "@blazetrails/ruby-compat/load-error";
+import { regexpEscape } from "@blazetrails/ruby-compat/regexp";
 import { Base as ThorBase } from "@blazetrails/thor/shell";
 import { Basic } from "@blazetrails/thor/shell/basic";
 import type { Base } from "./base.js";

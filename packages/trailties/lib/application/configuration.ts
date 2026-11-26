@@ -19,28 +19,21 @@ import {
 } from "@blazetrails/activesupport";
 import { HTML } from "@blazetrails/html-sanitizer";
 import * as Nokogiri from "@blazetrails/nokogiri";
-import {
-  ArgumentError,
-  Encoding,
-  File,
-  getPath,
-  loadIseqEval,
-  OpenSSL,
-  rbInspect,
-  SecureRandom,
-} from "@blazetrails/ruby-compat";
-import {
-  env as ENV,
-  FileUtils,
-  type IPAddr,
-  isPlainHash,
-  type Pathname,
-  rbModName,
-  rbObjAsString,
-  rbObjId,
-  RuntimeError,
-  stringSplit,
-} from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { Encoding } from "@blazetrails/ruby-compat/encoding";
+import { File } from "@blazetrails/ruby-compat/file";
+import { getPath } from "@blazetrails/ruby-compat/fs-adapter";
+import { loadIseqEval } from "@blazetrails/ruby-compat/load";
+import { rbInspect } from "@blazetrails/ruby-compat/object";
+import { OpenSSL } from "@blazetrails/ruby-compat/openssl";
+import { SecureRandom } from "@blazetrails/ruby-compat/secure-random";
+import { FileUtils } from "@blazetrails/ruby-compat/file-utils";
+import type { IPAddr } from "@blazetrails/ruby-compat/ipaddr";
+import { isPlainHash, rbModName, rbObjAsString, rbObjId } from "@blazetrails/ruby-compat/object";
+import type { Pathname } from "@blazetrails/ruby-compat/pathname";
+import { env as ENV } from "@blazetrails/ruby-compat/process-adapter";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
+import { stringSplit } from "@blazetrails/ruby-compat/string/split";
 import { LogSubscriber, reverseMergeBang, wrap } from "@blazetrails/activesupport";
 import type { DatabaseConfigModule } from "../database.js";
 import { Configuration as EngineConfiguration } from "../engine/configuration.js";

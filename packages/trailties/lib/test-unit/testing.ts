@@ -1,6 +1,8 @@
 import { getEnv } from "@blazetrails/activesupport";
 import { DSL } from "@blazetrails/rake";
-import { block, exit, rbFSystem } from "@blazetrails/ruby-compat";
+import { block } from "@blazetrails/ruby-compat/hash";
+import { rbFSystem } from "@blazetrails/ruby-compat/kernel-system";
+import { exit } from "@blazetrails/ruby-compat/process-adapter";
 import { Runner } from "./runner.js";
 
 DSL.task({ default: "test" });

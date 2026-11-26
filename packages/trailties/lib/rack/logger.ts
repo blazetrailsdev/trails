@@ -1,6 +1,6 @@
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
 import { BodyProxy } from "@blazetrails/rack";
-import { rbObjRespondTo, rbProcCall } from "@blazetrails/ruby-compat";
+import { rbObjRespondTo, rbProcCall } from "@blazetrails/ruby-compat/object";
 import { Request } from "@blazetrails/actionpack";
 import { LogSubscriber, Notifications } from "@blazetrails/activesupport";
 import type {

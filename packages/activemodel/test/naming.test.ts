@@ -3,7 +3,8 @@ import { Model } from "../lib/index.js";
 import { ModelName, Naming } from "../lib/naming.js";
 import { inflections } from "@blazetrails/activesupport";
 import { assert, assertNot } from "@blazetrails/activesupport/testing/assertions";
-import { constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
 
 class Post {
   static TrackBack = class TrackBack {};

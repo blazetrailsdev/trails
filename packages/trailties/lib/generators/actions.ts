@@ -1,13 +1,11 @@
 import type { Basic } from "@blazetrails/thor/shell/basic";
-import {
-  env as ENV,
-  File,
-  Gem,
-  rbFRequire,
-  regexpEscape,
-  rbInspect,
-  Shellwords,
-} from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat/file";
+import { Gem } from "@blazetrails/ruby-compat/gem";
+import { rbFRequire } from "@blazetrails/ruby-compat/load";
+import { rbInspect } from "@blazetrails/ruby-compat/object";
+import { env as ENV } from "@blazetrails/ruby-compat/process-adapter";
+import { regexpEscape } from "@blazetrails/ruby-compat/regexp";
+import { Shellwords } from "@blazetrails/ruby-compat/shellwords";
 import { chomp, extractOptionsBang, indent, stripHeredoc } from "@blazetrails/activesupport";
 import { silenceWarnings } from "@blazetrails/activesupport/core-ext/kernel/reporting";
 import { Trails } from "../trails.js";

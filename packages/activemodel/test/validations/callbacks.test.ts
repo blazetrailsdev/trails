@@ -1,4 +1,4 @@
-import { kernelThrow } from "@blazetrails/ruby-compat";
+import { kernelThrow } from "@blazetrails/ruby-compat/kernel-catch";
 import { describe, it, expect } from "vitest";
 import { include } from "@blazetrails/activesupport";
 import { assertEmpty } from "@blazetrails/activesupport/testing/assertions";

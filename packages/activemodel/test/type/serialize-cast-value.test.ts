@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { include } from "@blazetrails/activesupport";
-import { rbCallSuper } from "@blazetrails/ruby-compat";
+import { rbCallSuper } from "@blazetrails/ruby-compat/include";
 import { prepend } from "@blazetrails/ruby-compat/include";
 import { SerializeCastValue } from "../../lib/type/serialize-cast-value.js";
 

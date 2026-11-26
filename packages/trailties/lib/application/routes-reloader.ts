@@ -1,12 +1,8 @@
-import type { Pathname } from "@blazetrails/ruby-compat";
+import type { Pathname } from "@blazetrails/ruby-compat/pathname";
 import { FileUpdateChecker, runLoadHooks, TopLevel } from "@blazetrails/activesupport";
-import {
-  compiledFilesIn,
-  Dir,
-  loadIseqEval,
-  rbFLoad,
-  RuntimeError,
-} from "@blazetrails/ruby-compat";
+import { Dir } from "@blazetrails/ruby-compat/dir";
+import { compiledFilesIn, loadIseqEval, rbFLoad } from "@blazetrails/ruby-compat/load";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
 import type { DrawCallback } from "@blazetrails/actionpack";
 
 export interface RouteSetLike {

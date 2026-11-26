@@ -1,5 +1,5 @@
 import "../../../constants.test-unit-job-job-generator.generated.js";
-import { File } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat/file";
 import { dasherize } from "../../base.js";
 import { Base } from "../../test-unit.js";
 

@@ -5,7 +5,7 @@ import {
   assertRespondTo,
   assertNotRespondTo,
 } from "@blazetrails/activesupport/testing/assertions";
-import { kernelThrow } from "@blazetrails/ruby-compat";
+import { kernelThrow } from "@blazetrails/ruby-compat/kernel-catch";
 import { Callbacks } from "../lib/callbacks.js";
 
 type GeneratedMacro = (...args: unknown[]) => void;

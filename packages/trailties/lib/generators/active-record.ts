@@ -1,5 +1,6 @@
 import "../constants.active-record.generated.js";
-import { File, extend, include, type Extended, type Included } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat/file";
+import { extend, include, type Extended, type Included } from "@blazetrails/ruby-compat/include";
 import { NamedBase } from "./named-base.js";
 import * as Generators from "./migration.js";
 import type { CreateMigrationConfig, MigrationRenderer } from "./actions/create-migration.js";

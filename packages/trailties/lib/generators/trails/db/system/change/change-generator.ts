@@ -1,17 +1,11 @@
 import "../../../../../constants.trails-db-system-change-change-generator.generated.js";
 /* eslint-disable @typescript-eslint/no-unsafe-declaration-merging -- `include AppName` (`change_generator.rb:12`); the class/interface merge is how the mixin surfaces on the type side. */
 import { any } from "@blazetrails/activesupport";
-import {
-  aryDelete,
-  File,
-  include,
-  type Included,
-  rbObjDup,
-  flatten,
-  Hash,
-  JSON,
-  hashDelete,
-} from "@blazetrails/ruby-compat";
+import { aryDelete, flatten } from "@blazetrails/ruby-compat/array";
+import { File } from "@blazetrails/ruby-compat/file";
+import { Hash, hashDelete } from "@blazetrails/ruby-compat/hash";
+import { include, type Included, rbObjDup } from "@blazetrails/ruby-compat/include";
+import { JSON } from "@blazetrails/ruby-compat/json";
 import { toYaml, YAML } from "@blazetrails/ruby-compat/yaml";
 import { Base, type GeneratorOptions, type GeneratorConfig } from "../../../../base.js";
 import { Database, DATABASES, type DatabaseName } from "../../../../database.js";

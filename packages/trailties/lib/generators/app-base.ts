@@ -1,23 +1,18 @@
 import "../constants.app-base.generated.js";
 /* eslint-disable @typescript-eslint/no-unsafe-declaration-merging -- `include AppName` (`railties/lib/rails/generators/app_base.rb:15`); the class/interface merge is how the mixin surfaces on the type side. */
-import {
-  Dir,
-  Errno,
-  File,
-  FileUtils,
-  Gem,
-  LoadError,
-  RuntimeError,
-  Shellwords,
-  env,
-  exit,
-  include,
-  type Included,
-  rbFBackquote,
-  rbFSend,
-  rbObjRespondTo,
-  regexpEscape,
-} from "@blazetrails/ruby-compat";
+import { Dir } from "@blazetrails/ruby-compat/dir";
+import { Errno } from "@blazetrails/ruby-compat/errno";
+import { File } from "@blazetrails/ruby-compat/file";
+import { FileUtils } from "@blazetrails/ruby-compat/file-utils";
+import { Gem } from "@blazetrails/ruby-compat/gem";
+import { include, type Included } from "@blazetrails/ruby-compat/include";
+import { rbFBackquote } from "@blazetrails/ruby-compat/kernel-system";
+import { LoadError } from "@blazetrails/ruby-compat/load-error";
+import { rbFSend, rbObjRespondTo } from "@blazetrails/ruby-compat/object";
+import { env, exit } from "@blazetrails/ruby-compat/process-adapter";
+import { regexpEscape } from "@blazetrails/ruby-compat/regexp";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
+import { Shellwords } from "@blazetrails/ruby-compat/shellwords";
 import { dasherize, isPresent, underscore } from "@blazetrails/activesupport";
 import { Error as ThorError } from "@blazetrails/thor/error";
 import { Trails } from "../trails.js";

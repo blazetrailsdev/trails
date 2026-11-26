@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { rbObjClone } from "@blazetrails/ruby-compat";
+import { rbObjClone } from "@blazetrails/ruby-compat/include";
 import { Nodes } from "../../lib/index.js";
 import { buildQuoted } from "../../lib/nodes/casted.js";
 import { assertNotSame } from "../support/assertions.js";

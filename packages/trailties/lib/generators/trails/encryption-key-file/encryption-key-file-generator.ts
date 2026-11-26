@@ -1,6 +1,7 @@
 import "../../../constants.trails-encryption-key-file-encryption-key-file-generator.generated.js";
 import { EncryptedFile } from "@blazetrails/activesupport/encrypted-file";
-import { File, Pathname } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat/file";
+import { Pathname } from "@blazetrails/ruby-compat/pathname";
 import { Base } from "../../base.js";
 
 export class EncryptionKeyFileGenerator extends Base {

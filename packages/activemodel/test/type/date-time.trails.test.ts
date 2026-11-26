@@ -1,10 +1,11 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { DateTime, Time as RubyTime } from "@blazetrails/date";
-import { ArgumentError, Rational } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { Rational } from "@blazetrails/ruby-compat/rational";
 import { plainDateTime } from "@blazetrails/activesupport/testing/temporal-helpers";
 import * as Types from "../../lib/index.js";
 import { ValueType } from "../../lib/index.js";
-import { include } from "@blazetrails/ruby-compat";
+import { include } from "@blazetrails/ruby-compat/include";
 import { AcceptsMultiparameterTime } from "../../lib/type/helpers/accepts-multiparameter-time.js";
 
 describe("DateTimeType fallback string parsing", () => {

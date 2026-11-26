@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { AttributeRegistration } from "../lib/attribute-registration.js";
 import { include } from "@blazetrails/activesupport";
-import { Hash, hashAref } from "@blazetrails/ruby-compat";
+import { Hash, hashAref } from "@blazetrails/ruby-compat/hash";
 import { Attribute } from "../lib/attribute.js";
 import { AttributeSet } from "../lib/attribute-set.js";
 import * as Type from "../lib/type.js";

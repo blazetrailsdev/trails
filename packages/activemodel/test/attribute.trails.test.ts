@@ -1,7 +1,10 @@
 import { describe, it, expect } from "vitest";
 import { deepDup } from "@blazetrails/activesupport";
 import { Time } from "@blazetrails/date";
-import { Marshal, rbHash, rbObjDup, rbObjInstanceVariables } from "@blazetrails/ruby-compat";
+import { rbObjDup } from "@blazetrails/ruby-compat/include";
+import { Marshal } from "@blazetrails/ruby-compat/marshal";
+import { rbObjInstanceVariables } from "@blazetrails/ruby-compat/object";
+import { rbHash } from "@blazetrails/ruby-compat/rb-hash";
 import { Attribute, FromUser, UNINITIALIZED_ORIGINAL_VALUE } from "../lib/attribute.js";
 import { UNINITIALIZED_ORIGINAL_VALUE as UNINITIALIZED_FROM_INDEX } from "../lib/index.js";
 import { registry } from "../lib/type.js";

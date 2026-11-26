@@ -4,16 +4,13 @@ import {
   runLoadHooks,
   type ExecutionHook,
 } from "@blazetrails/activesupport";
-import {
-  File,
-  LoadError,
-  include,
-  Monitor,
-  rbClassSuperclass,
-  rbFRequire,
-  rbObjIsKindOf,
-  type Pathname,
-} from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat/file";
+import { include, rbObjIsKindOf } from "@blazetrails/ruby-compat/include";
+import { rbFRequire } from "@blazetrails/ruby-compat/load";
+import { LoadError } from "@blazetrails/ruby-compat/load-error";
+import { Monitor } from "@blazetrails/ruby-compat/monitor";
+import { rbClassSuperclass } from "@blazetrails/ruby-compat/object";
+import type { Pathname } from "@blazetrails/ruby-compat/pathname";
 import { Loader } from "@blazetrails/zeitwerk";
 import type { Autoloaders } from "../autoloaders.js";
 import { Initializable, type InitializableClass } from "../initializable.js";

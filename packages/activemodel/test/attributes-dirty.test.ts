@@ -1,4 +1,5 @@
-import { Hash, hashAref, rbEqual } from "@blazetrails/ruby-compat";
+import { Hash, hashAref } from "@blazetrails/ruby-compat/hash";
+import { rbEqual } from "@blazetrails/ruby-compat/rb-equal";
 import { HashWithIndifferentAccess } from "@blazetrails/activesupport";
 /* eslint-disable @typescript-eslint/no-unsafe-declaration-merging --
    Each model below spells `include ActiveModel::Dirty` in its class body, the way the Rails test

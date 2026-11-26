@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Duration } from "@blazetrails/activesupport";
-import { Rational } from "@blazetrails/ruby-compat";
+import { Rational } from "@blazetrails/ruby-compat/rational";
 import * as Types from "../../lib/index.js";
 import { ImmutableStringType } from "../../lib/type/immutable-string.js";
 

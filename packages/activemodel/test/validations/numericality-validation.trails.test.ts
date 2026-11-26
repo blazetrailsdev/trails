@@ -10,7 +10,7 @@ import {
 } from "../../lib/validations/numericality.js";
 import { Attributes, type AttributesClassHalf } from "../../lib/attributes.js";
 import { include } from "@blazetrails/activesupport";
-import { Range } from "@blazetrails/ruby-compat";
+import { Range } from "@blazetrails/ruby-compat/range";
 
 class Person extends Model {
   name: string | null = null;

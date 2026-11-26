@@ -1,5 +1,7 @@
 import "../constants.app-name.generated.js";
-import { File, TopLevel, constDefined } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat/file";
+import { constDefined } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
 import { camelize, parameterize, underscore } from "@blazetrails/activesupport";
 import { Error } from "./base.js";
 

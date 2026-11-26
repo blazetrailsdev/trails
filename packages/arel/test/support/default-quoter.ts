@@ -1,5 +1,5 @@
 import type { ArelConnection } from "../../lib/visitors/connection.js";
-import { rbObjAsString as toS } from "@blazetrails/ruby-compat";
+import { rbObjAsString as toS } from "@blazetrails/ruby-compat/object";
 
 function defaultSanitizeAsSqlComment(value: string): string {
   return String(value)

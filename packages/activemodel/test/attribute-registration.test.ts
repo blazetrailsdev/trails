@@ -1,4 +1,4 @@
-import { hashAref } from "@blazetrails/ruby-compat";
+import { hashAref } from "@blazetrails/ruby-compat/hash";
 import { describe, it, expect } from "vitest";
 import { ValueType } from "../lib/index.js";
 import type { AttributeSet } from "../lib/attribute-set.js";

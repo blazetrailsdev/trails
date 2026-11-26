@@ -1,6 +1,6 @@
 import "../../../constants.test-unit-generator-generator-generator.generated.js";
 import type { GeneratorGeneratorOptions } from "../../trails/generator/generator-generator.js";
-import { File } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat/file";
 import { Base } from "../../test-unit.js";
 
 const __dir__ = File.dirname(decodeURIComponent(new URL(import.meta.url).pathname));

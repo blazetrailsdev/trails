@@ -1,5 +1,6 @@
 import { Rake } from "@blazetrails/rake";
-import { File, rbFLoad } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat/file";
+import { rbFLoad } from "@blazetrails/ruby-compat/load";
 
 const tasks = ["framework", "log", "misc", "tmp", "pnpm", "zeitwerk"];
 if (Rake.application!.currentScope.isEmpty()) tasks.push("statistics");

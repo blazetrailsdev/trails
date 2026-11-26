@@ -1,11 +1,8 @@
-import {
-  Interrupt,
-  Shellwords,
-  defineModule,
-  env,
-  onSignal,
-  rbFSystem,
-} from "@blazetrails/ruby-compat";
+import { defineModule } from "@blazetrails/ruby-compat/include";
+import { rbFSystem } from "@blazetrails/ruby-compat/kernel-system";
+import { env, onSignal } from "@blazetrails/ruby-compat/process-adapter";
+import { Shellwords } from "@blazetrails/ruby-compat/shellwords";
+import { Interrupt } from "@blazetrails/ruby-compat/signal-exception";
 
 interface EditorHost {
   currentSubcommand: string | null | undefined;

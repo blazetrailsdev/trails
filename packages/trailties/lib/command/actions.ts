@@ -1,5 +1,9 @@
 import { Rake } from "@blazetrails/rake";
-import { defineModule, Dir, File, getPath, resolveTsThenJs } from "@blazetrails/ruby-compat";
+import { Dir } from "@blazetrails/ruby-compat/dir";
+import { File } from "@blazetrails/ruby-compat/file";
+import { getPath } from "@blazetrails/ruby-compat/fs-adapter";
+import { defineModule } from "@blazetrails/ruby-compat/include";
+import { resolveTsThenJs } from "@blazetrails/ruby-compat/load";
 import { APP_PATH, ENGINE_PATH, ENGINE_ROOT } from "../app-path.js";
 import { Engine } from "../engine.js";
 import { Generators } from "../generators.js";

@@ -8,7 +8,9 @@ import { hasSecurePassword, SecurePassword } from "../lib/secure-password.js";
 import { Engine, Errors, Password } from "@blazetrails/bcrypt";
 import { Attributes, type AttributesClassHalf } from "../lib/attributes.js";
 import { include, TopLevel } from "@blazetrails/activesupport";
-import { LoadError, setVerbose, stderr, verbose } from "@blazetrails/ruby-compat";
+import { LoadError } from "@blazetrails/ruby-compat/load-error";
+import { stderr } from "@blazetrails/ruby-compat/process-adapter";
+import { setVerbose, verbose } from "@blazetrails/ruby-compat/verbose";
 import { User } from "./models/user.js";
 
 let savedMinCost: boolean;

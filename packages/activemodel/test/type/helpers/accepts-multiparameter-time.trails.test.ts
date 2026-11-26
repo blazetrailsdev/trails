@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { include } from "@blazetrails/ruby-compat";
+import { include } from "@blazetrails/ruby-compat/include";
 import { DateTimeType } from "../../../lib/type/date-time.js";
 import { AcceptsMultiparameterTime } from "../../../lib/type/helpers/accepts-multiparameter-time.js";
 
