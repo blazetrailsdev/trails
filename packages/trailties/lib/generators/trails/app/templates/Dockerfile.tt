@@ -49,15 +49,17 @@ RUN <%= this.usingNode() ? "" : "npm install -g pnpm && " %>pnpm install --froze
 
 # Copy application code
 COPY . .
-RUN <%= this.usingBun() ? "bun" : "pnpm" %> run build && \
-    tar --exclude=./dist --exclude=./node_modules --exclude="*.ts" -cf - . | tar -xf - -C dist && \
-    cd dist && ../node_modules/.bin/trails build
+RUN <%= this.usingBun() ? "bun" : "pnpm" %> run build
 
 <% if (!(this.options.api || this.skipAssetPipeline())) { -%>
 # Precompiling assets for production without requiring secret TRAILS_MASTER_KEY
 RUN SECRET_KEY_BASE_DUMMY=1 ./bin/trails assets:precompile
 
 <% } -%>
+# Copy the files tsc does not emit into the compiled tree, then build its entry
+RUN tar --exclude=./dist --exclude=./node_modules --exclude="*.ts" -cf - . | tar -xf - -C dist && \
+    cd dist && ../node_modules/.bin/trails build
+
 # Keep only production dependencies, so tsx and typescript stay out of the runtime image
 RUN <%= this.usingBun() ? "rm -rf node_modules && bun install --frozen-lockfile --production" : "pnpm prune --prod" %>
 

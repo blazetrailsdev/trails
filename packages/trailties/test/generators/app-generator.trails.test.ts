@@ -129,6 +129,11 @@ describe("AppGenerator (trails-only)", () => {
       'CMD ["node", "--no-experimental-strip-types", "node_modules/@blazetrails/rackup/bin/rackup.js", "config.js"]',
     );
     expect(dockerfile).not.toContain("config.ts");
+    expect(dockerfile.indexOf("assets:precompile")).toBeLessThan(dockerfile.indexOf("-C dist"));
+    const entrypoint = await File.readAsync(File.join(tmpDir, "my-app/bin/docker-entrypoint"));
+    expect(entrypoint).toContain(
+      '[ "${@: -2:1}" == "node_modules/@blazetrails/rackup/bin/rackup.js" ] && [ "${@: -1:1}" == "config.js" ]',
+    );
   });
 
   it("generates action cable files by default", async () => {
