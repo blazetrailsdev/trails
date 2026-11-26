@@ -1,9 +1,16 @@
-import { describe, it, expect } from "vitest";
+import { beforeAll, describe, it, expect } from "vitest";
 import { EnumType } from "../../lib/enum.js";
 import { Book } from "../models/book.js";
 import { Company } from "../models/company.js";
 
 describe("enum on a model whose table has not reflected", () => {
+  beforeAll(async () => {
+    for (const klass of [Company, Book]) {
+      await klass.connectionPool().schemaCache.clearDataSourceCacheBang(klass.tableName!);
+      klass.reloadSchemaFromCache();
+    }
+  });
+
   it("reads its type without raising, and resolves the column once the schema lands", async () => {
     expect(Company.columnsHash()["status"]).toBeUndefined();
     expect(() => Company.typeForAttribute("status")).not.toThrow();

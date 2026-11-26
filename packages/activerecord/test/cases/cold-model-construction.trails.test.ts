@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { beforeAll, describe, it, expect } from "vitest";
 import { ArgumentError } from "@blazetrails/activesupport";
 import { MissingAttributeError, UnknownAttributeError } from "@blazetrails/activemodel";
 import { Book } from "../models/book.js";
@@ -8,6 +8,13 @@ import { Post } from "../models/post.js";
 import { Author } from "../models/author.js";
 
 describe("constructing a model whose table has not reflected", () => {
+  beforeAll(async () => {
+    for (const klass of [Company, Book, Lion, Post]) {
+      await klass.connectionPool().schemaCache.clearDataSourceCacheBang(klass.tableName!);
+      klass.reloadSchemaFromCache();
+    }
+  });
+
   it("alias_attribute does not raise, and the alias resolves once the schema lands", async () => {
     expect(Company.columnsHash()["name"]).toBeUndefined();
     expect(() => new Company()).not.toThrow();
