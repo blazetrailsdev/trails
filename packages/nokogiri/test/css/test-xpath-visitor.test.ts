@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { xpathFor } from "../../lib/css.js";
 import { ArgumentError } from "@blazetrails/ruby-compat";
+import { SyntaxError } from "../../lib/css/syntax-error.js";
 import { libxml2Patches } from "../../lib/version/info.js";
 import { BuiltinsConfig, DoctypeConfig, XPathVisitor } from "../../lib/css/xpath-visitor.js";
 
@@ -131,6 +132,20 @@ describe("Nokogiri::CSS::XPathVisitor", () => {
           assertXpath("//*[nokogiri-builtin:local-name-is('a')]/@href", "a/@href", config);
         }
       });
+
+      it("matches an escaped local-name", () => {
+        // eslint-disable-next-line vitest/no-conditional-in-test -- mirrors test_xpath_visitor.rb:981
+        if (libxml2Patches().includes("0009-allow-wildcard-namespaces.patch")) {
+          assertXpath("//*:a-b", String.raw`a\-b`, config);
+        } else {
+          assertXpath("//*[nokogiri-builtin:local-name-is('a-b')]", String.raw`a\-b`, config);
+        }
+      });
+
+      it("avoids the wildcard when the local-name is not an XML name", () => {
+        assertXpath("//*[nokogiri-builtin:local-name-is('a!b')]", String.raw`a\!b`, config);
+        assertXpath(`//*[nokogiri-builtin:local-name-is("a'b")]`, String.raw`a\'b`, config);
+      });
     });
   });
 
@@ -144,6 +159,29 @@ describe("Nokogiri::CSS::XPathVisitor", () => {
     it("type with namespaces", () => {
       assertXpath("//aaron:a", "aaron|a");
       assertXpath("//a", "|a");
+    });
+    it("type with escapes", () => {
+      assertXpath("//a-b", String.raw`a\-b`);
+      assertXpath("//a-b", String.raw`\61 -b`);
+      assertXpath("//aaron:a-b", String.raw`aaron|a\-b`);
+      assertXpath("//a-b:c", String.raw`a\-b|c`);
+      assertXpath("//*[not(self::a-b)]", String.raw`:not(a\-b)`);
+      assertXpath("//a-b", "\\61\r\n-b");
+      assertXpath("//a\u{FFFD}", String.raw`a\0`);
+      assertXpath("//a\u{FFFD}", String.raw`a\d800`);
+      assertXpath("//a\u{FFFD}", String.raw`a\110000`);
+    });
+    it("type that is not an XML name", () => {
+      expect(() => xpathFor(String.raw`a\!b`, { cache: false })).toThrow(SyntaxError);
+      expect(() => xpathFor(String.raw`\31 23`, { cache: false })).toThrow(SyntaxError);
+      expect(() => xpathFor(String.raw`a\[1\]`, { cache: false })).toThrow(SyntaxError);
+      expect(() => xpathFor(String.raw`a\|b|c`, { cache: false })).toThrow(SyntaxError);
+      expect(() => xpathFor(String.raw`a|b\ \|\ \/\/c`, { cache: false })).toThrow(SyntaxError);
+      expect(() => xpathFor(String.raw`\*`, { cache: false })).toThrow(SyntaxError);
+      expect(() => xpathFor(String.raw`\2a`, { cache: false })).toThrow(SyntaxError);
+      expect(() => xpathFor(String.raw`\*|a`, { cache: false })).toThrow(SyntaxError);
+      expect(() => xpathFor(String.raw`a|\*`, { cache: false })).toThrow(SyntaxError);
+      expect(() => xpathFor(String.raw`:not(\*)`, { cache: false })).toThrow(SyntaxError);
     });
     it(". class", () => {
       assertXpath("//*[contains(concat(' ',normalize-space(@class),' '),' awesome ')]", ".awesome");
@@ -168,6 +206,20 @@ describe("Nokogiri::CSS::XPathVisitor", () => {
         "*.pastoral",
       );
     });
+    it(". class with quotes", () => {
+      assertXpath(
+        `//*[contains(concat(' ',normalize-space(@class),' ')," it's ")]`,
+        String.raw`.it\'s`,
+      );
+      assertXpath(
+        `//*[contains(concat(' ',normalize-space(@class),' '),' a"b ')]`,
+        String.raw`.a\"b`,
+      );
+      assertXpath(
+        `//*[contains(concat(' ',normalize-space(@class),' '),concat(' a"b',"'",'c '))]`,
+        String.raw`.a\"b\'c`,
+      );
+    });
     describe("namespaces", () => {
       it("basic mechanics", () => {
         assertXpath("//a[@flavorjones:href]", "a[flavorjones|href]");
@@ -189,6 +241,48 @@ describe("Nokogiri::CSS::XPathVisitor", () => {
         assertXpath("//*[@id='escape:needed,']", "#escape\\3A needed\\2C");
         assertXpath("//*[@id='escape:needed']", "#escape\\00003Aneeded");
       });
+      it("#id with quotes", () => {
+        assertXpath(`//*[@id="it's"]`, String.raw`#it\'s`);
+        assertXpath(`//*[@id="it's"]`, String.raw`#it\27s`);
+        assertXpath(`//*[@id='a"b']`, String.raw`#a\"b`);
+        assertXpath(`//*[@id=concat('a"b',"'",'c')]`, String.raw`#a\"b\'c`);
+        assertXpath(`//*[@id="x' or '1'='1"]`, String.raw`#x\'\ or\ \'1\'\=\'1`);
+        assertXpath("//*[@id='a\nb']", String.raw`#a\a b`);
+        assertXpath("//*[@id='ab']", "#\\61\r\nb");
+        assertXpath("//*[@id='a\u{FFFD}']", String.raw`#a\0`);
+      });
+      it("name with escapes", () => {
+        assertXpath("//p[@a-b]", String.raw`p[a\-b]`);
+        assertXpath("//p[@a-b='1']", String.raw`p[a\-b="1"]`);
+        assertXpath("//p[@a-b]", String.raw`p[\61 -b]`);
+        assertXpath("//p[@x:a-b]", String.raw`p[x|a\-b]`);
+        assertXpath("//p[@a-b:c]", String.raw`p[a\-b|c]`);
+        assertXpath("//p[@a-b]", String.raw`p[|a\-b]`);
+        assertXpath("//p[@a\u{FFFD}]", String.raw`p[a\0]`);
+        assertXpath("//p[@a-b]", String.raw`p[@a\-b]`);
+        assertXpath("//@a-b", String.raw`@a\-b`);
+        assertXpath("//a[nokogiri:foo(.,@a-b)]", String.raw`a:foo(@a\-b)`);
+      });
+      it("name that is not an XPath name", () => {
+        assertXpath("//p[@*[namespace-uri()='' and name()='a!b']]", String.raw`p[a\!b]`);
+        assertXpath("//p[@*[namespace-uri()='' and name()='a!b']='1']", String.raw`p[a\!b="1"]`);
+        assertXpath("//p[@*[namespace-uri()='' and name()='@click']]", String.raw`p[\@click]`);
+        assertXpath("//p[@*[namespace-uri()='' and name()=':class']]", String.raw`p[\:class]`);
+        assertXpath("//p[@*[namespace-uri()='' and name()='*']]", String.raw`p[\*]`);
+        assertXpath("//p[@*[namespace-uri()='' and name()='a!b']]", String.raw`p[|a\!b]`);
+        assertXpath(`//p[@*[namespace-uri()='' and name()="a'b"]]`, String.raw`p[a\'b]`);
+        assertXpath(
+          "//p[@*[namespace-uri()='' and name()='a]|//*[@b']]",
+          String.raw`p[a\]\|\/\/\*\[\@b]`,
+        );
+        assertXpath("//@*[namespace-uri()='' and name()='a!b']", String.raw`@a\!b`);
+      });
+      it("namespaced name that is not an XPath name", () => {
+        expect(() => xpathFor(String.raw`p[x|a\!b]`, { cache: false })).toThrow(SyntaxError);
+        expect(() => xpathFor(String.raw`p[a\!b|c]`, { cache: false })).toThrow(SyntaxError);
+        expect(() => xpathFor(String.raw`p[\*|a]`, { cache: false })).toThrow(SyntaxError);
+        expect(() => xpathFor(String.raw`p[x|\*]`, { cache: false })).toThrow(SyntaxError);
+      });
       it("parses leading @ (extended-syntax)", () => {
         assertXpath("//a[@id='Boing']", "a[@id='Boing']");
         assertXpath("//a[@id='Boing']", "a[@id = 'Boing']");
@@ -196,8 +290,10 @@ describe("Nokogiri::CSS::XPathVisitor", () => {
       });
       it("rhs with quotes", () => {
         assertXpath('//h1[@a="\'"]', 'h1[a="\'"]');
-        assertXpath('//h1[@a=concat("\'","")]', "h1[a='\\'']");
-        assertXpath('//h1[@a=concat("",\'"\',"\'","")]', "h1[a='\"\\'']");
+        assertXpath(`//h1[@a="'"]`, "h1[a='\\'']");
+        assertXpath(`//h1[@a=concat('"',"'",'')]`, String.raw`h1[a='"\'']`);
+        assertXpath(`//h1[@a="'foo'"]`, String.raw`h1[a=\'foo\']`);
+        assertXpath(`//*[@a="'x' or true()"]`, String.raw`[a=\'x\'\ or\ true\(\)]`);
       });
       it("rhs is number or string", () => {
         assertXpath("//img[@width='200']", "img[width='200']");
@@ -248,6 +344,28 @@ describe("Nokogiri::CSS::XPathVisitor", () => {
         assertXpath(
           "//a[contains(concat(' ',normalize-space(@data-words),' '),' bar ')]",
           'a[data-words~="bar"]',
+        );
+      });
+      it("~= with quotes", () => {
+        assertXpath(
+          `//a[contains(concat(' ',normalize-space(@class),' ')," it's ")]`,
+          `a[class~="it's"]`,
+        );
+        assertXpath(
+          `//a[contains(concat(' ',normalize-space(@class),' ')," it's ")]`,
+          String.raw`a[class~='it\'s']`,
+        );
+        assertXpath(
+          `//a[contains(concat(' ',normalize-space(@class),' '),' a"b ')]`,
+          String.raw`a[class~="a\"b"]`,
+        );
+        assertXpath(
+          `//a[contains(concat(' ',normalize-space(@class),' '),concat(' a"b',"'",'c '))]`,
+          String.raw`a[class~="a\"b'c"]`,
+        );
+        assertXpath(
+          `//a[contains(concat(' ',normalize-space(@class),' ')," 'foo ")]`,
+          String.raw`a[class~=\'foo]`,
         );
       });
       it("~= (extended-syntax)", () => {
@@ -378,6 +496,10 @@ describe("Nokogiri::CSS::XPathVisitor", () => {
       assertXpath("//a[position()<=3]", "a:nth-of-type(-n+3)");
       assertXpath("//a[position()>=3]", "a:nth-of-type(1n+3)");
       assertXpath("//a[position()>=3]", "a:nth-of-type(n+3)");
+      assertXpath("//a[position()=3]", "a:nth-of-type(0n+3)");
+      assertXpath("//a[position()=-1]", "a:nth-of-type(0n-1)");
+      assertXpath("//a[position()<=0]", "a:nth-of-type(-n+0)");
+      assertXpath("//a[(position()<=0) and (((position()-0) mod 2)=0)]", "a:nth-of-type(-2n)");
       assertXpath("//a[((last()-position()+1) mod 2)=0]", "a:nth-last-of-type(2n)");
       assertXpath(
         "//a[((last()-position()+1)>=1) and ((((last()-position()+1)-1) mod 2)=0)]",
@@ -441,6 +563,8 @@ describe("Nokogiri::CSS::XPathVisitor", () => {
       assertXpath("//a[nokogiri:foo(.,a,10)]", "a:foo(a, 10)");
       assertXpath("//a[nokogiri:foo(.,42)]", "a:foo(42)");
       assertXpath("//a[nokogiri:foo(.,'bar')]", "a:foo('bar')");
+      assertXpath(`//a[nokogiri:foo(.,"it's")]`, String.raw`a:foo('it\'s')`);
+      assertXpath(`//a[nokogiri:foo(.,'bar',"it's")]`, String.raw`a:foo("bar", 'it\'s')`);
     });
     it("bare pseudo-class matches any ident", () => {
       assertXpath("//*[nokogiri:link(.)]", ":link");
@@ -506,7 +630,23 @@ describe("Nokogiri::CSS::XPathVisitor", () => {
       assertXpath("//script//comment()", "script comment()");
     });
     it("handles contains() (extended-syntax)", () => {
-      assertXpath('//div[contains(.,"youtube")]', 'div:contains("youtube")');
+      assertXpath("//div[contains(.,'youtube')]", 'div:contains("youtube")');
+      assertXpath("//div[contains(.,'youtube')]", "div:contains('youtube')");
+    });
+    it("handles contains() with escapes (extended-syntax)", () => {
+      assertXpath(`//p[contains(.,"it's")]`, String.raw`p:contains('it\'s')`);
+      assertXpath(`//p[contains(.,"it's")]`, String.raw`p:contains('it\27s')`);
+      assertXpath(`//p[contains(.,'a"b')]`, String.raw`p:contains("a\"b")`);
+      assertXpath(`//p[contains(.,concat('a"b',"'",'c'))]`, String.raw`p:contains("a\"b'c")`);
+      assertXpath(`//p[contains(.,"') or ('1'='1")]`, String.raw`p:contains('\') or (\'1\'=\'1')`);
+      assertXpath("//p[contains(.,'ab')]", "p:contains('a\\\nb')");
+      assertXpath("//p[contains(.,'ab')]", "p:contains('a\\\r\nb')");
+      assertXpath("//p[contains(.,'ab')]", "p:contains('a\\\rb')");
+      assertXpath("//p[contains(.,'ab')]", "p:contains('a\\\fb')");
+      assertXpath("//p[contains(.,'a\vb')]", "p:contains('\\61\vb')");
+      assertXpath("//p[contains(.,'a\u{FFFD}b')]", "p:contains('a\\0 b')");
+      assertXpath("//p[contains(.,'a\u{FFFD}b')]", "p:contains('a\\d800 b')");
+      assertXpath("//p[contains(.,'a\u{FFFD}b')]", "p:contains('a\\110000 b')");
     });
     it("handles gt() (extended-syntax)", () => {
       assertXpath("//td[position()>3]", "td:gt(3)");
@@ -554,6 +694,26 @@ describe("Nokogiri::CSS::XPathVisitor", () => {
         "//*[nokogiri-builtin:css-class(@class,'a') and nokogiri-builtin:css-class(@class,'b')]",
         ".a.b",
         { builtins: "always" },
+      );
+    });
+    it(". class with quotes", () => {
+      const config = { builtins: "always" } as const;
+      assertXpath(`//*[nokogiri-builtin:css-class(@class,"it's")]`, String.raw`.it\'s`, config);
+      assertXpath(`//*[nokogiri-builtin:css-class(@class,'a"b')]`, String.raw`.a\"b`, config);
+      assertXpath(
+        `//*[nokogiri-builtin:css-class(@class,concat('a"b',"'",'c'))]`,
+        String.raw`.a\"b\'c`,
+        config,
+      );
+      assertXpath(
+        `//a[nokogiri-builtin:css-class(@class,"it's")]`,
+        String.raw`a[class~='it\'s']`,
+        config,
+      );
+      assertXpath(
+        `//a[nokogiri-builtin:css-class(@class,concat('a"b',"'",'c'))]`,
+        String.raw`a[class~="a\"b'c"]`,
+        config,
       );
     });
     it("~=", () => {
@@ -606,6 +766,12 @@ describe("Nokogiri::CSS::XPathVisitor", () => {
           doctype: "html5",
           builtins: "never",
         });
+      });
+      it("matches an escaped local-name", () => {
+        const config = { doctype: "html5", builtins: "never" } as const;
+        assertXpath("//*[local-name()='a-b']", String.raw`a\-b`, config);
+        assertXpath("//*[local-name()='a!b']", String.raw`a\!b`, config);
+        assertXpath(`//*[local-name()="a'b"]`, String.raw`a\'b`, config);
       });
     });
   });

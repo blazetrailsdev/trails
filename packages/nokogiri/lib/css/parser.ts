@@ -157,20 +157,39 @@ export class Parser extends RaccParser {
     this._tokenizer = new Tokenizer();
   }
 
-  unescapeCssIdentifier(identifier: string): string {
-    return identifier.replace(/\\(?:([^0-9a-fA-F])|([0-9a-fA-F]{1,6})\s?)/g, (_m, $1, $2) =>
-      $1 != null ? $1 : String.fromCodePoint(parseInt($2, 16)),
+  static unescapeCssIdentifier(identifier: string): string {
+    return identifier.replace(
+      /\\(?:([^0-9a-fA-F])|([0-9a-fA-F]{1,6})(?:\r\n|[ \t\n\r\f])?)/g,
+      (_m, $1, $2) => ($1 != null ? $1 : Parser.unescapeCssCodePoint($2)),
     );
   }
 
-  unescapeCssString(str: string): string {
-    return str.replace(/\\(?:([^0-9a-fA-F])|([0-9a-fA-F]{1,6})\s?)/g, (_m, $1, $2) => {
-      if ($1 === "\n") {
-        return "";
-      } else {
-        return $1 != null ? $1 : String.fromCodePoint(parseInt($2, 16));
-      }
-    });
+  static unescapeCssString(str: string): string {
+    return str.replace(
+      /\\(?:(\r\n|[^0-9a-fA-F])|([0-9a-fA-F]{1,6})(?:\r\n|[ \t\n\r\f])?)/g,
+      (_m, $1, $2) => {
+        if (["\n", "\r\n", "\r", "\f"].includes($1)) {
+          return "";
+        } else {
+          return $1 != null ? $1 : Parser.unescapeCssCodePoint($2);
+        }
+      },
+    );
+  }
+
+  static unescapeCssCodePoint(hex: string): string {
+    const codePoint = parseInt(hex, 16);
+    if (codePoint === 0 || (codePoint >= 0xd800 && codePoint <= 0xdfff) || codePoint > 0x10ffff) {
+      return "\u{FFFD}";
+    } else {
+      return String.fromCodePoint(codePoint);
+    }
+  }
+
+  unescapeCssElementName(identifier: string): string {
+    const name = Parser.unescapeCssIdentifier(identifier);
+    if (name === "*") throw new SyntaxError(`Invalid element name '${identifier}'`);
+    return name;
   }
 
   parse(string: string): Node[] {
@@ -226,7 +245,7 @@ export class Parser extends RaccParser {
   }
 
   _reduce9(val: any[], _values: unknown[], _result: unknown) {
-    return val[1];
+    return Parser.unescapeCssIdentifier(val[1]);
   }
 
   _reduce10(val: any[], _values: unknown[], _result: unknown) {
@@ -262,7 +281,7 @@ export class Parser extends RaccParser {
   }
 
   _reduce21(val: any[], _values: unknown[], _result: unknown) {
-    return new Node("CLASS_CONDITION", [this.unescapeCssIdentifier(val[1])]);
+    return new Node("CLASS_CONDITION", [Parser.unescapeCssIdentifier(val[1])]);
   }
 
   _reduce23(val: any[], _values: unknown[], _result: unknown) {
@@ -270,12 +289,14 @@ export class Parser extends RaccParser {
   }
 
   _reduce24(val: any[], _values: unknown[], _result: unknown) {
-    return new Node("ELEMENT_NAME", [val[0], val[2]]);
+    return new Node("ELEMENT_NAME", [
+      val[0] != null ? this.unescapeCssElementName(val[0]) : val[0],
+      this.unescapeCssElementName(val[2]),
+    ]);
   }
 
   _reduce25(val: any[], _values: unknown[], _result: unknown) {
-    const name = val[0];
-    return new Node("ELEMENT_NAME", [name]);
+    return new Node("ELEMENT_NAME", [this.unescapeCssElementName(val[0])]);
   }
 
   _reduce26(val: any[], _values: unknown[], _result: unknown) {
@@ -295,11 +316,14 @@ export class Parser extends RaccParser {
   }
 
   _reduce31(val: any[], _values: unknown[], _result: unknown) {
-    return new Node("ATTRIB_NAME", [[val[0], val[2]].filter((v) => v != null).join(":")]);
+    return new Node(
+      "ATTRIB_NAME",
+      [val[0], val[2]].filter((v) => v != null).map((name) => Parser.unescapeCssIdentifier(name)),
+    );
   }
 
   _reduce32(val: any[], _values: unknown[], _result: unknown) {
-    return new Node("ATTRIB_NAME", [val[0]]);
+    return new Node("ATTRIB_NAME", [Parser.unescapeCssIdentifier(val[0])]);
   }
 
   _reduce34(val: any[], _values: unknown[], _result: unknown) {
@@ -417,15 +441,15 @@ export class Parser extends RaccParser {
   }
 
   _reduce64(val: any[], _values: unknown[], _result: unknown) {
-    return new Node("ID", [this.unescapeCssIdentifier(val[0])]);
+    return new Node("ID", [Parser.unescapeCssIdentifier(val[0])]);
   }
 
   _reduce65(val: any[], _values: unknown[], _result: unknown) {
-    return [val[0], this.unescapeCssIdentifier(val[1])];
+    return [val[0], Parser.unescapeCssIdentifier(val[1])];
   }
 
   _reduce66(val: any[], _values: unknown[], _result: unknown) {
-    return [val[0], this.unescapeCssString(val[1])];
+    return [val[0], Parser.unescapeCssString(val[1].slice(1, -1))];
   }
 
   _reduce67(val: any[], _values: unknown[], _result: unknown) {

@@ -1,4 +1,5 @@
 import { defaultTreeAdapter, type DefaultTreeAdapterMap } from "parse5";
+import { ArgumentError } from "@blazetrails/ruby-compat";
 
 import { Gumbo } from "../gumbo.js";
 
@@ -54,8 +55,32 @@ export class DocumentFragment extends XmlDocumentFragment {
       options.maxErrors = maxParseErrors ?? Gumbo.DEFAULT_MAX_ERRORS;
     }
     options.maxTreeDepth ??= Gumbo.DEFAULT_MAX_TREE_DEPTH;
+    const noscriptContentAsText = (options.parseNoscriptContentAsText = this.noscriptParsingMode(
+      doc,
+      options,
+    ));
 
     Gumbo.fragment(this, string, context, options);
+    if (doc.parseNoscriptContentAsText == null) {
+      doc.parseNoscriptContentAsText = noscriptContentAsText;
+    }
+  }
+
+  /** @internal */
+  private noscriptParsingMode(doc: Document, options: Record<string, unknown>): boolean {
+    const docMode = doc.parseNoscriptContentAsText;
+    const fetched = Object.hasOwn(options, "parseNoscriptContentAsText")
+      ? options.parseNoscriptContentAsText
+      : docMode;
+    const mode = fetched != null && fetched !== false;
+
+    if (docMode != null && mode !== docMode) {
+      throw new ArgumentError(
+        `parse_noscript_content_as_text: ${mode} does not match the document's value ${docMode}`,
+      );
+    }
+
+    return mode;
   }
 
   get errors(): SyntaxError[] {

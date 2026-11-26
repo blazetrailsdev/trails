@@ -7,10 +7,11 @@ export class ScanError extends Error {
 
 const nonascii = String.raw`[^\0-\x7f]`;
 const escape = String.raw`(\\[0-9A-Fa-f]{1,6}(\r\n|[ \t\r\n\f\v])?|\\[^\n\r\f0-9A-Fa-f])`;
+const atomic = (name: string, x: string) => String.raw`(?:(?=(?<${name}>${x}))\k<${name}>)`;
 const nmchar = String.raw`([_A-Za-z0-9-]|${nonascii}|${escape})`;
-const ident = String.raw`-?([_A-Za-z]|${nonascii}|${escape})${nmchar}*`;
-const string = (q: string) =>
-  String.raw`${q}([^\n\r\f${q}]|(\n|\r\n|\r|\f)|${nonascii}|${escape})*(?<!\\)(?:\\{2})*${q}`;
+const ident = String.raw`-?${atomic("nmstart", String.raw`[_A-Za-z]|${nonascii}|${escape}`)}${atomic("nmchar", nmchar)}*`;
+const string = (q: string, name: string) =>
+  String.raw`${q}${atomic(name, String.raw`[^\n\r\f${q}\\]|\\?(\n|\r\n|\r|\f)|${nonascii}|${escape}`)}*${q}`;
 
 export class Tokenizer {
   lineno = 1;
@@ -53,7 +54,7 @@ export class Tokenizer {
     if ((text = this._ss.scan(new RegExp(ident))) != null) {
       return this.action(() => ["IDENT", text!]);
     }
-    if ((text = this._ss.scan(new RegExp(String.raw`\#${nmchar}+`))) != null) {
+    if ((text = this._ss.scan(new RegExp(String.raw`\#${atomic("nmchar", nmchar)}+`))) != null) {
       return this.action(() => ["HASH", text!]);
     }
     if ((text = this._ss.scan(/[ \t\r\n\f\v]*~=[ \t\r\n\f\v]*/)) != null) {
@@ -116,7 +117,7 @@ export class Tokenizer {
     if ((text = this._ss.scan(/[ \t\r\n\f\v]+/)) != null) {
       return this.action(() => ["S", text!]);
     }
-    if ((text = this._ss.scan(new RegExp(`(${string('"')}|${string("'")})`))) != null) {
+    if ((text = this._ss.scan(new RegExp(`(${string('"', "dq")}|${string("'", "sq")})`))) != null) {
       return this.action(() => ["STRING", text!]);
     }
     if ((text = this._ss.scan(/[^\n]/)) != null) {

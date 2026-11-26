@@ -43,8 +43,8 @@
     },
     {
       "source": "loofah",
-      "ref": "v2.24.0",
-      "sha": "85990602c6fdb40489138e80080ca508200c7137"
+      "ref": "v2.25.3",
+      "sha": "bbe007e52e8aeaa520b3e515235d467f5b1416e6"
     },
     {
       "source": "rails-html-sanitizer",

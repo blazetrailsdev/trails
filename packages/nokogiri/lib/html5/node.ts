@@ -267,7 +267,11 @@ export class Node extends XmlNode {
     if ((configOptions & (SaveOptions.AS_XML | SaveOptions.AS_XHTML)) !== 0) {
       this.nativeWriteTo(io, encoding ?? null, indentString, configOptions);
     } else {
-      const html = this.htmlStandardSerialize(opts.preserveNewline || false);
+      const html = this.htmlStandardSerialize(
+        opts.preserveNewline || false,
+        (this.document as { parseNoscriptContentAsText?: boolean | null })
+          .parseNoscriptContentAsText ?? null,
+      );
       io.write(html);
     }
   }
@@ -349,8 +353,11 @@ export class Node extends XmlNode {
   }
 
   /** @internal */
-  private htmlStandardSerialize(preserveNewline: boolean): string {
-    return _outputNode(this._node, preserveNewline);
+  private htmlStandardSerialize(
+    preserveNewline: boolean,
+    parseNoscriptContentAsText: boolean | null,
+  ): string {
+    return _outputNode(this._node, preserveNewline, parseNoscriptContentAsText === true);
   }
 
   get attributes(): Record<string, Attr> {
@@ -554,7 +561,11 @@ export class Node extends XmlNode {
   }
 
   toString(): string {
-    return this.htmlStandardSerialize(false);
+    return this.htmlStandardSerialize(
+      false,
+      (this.document as { parseNoscriptContentAsText?: boolean | null })
+        .parseNoscriptContentAsText ?? null,
+    );
   }
 }
 
@@ -630,8 +641,9 @@ const _UNESCAPED_TEXT_ELEMENTS = new Set([
   "noembed",
   "noframes",
   "plaintext",
-  "noscript",
 ]);
+
+const _NOSCRIPT_ELEMENT = new Set(["noscript"]);
 
 type _OutputNode = {
   nodeName: string;
@@ -691,11 +703,19 @@ function _outputAttrName(attr: Parse5Attr): string {
   return name;
 }
 
-function _outputNode(node: _OutputNode, preserveNewline: boolean): string {
+function _outputNode(
+  node: _OutputNode,
+  preserveNewline: boolean,
+  scriptingEnabled: boolean,
+): string {
   let out = "";
   switch (node.nodeName) {
     case "#text":
-      if (node.parentNode && _isOneOf(node.parentNode, _UNESCAPED_TEXT_ELEMENTS)) {
+      if (
+        node.parentNode &&
+        (_isOneOf(node.parentNode, _UNESCAPED_TEXT_ELEMENTS) ||
+          (scriptingEnabled && _isOneOf(node.parentNode, _NOSCRIPT_ELEMENT)))
+      ) {
         return node.value!;
       }
       return _outputEscapedString(node.value!, false);
@@ -707,7 +727,8 @@ function _outputNode(node: _OutputNode, preserveNewline: boolean): string {
       return `<!DOCTYPE ${node.name}>`;
     case "#document":
     case "#document-fragment":
-      for (const child of _children(node)) out += _outputNode(child, preserveNewline);
+      for (const child of _children(node))
+        out += _outputNode(child, preserveNewline, scriptingEnabled);
       return out;
     default:
       if (node.tagName === undefined) {
@@ -722,7 +743,8 @@ function _outputNode(node: _OutputNode, preserveNewline: boolean): string {
       out += ">";
       if (!_isOneOf(node, _OUTPUT_VOID_ELEMENTS)) {
         if (preserveNewline && _shouldPrependNewline(node)) out += "\n";
-        for (const child of _children(node)) out += _outputNode(child, preserveNewline);
+        for (const child of _children(node))
+          out += _outputNode(child, preserveNewline, scriptingEnabled);
         out += `</${node.tagName}>`;
       }
       return out;

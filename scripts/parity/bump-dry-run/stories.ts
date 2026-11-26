@@ -165,7 +165,12 @@ export function planStories(input: StoryInput): Story[] {
 }
 
 function list(title: string, items: readonly string[]): string[] {
-  return items.length === 0 ? [] : [`${title}:`, "", ...items.map((i) => `- \`${i}\``), ""];
+  const span = (i: string) =>
+    i
+      .split(" > ")
+      .map((seg) => seg.replace(/\s+/g, " ").trim())
+      .join(" > ");
+  return items.length === 0 ? [] : [`${title}:`, "", ...items.map((i) => `- \`${span(i)}\``), ""];
 }
 
 export function renderStory(input: StoryInput, s: Story, cluster: string): string {
