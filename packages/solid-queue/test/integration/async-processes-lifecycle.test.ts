@@ -13,7 +13,7 @@ import {
   SolidQueue,
   SolidQueueAdapter,
 } from "../../lib/index.js";
-import { Process as RbProcess } from "@blazetrails/ruby-compat";
+import { Process as RbProcess, SystemExit, getProcessAdapter } from "@blazetrails/ruby-compat";
 import { Record } from "../../lib/record.js";
 import { ExpectedTestError } from "../support/expected-test-error.js";
 import { waitForJobsToFinishFor } from "../support/jobs-test-helper.js";
@@ -141,9 +141,13 @@ describe("AsyncProcessesLifecycleTest", () => {
   afterEach(async () => {
     if (pid.isExists) await pid.terminate();
     vi.restoreAllMocks();
+    vi.spyOn(getProcessAdapter(), "exit").mockImplementation((code) => {
+      throw new SystemExit(code ?? 0);
+    });
   });
 
   afterAll(() => {
+    vi.restoreAllMocks();
     setPermanentConnectionCheckout(oldPermanentConnectionCheckout);
   });
 
