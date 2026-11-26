@@ -135,56 +135,58 @@ class WithoutExecutorIntegrationTest extends ActionControllerTestCaseIntegration
 registerSpecType(/^WithExecutorIntegrationTest$/, WithExecutorIntegrationTest);
 registerSpecType(/^WithoutExecutorIntegrationTest$/, WithoutExecutorIntegrationTest);
 
-describe("WithExecutorIntegrationTest", () => {
-  let t: WithExecutorIntegrationTest;
-  beforeEach(async ({ task }) => {
-    t = new WithExecutorIntegrationTest(task.name);
-    await t.setup();
-    await t.beforeSetup();
-  }, 120_000);
-  afterEach(() => t.teardownApp());
+describe("ActionControllerTestCaseIntegrationTest", () => {
+  describe("WithExecutorIntegrationTest", () => {
+    let t: WithExecutorIntegrationTest;
+    beforeEach(async ({ task }) => {
+      t = new WithExecutorIntegrationTest(task.name);
+      await t.setup();
+      await t.beforeSetup();
+    }, 120_000);
+    afterEach(() => t.teardownApp());
 
-  it("current customer is cleared after each request", { timeout: 120_000 }, async () => {
-    expect(Trails.application!.config.activeSupport.executorAroundTestCase).toBeTruthy();
-    expect(TestCase.executorAroundEachRequest).toBeTruthy();
+    it("current customer is cleared after each request", { timeout: 120_000 }, async () => {
+      expect(Trails.application!.config.activeSupport.executorAroundTestCase).toBeTruthy();
+      expect(TestCase.executorAroundEachRequest).toBeTruthy();
 
-    await t.get("getCurrentCustomer");
-    t.assertResponse(":ok");
-    expect(t.response.body).toMatch(/noone,UTC/);
+      await t.get("getCurrentCustomer");
+      t.assertResponse(":ok");
+      expect(t.response.body).toMatch(/noone,UTC/);
 
-    await t.get("setCurrentCustomer");
-    t.assertResponse(":ok");
-    expect(t.response.body).toMatch(/david,Copenhagen/);
+      await t.get("setCurrentCustomer");
+      t.assertResponse(":ok");
+      expect(t.response.body).toMatch(/david,Copenhagen/);
 
-    await t.get("getCurrentCustomer");
-    t.assertResponse(":ok");
-    expect(t.response.body).toMatch(/noone,UTC/);
+      await t.get("getCurrentCustomer");
+      t.assertResponse(":ok");
+      expect(t.response.body).toMatch(/noone,UTC/);
+    });
   });
-});
 
-describe("WithoutExecutorIntegrationTest", () => {
-  let t: WithoutExecutorIntegrationTest;
-  beforeEach(async ({ task }) => {
-    t = new WithoutExecutorIntegrationTest(task.name);
-    await t.setup();
-    await t.beforeSetup();
-  }, 120_000);
-  afterEach(() => t.teardownApp());
+  describe("WithoutExecutorIntegrationTest", () => {
+    let t: WithoutExecutorIntegrationTest;
+    beforeEach(async ({ task }) => {
+      t = new WithoutExecutorIntegrationTest(task.name);
+      await t.setup();
+      await t.beforeSetup();
+    }, 120_000);
+    afterEach(() => t.teardownApp());
 
-  it("current customer is not cleared after each request", { timeout: 120_000 }, async () => {
-    expect(Trails.application!.config.activeSupport.executorAroundTestCase).toBeFalsy();
-    expect(TestCase.executorAroundEachRequest).toBeFalsy();
+    it("current customer is not cleared after each request", { timeout: 120_000 }, async () => {
+      expect(Trails.application!.config.activeSupport.executorAroundTestCase).toBeFalsy();
+      expect(TestCase.executorAroundEachRequest).toBeFalsy();
 
-    await t.get("getCurrentCustomer");
-    t.assertResponse(":ok");
-    expect(t.response.body).toMatch(/noone,UTC/);
+      await t.get("getCurrentCustomer");
+      t.assertResponse(":ok");
+      expect(t.response.body).toMatch(/noone,UTC/);
 
-    await t.get("setCurrentCustomer");
-    t.assertResponse(":ok");
-    expect(t.response.body).toMatch(/david,Copenhagen/);
+      await t.get("setCurrentCustomer");
+      t.assertResponse(":ok");
+      expect(t.response.body).toMatch(/david,Copenhagen/);
 
-    await t.get("getCurrentCustomer");
-    t.assertResponse(":ok");
-    expect(t.response.body).toMatch(/david,Copenhagen/);
+      await t.get("getCurrentCustomer");
+      t.assertResponse(":ok");
+      expect(t.response.body).toMatch(/david,Copenhagen/);
+    });
   });
 });

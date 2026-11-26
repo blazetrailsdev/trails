@@ -27,132 +27,134 @@ function assertNotOperator(o1: string, operator: "in", o2: object): void {
   expect(o1 in o2, `Expected ${o1} to not be ${operator} ${String(o2)}`).toBe(false);
 }
 
-describe("LazyRouteSet", () => {
-  let routes: LazyRouteSet;
-  let reload: ReturnType<typeof vi.fn>;
+describe("Engine", () => {
+  describe("LazyRouteSetTest", () => {
+    let routes: LazyRouteSet;
+    let reload: ReturnType<typeof vi.fn>;
 
-  beforeEach(() => {
-    routes = new LazyRouteSet();
-    reload = vi.fn((): boolean | null => true);
-    Trails.application = { reloadRoutesUnlessLoaded: reload } as never;
-    constSet(TopLevel, "PostsController", StubController);
-  });
-
-  afterEach(() => {
-    Trails.application = null;
-    vi.restoreAllMocks();
-  });
-
-  it("reloads routes when draw is called", () => {
-    routes.draw(function () {});
-    expect(reload).toHaveBeenCalledTimes(1);
-  });
-
-  it("reloads routes when recognize_path is called", () => {
-    routes.draw(function () {
-      this.get("/posts", { to: "posts#index" });
+    beforeEach(() => {
+      routes = new LazyRouteSet();
+      reload = vi.fn((): boolean | null => true);
+      Trails.application = { reloadRoutesUnlessLoaded: reload } as never;
+      constSet(TopLevel, "PostsController", StubController);
     });
-    expect(routes.recognizePath("/posts")).toEqual({ controller: "posts", action: "index" });
-  });
 
-  it("reloads routes when recognize_path_with_request is called", () => {
-    routes.draw(function () {
-      this.get("/posts", { to: "posts#index" });
+    afterEach(() => {
+      Trails.application = null;
+      vi.restoreAllMocks();
     });
-    const path = "/posts";
-    const req = routes.makeRequest(MockRequest.envFor(path));
 
-    expect(routes.recognizePathWithRequest(req, path, {})).toEqual({
-      controller: "posts",
-      action: "index",
+    it("reloads routes when draw is called", () => {
+      routes.draw(function () {});
+      expect(reload).toHaveBeenCalledTimes(1);
     });
-  });
 
-  it("reloads routes when generate_extras is called", () => {
-    routes.draw(function () {
-      this.get("/posts", { to: "posts#index", as: "posts" });
-    });
-    reload.mockClear();
-    routes.generateExtras({ useRoute: "posts" });
-    expect(reload).toHaveBeenCalledTimes(1);
-  });
-
-  it("reloads routes when call is invoked", async () => {
-    const superCall = vi
-      .spyOn(RouteSet.prototype, "call")
-      .mockResolvedValue([200, {}, []] as never);
-    reload.mockClear();
-    await routes.call({ REQUEST_METHOD: "GET", PATH_INFO: "/" });
-    expect(reload).toHaveBeenCalledTimes(1);
-    expect(superCall).toHaveBeenCalledTimes(1);
-  });
-
-  it("reloads routes when url helpers are invoked", () => {
-    const mod = routes.generateUrlHelpers(true) as unknown as {
-      urlFor: (o: Record<string, unknown>) => string;
-    };
-    expect(() => mod.urlFor({ host: "example.com" })).toThrow();
-    expect(reload).toHaveBeenCalled();
-  });
-
-  it("tolerates a missing application", () => {
-    Trails.application = null;
-    expect(() => routes.draw(function () {})).not.toThrow();
-  });
-
-  function loadRoutesLazily(): void {
-    let loaded = false;
-    reload.mockImplementation(() => {
-      if (loaded) return null;
-      loaded = true;
+    it("reloads routes when recognize_path is called", () => {
       routes.draw(function () {
-        this.root({ to: () => [200, {}, []] });
-        this.resources("products");
+        this.get("/posts", { to: "posts#index" });
       });
-      return true;
+      expect(routes.recognizePath("/posts")).toEqual({ controller: "posts", action: "index" });
     });
-  }
 
-  it("app lazily loads routes when invoking url helpers", () => {
-    loadRoutesLazily();
-    const appUrlHelpers = routes.urlHelpers() as unknown as { rootPath(): string };
+    it("reloads routes when recognize_path_with_request is called", () => {
+      routes.draw(function () {
+        this.get("/posts", { to: "posts#index" });
+      });
+      const path = "/posts";
+      const req = routes.makeRequest(MockRequest.envFor(path));
 
-    assertNotOperator("rootPath", "in", appUrlHelpers);
-    expect(appUrlHelpers.rootPath()).toBe("/");
-  });
+      expect(routes.recognizePathWithRequest(req, path, {})).toEqual({
+        controller: "posts",
+        action: "index",
+      });
+    });
 
-  it("app lazily loads routes when checking respond_to?", () => {
-    loadRoutesLazily();
-    const appUrlHelpers = routes.urlHelpers();
+    it("reloads routes when generate_extras is called", () => {
+      routes.draw(function () {
+        this.get("/posts", { to: "posts#index", as: "posts" });
+      });
+      reload.mockClear();
+      routes.generateExtras({ useRoute: "posts" });
+      expect(reload).toHaveBeenCalledTimes(1);
+    });
 
-    assertNotOperator("rootPath", "in", appUrlHelpers);
-    assertOperator(appUrlHelpers, "respond_to?", "rootPath");
-  });
+    it("reloads routes when call is invoked", async () => {
+      const superCall = vi
+        .spyOn(RouteSet.prototype, "call")
+        .mockResolvedValue([200, {}, []] as never);
+      reload.mockClear();
+      await routes.call({ REQUEST_METHOD: "GET", PATH_INFO: "/" });
+      expect(reload).toHaveBeenCalledTimes(1);
+      expect(superCall).toHaveBeenCalledTimes(1);
+    });
 
-  it("app lazily loads routes when making a request", async () => {
-    loadRoutesLazily();
-    const appUrlHelpers = routes.urlHelpers();
+    it("reloads routes when url helpers are invoked", () => {
+      const mod = routes.generateUrlHelpers(true) as unknown as {
+        urlFor: (o: Record<string, unknown>) => string;
+      };
+      expect(() => mod.urlFor({ host: "example.com" })).toThrow();
+      expect(reload).toHaveBeenCalled();
+    });
 
-    assertNotOperator("rootPath", "in", appUrlHelpers);
-    const response = await routes.call(MockRequest.envFor("/"));
-    expect(response[0]).toBe(200);
-  });
+    it("tolerates a missing application", () => {
+      Trails.application = null;
+      expect(() => routes.draw(function () {})).not.toThrow();
+    });
 
-  it("app lazily loads routes when url_for is used", () => {
-    loadRoutesLazily();
-    const appUrlHelpers = routes.urlHelpers() as unknown as {
-      urlFor(o: Record<string, unknown>): string;
-    };
+    function loadRoutesLazily(): void {
+      let loaded = false;
+      reload.mockImplementation(() => {
+        if (loaded) return null;
+        loaded = true;
+        routes.draw(function () {
+          this.root({ to: () => [200, {}, []] });
+          this.resources("products");
+        });
+        return true;
+      });
+    }
 
-    assertNotOperator("productsPath", "in", appUrlHelpers);
-    expect(appUrlHelpers.urlFor({ controller: "products", action: "index", onlyPath: true })).toBe(
-      "/products",
-    );
-    assertOperator("productsPath", "in", appUrlHelpers);
-  });
+    it("app lazily loads routes when invoking url helpers", () => {
+      loadRoutesLazily();
+      const appUrlHelpers = routes.urlHelpers() as unknown as { rootPath(): string };
 
-  it("new_with_config builds an instance of the receiving subclass", () => {
-    expect(LazyRouteSet.newWithConfig({})).toBeInstanceOf(LazyRouteSet);
-    expect(RouteSet.newWithConfig({})).not.toBeInstanceOf(LazyRouteSet);
+      assertNotOperator("rootPath", "in", appUrlHelpers);
+      expect(appUrlHelpers.rootPath()).toBe("/");
+    });
+
+    it("app lazily loads routes when checking respond_to?", () => {
+      loadRoutesLazily();
+      const appUrlHelpers = routes.urlHelpers();
+
+      assertNotOperator("rootPath", "in", appUrlHelpers);
+      assertOperator(appUrlHelpers, "respond_to?", "rootPath");
+    });
+
+    it("app lazily loads routes when making a request", async () => {
+      loadRoutesLazily();
+      const appUrlHelpers = routes.urlHelpers();
+
+      assertNotOperator("rootPath", "in", appUrlHelpers);
+      const response = await routes.call(MockRequest.envFor("/"));
+      expect(response[0]).toBe(200);
+    });
+
+    it("app lazily loads routes when url_for is used", () => {
+      loadRoutesLazily();
+      const appUrlHelpers = routes.urlHelpers() as unknown as {
+        urlFor(o: Record<string, unknown>): string;
+      };
+
+      assertNotOperator("productsPath", "in", appUrlHelpers);
+      expect(
+        appUrlHelpers.urlFor({ controller: "products", action: "index", onlyPath: true }),
+      ).toBe("/products");
+      assertOperator("productsPath", "in", appUrlHelpers);
+    });
+
+    it("new_with_config builds an instance of the receiving subclass", () => {
+      expect(LazyRouteSet.newWithConfig({})).toBeInstanceOf(LazyRouteSet);
+      expect(RouteSet.newWithConfig({})).not.toBeInstanceOf(LazyRouteSet);
+    });
   });
 });

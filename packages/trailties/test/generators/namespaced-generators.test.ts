@@ -135,7 +135,7 @@ describe("NamespacedControllerGeneratorTest", () => {
     await t.assertFile("app/views/test-app/account");
   });
 
-  it.skip("namespaced controller dont indent blank lines", async () => {
+  it("namespaced controller dont indent blank lines", async () => {
     await t.runGenerator();
     await t.assertFile("app/controllers/test_app/account-controller.ts", (content: string) => {
       for (const line of content.split("\n")) {
@@ -377,7 +377,7 @@ describe("NamespacedScaffoldGeneratorTest", () => {
     await t.assertFile("app/helpers/test_app/admin/roles-helper.ts");
   });
 
-  it.skip("scaffold with namespace on revoke", async () => {
+  it("scaffold with namespace on revoke", async () => {
     await t.runGenerator(["admin/role", "name:string", "description:string"]);
     await t.runGenerator(["admin/role"], { behavior: "revoke" });
 
@@ -392,6 +392,7 @@ describe("NamespacedScaffoldGeneratorTest", () => {
     t.assertNoFile("app/controllers/test_app/admin/roles-controller.ts");
     t.assertNoFile("test/controllers/test_app/admin/roles-controller.test.ts");
     t.assertNoFile("app/views/test-app/admin/roles");
+    t.assertNoFile("app/views/layouts/test-app/admin/roles.html.tse");
     t.assertNoFile("app/helpers/test_app/admin/roles-helper.ts");
   });
 
@@ -436,7 +437,7 @@ describe("NamespacedScaffoldGeneratorTest", () => {
     await t.assertFile("app/helpers/test_app/admin/user/special/roles-helper.ts");
   });
 
-  it.skip("scaffold with nested namespace on revoke", async () => {
+  it("scaffold with nested namespace on revoke", async () => {
     await t.runGenerator(["admin/user/special/role", "name:string", "description:string"]);
     await t.runGenerator(["admin/user/special/role"], { behavior: "revoke" });
 

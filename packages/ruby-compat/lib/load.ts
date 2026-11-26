@@ -66,9 +66,9 @@ export function isCompiledFile(fname: string): boolean {
  * @noRailsEquivalent PERMANENT
  */
 export function resolveTsThenJs(fname: string): string {
-  if (!fname.endsWith(".ts") || isCompiledFile(fname) || File.isExist(fname)) return fname;
+  if (!fname.endsWith(".ts") || File.isExist(fname)) return fname;
   const js = `${fname.slice(0, -3)}.js`;
-  return isCompiledFile(js) || File.isExist(js) ? js : fname;
+  return File.isExist(js) ? js : fname;
 }
 
 /**
