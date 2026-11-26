@@ -145,6 +145,7 @@ export class Trailtie extends BaseTrailtie {
       const options = app.config.actionMailer;
 
       if (options.showPreviews) {
+        /** @inventedArm loadPath — PERMANENT */
         await Trails.loadPath["trails/mailers_controller"]();
         app.routes().prepend(function () {
           this.get("/trails/mailers", { to: "trails/mailers#index", internal: true });
