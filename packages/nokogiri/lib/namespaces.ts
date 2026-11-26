@@ -104,7 +104,8 @@ export type LibXml2 = typeof import("libxml2-wasm") & {
     | "xmlSaveSetIndentString"
     | "xmlSaveTree"
     | "xmlSaveClose"
-  >;
+    | "xmlNewDoc"
+  > & { createNode(nodePtr: number): import("libxml2-wasm").XmlNode };
 
 const loadPath: Record<string, () => Promise<unknown>> = {
   "nokogiri/extension": () => import("./extension.js"),

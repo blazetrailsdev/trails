@@ -12,12 +12,11 @@ import { type Readable, readSource } from "../readable.js";
 import { SyntaxError } from "./syntax-error.js";
 import { XPathVisitor } from "../css/xpath-visitor.js";
 
-export class XmlDocument {
+export class XmlDocument extends XmlNode {
   declare css: (...args: unknown[]) => NodeSet;
   declare atCss: (...args: unknown[]) => XmlNode | undefined;
   declare xpath: (...args: unknown[]) => NodeSet;
   declare atXpath: (...args: unknown[]) => XmlNode | undefined;
-  declare isXml: () => boolean;
 
   static readonly IMPLIED_XPATH_CONTEXTS = ["//"] as const;
 
@@ -34,7 +33,14 @@ export class XmlDocument {
   encoding: string | null = null;
   private _root: XmlNode | null = null;
 
-  constructor(private _doc: LibXmlDocument | null = Nokogiri.LibXml2!.XmlDocument.create()) {}
+  private _doc: LibXmlDocument | null;
+
+  /** @missingRailsArgs xmlNewDoc — CONVERGEABLE nokogiri-xml-document-new-version-and-wrap */
+  constructor(cDocument: number = Nokogiri.LibXml2!.xmlNewDoc()) {
+    super(Nokogiri.LibXml2!.createNode(cDocument));
+    this._doc = Nokogiri.LibXml2!.XmlDocument.getInstance(cDocument);
+    this.document = this;
+  }
 
   static parse(
     stringOrIo: string | Readable | Pathname | null,
@@ -134,7 +140,7 @@ export class XmlDocument {
       }
     }
 
-    const document = new XmlDocument(libxml.XmlDocument.getInstance(cDocument));
+    const document = new XmlDocument(cDocument);
     document._root = new XmlNode(document._doc!.root, document);
     document.url = url;
     document.errors = rbErrors;
@@ -164,26 +170,8 @@ export class XmlDocument {
     }
   }
 
-  get document(): XmlDocument {
-    return this;
-  }
-
-  /**
-   * @internal
-   * @noRailsEquivalent PERMANENT
-   */
-  get _node(): LibXmlDocument | null {
-    return this._doc;
-  }
-
   get root(): XmlNode | null {
     return this._root;
-  }
-
-  get type(): number {
-    return Nokogiri.LibXml2!.XmlTreeCommonStruct.type(
-      (this._doc as unknown as { _ptr: number })._ptr,
-    );
   }
 
   fragment(tags: string | null = null): DocumentFragment {
@@ -206,5 +194,4 @@ export class XmlDocument {
 }
 
 include(XmlDocument, Searchable);
-XmlDocument.prototype.isXml = XmlNode.prototype.isXml;
 XML.Document = XmlDocument;

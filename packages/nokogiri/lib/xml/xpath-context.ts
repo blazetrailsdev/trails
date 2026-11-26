@@ -3,7 +3,6 @@ import type {
   XmlDocument as LibXmlDocument,
   XmlElement as LibXmlElement,
   XmlNode,
-  XmlTreeNode,
 } from "libxml2-wasm";
 import {
   RuntimeError,
@@ -410,10 +409,8 @@ export class XPathContext {
 
   private static unwrap(node: ContextHost): [Tree<XPathNode>, XPathNode] {
     const host = node._node;
-    if (host instanceof Nokogiri.LibXml2!.XmlDocument) {
-      return [LIBXML_TREE, libXmlRoot(host)];
-    }
     if (host instanceof Nokogiri.LibXml2!.XmlTreeNode) return [LIBXML_TREE, host];
+    if (host instanceof Nokogiri.LibXml2!.XmlNode) return [LIBXML_TREE, libXmlRoot(host.doc)];
     return [PARSE5_TREE, host as Parse5Node];
   }
 
@@ -430,7 +427,7 @@ export class XPathContext {
       return new Attr(node, this._document) as unknown as Node;
     }
     if (node instanceof Nokogiri.LibXml2!.XmlNode)
-      return new XMLNode(node as XmlTreeNode, this._document) as unknown as Node;
+      return new XMLNode(node, this._document) as unknown as Node;
     if (this._tree.kind(node) === "root") return this._document as Node;
     return new Node(node as DefaultTreeAdapterMap["childNode"], this._document);
   }

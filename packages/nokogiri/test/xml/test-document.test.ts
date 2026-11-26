@@ -1,6 +1,7 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { Dir, Pathname } from "@blazetrails/ruby-compat";
 import { XmlDocument } from "../../lib/xml/document.js";
+import { XmlNode } from "../../lib/xml/node.js";
 import { ParseOptions } from "../../lib/xml/parse-options.js";
 
 describe("Nokogiri::XML::Document", () => {
@@ -188,5 +189,15 @@ describe("Nokogiri::XML::Document Pathname", () => {
     } finally {
       await path.delete();
     }
+  });
+});
+
+describe("Nokogiri::XML::Document < Node (trails)", () => {
+  it("inherits type and xml? from XML::Node", () => {
+    const doc = new XmlDocument();
+    expect(doc).toBeInstanceOf(XmlNode);
+    expect(doc.type).toBe(XmlNode.DOCUMENT_NODE);
+    expect(doc.isXml()).toBe(true);
+    doc.dispose();
   });
 });
