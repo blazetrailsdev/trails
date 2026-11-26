@@ -1,8 +1,6 @@
 import "../constants.devcontainer.generated.js";
 import { chomp } from "@blazetrails/activesupport";
-import { File } from "@blazetrails/ruby-compat/file";
-import { constDefined } from "@blazetrails/ruby-compat/include";
-import { TopLevel } from "@blazetrails/ruby-compat/object";
+import { File, TopLevel, constDefined } from "@blazetrails/ruby-compat";
 import type { ThorClass } from "@blazetrails/thor";
 import { Base } from "../command/base.js";
 import { DevcontainerGenerator } from "../generators/trails/devcontainer/devcontainer-generator.js";

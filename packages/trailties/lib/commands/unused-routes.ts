@@ -13,11 +13,9 @@ import {
   tryCall,
   underscore,
 } from "@blazetrails/activesupport";
-import { toA } from "@blazetrails/ruby-compat/array";
-import { getPath } from "@blazetrails/ruby-compat/fs-adapter";
-import { publicInstanceMethods } from "@blazetrails/ruby-compat/include";
+import { getPath, publicInstanceMethods, toA } from "@blazetrails/ruby-compat";
 import { glob } from "@blazetrails/activesupport/glob";
-import { exit } from "@blazetrails/ruby-compat/process-adapter";
+import { exit } from "@blazetrails/ruby-compat";
 import type { ThorClass } from "@blazetrails/thor";
 import { Base } from "../command/base.js";
 import { Trails } from "../trails.js";

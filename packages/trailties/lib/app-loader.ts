@@ -1,8 +1,4 @@
-import { Dir } from "@blazetrails/ruby-compat/dir";
-import { File } from "@blazetrails/ruby-compat/file";
-import { Gem } from "@blazetrails/ruby-compat/gem";
-import { Pathname } from "@blazetrails/ruby-compat/pathname";
-import { exec, rbArgv } from "@blazetrails/ruby-compat/process-adapter";
+import { Dir, File, Gem, Pathname, exec, rbArgv } from "@blazetrails/ruby-compat";
 
 /** @internal */
 export const AppLoader = {

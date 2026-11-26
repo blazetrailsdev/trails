@@ -1,6 +1,4 @@
-import { Dir } from "@blazetrails/ruby-compat/dir";
-import { getFs, getPath } from "@blazetrails/ruby-compat/fs-adapter";
-import { argv } from "@blazetrails/ruby-compat/process-adapter";
+import { Dir, argv, getFs, getPath } from "@blazetrails/ruby-compat";
 import { setAppPath } from "../app-path.js";
 import { serve, type ServeOptions } from "./boot.js";
 

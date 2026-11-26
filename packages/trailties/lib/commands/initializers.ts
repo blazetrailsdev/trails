@@ -1,7 +1,6 @@
 import "../constants.initializers.generated.js";
 import { isPresent } from "@blazetrails/activesupport";
-import { include, type Included } from "@blazetrails/ruby-compat/include";
-import { rbModName } from "@blazetrails/ruby-compat/object";
+import { include, rbModName, type Included } from "@blazetrails/ruby-compat";
 import type { ThorClass } from "@blazetrails/thor";
 import type { ThorOptions } from "@blazetrails/thor/core-ext/hash-with-indifferent-access";
 import { Trails } from "../trails.js";

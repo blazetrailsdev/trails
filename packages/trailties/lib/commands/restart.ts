@@ -1,5 +1,5 @@
 import "../constants.restart.generated.js";
-import { FileUtils } from "@blazetrails/ruby-compat/file-utils";
+import { FileUtils } from "@blazetrails/ruby-compat";
 import type { ThorClass } from "@blazetrails/thor";
 import { applicationRoot } from "../command.js";
 import { Base } from "../command/base.js";

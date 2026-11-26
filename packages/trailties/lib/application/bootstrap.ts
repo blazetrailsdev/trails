@@ -12,14 +12,16 @@ import {
   TopLevel,
 } from "@blazetrails/activesupport";
 import { Runtime } from "@blazetrails/rack";
-import { File } from "@blazetrails/ruby-compat/file";
-import { include } from "@blazetrails/ruby-compat/include";
-import { STDERR } from "@blazetrails/ruby-compat/io";
-import { LoadError } from "@blazetrails/ruby-compat/load-error";
-import { rbObjRespondTo } from "@blazetrails/ruby-compat/object";
-import type { Pathname } from "@blazetrails/ruby-compat/pathname";
-import { StandardError } from "@blazetrails/ruby-compat/standard-error";
-import { constGet } from "@blazetrails/ruby-compat/variable";
+import {
+  File,
+  LoadError,
+  constGet,
+  include,
+  rbObjRespondTo,
+  StandardError,
+  STDERR,
+  type Pathname,
+} from "@blazetrails/ruby-compat";
 import type { Autoloaders } from "../autoloaders.js";
 import { Initializable, type InitializableClass } from "../initializable.js";
 import { _registerAutoloaded } from "./finisher.js";

@@ -1,9 +1,13 @@
 import "../../constants.app-update-command.generated.js";
-import { File } from "@blazetrails/ruby-compat/file";
-import { constDefined, include } from "@blazetrails/ruby-compat/include";
-import { TopLevel, rbModName } from "@blazetrails/ruby-compat/object";
-import { Pathname } from "@blazetrails/ruby-compat/pathname";
-import { chomp } from "@blazetrails/ruby-compat/string/chomp";
+import {
+  File,
+  TopLevel,
+  constDefined,
+  include,
+  Pathname,
+  rbModName,
+  chomp,
+} from "@blazetrails/ruby-compat";
 import { underscore } from "@blazetrails/activesupport";
 import type { ThorClass } from "@blazetrails/thor";
 import * as ThorActions from "@blazetrails/thor/actions";

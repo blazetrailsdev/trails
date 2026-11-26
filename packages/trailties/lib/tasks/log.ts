@@ -1,8 +1,6 @@
 import { getEnv } from "@blazetrails/activesupport";
 import { DSL, FileList } from "@blazetrails/rake";
-import { Dir } from "@blazetrails/ruby-compat/dir";
-import { File } from "@blazetrails/ruby-compat/file";
-import { block } from "@blazetrails/ruby-compat/hash";
+import { Dir, File, block } from "@blazetrails/ruby-compat";
 
 DSL.namespace("log", () => {
   DSL.desc(

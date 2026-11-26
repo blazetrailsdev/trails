@@ -1,5 +1,5 @@
 import "../../../constants.active-record-migration-migration-generator.generated.js";
-import { File } from "@blazetrails/ruby-compat/file";
+import { File } from "@blazetrails/ruby-compat";
 import { IllegalMigrationNameError } from "@blazetrails/activerecord/migration";
 import type { GeneratorOptions } from "../../base.js";
 import { Base } from "../../active-record.js";

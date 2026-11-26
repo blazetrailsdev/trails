@@ -1,5 +1,5 @@
 import "../../../constants.test-unit-controller-controller-generator.generated.js";
-import { File } from "@blazetrails/ruby-compat/file";
+import { File } from "@blazetrails/ruby-compat";
 import { dasherize } from "../../base.js";
 import { Base } from "../../test-unit.js";
 

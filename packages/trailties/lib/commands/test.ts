@@ -1,7 +1,5 @@
 import "../constants.test.generated.js";
-import { rbFSystem } from "@blazetrails/ruby-compat/kernel-system";
-import { LOAD_PATH } from "@blazetrails/ruby-compat/load";
-import { LoadError } from "@blazetrails/ruby-compat/load-error";
+import { LOAD_PATH, LoadError, rbFSystem } from "@blazetrails/ruby-compat";
 import type { ThorClass } from "@blazetrails/thor";
 import { Base } from "../command/base.js";
 import { UnrecognizedCommandError, root } from "../command.js";

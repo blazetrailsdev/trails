@@ -1,7 +1,4 @@
-import { Dir } from "@blazetrails/ruby-compat/dir";
-import { File } from "@blazetrails/ruby-compat/file";
-import { defineModule, included } from "@blazetrails/ruby-compat/include";
-import { setEnv } from "@blazetrails/ruby-compat/process-adapter";
+import { Dir, File, defineModule, included, setEnv } from "@blazetrails/ruby-compat";
 import { requireApplicationBang } from "./actions.js";
 import type { ThorClass } from "@blazetrails/thor";
 import type { Base } from "./base.js";

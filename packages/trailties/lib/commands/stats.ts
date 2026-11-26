@@ -1,5 +1,5 @@
 import "../constants.stats.generated.js";
-import { File } from "@blazetrails/ruby-compat/file";
+import { File } from "@blazetrails/ruby-compat";
 import type { ThorClass } from "@blazetrails/thor";
 import { CodeStatistics, type DirectoryPair } from "../code-statistics.js";
 import { Base } from "../command/base.js";

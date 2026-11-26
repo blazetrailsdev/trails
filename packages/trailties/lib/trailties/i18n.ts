@@ -1,9 +1,5 @@
 import { I18n, OrderedOptions, isPlainObject, wrap } from "@blazetrails/activesupport";
-import { File } from "@blazetrails/ruby-compat/file";
-import { include } from "@blazetrails/ruby-compat/include";
-import { NoMethodError } from "@blazetrails/ruby-compat/no-method-error";
-import { rbInspect } from "@blazetrails/ruby-compat/object";
-import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
+import { File, include, NoMethodError, rbInspect, RuntimeError } from "@blazetrails/ruby-compat";
 import { TranslationHelper } from "@blazetrails/actionview/helpers/translation-helper";
 import { Translation } from "@blazetrails/activemodel";
 import { onLoad, type FileUpdateChecker, type Reloader } from "@blazetrails/activesupport";

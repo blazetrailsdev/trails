@@ -1,14 +1,15 @@
 import "../constants.migration.generated.js";
-import { NotImplementedError } from "@blazetrails/ruby-compat/not-implemented-error";
-import { toS } from "@blazetrails/ruby-compat/object";
+import { NotImplementedError, toS } from "@blazetrails/ruby-compat";
 import { camelize } from "@blazetrails/activesupport";
-import { Dir } from "@blazetrails/ruby-compat/dir";
-import { File } from "@blazetrails/ruby-compat/file";
-import { rbModAttrReader } from "@blazetrails/ruby-compat/object";
-import { strNew } from "@blazetrails/ruby-compat/string/bytes";
-import { rbStrToI } from "@blazetrails/ruby-compat/string/convert";
-import { TSE } from "@blazetrails/ruby-compat/tse";
-import { rbFBinding } from "@blazetrails/ruby-compat/variable";
+import {
+  Dir,
+  File,
+  rbFBinding,
+  rbModAttrReader,
+  rbStrToI,
+  strNew,
+  TSE,
+} from "@blazetrails/ruby-compat";
 import {
   CreateMigration,
   type CreateMigrationConfig,

@@ -1,10 +1,14 @@
 import "../../constants.testing-behavior.generated.js";
-import { Dir } from "@blazetrails/ruby-compat/dir";
-import { File } from "@blazetrails/ruby-compat/file";
-import type { FileUtils } from "@blazetrails/ruby-compat/file-utils";
-import { extend, include, included } from "@blazetrails/ruby-compat/include";
-import { env } from "@blazetrails/ruby-compat/process-adapter";
-import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
+import {
+  Dir,
+  File,
+  RuntimeError,
+  env,
+  extend,
+  include,
+  included,
+  type FileUtils,
+} from "@blazetrails/ruby-compat";
 import { classAttribute } from "@blazetrails/activesupport";
 import { Stream, capture } from "@blazetrails/activesupport/testing/stream";
 import type { Base, GeneratorConfig } from "../base.js";

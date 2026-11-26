@@ -1,10 +1,5 @@
 import { DSL, Rake } from "@blazetrails/rake";
-import { Dir } from "@blazetrails/ruby-compat/dir";
-import { File } from "@blazetrails/ruby-compat/file";
-import { block } from "@blazetrails/ruby-compat/hash";
-import { rbFLoad } from "@blazetrails/ruby-compat/load";
-import { TopLevel } from "@blazetrails/ruby-compat/object";
-import { Pathname } from "@blazetrails/ruby-compat/pathname";
+import { Dir, File, Pathname, TopLevel, block, rbFLoad } from "@blazetrails/ruby-compat";
 import { ENGINE_ROOT, setEngineRoot } from "../app-path.js";
 import { Updater } from "../engine/updater.js";
 import { Engine } from "../engine.js";

@@ -1,7 +1,7 @@
 import "./constants.application-controller.generated.js";
 import { ActionController } from "@blazetrails/actionpack";
 import { TopLevel, htmlSafe } from "@blazetrails/activesupport";
-import { File } from "@blazetrails/ruby-compat/file";
+import { File } from "@blazetrails/ruby-compat";
 
 export class ApplicationController extends ActionController.Base {
   static {

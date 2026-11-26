@@ -1,7 +1,6 @@
 import "../../../constants.trails-authentication-authentication-generator.generated.js";
 import { TopLevel } from "@blazetrails/activesupport";
-import { File } from "@blazetrails/ruby-compat/file";
-import { include, type Included } from "@blazetrails/ruby-compat/include";
+import { File, include, type Included } from "@blazetrails/ruby-compat";
 import { Base, type GeneratorOptions, type GeneratorConfig } from "../../base.js";
 import type { GeneratorClass } from "../../../generators.js";
 import { BundleHelper } from "../../bundle-helper.js";

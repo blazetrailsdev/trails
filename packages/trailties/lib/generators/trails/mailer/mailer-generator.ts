@@ -1,5 +1,5 @@
 import "../../../constants.trails-mailer-mailer-generator.generated.js";
-import { File } from "@blazetrails/ruby-compat/file";
+import { File } from "@blazetrails/ruby-compat";
 import { dasherize } from "../../base.js";
 import { NamedBase } from "../../named-base.js";
 

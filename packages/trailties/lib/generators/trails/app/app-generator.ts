@@ -1,11 +1,15 @@
 import "../../../constants.trails-app-app-generator.generated.js";
 import type { ThorClass } from "@blazetrails/thor";
-import { File } from "@blazetrails/ruby-compat/file";
-import { included } from "@blazetrails/ruby-compat/include";
-import { STDOUT } from "@blazetrails/ruby-compat/io";
-import { env, exit, rbArgv } from "@blazetrails/ruby-compat/process-adapter";
-import { rbRegSUnion } from "@blazetrails/ruby-compat/regexp";
-import { stringSplit } from "@blazetrails/ruby-compat/string/split";
+import {
+  File,
+  STDOUT,
+  env,
+  exit,
+  included,
+  rbArgv,
+  rbRegSUnion,
+  stringSplit,
+} from "@blazetrails/ruby-compat";
 import { presence } from "@blazetrails/activesupport";
 import { TopLevel } from "@blazetrails/activesupport";
 import { AppBase, CSS_OPTIONS, JAVASCRIPT_OPTIONS, type AppBaseOptions } from "../../app-base.js";

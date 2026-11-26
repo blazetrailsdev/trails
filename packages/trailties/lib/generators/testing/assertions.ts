@@ -6,8 +6,7 @@ import {
   assertNil,
   assertNothingRaised,
 } from "@blazetrails/activesupport/testing/assertions";
-import { File } from "@blazetrails/ruby-compat/file";
-import { rbInspect } from "@blazetrails/ruby-compat/object";
+import { File, rbInspect } from "@blazetrails/ruby-compat";
 import { createGeneratedAttribute, migrationFileName, type BehaviorHost } from "./behavior.js";
 
 export type AssertionsHost = BehaviorHost;

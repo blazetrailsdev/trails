@@ -1,8 +1,13 @@
 import "../constants.console.generated.js";
 import { isPresent } from "@blazetrails/activesupport";
-import { include, rbClassNewInstance, type Included } from "@blazetrails/ruby-compat/include";
-import { STDOUT } from "@blazetrails/ruby-compat/io";
-import { exit, rbArgv } from "@blazetrails/ruby-compat/process-adapter";
+import {
+  STDOUT,
+  exit,
+  include,
+  rbArgv,
+  rbClassNewInstance,
+  type Included,
+} from "@blazetrails/ruby-compat";
 import type { ThorClass } from "@blazetrails/thor";
 import type { ThorOptions } from "@blazetrails/thor/core-ext/hash-with-indifferent-access";
 import { environment } from "../command.js";

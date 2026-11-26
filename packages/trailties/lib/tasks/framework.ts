@@ -1,8 +1,6 @@
 import { getEnv, isBlank } from "@blazetrails/activesupport";
 import { DSL, main } from "@blazetrails/rake";
-import { File } from "@blazetrails/ruby-compat/file";
-import { block } from "@blazetrails/ruby-compat/hash";
-import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
+import { File, RuntimeError, block } from "@blazetrails/ruby-compat";
 import { Trails } from "../trails.js";
 
 DSL.namespace("app", () => {

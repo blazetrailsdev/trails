@@ -9,8 +9,7 @@ import {
 } from "@blazetrails/activesupport";
 
 import { ActiveRecord } from "@blazetrails/activerecord";
-import { rbClearMethodCache } from "@blazetrails/ruby-compat/include";
-import { rbObjRespondTo, rbModName, TopLevel } from "@blazetrails/ruby-compat/object";
+import { rbObjRespondTo, rbClearMethodCache, rbModName, TopLevel } from "@blazetrails/ruby-compat";
 import { Base as GeneratorBase, type GeneratorConfig } from "./base.js";
 import { Generators } from "../generators.js";
 import { GeneratedAttribute } from "./generated-attribute.js";

@@ -1,7 +1,6 @@
 import { getEnv, presence } from "@blazetrails/activesupport";
-import { getPath } from "@blazetrails/ruby-compat/fs-adapter";
-import { setEnv } from "@blazetrails/ruby-compat/process-adapter";
-import type { HttpServer } from "@blazetrails/ruby-compat/http-adapter";
+import { getPath, setEnv } from "@blazetrails/ruby-compat";
+import type { HttpServer } from "@blazetrails/ruby-compat";
 import { Handler } from "@blazetrails/rackup";
 import { APP_PATH } from "../app-path.js";
 import { Trails } from "../trails.js";

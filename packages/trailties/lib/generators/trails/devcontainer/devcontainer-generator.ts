@@ -1,5 +1,5 @@
 import "../../../constants.trails-devcontainer-devcontainer-generator.generated.js";
-import { File } from "@blazetrails/ruby-compat/file";
+import { File } from "@blazetrails/ruby-compat";
 import { toYaml } from "@blazetrails/ruby-compat/yaml";
 import { Base, type GeneratorOptions, type GeneratorConfig } from "../../base.js";
 import { Database, DATABASES, type DatabaseName } from "../../database.js";

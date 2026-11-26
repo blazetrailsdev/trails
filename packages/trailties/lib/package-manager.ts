@@ -1,5 +1,4 @@
-import { getChildProcess } from "@blazetrails/ruby-compat/child-process-adapter";
-import { File } from "@blazetrails/ruby-compat/file";
+import { getChildProcess, File } from "@blazetrails/ruby-compat";
 
 export interface PackageManagerAdapter {
   name: string;

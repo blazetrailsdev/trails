@@ -1,11 +1,6 @@
 import "../../constants.console-tsrepl-console.generated.js";
 import { ActionController, ActionDispatch } from "@blazetrails/actionpack";
-import { extend } from "@blazetrails/ruby-compat/include";
-import { STDOUT } from "@blazetrails/ruby-compat/io";
-import { TopLevel } from "@blazetrails/ruby-compat/object";
-import { env as ENV } from "@blazetrails/ruby-compat/process-adapter";
-import { TSREPL } from "@blazetrails/ruby-compat/repl-adapter";
-import { constGet } from "@blazetrails/ruby-compat/variable";
+import { TSREPL, STDOUT, TopLevel, constGet, env as ENV, extend } from "@blazetrails/ruby-compat";
 import { Trails } from "../../trails.js";
 
 export class RailsHelperBase extends TSREPL.HelperMethod.Base {}

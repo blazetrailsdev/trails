@@ -1,5 +1,5 @@
 import "../constants.test-case.generated.js";
-import { FileUtils } from "@blazetrails/ruby-compat/file-utils";
+import { FileUtils } from "@blazetrails/ruby-compat";
 import "../generators.js";
 import { include, type Extended, type Included } from "@blazetrails/ruby-compat/include";
 import { TestCase as ActiveSupportTestCase } from "@blazetrails/activesupport/test-case";

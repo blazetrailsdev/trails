@@ -1,7 +1,6 @@
 import "../constants.configuration.generated.js";
 import { onLoad } from "@blazetrails/activesupport";
-import { NoMethodError } from "@blazetrails/ruby-compat/no-method-error";
-import { basicObjRespondTo } from "@blazetrails/ruby-compat/object";
+import { basicObjRespondTo, NoMethodError } from "@blazetrails/ruby-compat";
 import { PROTOCOL_PROBES } from "@blazetrails/ruby-compat/method-missing-proxy";
 import type { Application } from "../application.js";
 import { Generators, MiddlewareStackProxy } from "../configuration.js";

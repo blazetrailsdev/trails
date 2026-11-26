@@ -5,7 +5,7 @@ import {
   type RoutesFilter,
   type RoutesFormatter,
 } from "@blazetrails/actionpack";
-import { rbArgv } from "@blazetrails/ruby-compat/process-adapter";
+import { rbArgv } from "@blazetrails/ruby-compat";
 import type { ThorClass } from "@blazetrails/thor";
 import type { Command } from "@blazetrails/thor/command";
 import { invoke } from "../command.js";

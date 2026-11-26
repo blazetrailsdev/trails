@@ -1,4 +1,4 @@
-import { rbObjRespondTo } from "@blazetrails/ruby-compat/object";
+import { rbObjRespondTo } from "@blazetrails/ruby-compat";
 
 export class DummyConfig {
   #config: object;

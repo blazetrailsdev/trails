@@ -1,5 +1,5 @@
 import "../constants.new.generated.js";
-import { exit } from "@blazetrails/ruby-compat/process-adapter";
+import { exit } from "@blazetrails/ruby-compat";
 import type { ThorClass } from "@blazetrails/thor";
 import { invoke } from "../command.js";
 import { Base } from "../command/base.js";

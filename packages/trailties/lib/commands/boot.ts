@@ -1,6 +1,6 @@
 import "../constants.boot.generated.js";
 import { isPresent } from "@blazetrails/activesupport";
-import { include, type Included } from "@blazetrails/ruby-compat/include";
+import { include, type Included } from "@blazetrails/ruby-compat";
 import type { ThorClass } from "@blazetrails/thor";
 import type { ThorOptions } from "@blazetrails/thor/core-ext/hash-with-indifferent-access";
 import { environment } from "../command.js";

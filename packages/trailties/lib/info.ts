@@ -1,6 +1,6 @@
 import "./constants.info.generated.js";
 import { htmlEscape } from "@blazetrails/activesupport";
-import { env } from "@blazetrails/ruby-compat/process-adapter";
+import { env } from "@blazetrails/ruby-compat";
 import { VERSION } from "./gem-version.js";
 import { Trails } from "./trails.js";
 

@@ -1,10 +1,6 @@
 import { DeprecatedObjectProxy, callerLocations } from "@blazetrails/activesupport";
 import { DSL, Rake } from "@blazetrails/rake";
-import { File } from "@blazetrails/ruby-compat/file";
-import { block } from "@blazetrails/ruby-compat/hash";
-import { STDERR } from "@blazetrails/ruby-compat/io";
-import { TopLevel } from "@blazetrails/ruby-compat/object";
-import { stdout } from "@blazetrails/ruby-compat/process-adapter";
+import { File, STDERR, TopLevel, block, stdout } from "@blazetrails/ruby-compat";
 import { CodeStatistics, DIRECTORIES, type DirectoryPair } from "../code-statistics.js";
 import { deprecator } from "../deprecator.js";
 

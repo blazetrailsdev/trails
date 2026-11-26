@@ -1,6 +1,5 @@
 import "../constants.generate.generated.js";
-import { rbAryReplace } from "@blazetrails/ruby-compat/array";
-import { rbArgv } from "@blazetrails/ruby-compat/process-adapter";
+import { rbAryReplace, rbArgv } from "@blazetrails/ruby-compat";
 import type { ThorClass } from "@blazetrails/thor";
 import { Base } from "../command/base.js";
 import { Generators } from "../generators.js";

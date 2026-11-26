@@ -1,10 +1,6 @@
 import { getEnv } from "@blazetrails/activesupport";
 import { DSL } from "@blazetrails/rake";
-import { Errno } from "@blazetrails/ruby-compat/errno";
-import { block } from "@blazetrails/ruby-compat/hash";
-import { STDERR } from "@blazetrails/ruby-compat/io";
-import { rbFSystem } from "@blazetrails/ruby-compat/kernel-system";
-import { exit } from "@blazetrails/ruby-compat/process-adapter";
+import { Errno, STDERR, block, exit, rbFSystem } from "@blazetrails/ruby-compat";
 import { Trails } from "../trails.js";
 
 DSL.namespace("pnpm", () => {

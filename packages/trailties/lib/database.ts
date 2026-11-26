@@ -1,5 +1,5 @@
 import { presence } from "@blazetrails/activesupport";
-import { env } from "@blazetrails/ruby-compat/process-adapter";
+import { env } from "@blazetrails/ruby-compat";
 
 export function resolveEnv(): string {
   return presence(env.TRAILS_ENV) ?? presence(env.NODE_ENV) ?? "development";

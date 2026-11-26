@@ -1,8 +1,6 @@
 import { onLoad } from "@blazetrails/activesupport";
 import type { TestCase } from "@blazetrails/activesupport/test-case";
-import { File } from "@blazetrails/ruby-compat/file";
-import { extend } from "@blazetrails/ruby-compat/include";
-import { rbFLoad } from "@blazetrails/ruby-compat/load";
+import { File, extend, rbFLoad } from "@blazetrails/ruby-compat";
 import { Trailtie } from "../trailtie.js";
 import { Trails } from "../trails.js";
 import { LineFiltering } from "./line-filtering.js";

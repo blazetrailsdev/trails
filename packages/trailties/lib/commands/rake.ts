@@ -1,7 +1,6 @@
 import "../constants.rake.generated.js";
 import { Rake, TaskManager, type Application as RakeApplication } from "@blazetrails/rake";
-import { extend } from "@blazetrails/ruby-compat/include";
-import { regexpEscape } from "@blazetrails/ruby-compat/regexp";
+import { extend, regexpEscape } from "@blazetrails/ruby-compat";
 import { Actions } from "../command/actions.js";
 import { Base } from "../command/base.js";
 import { UnrecognizedCommandError, printingCommands, root } from "../command.js";

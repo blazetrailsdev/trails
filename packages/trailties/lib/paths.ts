@@ -1,8 +1,4 @@
-import { Dir } from "@blazetrails/ruby-compat/dir";
-import { File } from "@blazetrails/ruby-compat/file";
-import { rbInspect } from "@blazetrails/ruby-compat/object";
-import { Pathname } from "@blazetrails/ruby-compat/pathname";
-import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
+import { Dir, File, Pathname, rbInspect, RuntimeError } from "@blazetrails/ruby-compat";
 
 export interface PathOptions {
   with?: string | string[];

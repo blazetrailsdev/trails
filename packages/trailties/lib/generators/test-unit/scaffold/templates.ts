@@ -30,9 +30,7 @@ import { ${namespace.split("::")[0]} } from "../${root}lib/${namespaceDirs.join(
   const preamble = `import { describe, it } from "vitest";
 import { IntegrationTest } from "@blazetrails/actionpack/testing";
 import { assertDifference } from "@blazetrails/activesupport/testing/assertions";
-import { constSet } from "@blazetrails/ruby-compat/include";
-import { TopLevel } from "@blazetrails/ruby-compat/object";
-import { constGet } from "@blazetrails/ruby-compat/variable";
+import { constGet, constSet, TopLevel } from "@blazetrails/ruby-compat";
 ${engineImport}import { ${modelClassName} } from "../${root}app/models/${[...namespaceDirs, ...this["classPath"](), dasherize(this.fileName)].join("/")}.js";
 import "${root}test-helper.js";
 

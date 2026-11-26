@@ -1,12 +1,7 @@
 import "../../constants.actions-create-migration.generated.js";
 import { CreateFile } from "@blazetrails/thor/actions/create-file";
 import type { EmptyDirectoryBase } from "@blazetrails/thor/actions/empty-directory";
-import { File } from "@blazetrails/ruby-compat/file";
-import { FileUtils } from "@blazetrails/ruby-compat/file-utils";
-import { getFs } from "@blazetrails/ruby-compat/fs-adapter";
-import { merge } from "@blazetrails/ruby-compat/hash";
-import { rtest } from "@blazetrails/ruby-compat/object";
-import { rbEqual } from "@blazetrails/ruby-compat/rb-equal";
+import { File, FileUtils, getFs, merge, rbEqual, rtest } from "@blazetrails/ruby-compat";
 import { Error } from "../base.js";
 
 export interface CreateMigrationHost extends EmptyDirectoryBase {

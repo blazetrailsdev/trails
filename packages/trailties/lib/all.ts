@@ -1,6 +1,5 @@
 import "./trails.js";
-import { rbFRequire } from "@blazetrails/ruby-compat/load";
-import { LoadError } from "@blazetrails/ruby-compat/load-error";
+import { LoadError, rbFRequire } from "@blazetrails/ruby-compat";
 export type {} from "./trailties/active-record.js";
 export type {} from "./trailties/action-controller.js";
 export type {} from "./trailties/action-view.js";

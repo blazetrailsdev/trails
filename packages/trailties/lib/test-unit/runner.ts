@@ -1,17 +1,21 @@
 import { Formatter, SpellChecker } from "@blazetrails/did-you-mean";
 import { FileList } from "@blazetrails/rake";
-import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
-import { File } from "@blazetrails/ruby-compat/file";
-import { STDOUT } from "@blazetrails/ruby-compat/io";
-import { rbFSystem } from "@blazetrails/ruby-compat/kernel-system";
-import { LoadError } from "@blazetrails/ruby-compat/load-error";
-import type { Method } from "@blazetrails/ruby-compat/method";
-import { rbObjRespondTo } from "@blazetrails/ruby-compat/object";
-import { env, exit, setEnv } from "@blazetrails/ruby-compat/process-adapter";
-import { Range } from "@blazetrails/ruby-compat/range";
-import { regexpEscape } from "@blazetrails/ruby-compat/regexp";
-import { Shellwords } from "@blazetrails/ruby-compat/shellwords";
-import { setVerbose } from "@blazetrails/ruby-compat/verbose";
+import {
+  ArgumentError,
+  File,
+  LoadError,
+  Range,
+  STDOUT,
+  Shellwords,
+  env,
+  exit,
+  rbFSystem,
+  rbObjRespondTo,
+  regexpEscape,
+  setEnv,
+  setVerbose,
+  type Method,
+} from "@blazetrails/ruby-compat";
 import { TestParser } from "./test-parser.js";
 
 interface Runnable {
