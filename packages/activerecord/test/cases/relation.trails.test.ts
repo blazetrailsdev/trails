@@ -1,5 +1,8 @@
 import { DescendantsTracker } from "@blazetrails/activesupport";
-import { constSet, TopLevel, rbModRemoveConst, Hash } from "@blazetrails/ruby-compat";
+import { Hash } from "@blazetrails/ruby-compat/hash";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
+import { rbModRemoveConst } from "@blazetrails/ruby-compat/variable";
 import { describe, it, expect, beforeAll } from "vitest";
 import { Nodes, Table as ArelTable } from "@blazetrails/arel";
 import { isPresent, presence } from "@blazetrails/activesupport";

@@ -3,7 +3,7 @@ import { User } from "../models/user.js";
 import { Base } from "../../lib/base.js";
 import { Relation } from "../../lib/relation.js";
 import { RelationMethods, type TokenDefinition } from "../../lib/token-for.js";
-import { fetch } from "@blazetrails/ruby-compat";
+import { fetch } from "@blazetrails/ruby-compat/hash";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { fixtures } from "../support/use-fixtures.js";
 

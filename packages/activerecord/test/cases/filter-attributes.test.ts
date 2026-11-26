@@ -4,7 +4,7 @@ import { AdminUser } from "../models/admin/user.js";
 import { AdminAccount } from "../models/admin/account.js";
 import { User } from "../models/user.js";
 import { fixtures } from "../support/use-fixtures.js";
-import { PP } from "@blazetrails/ruby-compat";
+import { PP } from "@blazetrails/ruby-compat/pp";
 
 const { "admin/users": adminUsers } = fixtures(["admin/accounts", "admin/users"]);
 

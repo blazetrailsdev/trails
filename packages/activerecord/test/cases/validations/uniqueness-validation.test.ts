@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { rbObjSingletonClass, constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { rbObjSingletonClass, TopLevel } from "@blazetrails/ruby-compat/object";
 import { Base, StatementInvalid, UnknownPrimaryKey, ValueTooLong } from "../../../lib/index.js";
 import { adapterType } from "../../support/test-adapter.js";
 import { itIfSupports } from "../../support/supports.js";
@@ -18,7 +19,7 @@ import { Essay } from "../../models/essay.js";
 import { CpkBook } from "../../models/cpk.js";
 import { UuidItem, UuidValidatingItem } from "../../models/uuid-item.js";
 import "../../support/canonical-model-index.js";
-import { Range } from "@blazetrails/ruby-compat";
+import { Range } from "@blazetrails/ruby-compat/range";
 import { DescendantsTracker } from "@blazetrails/activesupport";
 import {
   assertChanges,

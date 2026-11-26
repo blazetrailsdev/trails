@@ -1,5 +1,5 @@
-import { Pathname } from "@blazetrails/ruby-compat";
-import { include, type Included } from "@blazetrails/ruby-compat";
+import { Pathname } from "@blazetrails/ruby-compat/pathname";
+import { include, type Included } from "@blazetrails/ruby-compat/include";
 import { Autoloaders } from "../../lib/autoloaders.js";
 import {
   BroadcastLogger,
@@ -9,7 +9,8 @@ import {
   resetLoadHooks,
 } from "@blazetrails/activesupport";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { Errno, STDERR } from "@blazetrails/ruby-compat";
+import { Errno } from "@blazetrails/ruby-compat/errno";
+import { STDERR } from "@blazetrails/ruby-compat/io";
 import { Initializable, type Collection } from "../../lib/initializable.js";
 import {
   Bootstrap,

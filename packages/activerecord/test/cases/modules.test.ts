@@ -6,7 +6,9 @@ import {
   assertNotNil,
   assertNothingRaised,
 } from "@blazetrails/activesupport/testing/assertions";
-import { constDefined, rbModRemoveConst, TopLevel, constSet } from "@blazetrails/ruby-compat";
+import { constDefined, constSet } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
+import { rbModRemoveConst } from "@blazetrails/ruby-compat/variable";
 import { Base } from "../../lib/index.js";
 import { fixtures } from "../support/use-fixtures.js";
 import { assertNoQueries } from "../../lib/testing/query-assertions.js";

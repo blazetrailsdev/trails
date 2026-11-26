@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { ConnectionUrlResolver } from "../../../lib/database-configurations/connection-url-resolver.js";
 import { InheritableOptions } from "@blazetrails/activesupport";
-import { InvalidURIError } from "@blazetrails/ruby-compat";
+import { InvalidURIError } from "@blazetrails/ruby-compat/uri/common";
 import { protocolAdapters, setProtocolAdapters } from "../../../lib/active-record.js";
 
 describe("ConnectionUrlResolver", () => {

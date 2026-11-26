@@ -6,14 +6,16 @@ import {
   assertNotRespondTo,
   assertRaises,
 } from "@blazetrails/activesupport/testing/assertions";
-import { isEmpty, constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
+import { isEmpty } from "@blazetrails/ruby-compat/ruby-empty";
 import { sql as arelSql } from "@blazetrails/arel";
 import { Relation } from "../../lib/index.js";
 import { WhereClause } from "../../lib/relation/where-clause.js";
 import { Base } from "../../lib/base.js";
 
 import { fixtures } from "../support/use-fixtures.js";
-import { ArgumentError } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
 import { HashMerger } from "../../lib/relation/merger.js";
 import { Post as CanonPost, NullPost, FirstPost } from "../models/post.js";
 import {

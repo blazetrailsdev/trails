@@ -1,5 +1,6 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { getFs, getOsAsync } from "@blazetrails/ruby-compat";
+import { getFs } from "@blazetrails/ruby-compat/fs-adapter";
+import { getOsAsync } from "@blazetrails/ruby-compat/os-adapter";
 import {
   TEMPLATE_PATH_ENV,
   RUN_TOKEN_ENV,

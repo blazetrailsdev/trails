@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
-import { ArgumentError, constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { assertRaises } from "@blazetrails/activesupport/testing/assertions";
 import { travel, travelBack } from "@blazetrails/activesupport/testing/time-helpers";

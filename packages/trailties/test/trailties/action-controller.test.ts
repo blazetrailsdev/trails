@@ -1,4 +1,4 @@
-import { Pathname } from "@blazetrails/ruby-compat";
+import { Pathname } from "@blazetrails/ruby-compat/pathname";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -10,7 +10,7 @@ import { Trailtie, type ActionControllerConfig } from "../../lib/trailties/actio
 import { Deprecators, resetLoadHooks, runLoadHooks } from "@blazetrails/activesupport";
 import { Trailtie as BaseTrailtie } from "../../lib/trailtie.js";
 import { AbstractController, ActionController, RouteSet } from "@blazetrails/actionpack";
-import { extend } from "@blazetrails/ruby-compat";
+import { extend } from "@blazetrails/ruby-compat/include";
 import { Loader } from "@blazetrails/zeitwerk";
 
 let deprecators: Deprecators;

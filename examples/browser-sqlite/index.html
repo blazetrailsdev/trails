@@ -24,6 +24,7 @@
         <span>playground</span>
       </h1>
       <span id="status" role="status" aria-live="polite" data-state="busy">Starting…</span>
+      <select id="example" aria-label="Example app" title="Switch example app"></select>
       <span class="spacer"></span>
       <label><input type="checkbox" id="autorun" checked /> Restart on edit</label>
       <button id="run" title="Restart the app (Ctrl+S)">▶ Restart</button>
@@ -52,6 +53,7 @@
       <nav id="files" aria-label="Files">
         <div class="bar">
           Files
+          <button id="generate" title="Run bin/trails generate">Generate</button>
           <button id="new-file" title="New file" aria-label="New file">+</button>
         </div>
         <div id="tree" role="tree"></div>
@@ -64,6 +66,17 @@
           <button id="rename-file">Rename</button>
           <button id="delete-file">Delete</button>
         </div>
+        <form id="find" class="bar" hidden onsubmit="return false;">
+          <input name="find" placeholder="Find" aria-label="Find" spellcheck="false" />
+          <button type="button" name="prev" title="Previous match (Shift+Enter)">↑</button>
+          <button type="button" name="next" title="Next match (Enter)">↓</button>
+          <input name="replace" placeholder="Replace" aria-label="Replace" spellcheck="false" />
+          <button type="button" name="one">Replace</button>
+          <button type="button" name="all">All</button>
+          <output></output>
+          <span class="spacer"></span>
+          <button type="button" name="close" title="Close (Escape)" aria-label="Close">×</button>
+        </form>
         <ul id="problems" hidden></ul>
         <div id="code">
           <div id="gutter" aria-hidden="true"></div>

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { TSREPL } from "@blazetrails/ruby-compat";
+import { TSREPL } from "@blazetrails/ruby-compat/repl-adapter";
 import { Trails } from "../../../lib/trails.js";
 import { TSREPLConsole } from "../../../lib/commands/console/tsrepl-console.js";
 

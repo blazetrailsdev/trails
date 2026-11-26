@@ -1,4 +1,4 @@
-import { StringIO } from "@blazetrails/ruby-compat";
+import { StringIO } from "@blazetrails/ruby-compat/string-io";
 import { describe, it, expect, beforeEach, afterEach, afterAll } from "vitest";
 import { Base } from "../../lib/base.js";
 import { SchemaDumper } from "../../lib/schema-dumper.js";

@@ -1,5 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { Dir, File, FileUtils, stdout } from "@blazetrails/ruby-compat";
+import { Dir } from "@blazetrails/ruby-compat/dir";
+import { File } from "@blazetrails/ruby-compat/file";
+import { FileUtils } from "@blazetrails/ruby-compat/file-utils";
+import { stdout } from "@blazetrails/ruby-compat/process-adapter";
 import { invoke } from "../../lib/command.js";
 import { Annotation, resetAnnotationRegistry } from "../../lib/source-annotation-extractor.js";
 

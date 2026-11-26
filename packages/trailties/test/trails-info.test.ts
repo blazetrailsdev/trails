@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test } from "vitest";
-import { CGI } from "@blazetrails/ruby-compat";
+import { CGI } from "@blazetrails/ruby-compat/cgi";
 import { Info, PropertyList } from "../lib/info.js";
 import { VERSION } from "../lib/gem-version.js";
 

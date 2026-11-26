@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { include } from "@blazetrails/ruby-compat";
+import { include } from "@blazetrails/ruby-compat/include";
 import { DatabaseStatements } from "../../../../lib/connection-adapters/mysql2/database-statements.js";
 import { ExplainRegistry } from "../../../../lib/explain-registry.js";
 

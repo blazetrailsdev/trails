@@ -50,15 +50,13 @@ import "../models/bird.js";
 import "../models/treasure.js";
 import "../models/price-estimate.js";
 
-import {
-  NoMethodError,
-  PP,
-  regexpEscape,
-  StandardError,
-  StringIO,
-  constSet,
-  TopLevel,
-} from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { NoMethodError } from "@blazetrails/ruby-compat/no-method-error";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
+import { PP } from "@blazetrails/ruby-compat/pp";
+import { regexpEscape } from "@blazetrails/ruby-compat/regexp";
+import { StandardError } from "@blazetrails/ruby-compat/standard-error";
+import { StringIO } from "@blazetrails/ruby-compat/string-io";
 
 import { Preloader } from "../../lib/associations/preloader.js";
 

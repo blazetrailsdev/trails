@@ -1,4 +1,8 @@
-import { Dir, File, FileUtils, env as ENV, getFs } from "@blazetrails/ruby-compat";
+import { Dir } from "@blazetrails/ruby-compat/dir";
+import { File } from "@blazetrails/ruby-compat/file";
+import { FileUtils } from "@blazetrails/ruby-compat/file-utils";
+import { getFs } from "@blazetrails/ruby-compat/fs-adapter";
+import { env as ENV } from "@blazetrails/ruby-compat/process-adapter";
 import { AppGenerator } from "../../../lib/generators/trails/app/app-generator.js";
 import { Paths, TRAILS_FRAMEWORK_ROOT } from "./paths.js";
 

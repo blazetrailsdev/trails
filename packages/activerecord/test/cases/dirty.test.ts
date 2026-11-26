@@ -1,5 +1,5 @@
 import type { TimeZone } from "@blazetrails/activesupport";
-import { Hash, hashAref, hasKey, keys } from "@blazetrails/ruby-compat";
+import { Hash, hashAref, hasKey, keys } from "@blazetrails/ruby-compat/hash";
 import { HashWithIndifferentAccess, isBlank } from "@blazetrails/activesupport";
 import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from "vitest";
 import { Base } from "../../lib/index.js";

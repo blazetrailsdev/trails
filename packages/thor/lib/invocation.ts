@@ -13,8 +13,8 @@ import {
   RuntimeError,
   toS,
   toSym,
-  warn,
 } from "@blazetrails/ruby-compat";
+import { warn } from "@blazetrails/ruby-compat/kernel-warn";
 import { Base, type BaseClass, type BaseConfig } from "./base.js";
 import type { Command } from "./command.js";
 import { findClassAndCommandByNamespace } from "./util.js";

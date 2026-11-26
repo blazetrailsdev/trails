@@ -1,17 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   childProcessAdapterConfig,
-  Dir,
-  env as ENV,
-  File,
-  FileUtils,
   registerChildProcessAdapter,
-  setEnv,
-  StandardError,
   type ChildProcessAdapter,
-  stderr,
-  SystemExit,
-} from "@blazetrails/ruby-compat";
+} from "@blazetrails/ruby-compat/child-process-adapter";
+import { Dir } from "@blazetrails/ruby-compat/dir";
+import { File } from "@blazetrails/ruby-compat/file";
+import { FileUtils } from "@blazetrails/ruby-compat/file-utils";
+import { env as ENV, setEnv, stderr, SystemExit } from "@blazetrails/ruby-compat/process-adapter";
+import { StandardError } from "@blazetrails/ruby-compat/standard-error";
 import {
   assertEqual,
   assertMatch,

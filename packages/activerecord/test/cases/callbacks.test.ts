@@ -3,7 +3,9 @@ import { describe, it, expect } from "vitest";
 import { Base, RecordNotSaved, RecordNotDestroyed, RecordInvalid } from "../../lib/index.js";
 import { fixtures } from "../support/use-fixtures.js";
 import { ContextualCallbacksDeveloper } from "../models/contextual-callbacks-developer.js";
-import { ArgumentError, Range, kernelThrow } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { kernelThrow } from "@blazetrails/ruby-compat/kernel-catch";
+import { Range } from "@blazetrails/ruby-compat/range";
 
 type HistoryEntry = [string, string];
 

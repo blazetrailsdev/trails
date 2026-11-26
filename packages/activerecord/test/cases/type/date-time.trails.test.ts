@@ -4,7 +4,7 @@ import { TimeZone, TimeWithZone, setZone } from "@blazetrails/activesupport";
 import { TimeZoneConverter } from "../../../lib/attribute-methods/time-zone-conversion.js";
 import { RangeType } from "../../../lib/connection-adapters/postgresql/oid/range.js";
 import { DateTime } from "../../../lib/type/date-time.js";
-import { Range } from "@blazetrails/ruby-compat";
+import { Range } from "@blazetrails/ruby-compat/range";
 import { setDefaultTimezone } from "../../../lib/active-record.js";
 
 afterEach(() => {

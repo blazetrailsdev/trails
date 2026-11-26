@@ -1,5 +1,6 @@
 import { DescendantsTracker } from "@blazetrails/activesupport";
-import { Module, rbInspect, constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { Module, constSet } from "@blazetrails/ruby-compat/include";
+import { rbInspect, TopLevel } from "@blazetrails/ruby-compat/object";
 import { describe, it, expect, vi } from "vitest";
 import { Base, DangerousAttributeError, ReadonlyAttributeError } from "../../lib/index.js";
 import { Model } from "@blazetrails/activemodel";

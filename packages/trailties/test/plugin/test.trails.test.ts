@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { File, rbFLoad } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat/file";
+import { rbFLoad } from "@blazetrails/ruby-compat/load";
 import { TestUnitReporter } from "../../lib/test-unit/reporter.js";
 import { Runner } from "../../lib/test-unit/runner.js";
 

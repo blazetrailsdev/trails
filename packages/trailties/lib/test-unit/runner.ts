@@ -8,14 +8,14 @@ import {
   STDOUT,
   Shellwords,
   env,
-  exit,
-  rbFSystem,
   rbObjRespondTo,
   regexpEscape,
   setEnv,
   setVerbose,
   type Method,
 } from "@blazetrails/ruby-compat";
+import { rbFSystem } from "@blazetrails/ruby-compat/kernel-system";
+import { exit } from "@blazetrails/ruby-compat/process-adapter";
 import { TestParser } from "./test-parser.js";
 
 interface Runnable {

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Inflections, inflections } from "@blazetrails/activesupport";
-import { rbObjDup } from "@blazetrails/ruby-compat";
+import { rbObjDup } from "@blazetrails/ruby-compat/include";
 import { Inflector } from "../../lib/autoloaders/inflector.js";
 
 const INFLECTOR = Inflector;

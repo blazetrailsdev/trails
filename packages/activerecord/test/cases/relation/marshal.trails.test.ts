@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { Marshal, rbModName } from "@blazetrails/ruby-compat";
+import { Marshal } from "@blazetrails/ruby-compat/marshal";
+import { rbModName } from "@blazetrails/ruby-compat/object";
 import type { CollectionProxy } from "../../../lib/associations/collection-proxy.js";
 import type { Base } from "../../../lib/base.js";
 import type { Relation } from "../../../lib/relation.js";

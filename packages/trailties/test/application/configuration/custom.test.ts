@@ -1,4 +1,4 @@
-import { Pathname } from "@blazetrails/ruby-compat";
+import { Pathname } from "@blazetrails/ruby-compat/pathname";
 import { describe, expect, it } from "vitest";
 import { OrderedOptions } from "@blazetrails/activesupport";
 import {
@@ -6,7 +6,8 @@ import {
   assertRespondTo,
   assertNil,
 } from "@blazetrails/activesupport/testing/assertions";
-import { ArgumentError, Method, rbObjMethod } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { Method, rbObjMethod } from "@blazetrails/ruby-compat/method";
 import { Configuration } from "../../../lib/application/configuration.js";
 
 describe("CustomTest", () => {

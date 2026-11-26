@@ -1,5 +1,5 @@
-import { Pathname } from "@blazetrails/ruby-compat";
-import { include, type Included } from "@blazetrails/ruby-compat";
+import { Pathname } from "@blazetrails/ruby-compat/pathname";
+import { include, type Included } from "@blazetrails/ruby-compat/include";
 import { Initializable, type Collection } from "../lib/initializable.js";
 import { Autoloaders } from "../lib/autoloaders.js";
 import {
@@ -12,7 +12,8 @@ import {
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { Codec } from "@blazetrails/activesupport/messages/codec";
 import { SerializerWithFallback } from "@blazetrails/activesupport/messages/serializer-with-fallback";
-import { LoadError, verbose } from "@blazetrails/ruby-compat";
+import { LoadError } from "@blazetrails/ruby-compat/load-error";
+import { verbose } from "@blazetrails/ruby-compat/verbose";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Configuration } from "../lib/application/configuration.js";
 import {

@@ -1,9 +1,9 @@
-import { stdout } from "@blazetrails/ruby-compat";
+import { stdout } from "@blazetrails/ruby-compat/process-adapter";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
-import { Dir } from "@blazetrails/ruby-compat";
+import { Dir } from "@blazetrails/ruby-compat/dir";
 import { EncryptionKeyFileGenerator } from "../../../../lib/generators/trails/encryption-key-file/encryption-key-file-generator.js";
 
 let tmpDir: string;

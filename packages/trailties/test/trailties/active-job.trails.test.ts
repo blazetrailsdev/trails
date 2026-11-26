@@ -11,7 +11,8 @@ afterEach(() => {
 import { Deprecators, OrderedOptions, runLoadHooks } from "@blazetrails/activesupport";
 import { ActiveJob, Base, Serializers } from "@blazetrails/activejob";
 import { EnqueueAfterTransactionCommit } from "@blazetrails/activejob/enqueue-after-transaction-commit";
-import { isModuleIncluded, TopLevel, constSet } from "@blazetrails/ruby-compat";
+import { isModuleIncluded, constSet } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
 import { Trailtie, type ActiveJobConfig } from "../../lib/trailties/active-job.js";
 import { runTrailtieInitializers } from "../support/trailtie-initializers.js";
 

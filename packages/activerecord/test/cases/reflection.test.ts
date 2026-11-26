@@ -36,7 +36,8 @@ import { ShardedComment } from "../models/sharded/comment.js";
 
 import { UnknownPrimaryKey, NameError } from "../../lib/errors.js";
 import { HasManyThroughSourceAssociationNotFoundError } from "../../lib/associations/errors.js";
-import { rbObjDup, constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { rbObjDup, constSet } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
 import { ArgumentError } from "@blazetrails/activemodel";
 import {
   assert,

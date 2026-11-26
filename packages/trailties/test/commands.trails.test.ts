@@ -1,12 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  File,
-  SystemExit,
-  rbAryReplace,
-  rbArgv,
-  rbFLoad,
-  getProcessAdapter,
-} from "@blazetrails/ruby-compat";
+import { rbAryReplace } from "@blazetrails/ruby-compat/array";
+import { File } from "@blazetrails/ruby-compat/file";
+import { rbFLoad } from "@blazetrails/ruby-compat/load";
+import { SystemExit, rbArgv, getProcessAdapter } from "@blazetrails/ruby-compat/process-adapter";
 import { invoke } from "../lib/command.js";
 
 vi.mock("@blazetrails/activesupport/node", () => ({}));

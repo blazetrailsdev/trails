@@ -6,18 +6,13 @@ import { Dependencies } from "@blazetrails/activesupport";
 import { TestCase } from "@blazetrails/activesupport/test-case";
 import { Isolation } from "@blazetrails/activesupport/testing/isolation";
 import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
-import {
-  Dir,
-  File,
-  FileUtils,
-  env as ENV,
-  extend,
-  include,
-  rbEqual,
-  rbObjRespondTo,
-  setEnv,
-  TopLevel,
-} from "@blazetrails/ruby-compat";
+import { Dir } from "@blazetrails/ruby-compat/dir";
+import { File } from "@blazetrails/ruby-compat/file";
+import { FileUtils } from "@blazetrails/ruby-compat/file-utils";
+import { extend, include } from "@blazetrails/ruby-compat/include";
+import { rbObjRespondTo, TopLevel } from "@blazetrails/ruby-compat/object";
+import { env as ENV, setEnv } from "@blazetrails/ruby-compat/process-adapter";
+import { rbEqual } from "@blazetrails/ruby-compat/rb-equal";
 import { Methods } from "@blazetrails/rack-test";
 import { Trails } from "../../../lib/trails.js";
 import { EnvHelpers } from "../../support/env-helpers.js";

@@ -1,5 +1,6 @@
 import { DSL, Task } from "@blazetrails/rake";
-import { ARGV, block, env as ENV, rbFSystem, setEnv } from "@blazetrails/ruby-compat";
+import { ARGV, block, env as ENV, setEnv } from "@blazetrails/ruby-compat";
+import { rbFSystem } from "@blazetrails/ruby-compat/kernel-system";
 import { ViteAssets } from "../vite-assets.js";
 
 DSL.namespace("vite", () => {

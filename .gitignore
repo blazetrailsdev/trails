@@ -77,5 +77,6 @@ log/
 # precompiled generator templates (trails-tsc-views build-templates)
 *.tt.js
 packages/solid-queue/lib/generators/solid-queue/update/templates/db/*.ts.js
+packages/solid-cable/lib/generators/solid-cable/update/templates/db/migrate/*.ts.js
 USAGE.js
 packages/thor/test/fixtures/doc/*.rb.js

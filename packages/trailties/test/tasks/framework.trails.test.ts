@@ -1,6 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Rake } from "@blazetrails/rake";
-import { Dir, File, FileUtils, RuntimeError, rbFLoad } from "@blazetrails/ruby-compat";
+import { Dir } from "@blazetrails/ruby-compat/dir";
+import { File } from "@blazetrails/ruby-compat/file";
+import { FileUtils } from "@blazetrails/ruby-compat/file-utils";
+import { rbFLoad } from "@blazetrails/ruby-compat/load";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
 import { Application } from "../../lib/application.js";
 import { Trails } from "../../lib/trails.js";
 

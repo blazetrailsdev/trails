@@ -8,7 +8,7 @@ import { getEnv } from "@blazetrails/activesupport";
 import { assertNotDeprecated } from "@blazetrails/activesupport/testing/deprecation";
 import { assertNothingRaised } from "@blazetrails/activesupport/testing/assertions";
 import { fixtures } from "../../support/use-fixtures.js";
-import { setEnv } from "@blazetrails/ruby-compat";
+import { setEnv } from "@blazetrails/ruby-compat/process-adapter";
 import { deprecator } from "../../../lib/deprecator.js";
 import { restoreWorkerConnection } from "../../support/connection.js";
 import { DEFAULT_ENV } from "../../../lib/connection-handling.js";

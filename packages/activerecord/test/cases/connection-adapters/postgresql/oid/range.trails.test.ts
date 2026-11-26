@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { TimeZone } from "@blazetrails/activesupport";
 import { RangeType } from "../../../../../lib/connection-adapters/postgresql/oid/range.js";
-import { Range } from "@blazetrails/ruby-compat";
+import { Range } from "@blazetrails/ruby-compat/range";
 
 const integerSubtype = {
   cast: (value: unknown) => (value == null ? null : Number(value)),

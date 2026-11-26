@@ -1,5 +1,7 @@
 import { DescendantsTracker } from "@blazetrails/activesupport";
-import { kernelThrow, constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { kernelThrow } from "@blazetrails/ruby-compat/kernel-catch";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
 import { describe, it, expect, vi } from "vitest";
 import { Base, RecordNotDestroyed } from "../../../lib/index.js";
 import type { AssociationProxy } from "../../../lib/associations/collection-proxy.js";

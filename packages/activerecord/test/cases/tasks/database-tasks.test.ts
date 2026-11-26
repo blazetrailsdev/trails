@@ -14,20 +14,14 @@ import {
   assertRaises,
 } from "@blazetrails/activesupport/testing/assertions";
 import { capture } from "@blazetrails/activesupport/testing/stream";
-import {
-  Dir,
-  File,
-  FileUtils,
-  StringIO,
-  stdout,
-  stderr,
-  setEnv,
-  Kernel,
-  rbObjDup,
-  rbObjIvarGet,
-  rbObjIvarSet,
-  RuntimeError,
-} from "@blazetrails/ruby-compat";
+import { Dir } from "@blazetrails/ruby-compat/dir";
+import { File } from "@blazetrails/ruby-compat/file";
+import { FileUtils } from "@blazetrails/ruby-compat/file-utils";
+import { Kernel, rbObjDup } from "@blazetrails/ruby-compat/include";
+import { rbObjIvarGet, rbObjIvarSet } from "@blazetrails/ruby-compat/object";
+import { stdout, stderr, setEnv } from "@blazetrails/ruby-compat/process-adapter";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
+import { StringIO } from "@blazetrails/ruby-compat/string-io";
 import { DatabaseTasks, DatabaseNotSupported } from "../../../lib/tasks/database-tasks.js";
 import { HashConfig } from "../../../lib/database-configurations/hash-config.js";
 import { DatabaseConfigurations } from "../../../lib/database-configurations.js";

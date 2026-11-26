@@ -1,15 +1,11 @@
 import { assertMatch, assertNoMatch } from "@blazetrails/activesupport/testing/assertions";
 import { capture } from "@blazetrails/activesupport/testing/stream";
 import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
-import {
-  Dir,
-  File,
-  TopLevel,
-  constGet,
-  constSet,
-  constDefined,
-  rbModRemoveConst,
-} from "@blazetrails/ruby-compat";
+import { Dir } from "@blazetrails/ruby-compat/dir";
+import { File } from "@blazetrails/ruby-compat/file";
+import { constSet, constDefined } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
+import { constGet, rbModRemoveConst } from "@blazetrails/ruby-compat/variable";
 import { beforeAll, beforeEach, describe, it } from "vitest";
 import { ActiveModel } from "../../lib/generators/active-model.js";
 import { Application } from "../../lib/application.js";

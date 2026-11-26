@@ -1,4 +1,5 @@
-import { constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
 import { describe, it, expect, vi } from "vitest";
 import { fixtures } from "../../support/use-fixtures.js";
 import { Author } from "../../models/author.js";
@@ -150,5 +151,22 @@ describe("collection replace diffs instead of clearing", () => {
 
     const fresh = new Firm({ name: "fresh" });
     expect(() => fresh.assignAttributes({ clients: [] })).not.toThrow();
+  });
+
+  it("runs the replace a create owes for a new owner whose primary key is set", async () => {
+    const client = await Client.find(companies("first_client").id);
+    const firm = (await Firm.create({ id: 9001, name: "pk set", clients: [client] })) as Firm;
+
+    expect(firm.isPersisted()).toBe(true);
+    expect((await Client.find(client.id)).firm_id).toBe(9001);
+    expect((await firm.clients).map((c) => c.id)).toEqual([client.id]);
+  });
+
+  it("runs the replace an update owes on a persisted owner", async () => {
+    const firm = await Firm.find(companies("first_firm").id);
+    expect(await Client.where({ firm_id: firm.id })).not.toEqual([]);
+    await firm.update({ clients: [] });
+
+    expect(await Client.where({ firm_id: firm.id })).toEqual([]);
   });
 });

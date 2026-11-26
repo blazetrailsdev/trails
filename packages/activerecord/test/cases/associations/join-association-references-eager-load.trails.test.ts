@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Person } from "../../models/person.js";
 import { fixtures } from "../../support/use-fixtures.js";
-import { regexpEscape } from "@blazetrails/ruby-compat";
+import { regexpEscape } from "@blazetrails/ruby-compat/regexp";
 
 describe("JoinAssociation#join_constraints references_values", () => {
   const { self } = fixtures(["people", "readers", "posts", "comments"]);

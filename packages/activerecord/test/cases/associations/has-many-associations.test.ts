@@ -1,5 +1,7 @@
 import { DescendantsTracker } from "@blazetrails/activesupport";
-import { kernelThrow, constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { kernelThrow } from "@blazetrails/ruby-compat/kernel-catch";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
 import type { AssociationProxy } from "../../../lib/associations/collection-proxy.js";
 import { describe, it, expect, beforeEach } from "vitest";
 import { ArgumentError, I18n } from "@blazetrails/activemodel";
@@ -99,7 +101,7 @@ import {
   CpkBrokenOrderWithNonCpkBooks,
   CpkNonCpkBook,
 } from "../../models/cpk.js";
-import { regexpEscape } from "@blazetrails/ruby-compat";
+import { regexpEscape } from "@blazetrails/ruby-compat/regexp";
 import { currentAdapter } from "../../support/adapter-helper.js";
 import { CompositePrimaryKeyMismatchError } from "../../../lib/associations/errors.js";
 import { TypedEssay } from "../../models/essay.js";

@@ -1,4 +1,6 @@
-import { File, Dir, TopLevel } from "@blazetrails/ruby-compat";
+import { Dir } from "@blazetrails/ruby-compat/dir";
+import { File } from "@blazetrails/ruby-compat/file";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
 import { capture } from "@blazetrails/activesupport/testing/stream";
 import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";

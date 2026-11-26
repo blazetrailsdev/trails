@@ -17,7 +17,7 @@ import { Encryption } from "../../../lib/encryption.js";
 import { MessagePackMessageSerializer } from "../../../lib/encryption/message-pack-message-serializer.js";
 
 import { Key } from "../../../lib/encryption/key.js";
-import { rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { rbObjRespondTo } from "@blazetrails/ruby-compat/object";
 import { prepend } from "@blazetrails/ruby-compat/include";
 import { Fixture } from "../../../lib/fixtures.js";
 import { EncryptedFixtures } from "../../../lib/encryption/encrypted-fixtures.js";

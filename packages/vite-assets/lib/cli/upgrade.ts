@@ -1,4 +1,5 @@
-import { ArgumentError, exec, rbInspect } from "@blazetrails/ruby-compat";
+import { ArgumentError, rbInspect } from "@blazetrails/ruby-compat";
+import { exec } from "@blazetrails/ruby-compat/process-adapter";
 import { ViteAssets } from "../vite-assets.js";
 import { Install } from "./install.js";
 

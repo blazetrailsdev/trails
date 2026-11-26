@@ -1,4 +1,4 @@
-import { env } from "@blazetrails/ruby-compat";
+import { env } from "@blazetrails/ruby-compat/process-adapter";
 
 export default {
   development: {

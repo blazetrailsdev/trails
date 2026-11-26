@@ -5,7 +5,7 @@ import {
 } from "@blazetrails/ruby-compat/psych-adapter";
 import { Base } from "../../lib/base.js";
 import { ColumnNotSerializableError } from "../../lib/attribute-methods/serialization.js";
-import { PP } from "@blazetrails/ruby-compat";
+import { PP } from "@blazetrails/ruby-compat/pp";
 import type { AbstractAdapter } from "../../lib/connection-adapters/abstract-adapter.js";
 import type { Table } from "../../lib/connection-adapters/abstract/schema-definitions.js";
 import { dumpTableSchema } from "../support/schema-dumping-helper.js";

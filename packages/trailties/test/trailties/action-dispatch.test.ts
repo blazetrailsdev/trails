@@ -1,4 +1,4 @@
-import { Pathname } from "@blazetrails/ruby-compat";
+import { Pathname } from "@blazetrails/ruby-compat/pathname";
 import { Configuration } from "../../lib/application/configuration.js";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Deprecators } from "@blazetrails/activesupport";

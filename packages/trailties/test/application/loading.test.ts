@@ -3,7 +3,7 @@ import { TestCase } from "@blazetrails/activesupport/test-case";
 import { Isolation } from "@blazetrails/activesupport/testing/isolation";
 import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
 import { Methods } from "@blazetrails/rack-test";
-import { include } from "@blazetrails/ruby-compat";
+import { include } from "@blazetrails/ruby-compat/include";
 import { Application } from "../../lib/application.js";
 import { Trails } from "../../lib/trails.js";
 import type { Generation, Rack } from "../support/isolation/abstract-unit.js";

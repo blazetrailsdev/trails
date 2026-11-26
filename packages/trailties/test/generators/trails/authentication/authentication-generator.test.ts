@@ -2,7 +2,10 @@ import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
-import { registerChildProcessAdapter, childProcessAdapterConfig } from "@blazetrails/ruby-compat";
+import {
+  registerChildProcessAdapter,
+  childProcessAdapterConfig,
+} from "@blazetrails/ruby-compat/child-process-adapter";
 import { TopLevel } from "@blazetrails/activesupport";
 import { parseTs, assertNoRubySource } from "../../../../lib/template-builder/testing.js";
 import { Application } from "../../../../lib/application.js";

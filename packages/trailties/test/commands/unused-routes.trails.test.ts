@@ -1,21 +1,14 @@
 import { describe, it, expect, afterEach, onTestFinished, vi } from "vitest";
 import { ActionController, ActionView, type Journey } from "@blazetrails/actionpack";
 import { Base } from "@blazetrails/activerecord";
-import "@blazetrails/activerecord/tasks/database-tasks.js";
 import { capture } from "@blazetrails/activesupport/testing/stream";
-import {
-  env,
-  getFs,
-  getOsAsync,
-  getPath,
-  setEnv,
-  rbFLoad,
-  rbModRemoveConst,
-  TopLevel,
-  constGet,
-  constSet,
-  constDefined,
-} from "@blazetrails/ruby-compat";
+import { getFs, getPath } from "@blazetrails/ruby-compat/fs-adapter";
+import { constSet, constDefined } from "@blazetrails/ruby-compat/include";
+import { rbFLoad } from "@blazetrails/ruby-compat/load";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
+import { getOsAsync } from "@blazetrails/ruby-compat/os-adapter";
+import { env, setEnv } from "@blazetrails/ruby-compat/process-adapter";
+import { rbModRemoveConst, constGet } from "@blazetrails/ruby-compat/variable";
 import { Application } from "../../lib/application.js";
 import { invoke } from "../../lib/command.js";
 import { Trails, _resetTrailsEnv } from "../../lib/trails.js";
@@ -25,8 +18,8 @@ import { lookupBang } from "../../lib/command/behavior.js";
 await lookupBang();
 
 const exit = vi.hoisted(() => vi.fn());
-vi.mock("@blazetrails/ruby-compat", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@blazetrails/ruby-compat")>()),
+vi.mock("@blazetrails/ruby-compat/process-adapter", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@blazetrails/ruby-compat/process-adapter")>()),
   exit,
 }));
 

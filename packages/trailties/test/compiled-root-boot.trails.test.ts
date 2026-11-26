@@ -1,4 +1,8 @@
-import { Dir, File, FileUtils, Open3, getProcessAdapter } from "@blazetrails/ruby-compat";
+import { Dir } from "@blazetrails/ruby-compat/dir";
+import { File } from "@blazetrails/ruby-compat/file";
+import { FileUtils } from "@blazetrails/ruby-compat/file-utils";
+import { Open3 } from "@blazetrails/ruby-compat/open3";
+import { getProcessAdapter } from "@blazetrails/ruby-compat/process-adapter";
 import { describe, expect, it } from "vitest";
 
 const record = "(globalThis.__stacks ??= []).push(new Error().stack);\nexport {};\n";

@@ -1,5 +1,5 @@
 import { expect } from "vitest";
-import type { StringIO } from "@blazetrails/ruby-compat";
+import type { StringIO } from "@blazetrails/ruby-compat/string-io";
 
 export function assertOutput(expected: string, io: StringIO, timeout: number = 10): void {
   const deadline = Date.now() + timeout * 1000;

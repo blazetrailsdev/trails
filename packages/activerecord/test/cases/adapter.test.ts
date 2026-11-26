@@ -8,7 +8,9 @@ import {
   assertRaises,
 } from "@blazetrails/activesupport/testing/assertions";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { Process, StandardError, Thread } from "@blazetrails/ruby-compat";
+import { Process } from "@blazetrails/ruby-compat/process";
+import { StandardError } from "@blazetrails/ruby-compat/standard-error";
+import { Thread } from "@blazetrails/ruby-compat/thread";
 import type { AbstractAdapter as DatabaseAdapter } from "../../lib/connection-adapters/abstract-adapter.js";
 import { AbstractAdapter } from "../../lib/connection-adapters/abstract-adapter.js";
 import { AdapterError, ConnectionFailed } from "../../lib/errors.js";

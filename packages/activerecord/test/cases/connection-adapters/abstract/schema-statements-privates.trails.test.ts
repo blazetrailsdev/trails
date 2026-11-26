@@ -19,7 +19,7 @@ import { AbstractAdapter } from "../../../../lib/connection-adapters/abstract-ad
 import { SQLite3Adapter } from "../../../../lib/connection-adapters/sqlite3-adapter.js";
 import { NotImplementedError } from "../../../../lib/errors.js";
 import { Table, Visitors } from "@blazetrails/arel";
-import { KeyError } from "@blazetrails/ruby-compat";
+import { KeyError } from "@blazetrails/ruby-compat/key-error";
 import { resultFromRowHashes } from "../../../support/result-from-row-hashes.js";
 
 function makeStatements(

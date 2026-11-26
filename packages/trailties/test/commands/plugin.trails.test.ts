@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { capture } from "@blazetrails/activesupport/testing/stream";
-import { Dir, File } from "@blazetrails/ruby-compat";
+import { Dir } from "@blazetrails/ruby-compat/dir";
+import { File } from "@blazetrails/ruby-compat/file";
 import { invoke } from "../../lib/command.js";
 
 describe("Trails::Command::PluginCommand", () => {

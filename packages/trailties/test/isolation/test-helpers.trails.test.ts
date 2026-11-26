@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { TestCase } from "@blazetrails/activesupport/test-case";
-import { getFs, env as ENV } from "@blazetrails/ruby-compat";
+import { getFs } from "@blazetrails/ruby-compat/fs-adapter";
+import { env as ENV } from "@blazetrails/ruby-compat/process-adapter";
 import { Application } from "../../lib/application.js";
 import { Trails } from "../../lib/trails.js";
 import type { Generation } from "../support/isolation/abstract-unit.js";

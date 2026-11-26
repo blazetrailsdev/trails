@@ -20,7 +20,8 @@ import {
   assertRaises,
 } from "@blazetrails/activesupport/testing/assertions";
 import type { Fanout } from "@blazetrails/activesupport/notifications/fanout";
-import { include, NotImplementedError, type Included } from "@blazetrails/ruby-compat";
+import { include, type Included } from "@blazetrails/ruby-compat/include";
+import { NotImplementedError } from "@blazetrails/ruby-compat/not-implemented-error";
 import type { RackApp, RackBody, RackResponse } from "@blazetrails/rack";
 import { Logger } from "../lib/rack/logger.js";
 import type { Tagger } from "../lib/rack/logger.js";

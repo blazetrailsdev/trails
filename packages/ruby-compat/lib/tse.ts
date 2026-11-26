@@ -1,3 +1,4 @@
+import { getPath } from "./fs-adapter.js";
 import { LoadError } from "./load-error.js";
 import type { Binding } from "./variable.js";
 
@@ -58,7 +59,11 @@ export class TSE {
   async result(b: Binding): Promise<string> {
     if (this.filename == null) throw new LoadError("cannot load such file -- (erb)");
     const compiled = `${this.filename}.js`;
-    const url = new URL(compiled.replace(/[%#?]/g, encodeURIComponent), "file:///");
+    const { pathToFileURL } = getPath();
+    const url =
+      pathToFileURL !== undefined
+        ? pathToFileURL(compiled)
+        : new URL(compiled.replace(/[%#?]/g, encodeURIComponent), "file:///");
     if (loaded.has(url.href)) url.search = `?${(loads += 1)}`;
     else loaded.add(url.href);
     let mod: Compiled;

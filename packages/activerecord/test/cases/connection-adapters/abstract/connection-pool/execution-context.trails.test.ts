@@ -4,7 +4,7 @@ import { ConnectionPool } from "../../../../../lib/connection-adapters/abstract/
 import { PoolConfig } from "../../../../../lib/connection-adapters/pool-config.js";
 import { ConnectionDescriptor } from "../../../../../lib/connection-adapters/abstract/connection-handler.js";
 import { HashConfig } from "../../../../../lib/database-configurations/hash-config.js";
-import { Thread } from "@blazetrails/ruby-compat";
+import { Thread } from "@blazetrails/ruby-compat/thread";
 
 describe("execution context per IsolatedExecutionState.run", () => {
   it("gives concurrent runs distinct leases and leaves top-level code on the root context", async () => {

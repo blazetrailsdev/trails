@@ -21,7 +21,7 @@ import {
   deprecator as activeSupportDeprecator,
 } from "@blazetrails/activesupport";
 import { Digest } from "@blazetrails/activesupport/digest";
-import { DigestClass } from "@blazetrails/ruby-compat";
+import { DigestClass } from "@blazetrails/ruby-compat/digest";
 import { Trailtie, type ActiveSupportConfig } from "../../lib/trailties/active-support.js";
 
 const deprecator = activeSupportDeprecator();

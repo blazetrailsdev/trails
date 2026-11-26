@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { NotImplementedError } from "@blazetrails/ruby-compat";
+import { NotImplementedError } from "@blazetrails/ruby-compat/not-implemented-error";
 import { SingularAssociation } from "../../../lib/associations/singular-association.js";
 
 describe("SingularAssociation#replace", () => {

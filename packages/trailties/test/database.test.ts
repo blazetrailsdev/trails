@@ -1,4 +1,4 @@
-import { Pathname } from "@blazetrails/ruby-compat";
+import { Pathname } from "@blazetrails/ruby-compat/pathname";
 import { describe, it, expect, afterEach } from "vitest";
 import { Base } from "@blazetrails/activerecord";
 import * as nodeFs from "node:fs";

@@ -1,4 +1,5 @@
-import { rbConstGet, rbModName } from "@blazetrails/ruby-compat";
+import { rbModName } from "@blazetrails/ruby-compat/object";
+import { rbConstGet } from "@blazetrails/ruby-compat/variable";
 import { describe, expect, it } from "vitest";
 import { Base } from "../../lib/index.js";
 import { ActiveRecord } from "../../lib/namespaces.js";

@@ -1,7 +1,9 @@
 import { DescendantsTracker } from "@blazetrails/activesupport";
 import { describe, it, expect } from "vitest";
 import { Nodes, Table as ArelTable } from "@blazetrails/arel";
-import { TypeError, constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
+import { TypeError } from "@blazetrails/ruby-compat/type-error";
 import { Base, Relation, UnmodifiableRelation } from "../../../lib/index.js";
 import { fixtures } from "../../support/use-fixtures.js";
 

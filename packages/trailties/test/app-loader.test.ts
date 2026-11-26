@@ -1,9 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { Dir, File, FileUtils, exec } from "@blazetrails/ruby-compat";
+import { Dir } from "@blazetrails/ruby-compat/dir";
+import { File } from "@blazetrails/ruby-compat/file";
+import { FileUtils } from "@blazetrails/ruby-compat/file-utils";
+import { exec } from "@blazetrails/ruby-compat/process-adapter";
 import { AppLoader } from "../lib/app-loader.js";
 
-vi.mock("@blazetrails/ruby-compat", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@blazetrails/ruby-compat")>()),
+vi.mock("@blazetrails/ruby-compat/process-adapter", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@blazetrails/ruby-compat/process-adapter")>()),
   exec: vi.fn(),
 }));
 

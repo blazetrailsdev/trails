@@ -10,7 +10,6 @@ import {
   constGet,
   rbEnsure,
   rbEqual,
-  rbFSystem,
   rbObjAsString as toS,
   rtest,
   stderr as $stderr,
@@ -23,6 +22,7 @@ import {
   uniq,
   rbObjIsKindOf,
 } from "@blazetrails/ruby-compat";
+import { rbFSystem } from "@blazetrails/ruby-compat/kernel-system";
 import * as LineEditor from "../line-editor.js";
 import { ColumnPrinter, type ColumnPrinterOptions } from "./column-printer.js";
 import { TablePrinter } from "./table-printer.js";

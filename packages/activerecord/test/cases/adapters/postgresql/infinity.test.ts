@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { describeIfPg, leasePgAdapter, PostgreSQLAdapter } from "./test-helper.js";
-import { BigDecimal } from "@blazetrails/ruby-compat";
+import { BigDecimal } from "@blazetrails/ruby-compat/big-decimal";
 import { Range } from "../../../../lib/index.js";
 import { setZone } from "@blazetrails/activesupport";
 import { fixtures } from "../../../support/use-fixtures.js";

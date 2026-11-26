@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { NoMethodError } from "@blazetrails/ruby-compat";
+import { NoMethodError } from "@blazetrails/ruby-compat/no-method-error";
 import { Updater } from "../../lib/engine/updater.js";
 import { PluginGenerator } from "../../lib/generators/trails/plugin/plugin-generator.js";
 

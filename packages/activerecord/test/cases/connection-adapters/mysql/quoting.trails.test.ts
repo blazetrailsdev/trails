@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { BinaryData } from "@blazetrails/activemodel";
 import { Time as RubyTime } from "@blazetrails/date";
-import { Rational } from "@blazetrails/ruby-compat";
+import { Rational } from "@blazetrails/ruby-compat/rational";
 import { BigDecimal, TimeWithZone, TimeZone } from "@blazetrails/activesupport";
 import {
   quoteColumnName,

@@ -2,7 +2,7 @@ import type { AssociationProxy } from "../../../lib/associations/collection-prox
 import type { CollectionAssociation } from "../../../lib/associations/collection-association.js";
 import { describe, it, expect } from "vitest";
 import { constantize } from "@blazetrails/activesupport";
-import { rbModName } from "@blazetrails/ruby-compat";
+import { rbModName } from "@blazetrails/ruby-compat/object";
 import "../../../lib/index.js";
 import { fixtures } from "../../support/use-fixtures.js";
 import "../../support/canonical-model-index.js";

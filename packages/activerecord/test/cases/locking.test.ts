@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeAll } from "vitest";
-import { RuntimeError, constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
 import {
   Base,
   StaleObjectError,

@@ -1,14 +1,14 @@
-import { Pathname } from "@blazetrails/ruby-compat";
+import { Pathname } from "@blazetrails/ruby-compat/pathname";
 import { describe, it, expect, beforeEach, afterEach, onTestFinished, vi } from "vitest";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
 import {
   env,
   setEnv,
   getProcessAdapter,
   registerProcessAdapter,
-  StringIO,
-  TopLevel,
-  constSet,
-} from "@blazetrails/ruby-compat";
+} from "@blazetrails/ruby-compat/process-adapter";
+import { StringIO } from "@blazetrails/ruby-compat/string-io";
 import { setAppPath, setEnginePath } from "../../lib/app-path.js";
 import { resolveEnv } from "../../lib/database.js";
 import {
@@ -47,10 +47,11 @@ import * as path from "node:path";
 import * as os from "node:os";
 import { lookupBang } from "../../lib/command/behavior.js";
 import { DSL, Rake } from "@blazetrails/rake";
-import { rbFLoad } from "@blazetrails/ruby-compat";
+import { rbFLoad } from "@blazetrails/ruby-compat/load";
 import { Configuration } from "../../lib/application/configuration.js";
 import { Actions } from "../../lib/command/actions.js";
-import { block, getPath } from "@blazetrails/ruby-compat";
+import { getPath } from "@blazetrails/ruby-compat/fs-adapter";
+import { block } from "@blazetrails/ruby-compat/hash";
 
 let seedLoads = 0;
 

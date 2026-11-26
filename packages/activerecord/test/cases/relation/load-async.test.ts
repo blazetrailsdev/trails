@@ -1,5 +1,7 @@
 import { describe, it, expect, afterEach, beforeEach } from "vitest";
-import { Concurrent, Thread, setEnv } from "@blazetrails/ruby-compat";
+import { Concurrent } from "@blazetrails/ruby-compat/concurrent/map";
+import { setEnv } from "@blazetrails/ruby-compat/process-adapter";
+import { Thread } from "@blazetrails/ruby-compat/thread";
 import {
   IsolatedExecutionState,
   Notifications,

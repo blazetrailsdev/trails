@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { BacktraceFilter, Minitest } from "@blazetrails/activesupport/testing/assertions";
-import { env, setEnv } from "@blazetrails/ruby-compat";
+import { env, setEnv } from "@blazetrails/ruby-compat/process-adapter";
 import { pluginTrailsInit } from "../../lib/minitest/trails-plugin.js";
 
 function backtraceGemLine(gemName: string): string {

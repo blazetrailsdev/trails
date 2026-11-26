@@ -1,14 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { assertMatch } from "@blazetrails/activesupport/testing/assertions";
 import { capture } from "@blazetrails/activesupport/testing/stream";
-import {
-  Dir,
-  File,
-  FileUtils,
-  SystemExit,
-  getProcessAdapter,
-  include,
-} from "@blazetrails/ruby-compat";
+import { Dir } from "@blazetrails/ruby-compat/dir";
+import { File } from "@blazetrails/ruby-compat/file";
+import { FileUtils } from "@blazetrails/ruby-compat/file-utils";
+import { include } from "@blazetrails/ruby-compat/include";
+import { SystemExit, getProcessAdapter } from "@blazetrails/ruby-compat/process-adapter";
 import { ARGVScrubber } from "../../lib/generators/trails/app/app-generator.js";
 import { VERSION } from "../../lib/gem-version.js";
 import { EnvHelpers } from "../support/env-helpers.js";

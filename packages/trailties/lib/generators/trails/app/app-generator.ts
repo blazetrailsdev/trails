@@ -4,12 +4,12 @@ import {
   File,
   STDOUT,
   env,
-  exit,
   included,
   rbArgv,
   rbRegSUnion,
   stringSplit,
 } from "@blazetrails/ruby-compat";
+import { exit } from "@blazetrails/ruby-compat/process-adapter";
 import { presence } from "@blazetrails/activesupport";
 import { TopLevel } from "@blazetrails/activesupport";
 import { AppBase, CSS_OPTIONS, JAVASCRIPT_OPTIONS, type AppBaseOptions } from "../../app-base.js";

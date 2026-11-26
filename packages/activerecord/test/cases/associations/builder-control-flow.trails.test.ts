@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { Hash } from "@blazetrails/ruby-compat";
+import { Hash } from "@blazetrails/ruby-compat/hash";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { Base, RecordNotDestroyed } from "../../../lib/index.js";
 import { fixtures } from "../../support/use-fixtures.js";

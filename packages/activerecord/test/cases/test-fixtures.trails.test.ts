@@ -1,5 +1,6 @@
 import { describe, it, expect, expectTypeOf, vi, beforeAll, afterAll, beforeEach } from "vitest";
-import { NoMethodError, include } from "@blazetrails/ruby-compat";
+import { include } from "@blazetrails/ruby-compat/include";
+import { NoMethodError } from "@blazetrails/ruby-compat/no-method-error";
 import { Minitest } from "@blazetrails/activesupport/testing/assertions";
 import "../../lib/relation.js";
 import { TestCase } from "./test-case.js";

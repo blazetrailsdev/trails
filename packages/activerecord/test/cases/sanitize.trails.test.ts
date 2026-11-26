@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { sql as arelSql } from "@blazetrails/arel";
-import { ArgumentError } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
 import { fixtures } from "../support/use-fixtures.js";
 import { Post } from "../models/post.js";
 import { User } from "../models/user.js";

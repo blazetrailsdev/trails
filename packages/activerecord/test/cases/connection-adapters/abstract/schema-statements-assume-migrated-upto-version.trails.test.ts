@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { RuntimeError } from "@blazetrails/ruby-compat";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
 import { SchemaStatements } from "../../../../lib/connection-adapters/abstract/schema-statements.js";
 
 function makeStatements(options: { migrated?: number[]; versions?: number[] } = {}) {

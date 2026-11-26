@@ -10,7 +10,7 @@ import { Application } from "../lib/application.js";
 import { Trails } from "../lib/trails.js";
 import { AuthenticationGenerator } from "../lib/generators/trails/authentication/authentication-generator.js";
 import { GeneratorGenerator } from "../lib/generators/trails/generator/generator-generator.js";
-import { getFs, getPath } from "@blazetrails/ruby-compat";
+import { getFs, getPath } from "@blazetrails/ruby-compat/fs-adapter";
 import { lookupBang } from "../lib/command/behavior.js";
 
 await lookupBang();

@@ -1,11 +1,11 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import {
-  STDOUT,
   fsAdapterConfig,
   registerFsAdapter,
   type FsAdapter,
   type PathAdapter,
-} from "@blazetrails/ruby-compat";
+} from "@blazetrails/ruby-compat/fs-adapter";
+import { STDOUT } from "@blazetrails/ruby-compat/io";
 import {
   Annotation,
   SourceAnnotationExtractor,

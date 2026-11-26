@@ -1,6 +1,7 @@
 import { DescendantsTracker } from "@blazetrails/activesupport";
 import { Namespaced } from "../../models/company.js";
-import { constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
 import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
 import { Base } from "../../../lib/base.js";
 import { Tagging } from "../../models/tagging.js";

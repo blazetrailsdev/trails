@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { assertRaises, assertRespondTo } from "@blazetrails/activesupport/testing/assertions";
-import { NotImplementedError, Thread } from "@blazetrails/ruby-compat";
+import { NotImplementedError } from "@blazetrails/ruby-compat/not-implemented-error";
+import { Thread } from "@blazetrails/ruby-compat/thread";
 import { Executor } from "@blazetrails/activesupport";
 import { BodyProxy } from "@blazetrails/rack";
 import { Base } from "../../lib/index.js";

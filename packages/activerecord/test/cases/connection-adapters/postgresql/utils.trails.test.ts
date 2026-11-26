@@ -1,4 +1,4 @@
-import { TypeError } from "@blazetrails/ruby-compat";
+import { TypeError } from "@blazetrails/ruby-compat/type-error";
 import { describe, expect, it } from "vitest";
 import {
   describeIfPg,

@@ -1,4 +1,4 @@
-import { env as ENV } from "@blazetrails/ruby-compat";
+import { env as ENV } from "@blazetrails/ruby-compat/process-adapter";
 import { buildTemplates } from "@blazetrails/trails-tsc";
 
 export default async function setup(): Promise<void> {

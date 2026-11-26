@@ -13,7 +13,6 @@ import {
   aryDeleteIf,
   block,
   fetch,
-  warn,
   Process,
   RFC2396_PARSER,
   URI,
@@ -25,6 +24,7 @@ import {
   b as rbB,
   Range,
 } from "@blazetrails/ruby-compat";
+import { warn } from "@blazetrails/ruby-compat/kernel-warn";
 
 export { ArgumentError };
 

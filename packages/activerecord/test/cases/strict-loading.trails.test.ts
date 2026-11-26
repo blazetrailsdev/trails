@@ -1,4 +1,5 @@
-import { constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
 import { describe, it, expect } from "vitest";
 import { loadSingularTarget } from "../support/load-singular-target.js";
 import { StrictLoadingViolationError } from "../../lib/index.js";

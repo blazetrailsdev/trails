@@ -1,4 +1,4 @@
-import { StandardError } from "@blazetrails/ruby-compat";
+import { StandardError } from "@blazetrails/ruby-compat/standard-error";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import "../../../../lib/index.js";
 import { Base } from "../../../../lib/base.js";

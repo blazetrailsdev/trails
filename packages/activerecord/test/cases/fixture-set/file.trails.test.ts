@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { File as RubyFile, RuntimeError, Tempfile } from "@blazetrails/ruby-compat";
+import { File as RubyFile } from "@blazetrails/ruby-compat/file";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
+import { Tempfile } from "@blazetrails/ruby-compat/tempfile";
 import { ConfigurationFile } from "@blazetrails/activesupport/configuration-file";
 
 import { File } from "../../../lib/fixture-set/file.js";

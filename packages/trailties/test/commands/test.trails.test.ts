@@ -1,5 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { Dir, File, getFs, rbFSystem } from "@blazetrails/ruby-compat";
+import { Dir } from "@blazetrails/ruby-compat/dir";
+import { File } from "@blazetrails/ruby-compat/file";
+import { getFs } from "@blazetrails/ruby-compat/fs-adapter";
+import { rbFSystem } from "@blazetrails/ruby-compat/kernel-system";
 import { buildTemplates } from "@blazetrails/trails-tsc";
 import { TestUnitReporter } from "../../lib/test-unit/reporter.js";
 import { Runner } from "../../lib/test-unit/runner.js";
@@ -8,8 +11,8 @@ import { UnrecognizedCommandError } from "../../lib/command.js";
 import { RakeCommand } from "../../lib/commands/rake.js";
 import { TestCommand } from "../../lib/commands/test.js";
 
-vi.mock("@blazetrails/ruby-compat", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@blazetrails/ruby-compat")>()),
+vi.mock("@blazetrails/ruby-compat/kernel-system", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@blazetrails/ruby-compat/kernel-system")>()),
   rbFSystem: vi.fn().mockResolvedValue(true),
 }));
 

@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { EncryptedAttributeType } from "../../../lib/encryption/encrypted-attribute-type.js";
 import { Decryption } from "../../../lib/encryption/errors.js";
-import { rbInspect } from "@blazetrails/ruby-compat";
+import { rbInspect } from "@blazetrails/ruby-compat/object";
 import type { EncryptorLike } from "../../../lib/encryption/encryptor.js";
 import { encrypts } from "../../../lib/encryption/encryptable-record.js";
 import { Base } from "../../../lib/index.js";

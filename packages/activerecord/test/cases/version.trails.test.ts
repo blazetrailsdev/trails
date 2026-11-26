@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Gem } from "@blazetrails/ruby-compat";
+import { Gem } from "@blazetrails/ruby-compat/gem";
 import { VERSION, gemVersion } from "../../lib/gem-version.js";
 import { version } from "../../lib/version.js";
 

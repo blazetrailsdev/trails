@@ -1,4 +1,5 @@
-import { constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
 import { rbModAppendFeatures } from "@blazetrails/ruby-compat/include";
 import { describe, it, expect } from "vitest";
 import { fixtures } from "../support/use-fixtures.js";

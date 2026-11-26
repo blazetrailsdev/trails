@@ -1,20 +1,16 @@
-import {
-  Dir,
-  File,
-  FileUtils,
-  Process,
-  RuntimeError,
-  Shellwords,
-  classModule,
-  env as ENV,
-  extend,
-  include,
-  getFs,
-  rbFArray,
-  rbFBackquote,
-  rbInspect,
-  setEnv,
-} from "@blazetrails/ruby-compat";
+import { rbFArray } from "@blazetrails/ruby-compat/array";
+import { classModule } from "@blazetrails/ruby-compat/class-module";
+import { Dir } from "@blazetrails/ruby-compat/dir";
+import { File } from "@blazetrails/ruby-compat/file";
+import { FileUtils } from "@blazetrails/ruby-compat/file-utils";
+import { getFs } from "@blazetrails/ruby-compat/fs-adapter";
+import { extend, include } from "@blazetrails/ruby-compat/include";
+import { rbFBackquote } from "@blazetrails/ruby-compat/kernel-system";
+import { rbInspect } from "@blazetrails/ruby-compat/object";
+import { Process } from "@blazetrails/ruby-compat/process";
+import { env as ENV, setEnv } from "@blazetrails/ruby-compat/process-adapter";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
+import { Shellwords } from "@blazetrails/ruby-compat/shellwords";
 import { Dependencies } from "@blazetrails/activesupport";
 import { MethodCallAssertions } from "@blazetrails/activesupport/testing/method-call-assertions";
 import { Stream } from "@blazetrails/activesupport/testing/stream";

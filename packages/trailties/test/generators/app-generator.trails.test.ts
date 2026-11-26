@@ -1,18 +1,14 @@
-import { Gem } from "@blazetrails/ruby-compat";
+import { Gem } from "@blazetrails/ruby-compat/gem";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { spawnSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
-import {
-  Dir,
-  File,
-  FileUtils,
-  SecureRandom,
-  env,
-  getProcessAdapter,
-  setEnv,
-} from "@blazetrails/ruby-compat";
+import { Dir } from "@blazetrails/ruby-compat/dir";
+import { File } from "@blazetrails/ruby-compat/file";
+import { FileUtils } from "@blazetrails/ruby-compat/file-utils";
+import { env, getProcessAdapter, setEnv } from "@blazetrails/ruby-compat/process-adapter";
+import { SecureRandom } from "@blazetrails/ruby-compat/secure-random";
 import { AppBuilder, AppGenerator } from "../../lib/generators/trails/app/app-generator.js";
 import { TopLevel } from "@blazetrails/activesupport";
 import { Generators } from "../../lib/generators.js";

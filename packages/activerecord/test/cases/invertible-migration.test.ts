@@ -1,4 +1,6 @@
-import { block as rbBlock, constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { block as rbBlock } from "@blazetrails/ruby-compat/hash";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
 import { describe, it, expect, afterEach } from "vitest";
 import { assertEmpty } from "@blazetrails/activesupport/testing/assertions";
 import { Base } from "../../lib/base.js";

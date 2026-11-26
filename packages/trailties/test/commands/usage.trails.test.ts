@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { Dir, File, getFs } from "@blazetrails/ruby-compat";
+import { Dir } from "@blazetrails/ruby-compat/dir";
+import { File } from "@blazetrails/ruby-compat/file";
+import { getFs } from "@blazetrails/ruby-compat/fs-adapter";
 import { buildTemplates } from "@blazetrails/trails-tsc";
 import { capture } from "@blazetrails/activesupport/testing/stream";
 import { invoke } from "../../lib/command.js";

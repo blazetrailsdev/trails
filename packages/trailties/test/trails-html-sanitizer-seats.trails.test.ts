@@ -1,5 +1,5 @@
 import { HTML, HTML4, HTML5 } from "@blazetrails/html-sanitizer";
-import { TopLevel, rbModName } from "@blazetrails/ruby-compat";
+import { TopLevel, rbModName } from "@blazetrails/ruby-compat/object";
 import { describe, expect, it } from "vitest";
 import { Trails } from "../lib/trails.js";
 

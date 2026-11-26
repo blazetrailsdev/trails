@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import { SQLite3Adapter } from "../../lib/connection-adapters/sqlite3-adapter.js";
-import { File, TopLevel, constSet } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat/file";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
 import { ConnectionPool } from "../../lib/connection-adapters/abstract/connection-pool.js";
 import { PoolConfig } from "../../lib/connection-adapters/pool-config.js";
 import { ConnectionDescriptor } from "../../lib/connection-adapters/abstract/connection-handler.js";

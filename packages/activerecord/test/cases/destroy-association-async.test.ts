@@ -15,7 +15,10 @@ import {
 } from "@blazetrails/activesupport/testing/assertions";
 import type { TestHelper } from "@blazetrails/activejob/test-helper";
 import { TestHelper as ActiveJobTestHelper } from "@blazetrails/activejob/test-helper";
-import { include, rbEqual, regexpEscape, TopLevel, constSet } from "@blazetrails/ruby-compat";
+import { include, constSet } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
+import { rbEqual } from "@blazetrails/ruby-compat/rb-equal";
+import { regexpEscape } from "@blazetrails/ruby-compat/regexp";
 import { Base } from "../../lib/base.js";
 import type { TestCase } from "./test-case.js";
 import { RecordNotFound, Rollback } from "../../lib/errors.js";

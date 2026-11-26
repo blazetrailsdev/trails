@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { Notifications, type NotificationEvent } from "@blazetrails/activesupport";
-import { rbObjIvarGet, rbObjIvarSet, ThreadPoolExecutor } from "@blazetrails/ruby-compat";
+import { rbObjIvarGet, rbObjIvarSet } from "@blazetrails/ruby-compat/object";
+import { ThreadPoolExecutor } from "@blazetrails/ruby-compat/thread-pool-executor";
 import {
   asyncQueryExecutor,
   globalExecutorConcurrency,

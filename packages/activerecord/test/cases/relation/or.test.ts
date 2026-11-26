@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { assertNothingRaised, assertRaises } from "@blazetrails/activesupport/testing/assertions";
-import { ArgumentError, constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
 import { adapterType } from "../../support/test-adapter.js";
 import { fixtures } from "../../support/use-fixtures.js";
 import { Author } from "../../models/author.js";

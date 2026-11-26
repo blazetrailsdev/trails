@@ -1,7 +1,7 @@
 import { describe, it } from "vitest";
 import { Concern } from "@blazetrails/activesupport";
 import { assertEqual } from "@blazetrails/activesupport/testing/assertions";
-import { extend, include, rbCallSuper } from "@blazetrails/ruby-compat";
+import { extend, include, rbCallSuper } from "@blazetrails/ruby-compat/include";
 import { Base } from "../../lib/index.js";
 import { fixtures } from "../support/use-fixtures.js";
 

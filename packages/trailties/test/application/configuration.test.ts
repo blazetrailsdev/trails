@@ -9,7 +9,8 @@ import {
   onTestFinished,
   vi,
 } from "vitest";
-import { constSet, isModuleIncluded, rbModRemoveConst } from "@blazetrails/ruby-compat";
+import { constSet, isModuleIncluded } from "@blazetrails/ruby-compat/include";
+import { rbModRemoveConst } from "@blazetrails/ruby-compat/variable";
 import { ActionDispatch, Response, Session } from "@blazetrails/actionpack";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -45,27 +46,25 @@ import { ActionMailbox } from "@blazetrails/actionmailbox";
 import { ActionCable } from "@blazetrails/actioncable";
 import type { Base as CableServer } from "@blazetrails/actioncable/server/base";
 import { days, Logger } from "@blazetrails/activesupport";
-import {
-  ArgumentError,
-  constGet,
-  Encoding,
-  FileUtils,
-  rbInspect,
-  rbObjRespondTo,
-  STDOUT,
-  NameError,
-  Process,
-  TopLevel,
-  env,
-  getFs,
-  Pathname,
-  RuntimeError,
-  setEnv,
-} from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { Encoding } from "@blazetrails/ruby-compat/encoding";
+import { FileUtils } from "@blazetrails/ruby-compat/file-utils";
+import { getFs } from "@blazetrails/ruby-compat/fs-adapter";
+import { STDOUT } from "@blazetrails/ruby-compat/io";
+import { NameError } from "@blazetrails/ruby-compat/name-error";
+import { rbInspect, rbObjRespondTo, TopLevel } from "@blazetrails/ruby-compat/object";
+import { Pathname } from "@blazetrails/ruby-compat/pathname";
+import { Process } from "@blazetrails/ruby-compat/process";
+import { env, setEnv } from "@blazetrails/ruby-compat/process-adapter";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
+import { constGet } from "@blazetrails/ruby-compat/variable";
 import * as ActiveRecord from "@blazetrails/activerecord";
 import { Dependencies } from "@blazetrails/activesupport";
 import { Numeric } from "@blazetrails/activesupport/core-ext/numeric/bytes";
-import { File, LOAD_PATH, OpenSSL, StandardError } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat/file";
+import { LOAD_PATH } from "@blazetrails/ruby-compat/load";
+import { OpenSSL } from "@blazetrails/ruby-compat/openssl";
+import { StandardError } from "@blazetrails/ruby-compat/standard-error";
 import { Time } from "@blazetrails/date";
 import { SQLite3Adapter } from "@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js";
 import { Digest } from "@blazetrails/activesupport/digest";
@@ -80,7 +79,7 @@ import { Trailtie as ActionMailerTrailtie } from "../../lib/trailties/action-mai
 import { TestCase } from "@blazetrails/activesupport/test-case";
 import { Isolation } from "@blazetrails/activesupport/testing/isolation";
 import { ActionController } from "@blazetrails/actionpack";
-import { include } from "@blazetrails/ruby-compat";
+import { include } from "@blazetrails/ruby-compat/include";
 import type { Generation } from "../support/isolation/abstract-unit.js";
 import "../support/isolation/abstract-unit.js";
 import * as FormTagHelper from "@blazetrails/actionview/helpers/form-tag-helper";
@@ -124,7 +123,8 @@ import {
   IsolatedExecutionState,
 } from "@blazetrails/activesupport";
 import { Store as CacheStore } from "@blazetrails/activesupport/cache/store";
-import { NoMethodError, toA } from "@blazetrails/ruby-compat";
+import { toA } from "@blazetrails/ruby-compat/array";
+import { NoMethodError } from "@blazetrails/ruby-compat/no-method-error";
 import { ContentHelper } from "@blazetrails/actiontext";
 import { TranslationHelper } from "@blazetrails/actionview/helpers/translation-helper";
 import { Translation } from "@blazetrails/activemodel";
