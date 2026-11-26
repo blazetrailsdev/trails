@@ -1,0 +1,37 @@
+name: Playground
+
+on:
+  pull_request:
+    paths:
+      - "examples/browser-sqlite/**"
+      - ".github/workflows/playground.yml"
+
+concurrency:
+  group: playground-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    name: Playground smoke (${{ matrix.browser }})
+    runs-on: ${{ vars.RUNNER || 'ubuntu-24.04' }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, webkit]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-pnpm
+      - run: pnpm install --frozen-lockfile --prefer-offline
+      - name: Resolve the playwright version
+        id: playwright-version
+        run: echo "version=$(pnpm --filter @blazetrails/example-browser-sqlite exec node -p "require('playwright/package.json').version")" >>"$GITHUB_OUTPUT"
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ms-playwright-v1-${{ matrix.browser }}-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}
+      - run: pnpm exec tsc --build tsconfig.json
+      - run: pnpm --filter @blazetrails/example-browser-sqlite exec playwright install --with-deps ${{ matrix.browser }}
+      - run: pnpm --filter @blazetrails/example-browser-sqlite smoke
+        env:
+          BROWSER: ${{ matrix.browser }}
