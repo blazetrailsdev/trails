@@ -19,7 +19,7 @@ export type MiddlewareFactory =
   | { name: string; "new"(app: unknown, ...args: unknown[]): unknown };
 
 /** @noRailsEquivalent PERMANENT */
-function _name(klass: object): string | null {
+function _klassName(klass: object): string | null {
   if (typeof klass === "function") {
     for (
       let k: object | null = klass;
@@ -41,7 +41,7 @@ export class Middleware {
   ) {}
 
   get name(): string | null {
-    return _name(this.klass);
+    return _klassName(this.klass);
   }
 
   equals(middleware: unknown): boolean | undefined {
@@ -171,7 +171,7 @@ export class MiddlewareStack implements Iterable<Middleware> {
   delete(target: MiddlewareClass | MiddlewareFactory): Middleware[] | null {
     let rejected = false;
     for (let i = this.entries.length - 1; i >= 0; i--) {
-      if (this.entries[i].name === _name(target)) {
+      if (this.entries[i].name === _klassName(target)) {
         this.entries.splice(i, 1);
         rejected = true;
       }
@@ -261,6 +261,6 @@ export class MiddlewareStack implements Iterable<Middleware> {
 
   /** @internal */
   indexOf(klass: MiddlewareFactory): number {
-    return this.entries.findIndex((m) => m.name === _name(klass));
+    return this.entries.findIndex((m) => m.name === _klassName(klass));
   }
 }
