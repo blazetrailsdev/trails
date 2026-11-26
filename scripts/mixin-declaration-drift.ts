@@ -77,11 +77,6 @@ function signatureOf(node: ts.SignatureDeclarationBase): string {
   return `${typeParams}(${params}): ${typeText(node.type) ?? ""}`;
 }
 
-/**
- * A declaration has no body to bind into, and typescript-5 rejects an optional
- * destructured parameter with no initializer (TS2339), so an interface names a
- * kwargs pattern by its `**options` rest: `{ ifExists, ...options }` is `options`.
- */
 function parameterNameText(name: ts.BindingName): string {
   if (ts.isObjectBindingPattern(name)) {
     const rest = name.elements.find((e) => e.dotDotDotToken && ts.isIdentifier(e.name));
