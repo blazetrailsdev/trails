@@ -23,7 +23,8 @@ if (!app.requestSingleInstanceLock()) app.exit(0);
 async function boot(): Promise<void> {
   const { Trails } = await import("@blazetrails/trailties");
   await import("../config/environment.ts");
-  const { Base, DatabaseTasks } = await import("@blazetrails/activerecord");
+  const { Base } = await import("@blazetrails/activerecord");
+  const { DatabaseTasks } = await import("@blazetrails/activerecord/tasks/database-tasks.js");
   await DatabaseTasks.prepareAll();
   const pool = Base.connectionPool();
   await pool.schemaReflection.loadAllBang(pool);
