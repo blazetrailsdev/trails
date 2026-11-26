@@ -22,7 +22,7 @@ async function withMigrationTemplate(name: string, block: () => Promise<void>) {
     await FileUtils.mkdirPAsync(File.join(sourceRoot, "db"));
     await File.writeAsync(
       File.join(sourceRoot, "db", `${name}.ts`),
-      `export class ${camelize(name)} extends Migration.get(7.1) {\n  async change(): Promise<void> {}\n}\n`,
+      `export class ${camelize(name.replaceAll("-", "_"))} extends Migration.get(7.1) {\n  async change(): Promise<void> {}\n}\n`,
     );
 
     await buildTemplates([File.join(sourceRoot, "db", `${name}.ts`)]);
@@ -57,11 +57,11 @@ describe("UpdateGeneratorTest", () => {
   });
 
   it("copies new migrations to the queue database migrations path", async () => {
-    await withMigrationTemplate("add_batches_to_solid_queue", async () => {
+    await withMigrationTemplate("add-batches-to-solid-queue", async () => {
       await testCase.runGenerator();
 
       await testCase.assertMigration(
-        "db/queue_migrate/add_batches_to_solid_queue.ts",
+        "db/queue_migrate/add-batches-to-solid-queue.ts",
         (migration: string) => {
           expect(migration).toMatch(/class AddBatchesToSolidQueue/);
         },
@@ -70,22 +70,22 @@ describe("UpdateGeneratorTest", () => {
   });
 
   it("copies new migrations to another database's migrations path", async () => {
-    await withMigrationTemplate("add_batches_to_solid_queue", async () => {
+    await withMigrationTemplate("add-batches-to-solid-queue", async () => {
       await testCase.runGenerator(["--database", "primary"]);
 
-      await testCase.assertMigration("db/migrate/add_batches_to_solid_queue.ts");
+      await testCase.assertMigration("db/migrate/add-batches-to-solid-queue.ts");
     });
   });
 
   it("skips migrations that have already been copied", async () => {
-    await withMigrationTemplate("add_batches_to_solid_queue", async () => {
+    await withMigrationTemplate("add-batches-to-solid-queue", async () => {
       await testCase.runGenerator();
       await testCase.runGenerator();
 
       expect(
         (
           await Dir.globAsync(
-            File.join(testCase.destinationRoot, "db/queue_migrate/*_add_batches_to_solid_queue.ts"),
+            File.join(testCase.destinationRoot, "db/queue_migrate/*_add-batches-to-solid-queue.ts"),
           )
         ).length,
       ).toBe(1);
@@ -110,7 +110,7 @@ describe("UpdateGeneratorTest", () => {
     await testCase.runGenerator();
 
     await testCase.assertMigration(
-      "db/queue_migrate/add_batches_to_solid_queue.ts",
+      "db/queue_migrate/add-batches-to-solid-queue.ts",
       (migration: string) => {
         expect(migration).toMatch(/class AddBatchesToSolidQueue/);
         expect(migration).toMatch(/createTable\("solid_queue_batches", \{ ifNotExists: true \}/);
