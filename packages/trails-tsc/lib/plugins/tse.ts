@@ -155,7 +155,12 @@ function buildPreamble(needsNoExtraKeys: boolean, withTopLevel: boolean): string
   return [
     "/* virtualized from .tse — phase 2b trails-tsc plugin */",
     `import type { ${actionviewImports} } from "@blazetrails/actionview";`,
-    ...(withTopLevel ? ['import { TopLevel } from "@blazetrails/actionview";'] : []),
+    ...(withTopLevel
+      ? [
+          'import { TopLevel } from "@blazetrails/actionview";',
+          'import type { ConstantTable } from "@blazetrails/actionview";',
+        ]
+      : []),
     "interface SafeString { readonly __safeStringBrand: unique symbol }",
     "interface OutputBuffer extends SafeString {",
     "  safeAppend(s: string): void;",
@@ -170,12 +175,13 @@ function buildPreamble(needsNoExtraKeys: boolean, withTopLevel: boolean): string
     "  yield(section?: string): SafeString;",
     "  contentFor(name: string, callback: () => void): void;",
     "  render<O extends object = {}>(options?: O extends { partial: unknown } ? never : O, locals?: Record<string, unknown>, block?: () => unknown): SafeString | string | Uint8Array | null | Promise<SafeString | string | Uint8Array | null>;",
-    "  render<P extends string>(options: { partial: P } & (",
-    "    P extends keyof TemplateRegistry",
+    "  render<P extends string, C = undefined>(options: { partial: P; collection?: C; as?: string; spacerTemplate?: string; cached?: unknown } & (",
+    "    [C] extends [undefined] ? P extends keyof TemplateRegistry",
     "      ? {} extends TemplateLocals<TemplateRegistry[P]>",
     "        ? { locals?: TemplateLocals<TemplateRegistry[P]> }",
     "        : { locals: TemplateLocals<TemplateRegistry[P]> }",
     "      : { locals?: Record<string, unknown> }",
+    "    : { locals?: Record<string, unknown> }",
     "  )): SafeString | string | Uint8Array | null | Promise<SafeString | string | Uint8Array | null>;",
     "  render<P extends string>(options: P, ...rest: P extends keyof TemplateRegistry ? {} extends TemplateLocals<TemplateRegistry[P]> ? [locals?: TemplateLocals<TemplateRegistry[P]>, block?: () => unknown] : [locals: TemplateLocals<TemplateRegistry[P]>, block?: () => unknown] : [locals?: Record<string, unknown>, block?: () => unknown]): SafeString | string | Uint8Array | null | Promise<SafeString | string | Uint8Array | null>;",
     "  [key: string]: unknown;",
@@ -363,6 +369,8 @@ function scopeTypes(scope: TseScope, localsKnown: boolean): string[] {
     "    ? Bare<View[K]>",
     "    : K extends keyof typeof TopLevel",
     "      ? (typeof TopLevel)[K]",
+    "    : K extends keyof ConstantTable",
+    "      ? ConstantTable[K]",
     "    : K extends keyof typeof globalThis",
     "      ? (typeof globalThis)[K]",
     `      : ${localsKnown ? "never" : "any"};`,

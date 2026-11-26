@@ -8,6 +8,8 @@ export {
 
 export { Template } from "./template.js";
 export { TopLevel } from "@blazetrails/activesupport";
+export type { ConstantTable } from "@blazetrails/ruby-compat";
+export type { ControllerDelegate } from "./helpers/controller-helper.js";
 export type { BacktraceLocation, Spot } from "./template/handlers/tse.js";
 
 export { FileSystemResolver, PathParser, Resolver } from "./template/resolver.js";

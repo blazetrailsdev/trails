@@ -1,7 +1,13 @@
 import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { NoMethodError } from "@blazetrails/ruby-compat/no-method-error";
 import { hashAref } from "@blazetrails/ruby-compat/hash";
 import { methodMissingPrototype } from "@blazetrails/ruby-compat/method-missing-proxy";
-import { rbFSend, rbModMethodDefined, rbObjRespondTo } from "@blazetrails/ruby-compat/object";
+import {
+  rbFSend,
+  rbModMethodDefined,
+  rbModName,
+  rbObjRespondTo,
+} from "@blazetrails/ruby-compat/object";
 import { Callbacks } from "./callbacks.js";
 import { classAttribute } from "./class-attribute.js";
 import { CodeGenerator } from "./code-generator.js";
@@ -182,7 +188,9 @@ export class CurrentAttributes {
   /** @internal */
   private static currentInstancesKey(): string {
     if (!Object.hasOwn(this, "_currentInstancesKey")) {
-      (this as CurrentAttributesClass)._currentInstancesKey = this.name;
+      const name = rbModName(this);
+      if (name == null) throw new NoMethodError("undefined method 'to_sym' for nil");
+      (this as CurrentAttributesClass)._currentInstancesKey = name;
     }
     return (this as CurrentAttributesClass)._currentInstancesKey!;
   }

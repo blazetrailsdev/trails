@@ -31,7 +31,7 @@ export function delegate(this: object, ...methods: (string | DelegateOptions)[])
 export function delegateMissingTo(
   this: { prototype: object },
   target: string,
-  options: { allowNil?: boolean } = {},
+  options: Delegation.DelegateMissingToOptions = {},
 ): void {
   Delegation.generateMethodMissing(this, target, options);
 }

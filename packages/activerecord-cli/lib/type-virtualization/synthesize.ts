@@ -549,7 +549,7 @@ function scopeLine(info: ClassInfo, name: string, params: readonly string[]): Re
   const memberName = renderDeclaredMemberName(name);
   return {
     ...line(`declare static ${memberName}: (${argList}) => ${relation};`, name, true),
-    relationScope: `${memberName}(${[`this: ${relation}`, ...params].join(", ")}): ${relation};`,
+    relationScope: `${memberName}(${[`this: ${AR_IMPORT}.Relation<${info.name}, boolean> | ${AR_IMPORT}.CollectionProxy<${info.name}>`, ...params].join(", ")}): ${relation};`,
   };
 }
 

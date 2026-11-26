@@ -20,10 +20,7 @@ describe("ServerTest", () => {
 
   it("port is always included", async () => {
     await new Server().run();
-    assert(
-      /^http:\/\/127\.0\.0\.1:\d+\/$/.test(vite.url!),
-      "expected vite.url to include the port",
-    );
+    assert(/^http:\/\/127\.0\.0\.1:\d+$/.test(vite.url!), "expected vite.url to include the port");
   });
 
   it("server is changed from `default` to `puma`", async () => {

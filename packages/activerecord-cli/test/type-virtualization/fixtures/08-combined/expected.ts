@@ -53,6 +53,6 @@ export interface Post {
 
 declare module "@blazetrails/activerecord" {
   interface RelationScopes<T extends import("@blazetrails/activerecord").Base> {
-    published(this: import("@blazetrails/activerecord").Relation<Post>): import("@blazetrails/activerecord").Relation<Post>;
+    published(this: import("@blazetrails/activerecord").Relation<Post, boolean> | import("@blazetrails/activerecord").CollectionProxy<Post>): import("@blazetrails/activerecord").Relation<Post>;
   }
 }

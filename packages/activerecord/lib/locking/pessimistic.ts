@@ -22,33 +22,33 @@ export async function lockBang<T extends Base>(this: T, lock: boolean | string =
 
 type TxOptions = { requiresNew?: boolean; joinable?: boolean; isolation?: string };
 
-export async function withLock<T extends Base>(
+export async function withLock<T extends Base, R>(
   this: T,
-  fn: () => Promise<void> | void,
-): Promise<void>;
-export async function withLock<T extends Base>(
-  this: T,
-  lockClause: boolean | string,
-  fn: () => Promise<void> | void,
-): Promise<void>;
-export async function withLock<T extends Base>(
-  this: T,
-  options: TxOptions,
-  fn: () => Promise<void> | void,
-): Promise<void>;
-export async function withLock<T extends Base>(
+  fn: () => Promise<R> | R,
+): Promise<R | undefined>;
+export async function withLock<T extends Base, R>(
   this: T,
   lockClause: boolean | string,
+  fn: () => Promise<R> | R,
+): Promise<R | undefined>;
+export async function withLock<T extends Base, R>(
+  this: T,
   options: TxOptions,
-  fn: () => Promise<void> | void,
-): Promise<void>;
-export async function withLock<T extends Base>(this: T, ...args: unknown[]): Promise<void> {
+  fn: () => Promise<R> | R,
+): Promise<R | undefined>;
+export async function withLock<T extends Base, R>(
+  this: T,
+  lockClause: boolean | string,
+  options: TxOptions,
+  fn: () => Promise<R> | R,
+): Promise<R | undefined>;
+export async function withLock<T extends Base>(this: T, ...args: unknown[]): Promise<unknown> {
   const block = typeof args[args.length - 1] === "function" ? args.pop() : undefined;
   const transactionOpts = extractOptionsBang(args) as TxOptions;
   const lock = isPresent(args) ? (args[0] as boolean | string) : true;
-  await this.transaction(async () => {
+  return await this.transaction(async () => {
     await lockBang.call(this, lock);
-    await (block as () => unknown)();
+    return await (block as () => unknown)();
   }, transactionOpts);
 }
 

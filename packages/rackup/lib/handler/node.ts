@@ -472,6 +472,7 @@ function sentHeaders(headers: RackResponse[1]): Record<string, string | string[]
     if (key.startsWith("rack.")) continue;
     if (key === SET_COOKIE) continue;
     if (typeof value === "function") continue;
+    if (value == null) continue;
     sent[key] = Array.isArray(value) ? value.join(", ") : value;
   }
   return sent;

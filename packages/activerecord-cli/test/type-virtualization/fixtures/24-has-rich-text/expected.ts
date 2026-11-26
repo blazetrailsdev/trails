@@ -12,7 +12,7 @@ export class Message extends Base {
 }
 declare module "@blazetrails/activerecord" {
   interface RelationScopes<T extends import("@blazetrails/activerecord").Base> {
-    withRichTextContent(this: import("@blazetrails/activerecord").Relation<Message>): import("@blazetrails/activerecord").Relation<Message>;
-    withRichTextContentAndEmbeds(this: import("@blazetrails/activerecord").Relation<Message>): import("@blazetrails/activerecord").Relation<Message>;
+    withRichTextContent(this: import("@blazetrails/activerecord").Relation<Message, boolean> | import("@blazetrails/activerecord").CollectionProxy<Message>): import("@blazetrails/activerecord").Relation<Message>;
+    withRichTextContentAndEmbeds(this: import("@blazetrails/activerecord").Relation<Message, boolean> | import("@blazetrails/activerecord").CollectionProxy<Message>): import("@blazetrails/activerecord").Relation<Message>;
   }
 }

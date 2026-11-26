@@ -250,6 +250,7 @@ interface Controller {
   file: string;
   name: string;
   path: string;
+  helpers?: Array<[string, string]>;
 }
 
 interface Mailers {
@@ -340,18 +341,59 @@ function isMailerView(rel: string, layout: string | undefined, mailers: Mailers)
 
 async function allControllers(controllersDir: string): Promise<Controller[]> {
   if (!(await exists(controllersDir))) return [];
-  return (await fs.readdir(controllersDir, { recursive: true, encoding: "utf8" }))
+  const files = (await fs.readdir(controllersDir, { recursive: true, encoding: "utf8" }))
     .map((file) => file.split(path.sep).join("/"))
     .filter((file) => file.endsWith("-controller.ts"))
-    .sort()
-    .map((file) => {
+    .sort();
+  return await Promise.all(
+    files.map(async (file) => {
       const controllerPath = underscore(file.slice(0, -"-controller.ts".length));
+      const absolute = path.join(controllersDir, file);
       return {
-        file: path.join(controllersDir, file),
+        file: absolute,
         name: `${constantName(controllerPath)}Controller`,
         path: controllerPath,
+        helpers: helperModules(absolute, await fs.readFile(absolute, "utf8")),
       };
-    });
+    }),
+  );
+}
+
+function helperModules(file: string, text: string): Array<[string, string]> {
+  const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest);
+  const imports = new Map<string, [string, string]>();
+  for (const statement of source.statements) {
+    if (
+      !ts.isImportDeclaration(statement) ||
+      !ts.isStringLiteral(statement.moduleSpecifier) ||
+      !statement.moduleSpecifier.text.startsWith(".")
+    ) {
+      continue;
+    }
+    const bindings = statement.importClause?.namedBindings;
+    if (!bindings || !ts.isNamedImports(bindings)) continue;
+    const target = path.resolve(path.dirname(file), statement.moduleSpecifier.text);
+    for (const e of bindings.elements) {
+      imports.set(e.name.text, [target, (e.propertyName ?? e.name).text]);
+    }
+  }
+  const helpers: Array<[string, string]> = [];
+  const visit = (node: ts.Node): void => {
+    if (
+      ts.isCallExpression(node) &&
+      ts.isPropertyAccessExpression(node.expression) &&
+      node.expression.expression.kind === ts.SyntaxKind.ThisKeyword &&
+      node.expression.name.text === "helper"
+    ) {
+      for (const arg of node.arguments) {
+        const imported = ts.isIdentifier(arg) ? imports.get(arg.text) : undefined;
+        if (imported) helpers.push(imported);
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  ts.forEachChild(source, visit);
+  return helpers;
 }
 
 function importPath(fromDir: string, file: string): string {
@@ -360,7 +402,7 @@ function importPath(fromDir: string, file: string): string {
 }
 
 function constantName(path_: string): string {
-  return camelize(underscore(path_)).split("::").join("");
+  return camelize(underscore(path_)).split("::").at(-1)!;
 }
 
 interface HandlerShim {
@@ -946,7 +988,7 @@ function renderSite(
     : ts.isPropertyAccessExpression(callee) &&
       callee.expression.kind === ts.SyntaxKind.ThisKeyword &&
       callee.name.text === "render";
-  if (!isRender) return undefined;
+  if (!isRender) return turboStreamRenderSite(call);
   const [first, second] = call.arguments;
   if (!first) return undefined;
   if (ts.isStringLiteral(first)) {
@@ -998,6 +1040,26 @@ function renderSite(
     };
   }
   return "unknown";
+}
+
+function turboStreamRenderSite(call: ts.CallExpression): RenderSite | undefined {
+  const callee = call.expression;
+  if (
+    !ts.isPropertyAccessExpression(callee) ||
+    !(
+      (ts.isIdentifier(callee.expression) && callee.expression.text === "turboStream") ||
+      /^broadcast\w*To$/u.test(callee.name.text)
+    )
+  ) {
+    return undefined;
+  }
+  const options = call.arguments.find(
+    (arg): arg is ts.ObjectLiteralExpression =>
+      ts.isObjectLiteralExpression(arg) && arg.properties.map(propertyName).includes("partial"),
+  );
+  const partial = options && option(options, "partial");
+  if (!partial || !ts.isStringLiteral(partial)) return undefined;
+  return { name: partial.text, locals: option(options, "locals") };
 }
 
 function actionName(call: ts.CallExpression): string | undefined {
@@ -1080,6 +1142,19 @@ async function templateScope(
   if (helpersFrom !== undefined) {
     view.push(
       `((typeof import(${importPath(shimDir, helpersFrom.file)}))[${JSON.stringify(helpersFrom.name)}] extends { _helpers: infer H } ? H : unknown)`,
+    );
+  }
+  const helperSources = new Set([helpersFrom, controllers.find((c) => c.path === "application")]);
+  for (const source of helperSources) {
+    for (const [file, name] of source?.helpers ?? []) {
+      view.push(`(typeof import(${importPath(shimDir, file)}))[${JSON.stringify(name)}]`);
+    }
+  }
+  const delegatesFrom = controller ?? helpersFrom;
+  if (delegatesFrom !== undefined) {
+    const instance = `InstanceType<(typeof import(${importPath(shimDir, delegatesFrom.file)}))[${JSON.stringify(delegatesFrom.name)}]>`;
+    view.push(
+      `Pick<${instance}, Extract<import("@blazetrails/actionview").ControllerDelegate | "request", keyof ${instance}>>`,
     );
   }
   const locals = new Map<string, Set<string>>();

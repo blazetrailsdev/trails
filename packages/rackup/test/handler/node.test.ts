@@ -172,6 +172,21 @@ describe("Rack::Handler::Node", () => {
     );
   });
 
+  it("leaves out a response header whose value is nil", async () => {
+    const headers = { "x-rev": undefined, "x-version": "0" } as unknown as Record<string, string>;
+
+    await serving(
+      async () => [200, headers, [""]],
+      async (url) => {
+        const response = await fetch(url);
+
+        expect(response.status).toBe(200);
+        expect(response.headers.has("x-rev")).toBe(false);
+        expect(response.headers.get("x-version")).toBe("0");
+      },
+    );
+  });
+
   it("keeps the raw path request_uri carries", async () => {
     const env = await envFor("/a%20b/c");
 

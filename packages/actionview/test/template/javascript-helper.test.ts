@@ -69,8 +69,10 @@ describe("JavaScriptHelperTest", () => {
   });
 
   it("javascript include tag", () => {
-    const view = new (Base.withEmptyTemplateCache())(null, {}, null) as Base &
-      Record<string, (...args: unknown[]) => unknown>;
+    const view = new (Base.withEmptyTemplateCache())(null, {}, null) as unknown as Record<
+      string,
+      (...args: unknown[]) => unknown
+    >;
     assertDomEqual("<script src='/foo.js'></script>", view.javascriptIncludeTag("/foo"));
     assertDomEqual(
       "<script src='/foo'></script>",

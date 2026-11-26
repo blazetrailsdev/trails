@@ -8,9 +8,27 @@ import { Scrub } from "./loofah/html5/scrub.js";
 import { MetaHelpers } from "./loofah/metahelpers.js";
 import { Scrubber, ScrubberNotFound } from "./loofah/scrubber.js";
 import { Scrubbers } from "./loofah/scrubbers.js";
-export const Loofah = {
+interface LoofahModule {
+  Scrubber: typeof Scrubber;
+  ScrubberNotFound: typeof ScrubberNotFound;
+  HTML5: { SafeList: typeof SafeList; Scrub: typeof Scrub };
+  LibxmlWorkarounds: typeof LibxmlWorkarounds;
+  MetaHelpers: typeof MetaHelpers;
+  ScrubBehavior: typeof ScrubBehavior;
+  Scrubbers: typeof Scrubbers;
+  html4Fragment(string: string): Html5DocumentFragment;
+  html5Fragment(string: string): Html5DocumentFragment;
+  scrubHtml5Fragment(stringOrIo: string, method: unknown): Html5DocumentFragment;
+}
+
+export const Loofah: LoofahModule = {
   Scrubber,
   ScrubberNotFound,
+  HTML5: { SafeList, Scrub },
+  LibxmlWorkarounds,
+  MetaHelpers,
+  ScrubBehavior,
+  Scrubbers,
 
   /** @missingRailsCall parse — CONVERGEABLE html-sanitizer-parser-concerns */
   html4Fragment(string: string): Html5DocumentFragment {
@@ -27,8 +45,3 @@ export const Loofah = {
 };
 
 constSet(TopLevel, "Loofah", Loofah);
-constSet(Loofah, "HTML5", { SafeList, Scrub });
-constSet(Loofah, "LibxmlWorkarounds", LibxmlWorkarounds);
-constSet(Loofah, "MetaHelpers", MetaHelpers);
-constSet(Loofah, "ScrubBehavior", ScrubBehavior);
-constSet(Loofah, "Scrubbers", Scrubbers);

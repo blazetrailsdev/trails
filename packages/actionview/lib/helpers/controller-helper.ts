@@ -60,6 +60,9 @@ export function isRespondTo(
   return basicObjRespondTo(this, methodName);
 }
 
+/** @noRailsEquivalent PERMANENT */
+export type ControllerDelegate = (typeof CONTROLLER_DELEGATES)[number];
+
 export class ControllerHelper {}
 
 attrInternal.call(ControllerHelper.prototype, "controller", "request");

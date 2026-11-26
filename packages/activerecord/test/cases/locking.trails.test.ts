@@ -83,3 +83,13 @@ describe("OptimisticLockingTrailsTest", () => {
     await expect(Person.find(42)).rejects.toBeInstanceOf(RecordNotFound);
   });
 });
+
+describe("PessimisticLockingTrailsTest", () => {
+  const { people } = fixtures(["people"]);
+
+  it("with_lock returns its block's value", async () => {
+    const person = await Person.find(people("michael").id);
+    expect(await person.withLock(async () => "locked")).toBe("locked");
+    expect(await person.withLock({ requiresNew: true }, () => 42)).toBe(42);
+  });
+});

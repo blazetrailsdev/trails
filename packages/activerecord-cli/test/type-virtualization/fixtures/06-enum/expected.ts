@@ -35,9 +35,9 @@ export interface Task {
 
 declare module "@blazetrails/activerecord" {
   interface RelationScopes<T extends import("@blazetrails/activerecord").Base> {
-    low(this: import("@blazetrails/activerecord").Relation<Task>): import("@blazetrails/activerecord").Relation<Task>;
-    notLow(this: import("@blazetrails/activerecord").Relation<Task>): import("@blazetrails/activerecord").Relation<Task>;
-    high(this: import("@blazetrails/activerecord").Relation<Task>): import("@blazetrails/activerecord").Relation<Task>;
-    notHigh(this: import("@blazetrails/activerecord").Relation<Task>): import("@blazetrails/activerecord").Relation<Task>;
+    low(this: import("@blazetrails/activerecord").Relation<Task, boolean> | import("@blazetrails/activerecord").CollectionProxy<Task>): import("@blazetrails/activerecord").Relation<Task>;
+    notLow(this: import("@blazetrails/activerecord").Relation<Task, boolean> | import("@blazetrails/activerecord").CollectionProxy<Task>): import("@blazetrails/activerecord").Relation<Task>;
+    high(this: import("@blazetrails/activerecord").Relation<Task, boolean> | import("@blazetrails/activerecord").CollectionProxy<Task>): import("@blazetrails/activerecord").Relation<Task>;
+    notHigh(this: import("@blazetrails/activerecord").Relation<Task, boolean> | import("@blazetrails/activerecord").CollectionProxy<Task>): import("@blazetrails/activerecord").Relation<Task>;
   }
 }

@@ -36,9 +36,9 @@ export interface Conversation {
 Conversation.enum("status", ["active", "archived"]);
 declare module "@blazetrails/activerecord" {
   interface RelationScopes<T extends import("@blazetrails/activerecord").Base> {
-    active(this: import("@blazetrails/activerecord").Relation<Conversation>): import("@blazetrails/activerecord").Relation<Conversation>;
-    notActive(this: import("@blazetrails/activerecord").Relation<Conversation>): import("@blazetrails/activerecord").Relation<Conversation>;
-    archived(this: import("@blazetrails/activerecord").Relation<Conversation>): import("@blazetrails/activerecord").Relation<Conversation>;
-    notArchived(this: import("@blazetrails/activerecord").Relation<Conversation>): import("@blazetrails/activerecord").Relation<Conversation>;
+    active(this: import("@blazetrails/activerecord").Relation<Conversation, boolean> | import("@blazetrails/activerecord").CollectionProxy<Conversation>): import("@blazetrails/activerecord").Relation<Conversation>;
+    notActive(this: import("@blazetrails/activerecord").Relation<Conversation, boolean> | import("@blazetrails/activerecord").CollectionProxy<Conversation>): import("@blazetrails/activerecord").Relation<Conversation>;
+    archived(this: import("@blazetrails/activerecord").Relation<Conversation, boolean> | import("@blazetrails/activerecord").CollectionProxy<Conversation>): import("@blazetrails/activerecord").Relation<Conversation>;
+    notArchived(this: import("@blazetrails/activerecord").Relation<Conversation, boolean> | import("@blazetrails/activerecord").CollectionProxy<Conversation>): import("@blazetrails/activerecord").Relation<Conversation>;
   }
 }

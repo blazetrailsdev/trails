@@ -1,7 +1,7 @@
 import { isBlank } from "@blazetrails/activesupport";
 import { beforeEach, describe, expect, it } from "vitest";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
-import { StringIO } from "@blazetrails/ruby-compat";
+import { StringIO, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import "../support/database/setup.js";
 import { ActiveStorage } from "../../lib/active-storage.js";
 import { Blob } from "../../lib/app/models/active-storage/blob.js";
@@ -47,6 +47,19 @@ describe("ActiveStorage::Attached::One", () => {
     expect(user.avatar.variant({ resizeToLimit: [1, 1] })).toBeNull();
     expect(user.avatar.blob).toBeNull();
     expect((user.avatar as unknown as { [k: string]: () => unknown }).notAMethod()).toBeNull();
+  });
+
+  it("responds to the attachment's methods through delegate_missing_to", async () => {
+    await user.avatar.attach(await createBlob());
+    const reloaded = (await Member.find(user.id)) as AvatarUser;
+    await reloaded.avatar.load();
+    expect(rbObjRespondTo(reloaded.avatar, "signedId")).toBe(true);
+    expect(rbObjRespondTo(reloaded.avatar, "notAMethod")).toBe(false);
+  });
+
+  it("responds to nothing delegated on an unattached attachment", async () => {
+    await user.avatar.load();
+    expect(rbObjRespondTo(user.avatar, "signedId")).toBe(false);
   });
 
   it("create awaits the attachment writer before saving", async () => {
@@ -164,7 +177,7 @@ describe("ActiveStorage::Attached::One", () => {
     const reloaded = (await Member.find(user.id)) as AvatarUser;
     expect(() => isBlank(reloaded.avatar)).toThrow("await avatar.load()");
     expect(() => (reloaded.avatar as unknown as { blobId: unknown }).blobId).toThrow(
-      "await avatar.load()",
+      "blobId needs attachment loaded",
     );
     await reloaded.avatar.load();
     expect(isBlank(reloaded.avatar)).toBe(false);

@@ -130,9 +130,11 @@ export {
 export type { AssetPathOptions, AssetUrlHelperHost } from "./asset-url-helper.js";
 
 export {
+  javascriptIncludeTag,
   stylesheetLinkTag,
   autoDiscoveryLinkTag,
   faviconLinkTag,
+  preloadLinkTag,
   imageTag,
   pictureTag,
   videoTag,
