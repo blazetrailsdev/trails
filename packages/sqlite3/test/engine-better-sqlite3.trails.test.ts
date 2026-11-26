@@ -82,6 +82,35 @@ describe("SQLite3::Database over the better-sqlite3 engine", () => {
     await waiter.close();
   });
 
+  it("skips the busy handler for a write that would deadlock on a held read lock", async () => {
+    const path = `${getOs().tmpdir()}/engine-deadlock-${Date.now()}-${Math.random()}.sqlite3`;
+    paths.push(path);
+    const holder = new SQLite3.Database(path, { engine });
+    await holder.executeBatch2("CREATE TABLE t (a); INSERT INTO t VALUES (1);");
+    const reader = new SQLite3.Database(path, { engine });
+    reader.setBusyHandlerTimeout(1000);
+    await reader.execute("BEGIN DEFERRED");
+    expect(await reader.execute("SELECT * FROM t")).toEqual([[1]]);
+    await holder.execute("BEGIN IMMEDIATE");
+    const started = performance.now();
+    await expect(reader.execute("INSERT INTO t VALUES (2)")).rejects.toBeInstanceOf(
+      SQLite3.BusyException,
+    );
+    expect(performance.now() - started).toBeLessThan(500);
+    await reader.execute("ROLLBACK");
+    await holder.execute("ROLLBACK");
+    await holder.close();
+    await reader.close();
+  });
+
+  it("reads an INTEGER as a number when it is safe and as a bigint past 2^53", async () => {
+    const db = new SQLite3.Database(":memory:", { engine });
+    expect(await db.execute("SELECT 7, 9007199254740993, -9007199254740993, 1.5")).toEqual([
+      [7, 9007199254740993n, -9007199254740993n, 1.5],
+    ]);
+    await db.close();
+  });
+
   it("setBusyHandlerTimeout retries until the deadline, then raises BusyException", async () => {
     const path = `${getOs().tmpdir()}/engine-busy-timeout-${Date.now()}-${Math.random()}.sqlite3`;
     paths.push(path);

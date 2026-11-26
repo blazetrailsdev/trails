@@ -14,7 +14,7 @@ import type { SqliteBindValue } from "../driver.js";
 import { closedStatement, statementTail } from "./statement-tail.js";
 import { drive, withBusyHandler } from "./busy-handler.js";
 import { bindParameterIndex, bindParameterNames } from "./bind-parameter-index.js";
-import { columnText } from "./column-text.js";
+import { columnIntegers, columnText } from "./column-text.js";
 import { aggregateOptions, databaseListFilename, libversionNumber } from "./aggregator.js";
 
 const MISSING_DIRECTORY = "Cannot open database because the directory does not exist";
@@ -76,10 +76,11 @@ function prepareStatement(
   raw: BetterSqlite3.Database,
   sql: string,
   finalize: () => void,
+  locked: <T>(run: () => T) => T,
 ): EngineStatement {
   const stmt = raw.prepare(sql);
   const reader = stmt.reader;
-  if (reader) stmt.raw(true);
+  if (reader) stmt.raw(true).safeIntegers(true);
   const names = bindParameterNames(sql);
   const positional: SqliteBindValue[] = [];
   const named: Record<string, SqliteBindValue> = {};
@@ -133,39 +134,39 @@ function prepareStatement(
       rows = null;
       done = false;
     },
-    step() {
-      if (done) return null;
-      if (!reader) {
-        bound((args) => stmt.run(...args));
-        done = true;
-        return null;
-      }
-      const r =
-        rows !== null
-          ? rows.next()
-          : (() => {
-              const started = bound((args) => stmt.iterate(...args)) as Iterator<unknown[]>;
-              try {
-                const first = started.next();
-                rows = started;
-                return first;
-              } catch (e) {
-                started.return?.();
-                throw e;
-              }
-            })();
-      if (r.done) {
-        done = true;
-        return null;
-      }
-      return r.value;
-    },
+    step: () =>
+      locked(() => {
+        if (done) return null;
+        if (!reader) {
+          bound((args) => stmt.run(...args));
+          done = true;
+          return null;
+        }
+        const r =
+          rows !== null
+            ? rows.next()
+            : (() => {
+                const started = bound((args) => stmt.iterate(...args)) as Iterator<unknown[]>;
+                try {
+                  const first = started.next();
+                  rows = started;
+                  return first;
+                } catch (e) {
+                  started.return?.();
+                  throw e;
+                }
+              })();
+        if (r.done) {
+          done = true;
+          return null;
+        }
+        return columnIntegers(r.value);
+      }),
     isDone: () => done,
     bindParameterCount: () => bindParameterNames(sql).length,
     columnCount: () => (reader ? stmt.columns().length : 0),
     columnName: (index) => (reader ? (stmt.columns()[index]?.name ?? null) : null),
     columnDecltype: (index) => (reader ? (stmt.columns()[index]?.type ?? null) : null),
-    setReadBigInts: (toggle) => void stmt.safeIntegers(toggle),
   };
 }
 
@@ -174,6 +175,14 @@ export const engine: SyncEngineOpenV2 = Object.assign((file: string, mode: numbe
   let handler: BusyHandler | null = null;
   let zombie = false;
   let liveStatements = 0;
+  let readLock = false;
+  const locked = <T>(run: () => T): T => {
+    const held = raw.inTransaction;
+    if (!held) readLock = false;
+    const result = run();
+    readLock = raw.inTransaction && (readLock || held);
+    return result;
+  };
   const finalize = () => {
     liveStatements -= 1;
     if (zombie && liveStatements === 0) raw.close();
@@ -181,6 +190,7 @@ export const engine: SyncEngineOpenV2 = Object.assign((file: string, mode: numbe
   let changesStmt: ReturnType<typeof raw.prepare> | null = null;
   const db: SyncEngineDatabase = {
     ...errors,
+    isDeadlock: () => raw.inTransaction && readLock,
     isClosed: () => zombie || !raw.open,
     isDiscarded: () => false,
     close: () => {
@@ -221,23 +231,23 @@ export const engine: SyncEngineOpenV2 = Object.assign((file: string, mode: numbe
             rest = rest.slice(tail).trim();
             if (empty) continue;
             const stmt = (yield withBusyHandler(
-              errors,
+              db,
               () => handler,
               () => raw.prepare(head),
             )) as BetterSqlite3.Statement;
             if (!stmt.reader) {
               yield withBusyHandler(
-                errors,
+                db,
                 () => handler,
-                () => stmt.run(),
+                () => locked(() => stmt.run()),
               );
             } else {
               stmt.safeIntegers(true).raw(true);
               const names = stmt.columns().map((c) => c.name);
               for (const row of (yield withBusyHandler(
-                errors,
+                db,
                 () => handler,
-                () => stmt.all() as unknown[][],
+                () => locked(() => stmt.all() as unknown[][]),
               )) as unknown[][]) {
                 const vals = row.map(columnText);
                 results.push(
@@ -255,7 +265,7 @@ export const engine: SyncEngineOpenV2 = Object.assign((file: string, mode: numbe
     prepare(sql) {
       const [tail, empty] = statementTail(sql);
       if (empty) return [closedStatement, sql.slice(tail)];
-      const stmt = prepareStatement(raw, sql.slice(0, tail), finalize);
+      const stmt = prepareStatement(raw, sql.slice(0, tail), finalize, locked);
       liveStatements += 1;
       return [stmt, sql.slice(tail)];
     },

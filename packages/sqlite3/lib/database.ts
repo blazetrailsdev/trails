@@ -44,6 +44,7 @@ export interface Aggregator {
 export interface EngineErrors {
   errcode(error: unknown): number | null;
   errmsg(error: unknown): string;
+  isDeadlock?(error: unknown): boolean;
 }
 
 export interface EngineDatabase extends EngineErrors {

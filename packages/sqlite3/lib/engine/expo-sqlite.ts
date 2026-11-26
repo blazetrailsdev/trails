@@ -7,7 +7,8 @@ import type { EngineStatement } from "../statement.js";
 import type { SqliteBindValue } from "../driver.js";
 import { closedStatement, statementTail } from "./statement-tail.js";
 import { bindParameterNames } from "./bind-parameter-index.js";
-import { columnText } from "./column-text.js";
+import { columnIntegers, columnText } from "./column-text.js";
+import { withBusyHandler } from "./busy-handler.js";
 import { databaseListFilename, libversionNumber } from "./aggregator.js";
 
 /** @internal */
@@ -65,28 +66,11 @@ async function open(file: string): Promise<ExpoDatabase> {
   return expoSqlite.openDatabaseAsync(file);
 }
 
-async function withBusyHandler<T>(
-  handler: () => BusyHandler | null,
-  attempt: () => Promise<T>,
-): Promise<T> {
-  let count = 0;
-  for (;;) {
-    try {
-      return await attempt();
-    } catch (e) {
-      const busy = handler();
-      if (busy == null || errors.errcode(e) !== SQLite3.Constants.ErrorCode.BUSY) throw e;
-      if ((await busy(count++)) === false) throw e;
-    }
-  }
-}
-
 /** @internal */
 function prepareStatement(
   opening: () => Promise<ExpoDatabase>,
   prepared: Promise<ExpoStatement> | null,
   sql: string,
-  handler: () => BusyHandler | null,
   setChanges: (n: number) => void,
   finalize: () => Promise<void>,
 ): EngineStatement {
@@ -96,7 +80,6 @@ function prepareStatement(
   let rows: AsyncIterator<unknown[]> | null = null;
   let done = false;
   let closed = false;
-  let readBigInts = false;
   let typed: Promise<ExpoStatement | null> | null = null;
   let wide = false;
 
@@ -145,10 +128,10 @@ function prepareStatement(
       if (done) return null;
       if (rows === null) {
         const cols = (await metadata()).map((_, i) => `c${i}`);
-        const wider = readBigInts && cols.length !== 0 ? await (typed ??= intText(cols)) : null;
+        const wider = cols.length !== 0 ? await (typed ??= intText(cols)) : null;
         wide = wider !== null;
         const st = wider ?? (await stmt());
-        const result = await withBusyHandler(handler, () => st.executeForRawResultAsync(params()));
+        const result = await st.executeForRawResultAsync(params());
         setChanges(result.changes);
         if (cols.length === 0) {
           done = true;
@@ -163,9 +146,11 @@ function prepareStatement(
       }
       const n = names!.length;
       if (!wide) return r.value;
-      return r.value
-        .slice(0, n)
-        .map((v, i) => (r.value[n + i] != null ? BigInt(r.value[n + i] as string) : v));
+      return columnIntegers(
+        r.value
+          .slice(0, n)
+          .map((v, i) => (r.value[n + i] != null ? BigInt(r.value[n + i] as string) : v)),
+      );
     },
     isDone: () => done,
     bindParameterCount: () => bindParameterNames(sql).length,
@@ -173,9 +158,6 @@ function prepareStatement(
     columnName: (index) =>
       names !== null ? (names[index] ?? null) : metadata().then((n) => n[index] ?? null),
     columnDecltype: () => null,
-    setReadBigInts: (toggle) => {
-      readBigInts = toggle;
-    },
   };
 }
 
@@ -247,6 +229,7 @@ export const engine: EngineOpenV2 = Object.assign((file: string, mode: number) =
         if (empty) continue;
         const raw = await opening();
         const st = await withBusyHandler(
+          db,
           () => handler,
           () => raw.prepareAsync(head),
         );
@@ -263,6 +246,7 @@ export const engine: EngineOpenV2 = Object.assign((file: string, mode: number) =
               .catch(() => null);
           }
           const result = await withBusyHandler(
+            db,
             () => handler,
             () => (typed ?? st).executeForRawResultAsync([]),
           );
@@ -292,20 +276,10 @@ export const engine: EngineOpenV2 = Object.assign((file: string, mode: number) =
       const head = sql.slice(0, tail);
       if (empty) return [closedStatement, sql.slice(tail)];
       const raw = await opening();
-      const prepared = await withBusyHandler(
-        () => handler,
-        () => raw.prepareAsync(head),
-      );
+      const prepared = await raw.prepareAsync(head);
       liveStatements += 1;
       return [
-        prepareStatement(
-          opening,
-          Promise.resolve(prepared),
-          head,
-          () => handler,
-          setChanges,
-          finalize,
-        ),
+        prepareStatement(opening, Promise.resolve(prepared), head, setChanges, finalize),
         sql.slice(tail),
       ];
     },

@@ -24,8 +24,6 @@ export interface EngineStatement {
   columnName(index: number): string | null | Promise<string | null>;
   columnDecltype(index: number): string | null | Promise<string | null>;
   bindParameterCount(): number;
-  /** @noRailsEquivalent PERMANENT */
-  setReadBigInts(toggle: boolean): void;
   statFor?(key: string): number;
   statsAsHash?(): Record<string, number>;
 }
@@ -280,12 +278,6 @@ export class Statement {
     } else {
       return this.statsAsHash();
     }
-  }
-
-  /** @noRailsEquivalent PERMANENT */
-  setReadBigInts(toggle: boolean): void {
-    this.mustBeOpenBang();
-    this.#st.setReadBigInts(toggle);
   }
 
   /** @internal */
