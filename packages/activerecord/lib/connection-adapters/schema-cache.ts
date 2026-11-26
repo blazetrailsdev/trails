@@ -3,10 +3,10 @@ import { File } from "@blazetrails/ruby-compat/file";
 import { FileUtils } from "@blazetrails/ruby-compat/file-utils";
 import { Marshal } from "@blazetrails/ruby-compat/marshal";
 import { Zlib } from "@blazetrails/ruby-compat/zlib";
-import { block, fetch } from "@blazetrails/ruby-compat/hash";
+import { Hash, block, fetch } from "@blazetrails/ruby-compat/hash";
 import { forceEncoding } from "@blazetrails/ruby-compat/string/force-encoding";
 import { isEmpty } from "@blazetrails/ruby-compat/ruby-empty";
-import { isModuleIncluded, rbCallSuper } from "@blazetrails/ruby-compat/include";
+import { isModuleIncluded, rbCallSuper, rbObjDup } from "@blazetrails/ruby-compat/include";
 import { rbObjRespondTo } from "@blazetrails/ruby-compat/object";
 import { sort, toH } from "@blazetrails/ruby-compat/array";
 import { synchronize } from "@blazetrails/ruby-compat/monitor";
@@ -326,11 +326,17 @@ export class FakePool {
 }
 
 export class SchemaCache {
-  private _columns = new Map<string, Column[]>();
-  private _columnsHash = new Map<string, Record<string, Column>>();
-  private _primaryKeys = new Map<string, string | string[] | null>();
-  private _dataSources = new Map<string, boolean>();
-  private _indexes = new Map<string, IndexDefinition[]>();
+  private _columns: Map<string, Column[]> = new Hash<string, Column[]>();
+  private _columnsHash: Map<string, Record<string, Column>> = new Hash<
+    string,
+    Record<string, Column>
+  >();
+  private _primaryKeys: Map<string, string | string[] | null> = new Hash<
+    string,
+    string | string[] | null
+  >();
+  private _dataSources: Map<string, boolean> = new Hash<string, boolean>();
+  private _indexes: Map<string, IndexDefinition[]> = new Hash<string, IndexDefinition[]>();
   private _version: string | number | null = null;
 
   /** @inventedArm forceEncoding — PERMANENT */
@@ -367,11 +373,11 @@ export class SchemaCache {
 
   initializeDup(other: SchemaCache): void {
     rbCallSuper(this, SchemaCache.prototype.initializeDup, other);
-    this._columns = new Map(this._columns);
-    this._columnsHash = new Map(this._columnsHash);
-    this._primaryKeys = new Map(this._primaryKeys);
-    this._dataSources = new Map(this._dataSources);
-    this._indexes = new Map(this._indexes);
+    this._columns = rbObjDup(this._columns);
+    this._columnsHash = rbObjDup(this._columnsHash);
+    this._primaryKeys = rbObjDup(this._primaryKeys);
+    this._dataSources = rbObjDup(this._dataSources);
+    this._indexes = rbObjDup(this._indexes);
   }
 
   isCached(tableName: string): boolean {
@@ -385,8 +391,8 @@ export class SchemaCache {
       block(() =>
         pool.withConnection(async (connection) => {
           if (await this.dataSourceExists(pool, tableName)) {
-            const pk = deepDeduplicate(await connection.primaryKey(tableName));
-            this._primaryKeys.set(deepDeduplicate(tableName), pk);
+            const pk = this.deepDeduplicate(await connection.primaryKey(tableName));
+            this._primaryKeys.set(this.deepDeduplicate(tableName), pk);
             return pk;
           }
           return null;
@@ -411,7 +417,7 @@ export class SchemaCache {
     const exists: boolean = await pool.withConnection((connection) =>
       connection.dataSourceExists(name),
     );
-    this._dataSources.set(deepDeduplicate(name), exists);
+    this._dataSources.set(this.deepDeduplicate(name), exists);
     return exists;
   }
 
@@ -436,8 +442,8 @@ export class SchemaCache {
       tableName,
       block(() =>
         pool.withConnection(async (connection) => {
-          const cols: Column[] = deepDeduplicate(await connection.columns(tableName));
-          this.setColumns(deepDeduplicate(tableName), cols);
+          const cols: Column[] = this.deepDeduplicate(await connection.columns(tableName));
+          this.setColumns(this.deepDeduplicate(tableName), cols);
           return cols;
         }),
       ),
@@ -452,7 +458,7 @@ export class SchemaCache {
         const hash = Object.freeze(
           indexBy(await this.columns(pool, tableName), (column) => column.name),
         );
-        this._columnsHash.set(deepDeduplicate(tableName), hash);
+        this._columnsHash.set(this.deepDeduplicate(tableName), hash);
         return hash;
       }),
     ) as Promise<Record<string, Column>> | Record<string, Column>;
@@ -469,8 +475,10 @@ export class SchemaCache {
       block(() =>
         pool.withConnection(async (connection) => {
           if (await this.dataSourceExists(pool, tableName)) {
-            const idx: IndexDefinition[] = deepDeduplicate(await connection.indexes(tableName));
-            this._indexes.set(deepDeduplicate(tableName), idx);
+            const idx: IndexDefinition[] = this.deepDeduplicate(
+              await connection.indexes(tableName),
+            );
+            this._indexes.set(this.deepDeduplicate(tableName), idx);
             return idx;
           }
           return [];
@@ -527,7 +535,7 @@ export class SchemaCache {
     return [
       this._version,
       this._columns,
-      new Map(),
+      new Hash(),
       this._primaryKeys,
       this._dataSources,
       this._indexes,
@@ -553,7 +561,7 @@ export class SchemaCache {
       Map<string, IndexDefinition[]>,
       unknown,
     ];
-    this._indexes ??= new Map();
+    this._indexes ??= new Hash();
 
     this.deriveColumnsHashAndDeduplicateValues();
   }
@@ -576,16 +584,34 @@ export class SchemaCache {
    * @missingRailsName indexes — PERMANENT
    */
   private deriveColumnsHashAndDeduplicateValues(): void {
-    this._columns = deepDeduplicate(this._columns);
+    this._columns = this.deepDeduplicate(this._columns);
     this._columnsHash = new Map(
       [...this._columns].map(([table, columns]) => [
         table,
         Object.fromEntries(columns.map((column) => [column.name, column])),
       ]),
     );
-    this._primaryKeys = deepDeduplicate(this._primaryKeys);
-    this._dataSources = deepDeduplicate(this._dataSources);
-    this._indexes = deepDeduplicate(this._indexes);
+    this._primaryKeys = this.deepDeduplicate(this._primaryKeys);
+    this._dataSources = this.deepDeduplicate(this._dataSources);
+    this._indexes = this.deepDeduplicate(this._indexes);
+  }
+
+  /** @internal */
+  private deepDeduplicate<T>(value: T): T {
+    if (value instanceof Hash) {
+      return value
+        .transformKeys((k) => this.deepDeduplicate(k))
+        .transformValues((v) => this.deepDeduplicate(v)) as unknown as T;
+    }
+    if (Array.isArray(value)) return value.map((i) => this.deepDeduplicate(i)) as unknown as T;
+    if (
+      value !== null &&
+      typeof value === "object" &&
+      isModuleIncluded(value.constructor, Deduplicable)
+    ) {
+      return (value as unknown as { negate(): T }).negate();
+    }
+    return value;
   }
 
   /** @internal */
@@ -625,7 +651,7 @@ export class SchemaCache {
     this._columnsHash = coder["columns_hash"] as Map<string, Record<string, Column>>;
     this._primaryKeys = coder["primary_keys"] as Map<string, string | string[] | null>;
     this._dataSources = coder["data_sources"] as Map<string, boolean>;
-    this._indexes = (coder["indexes"] as Map<string, IndexDefinition[]>) ?? new Map();
+    this._indexes = (coder["indexes"] as Map<string, IndexDefinition[]>) ?? new Hash();
     this._version = (coder["version"] as string | number | null | undefined) ?? null;
 
     if (coder["deduplicated"] == null || coder["deduplicated"] === false) {
@@ -678,22 +704,4 @@ export class SchemaCache {
     this._columnsHash.set(tableName, hash);
     this._dataSources.set(tableName, true);
   }
-}
-
-/** @internal */
-export function deepDeduplicate<T>(value: T): T {
-  if (value instanceof Map) {
-    return new Map(
-      [...value].map(([k, v]) => [deepDeduplicate(k), deepDeduplicate(v)]),
-    ) as unknown as T;
-  }
-  if (Array.isArray(value)) return value.map((i) => deepDeduplicate(i)) as unknown as T;
-  if (
-    value !== null &&
-    typeof value === "object" &&
-    isModuleIncluded(value.constructor, Deduplicable)
-  ) {
-    return (value as unknown as { negate(): T }).negate();
-  }
-  return value;
 }
