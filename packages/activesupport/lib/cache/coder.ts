@@ -106,6 +106,8 @@ export class LazyEntry extends Entry {
 
 /** @internal */
 export class Coder {
+  static LazyEntry = LazyEntry;
+
   private legacySerializer: boolean;
 
   constructor(
