@@ -617,6 +617,7 @@ export class Database<E extends EngineDatabase = EngineDatabase> {
     return this;
   }
 
+  /** @inventedArm if — CONVERGEABLE sqlite3-engines-without-sqlite3-interrupt */
   interrupt(): this {
     if (this.isClosed()) throw new Exception("cannot use a closed database");
 
