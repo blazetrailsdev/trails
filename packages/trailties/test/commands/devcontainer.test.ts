@@ -28,8 +28,10 @@ describe("Trails::Command::DevcontainerTest", { timeout: 120_000 }, () => {
   it.skip("generates devcontainer for default app with solid gems", async () => {
     await t.buildApp();
 
-    await import("@blazetrails/solid-cable");
-    await import("@blazetrails/solid-queue");
+    const solidCable: string = "@blazetrails/solid-cable";
+    const solidQueue: string = "@blazetrails/solid-queue";
+    await import(solidCable);
+    await import(solidQueue);
 
     const output = await t.trails("devcontainer");
 
