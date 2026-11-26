@@ -84,7 +84,7 @@ async function verify(
           expect(mtime).toBeGreaterThanOrEqual(start - 1);
         }
         const tmp = await gz.read();
-        await gz.close();
+        gz.close();
         deflatedBody = tmp;
         break;
       }

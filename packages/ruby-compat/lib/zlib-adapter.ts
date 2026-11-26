@@ -16,15 +16,49 @@ export interface ZlibAdapter {
   deflate(data: Uint8Array): Uint8Array;
   inflate(data: Uint8Array): Uint8Array;
   /**
-   * Everything `data`, a possibly truncated stream, inflates to so far:
-   * zlib's `Z_SYNC_FLUSH` finish, which `Zlib::Inflate#inflate` reaches one
-   * chunk at a time (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:2145`). `windowBits`
-   * picks the format as `inflateInit2` does: negative is raw deflate, `+ 32`
-   * detects zlib or gzip.
+   * `zstream_init_deflate` with `deflateInit2(level, Z_DEFLATED, windowBits, ...,
+   * strategy)` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:1694`), which `gzfile_writer`
+   * opens with `-MAX_WBITS` (`zlib.c:3670`).
    */
-  inflateStream(data: Uint8Array, windowBits: number): Uint8Array;
-  gzipWriter(io: GzipWriterIO): GzipWriterHandle;
-  gzipReader(io: GzipReaderIO): GzipReaderHandle;
+  deflateZStream(level: number, windowBits: number, strategy: number): ZStream;
+  /**
+   * `zstream_init_inflate` with `inflateInit2(windowBits)`, `-MAX_WBITS` for a
+   * gzip file (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:3949`): negative is raw
+   * deflate, `+ 32` detects zlib or gzip.
+   */
+  inflateZStream(windowBits: number): ZStream;
+}
+
+/**
+ * MRI's `struct zstream` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:562`), run
+ * synchronously: `run` is `zstream_run` (`zlib.c:1190`) over `input` and `src`,
+ * appending what the stream produced to `buf` and leaving in `input` what it
+ * did not consume once the stream has ended.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export interface ZStream {
+  buf: Uint8Array;
+  input: Uint8Array;
+  totalIn: number;
+  readonly totalOut: number;
+  run(src: Uint8Array, flush: number): void;
+  /** `zstream_append_buffer` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:758`). */
+  appendBuffer(src: Uint8Array): void;
+  /** `zstream_append_input` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:875`). */
+  appendInput(src: Uint8Array): void;
+  /** `zstream_detach_buffer` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:789`). */
+  detachBuffer(): Uint8Array;
+  /** `zstream_shift_buffer` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:823`). */
+  shiftBuffer(len: number): Uint8Array;
+  /**
+   * `ZSTREAM_IS_FINISHED` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:587`). Node's
+   * binding answers zlib's `Z_STREAM_END` only through input it leaves
+   * unconsumed, so a stream that ended exactly at the end of its input is asked
+   * with an empty `Z_FINISH` when `atEnd`, which zlib answers `Z_BUF_ERROR` for
+   * a stream that has not ended.
+   */
+  isFinished(atEnd?: boolean): boolean;
 }
 
 /**
@@ -35,21 +69,6 @@ export interface ZlibAdapter {
  */
 export interface GzipWriterIO {
   write(data: Uint8Array): void;
-}
-
-/** @noRailsEquivalent PERMANENT */
-export interface GzipWriterHandle {
-  mtime: number | null;
-  /**
-   * Feeds `data` and, for a `flush` other than `Z_NO_FLUSH`, queues that flush,
-   * as `gzfile_write` does under sync mode (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:2808-2820`).
-   * Node's gzip stream is asynchronous, so the compressed bytes reach the IO, and a
-   * stream error is raised, only at the next awaited `flush` or `finish`; a caller
-   * that reads the IO awaits one first.
-   */
-  write(data: Uint8Array, flush: number): void;
-  flush(flush: number): Promise<void>;
-  finish(): Promise<void>;
 }
 
 /**
@@ -65,23 +84,6 @@ export interface GzipReaderIO {
 }
 
 /**
- * The inflate half of the streaming pair: `read` feeds the associated IO into
- * the zstream chunk by chunk (`gzfile_read_more`, `vendor/ruby/v3.3.11/ext/zlib/zlib.c:2823`)
- * and answers what `gzfile_read_all` (`zlib.c:2946`) detaches.
- *
- * @noRailsEquivalent PERMANENT
- */
-export interface GzipReaderHandle {
-  /**
-   * The header's MTIME field, read by `gzfile_read_header`, which raises
-   * "not in gzip format" on a short or unmagic header
-   * (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:2709-2717,2743`).
-   */
-  readonly mtime: number;
-  read(): Uint8Array;
-}
-
-/**
  * Ruby stdlib's `Zlib::GzipWriter` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:3841`), the
  * streaming counterpart of one-shot `Zlib.gzip` — `Rack::Deflater::GzipStream#each`
  * writes into it and reads the compressed bytes back through the io it wraps
@@ -92,43 +94,37 @@ export interface GzipReaderHandle {
  * (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:3841`); Rails calls `Zlib`, and neither Rails
  * nor Ruby declares the backend registry a JS runtime needs.
  */
-export class GzipWriter implements GzipWriterHandle {
-  private readonly handle: GzipWriterHandle;
-  private headerFinished = false;
+export class GzipWriter {
+  private readonly gz: InstanceType<typeof Zlib.GzipWriter>;
 
   /** @noRailsEquivalent PERMANENT */
   constructor(io: GzipWriterIO) {
-    this.handle = resolve().gzipWriter(io);
+    this.gz = new Zlib.GzipWriter(io as ConstructorParameters<typeof Zlib.GzipWriter>[0]);
   }
 
   /** @noRailsEquivalent PERMANENT */
   get mtime(): number | null {
-    return this.handle.mtime;
+    return this.gz.mtime;
   }
 
   /** @noRailsEquivalent PERMANENT */
   set mtime(value: number | null) {
-    if (this.headerFinished) {
-      throw new Zlib.GzipFile.Error("header is already written");
-    }
-    this.handle.mtime = value;
+    this.gz.mtime = value;
   }
 
   /** @noRailsEquivalent PERMANENT */
   write(data: Uint8Array): void {
-    this.headerFinished = true;
-    this.handle.write(data, 0);
+    this.gz.write(data);
   }
 
   /** @noRailsEquivalent PERMANENT */
   async flush(flush = Z_SYNC_FLUSH): Promise<void> {
-    this.headerFinished = true;
-    await this.handle.flush(flush);
+    await this.gz.flush(flush);
   }
 
   /** @noRailsEquivalent PERMANENT */
   async finish(): Promise<void> {
-    await this.handle.finish();
+    this.gz.finish();
   }
 }
 
@@ -166,28 +162,22 @@ function syncBuiltinLoader(): ((id: string) => unknown) | null {
   return nodeModule.createRequire("file:///ruby-compat");
 }
 
-/**
- * `gzfile_make_header` writes the mtime as a 4-byte little-endian field at
- * offset 4 of the 10-byte gzip header (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:2648,2672`).
- * Node's `createGzip` has no option for it, so the backend patches the field
- * into the first emitted chunk — which carries that header — to reproduce
- * `Zlib::GzipWriter#mtime=` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:3356`), and the `time(0)` it
- * defaults to when unset (`zlib.c:2658-2660`).
- */
-const GZIP_HEADER_LENGTH = 10;
+type NodeZlibHandle = {
+  writeSync(
+    flush: number,
+    src: Uint8Array,
+    inOff: number,
+    inLen: number,
+    out: Uint8Array,
+    outOff: number,
+    outLen: number,
+  ): void;
+};
 
-function setGzipHeaderMtime(header: Uint8Array, mtime: number): void {
-  header[4] = mtime & 0xff;
-  header[5] = (mtime >>> 8) & 0xff;
-  header[6] = (mtime >>> 16) & 0xff;
-  header[7] = (mtime >>> 24) & 0xff;
-}
-
-type NodeGzipStream = {
+type NodeZlibStream = {
+  _handle: NodeZlibHandle | null;
+  _writeState: Uint32Array;
   on(event: string, listener: (arg?: unknown) => void): void;
-  write(data: Uint8Array): boolean;
-  flush(kind: number, callback: () => void): void;
-  end(): void;
 };
 
 type NodeZlib = {
@@ -195,12 +185,99 @@ type NodeZlib = {
   gunzipSync: (data: Uint8Array) => Uint8Array;
   deflateSync: (data: Uint8Array) => Uint8Array;
   inflateSync: (data: Uint8Array, options?: { finishFlush: number }) => Uint8Array;
-  inflateRawSync: (data: Uint8Array, options: { finishFlush: number }) => Uint8Array;
-  unzipSync: (data: Uint8Array, options: { finishFlush: number }) => Uint8Array;
-  createGzip: () => NodeGzipStream;
+  createDeflateRaw: (options: { level: number; strategy: number }) => NodeZlibStream;
+  createInflateRaw: () => NodeZlibStream;
+  createDeflate: (options: { level: number; strategy: number }) => NodeZlibStream;
+  createInflate: () => NodeZlibStream;
+  createUnzip: () => NodeZlibStream;
 };
 
-const GZFILE_READ_SIZE = 2048;
+const Z_FINISH = 4;
+
+const ZSTREAM_AVAIL_OUT_STEP = 16384;
+
+/**
+ * `zstream_run` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:1190`) over the handle
+ * under one of Node's zlib streams, driven as `processChunkSync` drives it but
+ * left open between calls, which `_processChunk` is not.
+ */
+function nodeZStream(stream: NodeZlibStream, inflate: boolean): ZStream {
+  let error: unknown = null;
+  stream.on("error", (err) => {
+    error ??= err;
+  });
+  let finished = false;
+  const raised = (): unknown => {
+    const kError = Object.getOwnPropertySymbols(stream).find((s) => s.description === "kError");
+    return (kError && (stream as unknown as Record<symbol, unknown>)[kError]) ?? error;
+  };
+  const concat = (a: Uint8Array, b: Uint8Array): Uint8Array => {
+    if (a.length === 0) return b;
+    const dst = new Uint8Array(a.length + b.length);
+    dst.set(a);
+    dst.set(b, a.length);
+    return dst;
+  };
+  const z: ZStream & { totalIn: number; totalOut: number } = {
+    buf: new Uint8Array(),
+    input: new Uint8Array(),
+    totalIn: 0,
+    totalOut: 0,
+    run(src, flush) {
+      const handle = stream._handle;
+      if (handle === null) throw raised();
+      const input = concat(z.input, src);
+      const chunks: Uint8Array[] = [];
+      let inOff = 0;
+      let availIn = input.length;
+      for (;;) {
+        const out = new Uint8Array(ZSTREAM_AVAIL_OUT_STEP);
+        handle.writeSync(flush, input, inOff, availIn, out, 0, out.length);
+        if (stream._handle === null) throw raised();
+        const [availOut, availInAfter] = stream._writeState;
+        chunks.push(out.subarray(0, out.length - availOut));
+        inOff += availIn - availInAfter;
+        availIn = availInAfter;
+        if (availOut !== 0) break;
+      }
+      z.input = input.slice(inOff);
+      if (inflate && z.input.length > 0) finished = true;
+      if (!inflate && flush === Z_FINISH) finished = true;
+      z.totalIn += inOff;
+      for (const chunk of chunks) {
+        z.totalOut += chunk.length;
+        z.buf = concat(z.buf, chunk);
+      }
+    },
+    appendBuffer(src) {
+      z.buf = concat(z.buf, src);
+    },
+    appendInput(src) {
+      z.input = concat(z.input, src);
+    },
+    detachBuffer() {
+      const dst = z.buf;
+      z.buf = new Uint8Array();
+      return dst;
+    },
+    shiftBuffer(len) {
+      const dst = z.buf.subarray(0, len);
+      z.buf = z.buf.subarray(len);
+      return dst;
+    },
+    isFinished(atEnd = false) {
+      if (finished || !atEnd || !inflate) return finished;
+      try {
+        z.run(new Uint8Array(), Z_FINISH);
+        finished = true;
+      } catch {
+        return false;
+      }
+      return finished;
+    },
+  };
+  return z;
+}
 
 const Z_SYNC_FLUSH = 2;
 
@@ -210,96 +287,22 @@ function wrap(zlib: NodeZlib): ZlibAdapter {
     gunzip: (data) => zlib.gunzipSync(data),
     deflate: (data) => zlib.deflateSync(data),
     inflate: (data) => zlib.inflateSync(data),
-    inflateStream: (data, windowBits) => {
-      const options = { finishFlush: Z_SYNC_FLUSH };
-      if (windowBits < 0) return zlib.inflateRawSync(data, options);
-      if (windowBits > 15) return zlib.unzipSync(data, options);
-      return zlib.inflateSync(data, options);
-    },
-    gzipWriter: (io) => {
-      const stream = zlib.createGzip();
-      let headerSeen = false;
-      let failure: Error | null = null;
-      let pending = new Uint8Array();
-      const writeRaw = (): void => {
-        if (failure !== null || pending.length === 0) return;
-        const dst = pending;
-        pending = new Uint8Array();
-        try {
-          io.write(dst);
-        } catch (err) {
-          failure = err as Error;
-        }
-      };
-      const handle: GzipWriterHandle = {
-        mtime: null,
-        write: (data, flush) => {
-          stream.write(data);
-          if (flush !== 0) stream.flush(flush, () => {});
-        },
-        flush: async (flush) => {
-          if (flush !== 0) await new Promise<void>((res) => stream.flush(flush, res));
-          writeRaw();
-          if (failure !== null) throw failure;
-        },
-        finish: async () => {
-          stream.end();
-          await ended;
-          writeRaw();
-          if (failure !== null) throw failure;
-        },
-      };
-      stream.on("data", (chunk) => {
-        const bytes = chunk as Uint8Array;
-        if (!headerSeen) {
-          headerSeen = true;
-          if (bytes.length >= GZIP_HEADER_LENGTH) {
-            setGzipHeaderMtime(bytes, handle.mtime ?? Math.floor(Date.now() / 1000));
-          }
-        }
-        const buf = new Uint8Array(pending.length + bytes.length);
-        buf.set(pending);
-        buf.set(bytes, pending.length);
-        pending = buf;
-      });
-      const ended = new Promise<void>((res) => {
-        stream.on("end", () => res());
-        stream.on("error", (err) => {
-          failure ??= err as Error;
-          res();
-        });
-      });
-      return handle;
-    },
-    gzipReader: (io) => {
-      const toBytes = (str: string | Uint8Array): Uint8Array =>
-        typeof str === "string" ? Uint8Array.from(str, (c) => c.charCodeAt(0) & 0xff) : str;
-      const header = toBytes(io.read(GZIP_HEADER_LENGTH) ?? new Uint8Array());
-      if (header.length < GZIP_HEADER_LENGTH || header[0] !== 0x1f || header[1] !== 0x8b) {
-        throw new Zlib.GzipFile.Error("not in gzip format");
-      }
-      const mtime = (header[4] | (header[5] << 8) | (header[6] << 16) | (header[7] << 24)) >>> 0;
-      let finished = false;
-      return {
-        mtime,
-        read: () => {
-          if (finished) return new Uint8Array();
-          finished = true;
-          const chunks: Uint8Array[] = [header];
-          let str: string | Uint8Array | null;
-          while ((str = io.read(GZFILE_READ_SIZE)) !== null && str.length > 0) {
-            chunks.push(toBytes(str));
-          }
-          const src = new Uint8Array(chunks.reduce((n, chunk) => n + chunk.length, 0));
-          let offset = 0;
-          for (const chunk of chunks) {
-            src.set(chunk, offset);
-            offset += chunk.length;
-          }
-          return zlib.gunzipSync(src);
-        },
-      };
-    },
+    deflateZStream: (level, windowBits, strategy) =>
+      nodeZStream(
+        windowBits < 0
+          ? zlib.createDeflateRaw({ level, strategy })
+          : zlib.createDeflate({ level, strategy }),
+        false,
+      ),
+    inflateZStream: (windowBits) =>
+      nodeZStream(
+        windowBits < 0
+          ? zlib.createInflateRaw()
+          : windowBits > 15
+            ? zlib.createUnzip()
+            : zlib.createInflate(),
+        true,
+      ),
   };
 }
 

@@ -231,7 +231,7 @@ export {
   zlibAdapterConfig,
   GzipWriter,
 } from "./zlib-adapter.js";
-export type { ZlibAdapter, GzipWriterIO, GzipWriterHandle } from "./zlib-adapter.js";
+export type { ZlibAdapter, GzipWriterIO, ZStream } from "./zlib-adapter.js";
 export {
   aryCount,
   aryDelete,
