@@ -172,8 +172,5 @@
   ],
   "publishConfig": {
     "access": "public"
-  },
-  "dependencies": {
-    "@js-temporal/polyfill": "^0.5.1"
   }
 }

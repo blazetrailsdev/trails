@@ -765,13 +765,7 @@ function tryAutoRegisterNode(): boolean {
   const proc = (globalThis as { process?: NodeProcessLike }).process;
   if (!proc?.versions?.node) return false;
   const adapter = buildNodeAdapter(proc);
-  if (runtime() === "bun") {
-    delete adapter.registerHooks;
-    const host = globalThis as { Temporal?: unknown };
-    host.Temporal ??= (import.meta as { require?(id: string): { Temporal: unknown } }).require!(
-      "@js-temporal/polyfill",
-    ).Temporal;
-  }
+  if (runtime() === "bun") delete adapter.registerHooks;
   nodeAutoRegistered = adapter;
   registerProcessAdapter(adapter);
   return true;

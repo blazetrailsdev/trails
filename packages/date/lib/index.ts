@@ -1,3 +1,4 @@
+import "./bun-temporal.js";
 import "./acts-like.js";
 export {
   ArgumentError,

@@ -1158,6 +1158,9 @@ importers:
       '@blazetrails/ruby-compat':
         specifier: workspace:*
         version: link:../ruby-compat
+      '@js-temporal/polyfill':
+        specifier: ^0.5.1
+        version: 0.5.1
 
   packages/did-you-mean:
     dependencies:
@@ -1563,10 +1566,6 @@ importers:
         version: link:../vitest-matchers
 
   packages/ruby-compat:
-    dependencies:
-      '@js-temporal/polyfill':
-        specifier: ^0.5.1
-        version: 0.5.1
     optionalDependencies:
       yaml:
         specifier: ^2.8.3
