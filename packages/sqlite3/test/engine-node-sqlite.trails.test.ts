@@ -40,6 +40,27 @@ describe("SQLite3::Database over the node-sqlite engine", () => {
     await reader.close();
   });
 
+  it("calls the busy handler for a write after a statement that took no read lock", async () => {
+    const path = `${getOs().tmpdir()}/engine-nodeadlock-${Date.now()}-${Math.random()}.sqlite3`;
+    paths.push(path);
+    const holder = new SQLite3.Database(path, { engine });
+    await holder.executeBatch2("CREATE TABLE t (a);");
+    const writer = new SQLite3.Database(path, { engine });
+    const counts: number[] = [];
+    writer.busyHandler((count) => (counts.push(count), count < 2));
+    await writer.execute("BEGIN DEFERRED");
+    await writer.execute("SAVEPOINT a");
+    await holder.execute("BEGIN IMMEDIATE");
+    await expect(writer.execute("INSERT INTO t VALUES (2)")).rejects.toBeInstanceOf(
+      SQLite3.BusyException,
+    );
+    expect(counts).toEqual([0, 1, 2]);
+    await writer.execute("ROLLBACK");
+    await holder.execute("ROLLBACK");
+    await holder.close();
+    await writer.close();
+  });
+
   it("reads an INTEGER as a number when it is safe and as a bigint past 2^53", async () => {
     const db = new SQLite3.Database(":memory:", { engine });
     expect(await db.execute("SELECT 7, 9007199254740993, -9007199254740993, 1.5")).toEqual([

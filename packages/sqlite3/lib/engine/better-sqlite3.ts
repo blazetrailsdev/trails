@@ -76,7 +76,7 @@ function prepareStatement(
   raw: BetterSqlite3.Database,
   sql: string,
   finalize: () => void,
-  locked: <T>(run: () => T) => T,
+  locked: <T>(run: () => T, reader: boolean) => T,
 ): EngineStatement {
   const stmt = raw.prepare(sql);
   const reader = stmt.reader;
@@ -161,7 +161,7 @@ function prepareStatement(
           return null;
         }
         return columnIntegers(r.value);
-      }),
+      }, reader),
     isDone: () => done,
     bindParameterCount: () => bindParameterNames(sql).length,
     columnCount: () => (reader ? stmt.columns().length : 0),
@@ -176,11 +176,11 @@ export const engine: SyncEngineOpenV2 = Object.assign((file: string, mode: numbe
   let zombie = false;
   let liveStatements = 0;
   let readLock = false;
-  const locked = <T>(run: () => T): T => {
+  const locked = <T>(run: () => T, reader: boolean): T => {
     const held = raw.inTransaction;
     if (!held) readLock = false;
     const result = run();
-    readLock = raw.inTransaction && (readLock || held);
+    readLock = raw.inTransaction && (readLock || (held && reader));
     return result;
   };
   const finalize = () => {
@@ -239,7 +239,7 @@ export const engine: SyncEngineOpenV2 = Object.assign((file: string, mode: numbe
               yield withBusyHandler(
                 db,
                 () => handler,
-                () => locked(() => stmt.run()),
+                () => locked(() => stmt.run(), false),
               );
             } else {
               stmt.safeIntegers(true).raw(true);
@@ -247,7 +247,7 @@ export const engine: SyncEngineOpenV2 = Object.assign((file: string, mode: numbe
               for (const row of (yield withBusyHandler(
                 db,
                 () => handler,
-                () => locked(() => stmt.all() as unknown[][]),
+                () => locked(() => stmt.all() as unknown[][], true),
               )) as unknown[][]) {
                 const vals = row.map(columnText);
                 results.push(

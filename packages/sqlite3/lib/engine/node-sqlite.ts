@@ -103,7 +103,7 @@ function prepareStatement(
   raw: DatabaseSync,
   sql: string,
   finalize: () => void,
-  locked: <T>(run: () => T) => T,
+  locked: <T>(run: () => T, reader: boolean) => T,
 ): EngineStatement {
   const stmt: StatementSync = raw.prepare(sql);
   stmt.setAllowBareNamedParameters(true);
@@ -175,7 +175,7 @@ function prepareStatement(
           return null;
         }
         return columnIntegers(r.value as unknown[]);
-      }),
+      }, reader),
     isDone: () => done,
     bindParameterCount: () => bindParameterNames(sql).length,
     columnCount: () => columns.length,
@@ -191,11 +191,11 @@ export const engine: SyncEngineOpenV2 = Object.assign((file: string, mode: numbe
   let zombie = false;
   let liveStatements = 0;
   let readLock = false;
-  const locked = <T>(run: () => T): T => {
+  const locked = <T>(run: () => T, reader: boolean): T => {
     const held = raw.isTransaction;
     if (!held) readLock = false;
     const result = run();
-    readLock = raw.isTransaction && (readLock || held);
+    readLock = raw.isTransaction && (readLock || (held && reader));
     return result;
   };
   const finalize = () => {
@@ -271,7 +271,7 @@ export const engine: SyncEngineOpenV2 = Object.assign((file: string, mode: numbe
               yield withBusyHandler(
                 db,
                 () => handler,
-                () => locked(() => stmt.run()),
+                () => locked(() => stmt.run(), false),
               );
               continue;
             }
@@ -280,7 +280,7 @@ export const engine: SyncEngineOpenV2 = Object.assign((file: string, mode: numbe
             for (const row of (yield withBusyHandler(
               db,
               () => handler,
-              () => locked(() => stmt.all() as unknown as unknown[][]),
+              () => locked(() => stmt.all() as unknown as unknown[][], true),
             )) as unknown[][]) {
               const vals = row.map(columnText);
               results.push(
