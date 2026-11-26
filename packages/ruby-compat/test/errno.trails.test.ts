@@ -13,6 +13,9 @@ describe("SystemCallError", () => {
   it("is not the class of a value that is not an fs error", () => {
     expect(new Error("boom") instanceof SystemCallError).toBe(false);
     expect(({ code: "EACCES" } as unknown) instanceof SystemCallError).toBe(false);
+    const bogus = Object.assign(new Error("boom"), { code: "EBOGUS" });
+    expect(bogus instanceof SystemCallError).toBe(false);
+    expect(bogus instanceof StandardError).toBe(false);
     const coded = Object.assign(new Error("boom"), { code: "ERR_INVALID_ARG_TYPE" });
     expect(coded instanceof SystemCallError).toBe(false);
     expect(Object.assign(new Error("boom"), { code: "23505" }) instanceof SystemCallError).toBe(

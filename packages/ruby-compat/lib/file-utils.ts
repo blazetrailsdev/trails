@@ -6,6 +6,7 @@ import { getFs, getPath, type FsFileHandle, type FsStatResult } from "./fs-adapt
 import { IO } from "./io.js";
 import { NotImplementedError } from "./not-implemented-error.js";
 import { rbObjRespondTo, rtest } from "./object.js";
+import { syserrTbl } from "./standard-error.js";
 import { stdout } from "./process-adapter.js";
 import { stringSplit } from "./string/split.js";
 
@@ -25,7 +26,7 @@ function isDirectory(path: string): boolean {
  * `rescue SystemCallError`.
  */
 function isSystemCallError(error: unknown): boolean {
-  return typeof (error as { code?: unknown } | null | undefined)?.code === "string";
+  return syserrTbl.has(String((error as { code?: unknown } | null | undefined)?.code));
 }
 
 /** `Entry_#exist?` / `#directory?` (`vendor/ruby/v3.3.11/lib/fileutils.rb:2109,2123`). */

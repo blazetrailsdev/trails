@@ -12,7 +12,6 @@ import {
   flatten,
   rbFArray,
   rbObjRespondTo,
-  signo2signm,
 } from "@blazetrails/ruby-compat";
 import type { main } from "./dsl-definition.js";
 import { FileList } from "./file-list.js";
@@ -64,7 +63,6 @@ export class TestTask extends TaskLib {
     this.define();
   }
 
-  /** @inventedArm signo2signm — CONVERGEABLE signal-exception-esignal-init-integer-arm */
   define(): this {
     const self = this as unknown as typeof main & typeof FileUtils;
     self.desc(this.description);
@@ -82,9 +80,7 @@ export class TestTask extends TaskLib {
             args,
             block((ok: unknown, status: RunStatus) => {
               if (!ok && rbObjRespondTo(status, "isSignaled") && status.isSignaled!()) {
-                throw new SignalException(
-                  `SIG${signo2signm(status.termsig!()!) ?? status.termsig!()}`,
-                );
+                throw new SignalException(status.termsig!()!);
               } else if (!ok) {
                 const statusMessage = `Command failed with status (${status.exitstatus()})`;
                 const details = `: [ruby ${args}]`;

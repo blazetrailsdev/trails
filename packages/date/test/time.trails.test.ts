@@ -929,6 +929,17 @@ describe("Time through Marshal", () => {
     const back = Marshal.load(Marshal.dump(local)) as Time;
     expect([back.eql(local), back.utcOffset]).toEqual([true, local.utcOffset]);
   });
+
+  it("loads TZ=Asia/Tokyo ruby -e 'Marshal.dump(Time.local(2004))' with its String zone", async () => {
+    const { Marshal } = await import("@blazetrails/ruby-compat");
+    const mri = String.fromCharCode(
+      ...[4, 8, 73, 117, 58, 9, 84, 105, 109, 101, 13, 239, 239, 25, 128, 0, 0, 0, 0, 7, 58, 11],
+      ...[111, 102, 102, 115, 101, 116, 105, 2, 144, 126, 58, 9, 122, 111, 110, 101, 73, 34, 8],
+      ...[74, 83, 84, 6, 58, 6, 69, 70],
+    );
+    const t = Marshal.load(mri) as Time;
+    expect([t.zone, t.utcOffset, t.toS()]).toEqual(["JST", 32400, "2004-01-01 00:00:00 +0900"]);
+  });
 });
 
 describe("Date#iso8601, DateTime#iso8601 and Time#xmlschema on a Temporal seat", () => {

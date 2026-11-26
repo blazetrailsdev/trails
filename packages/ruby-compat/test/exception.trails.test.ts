@@ -69,3 +69,28 @@ describe("Exception#name", () => {
     expect(new StandardError().name).toBe("StandardError");
   });
 });
+
+describe("Exception#message", () => {
+  it("dispatches to a to_s override, as exc_message does", () => {
+    class Suffixed extends StandardError {
+      override toString(): string {
+        return `${super.toString()}!`;
+      }
+    }
+    const error = new Suffixed("boom");
+    expect([error.message, error.toS(), String(error)]).toEqual(["boom!", "boom!", "boom!"]);
+    expect(new Suffixed().message).toBe("Suffixed!");
+  });
+});
+
+describe("SignalException.new", () => {
+  it("names a signal number as esignal_init does", async () => {
+    const { SignalException, ArgumentError } = await import("../lib/index.js");
+    const term = new SignalException(15);
+    expect([term.message, term.signo()]).toEqual(["SIGTERM", 15]);
+    expect(new SignalException(15, "X").message).toBe("X");
+    expect(new SignalException(64).message).toBe("SIG64");
+    expect(() => new SignalException(99)).toThrow(ArgumentError);
+    expect(new SignalException("SIGINT").message).toBe("SIGINT");
+  });
+});

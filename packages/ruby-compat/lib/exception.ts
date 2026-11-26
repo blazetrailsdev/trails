@@ -1,5 +1,7 @@
 import { rbClassPath } from "./classpath.js";
 
+const mesgKey = Symbol("mesg");
+
 /* eslint-disable @typescript-eslint/no-unsafe-declaration-merging */
 /**
  * Ruby's core `Exception` (`vendor/ruby/v3.3.11/error.c:3294` `rb_eException`) — the
@@ -13,13 +15,28 @@ import { rbClassPath } from "./classpath.js";
  * @noRailsEquivalent PERMANENT — Ruby core `Exception`, which Rails inherits
  * rather than defines.
  */
-export class Exception extends Error {}
+export class Exception extends Error {
+  /**
+   * `exc_init` (`vendor/ruby/v3.3.11/error.c:1402-1408`) seats the `mesg` ivar.
+   * `Error`'s constructor seats an own `message` instead, which would shadow
+   * `exc_message`'s getter, so it is moved to the ivar's slot.
+   */
+  constructor(...args: ConstructorParameters<typeof Error>) {
+    super(...args);
+    if (Object.hasOwn(this, "message")) {
+      const mesg = Reflect.get(this, "message", this);
+      delete (this as { message?: string }).message;
+      Object.defineProperty(this, mesgKey, { value: mesg, writable: true, configurable: true });
+    }
+  }
+}
 
 export interface Exception {
   /** @noRailsEquivalent PERMANENT */
   detailedMessage(opt?: { highlight?: boolean | null } | null): string;
   /** @noRailsEquivalent PERMANENT */
   toS(): string;
+  toString(): string;
 }
 /* eslint-enable @typescript-eslint/no-unsafe-declaration-merging */
 
@@ -48,22 +65,28 @@ Object.defineProperty(Exception.prototype, "name", {
 
 /**
  * `exc_to_s` (`vendor/ruby/v3.3.11/error.c:1463`): the message, or the class
- * name when there is none. Ruby's `mesg` ivar is the own `message` property
- * `Error`'s constructor seats only when given a message. `rb_String` is
+ * name when there is none. Ruby's `mesg` ivar is the slot the constructor
+ * moves `Error`'s own `message` into, seated only when given a message. `rb_String` is
  * `String`, not ruby-compat's `rbObjAsString`: `object.ts` reaches classes that
  * extend `Exception`, so importing it here leaves `Exception` uninitialized
- * when this module is loaded first.
+ * when this module is loaded first. Ruby's `to_s` is `toString` here, as
+ * everywhere in trails, so it replaces JS's `"Name: message"` form.
  *
  * @noRailsEquivalent PERMANENT
  */
-Exception.prototype.toS = function (this: Exception): string {
-  const mesg: unknown = Object.hasOwn(this, "message") ? Reflect.get(this, "message", this) : null;
+Exception.prototype.toString = function (this: Exception): string {
+  const mesg: unknown = Object.hasOwn(this, mesgKey) ? Reflect.get(this, mesgKey, this) : null;
 
   if (mesg == null) {
     const klass = this.constructor;
     return rbClassPath(klass) ?? (klass.name || "");
   }
   return String(mesg);
+};
+
+/** @noRailsEquivalent PERMANENT */
+Exception.prototype.toS = function (this: Exception): string {
+  return this.toString();
 };
 
 /**
@@ -74,15 +97,10 @@ Exception.prototype.toS = function (this: Exception): string {
 Object.defineProperty(Exception.prototype, "message", {
   configurable: true,
   get(this: Exception) {
-    return this.toS();
+    return this.toString();
   },
   set(this: Exception, value: unknown) {
-    Object.defineProperty(this, "message", {
-      value,
-      writable: true,
-      configurable: true,
-      enumerable: false,
-    });
+    Object.defineProperty(this, mesgKey, { value, writable: true, configurable: true });
   },
 });
 

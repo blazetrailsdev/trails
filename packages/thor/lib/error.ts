@@ -1,11 +1,5 @@
 import { formatter, SpellChecker as DidYouMeanSpellChecker } from "@blazetrails/did-you-mean";
-import {
-  prepend,
-  rbCallSuper,
-  rbInspect,
-  rbModName,
-  StandardError,
-} from "@blazetrails/ruby-compat";
+import { prepend, rbCallSuper, rbInspect, StandardError } from "@blazetrails/ruby-compat";
 
 interface Corrected {
   _corrections?: string[];
@@ -28,24 +22,7 @@ export const Correctable = {
   },
 };
 
-export class Error extends StandardError {
-  #mesg: string;
-
-  constructor(message?: string) {
-    super(message);
-    this.#mesg = message ?? rbModName(new.target) ?? "";
-    delete (this as { message?: string }).message;
-  }
-
-  /** @noRailsEquivalent CONVERGEABLE ruby-compat-exception-message-dispatches-to-to-s */
-  override get message(): string {
-    return this.toString();
-  }
-
-  override toString(): string {
-    return this.#mesg;
-  }
-}
+export class Error extends StandardError {}
 
 Error.prototype.name = "Thor::Error";
 

@@ -15,6 +15,7 @@ import {
   rtest,
   toI,
   toS,
+  TypeError as RbTypeError,
   warn,
 } from "@blazetrails/ruby-compat";
 import { Date as RubyDate, DateTime, Time } from "@blazetrails/date";
@@ -616,13 +617,13 @@ export class Client {
           this.setEnableCleartextPlugin(rtest(opts[key]));
           break;
         case "connectTimeout":
-          if (opts[key] != null) this.setConnectTimeout(Number(kernelInteger(opts[key])));
+          if (opts[key] != null) this.setConnectTimeout(kernelInteger(opts[key]));
           break;
         case "readTimeout":
-          if (opts[key] != null) this.setReadTimeout(Number(kernelInteger(opts[key])));
+          if (opts[key] != null) this.setReadTimeout(kernelInteger(opts[key]));
           break;
         case "writeTimeout":
-          if (opts[key] != null) this.setWriteTimeout(Number(kernelInteger(opts[key])));
+          if (opts[key] != null) this.setWriteTimeout(kernelInteger(opts[key]));
           break;
         case "defaultFile":
           this.setDefaultFile(opts[key] as string | null);
@@ -760,14 +761,20 @@ export class Client {
     return this._mysqlClientOptions("localInfile", value);
   }
 
-  private setConnectTimeout(value: number): boolean {
+  private setConnectTimeout(value: number | bigint): boolean {
+    if (typeof value !== "number") {
+      throw new RbTypeError("wrong argument type Integer (expected Integer)");
+    }
     if (value < 0) {
       throw new Mysql2Error(`connect_timeout must be a positive integer, you passed ${value}`);
     }
     return this._mysqlClientOptions("connectTimeout", value);
   }
 
-  private setReadTimeout(value: number): boolean {
+  private setReadTimeout(value: number | bigint): boolean {
+    if (typeof value !== "number") {
+      throw new RbTypeError("wrong argument type Integer (expected Integer)");
+    }
     if (value < 0) {
       throw new Mysql2Error(`read_timeout must be a positive integer, you passed ${value}`);
     }
@@ -775,7 +782,10 @@ export class Client {
     return this._mysqlClientOptions("readTimeout", value);
   }
 
-  private setWriteTimeout(value: number): boolean {
+  private setWriteTimeout(value: number | bigint): boolean {
+    if (typeof value !== "number") {
+      throw new RbTypeError("wrong argument type Integer (expected Integer)");
+    }
     if (value < 0) {
       throw new Mysql2Error(`write_timeout must be a positive integer, you passed ${value}`);
     }

@@ -486,7 +486,7 @@ const SIGLIST: Record<string, number> = {
   POLL: 29,
 };
 
-const NSIG = 65;
+export const NSIG = 65;
 
 const traps = new Map<number, { command: TrapCommand; off: (() => void) | null }>();
 

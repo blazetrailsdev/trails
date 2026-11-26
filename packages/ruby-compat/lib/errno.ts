@@ -1,4 +1,4 @@
-import { StandardError } from "./standard-error.js";
+import { StandardError, syserrTbl } from "./standard-error.js";
 
 /**
  * Ruby's core `SystemCallError` (`vendor/ruby/v3.3.11/error.c:3380`
@@ -14,13 +14,13 @@ export class SystemCallError extends StandardError {
   /** @noRailsEquivalent PERMANENT */
   errno: number | null = null;
 
-  /** @noRailsEquivalent CONVERGEABLE system-call-error-instanceof-reads-an-errno-table-and-all-takes-a-pattern */
+  /** @noRailsEquivalent PERMANENT */
   static [Symbol.hasInstance](error: unknown): boolean {
     return (
       Function.prototype[Symbol.hasInstance].call(this, error) ||
       (this === SystemCallError &&
         error instanceof Error &&
-        /^E[A-Z0-9]+$/.test(String((error as { code?: unknown }).code)))
+        syserrTbl.has(String((error as { code?: unknown }).code)))
     );
   }
 }

@@ -243,7 +243,9 @@ export function rbEqq(pattern: unknown, target: unknown): boolean {
   }
   if (pattern instanceof Set) return pattern.has(target);
   if (typeof pattern === "function") {
-    if (!rbObjIsProc(pattern)) return Object(target) instanceof pattern;
+    if (!rbObjIsProc(pattern)) {
+      return rbObjClass(target) === pattern || Object(target) instanceof pattern;
+    }
     return rtest(pattern(target));
   }
   return rbEqual(pattern, target);

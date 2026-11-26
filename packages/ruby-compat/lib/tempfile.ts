@@ -2,8 +2,10 @@ import { DelegateClass } from "./delegate.js";
 import { createTmpname } from "./dir.js";
 import { Encoding } from "./encoding.js";
 import { File } from "./file.js";
+import { STDERR } from "./io.js";
 import { ObjectSpace } from "./object-space.js";
 import { Process } from "./process.js";
+import { debug } from "./verbose.js";
 
 /**
  * The `basename` argument of `Tempfile.new` (`vendor/ruby/v3.3.11/lib/tempfile.rb:150`):
@@ -367,14 +369,17 @@ class Remover {
     this.path = path;
   }
 
-  /** @missingRailsCall puts — CONVERGEABLE tempfile-remover-debug-output */
   call = (): void => {
     if (this.pid !== Process.pid) return;
+
+    if (debug() != null && debug() !== false) STDERR.puts(`removing ${this.path}...`);
 
     try {
       File.delete(this.path);
     } catch (error) {
       if ((error as { code?: string }).code !== "ENOENT") throw error;
     }
+
+    if (debug() != null && debug() !== false) STDERR.puts("done");
   };
 }

@@ -1,4 +1,6 @@
+import { ArgumentError } from "./argument-error.js";
 import { Exception } from "./exception.js";
+import { NSIG, signo2signm } from "./process-adapter.js";
 
 /**
  * Ruby's core `SignalException` (`vendor/ruby/v3.3.11/error.c:3318`
@@ -8,7 +10,46 @@ import { Exception } from "./exception.js";
  * @noRailsEquivalent PERMANENT — Ruby core `SignalException`, which Rails
  * inherits rather than defines.
  */
-export class SignalException extends Exception {}
+export class SignalException extends Exception {
+  private readonly _signo: number | undefined;
+
+  /**
+   * `esignal_init` (`vendor/ruby/v3.3.11/signal.c:344-379`): an Integer is a
+   * signal number, named by `rb_signo2signm` (`:323-332`, `SIG%s` or `SIG%u`)
+   * unless a name follows it.
+   */
+  constructor(...argv: unknown[]) {
+    let argnum = 1;
+    let sig: unknown = null;
+    let signo: number | undefined;
+
+    if (argv.length > 0) {
+      if (typeof argv[0] === "number") {
+        sig = argv[0];
+        argnum = 2;
+      } else sig = argv[0];
+    }
+    if (argnum === 2) {
+      signo = sig as number;
+      if (signo < 0 || signo > NSIG) {
+        throw new ArgumentError(`invalid signal number (${signo})`);
+      }
+      if (argv.length > 1) {
+        sig = argv[1];
+      } else {
+        const signm = signo2signm(signo);
+        sig = signm != null ? `SIG${signm}` : `SIG${signo}`;
+      }
+    }
+    super(...((sig == null ? [] : [sig]) as [string?]));
+    this._signo = signo;
+  }
+
+  /** `esignal_signo` (`vendor/ruby/v3.3.11/signal.c:389-393`). */
+  signo(): number | undefined {
+    return this._signo;
+  }
+}
 
 /**
  * Ruby's core `Interrupt` (`vendor/ruby/v3.3.11/error.c:3319`
