@@ -1,15 +1,19 @@
 // This command will automatically be run when you run "trails" from the root of your engine.
 import "@blazetrails/activesupport/node";
-import { File } from "@blazetrails/ruby-compat";
+import { File, resolveTsThenJs } from "@blazetrails/ruby-compat";
 import { setAppPath, setEnginePath, setEngineRoot } from "@blazetrails/trailties/app-path";
 
 const __dir__ = import.meta.dirname;
 const ENGINE_ROOT = File.expandPath("..", __dir__);
-const ENGINE_PATH = File.expandPath("../lib/<%= this.namespacedName() %>/engine.ts", __dir__);
+const ENGINE_PATH = resolveTsThenJs(
+  File.expandPath("../lib/<%= this.namespacedName() %>/engine.ts", __dir__),
+);
 setEngineRoot(ENGINE_ROOT);
 setEnginePath(ENGINE_PATH);
 <% if (this.isWithDummyApp()) { -%>
-const APP_PATH = File.expandPath("../<%= this.dummyPath() %>/config/application.ts", __dir__);
+const APP_PATH = resolveTsThenJs(
+  File.expandPath("../<%= this.dummyPath() %>/config/application.ts", __dir__),
+);
 setAppPath(APP_PATH);
 <% } -%>
 

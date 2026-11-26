@@ -1,6 +1,9 @@
-import { Pathname } from "@blazetrails/ruby-compat";
+import { Pathname } from "@blazetrails/ruby-compat/pathname";
 import type { RackResponse } from "@blazetrails/rack";
-import { Encoding, publicInstanceMethods, rbFSend, StringIO } from "@blazetrails/ruby-compat";
+import { Encoding } from "@blazetrails/ruby-compat/encoding";
+import { publicInstanceMethods } from "@blazetrails/ruby-compat/include";
+import { rbFSend } from "@blazetrails/ruby-compat/object";
+import { StringIO } from "@blazetrails/ruby-compat/string-io";
 import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 import {
   BroadcastLogger,
@@ -18,7 +21,7 @@ import {
   registerFsAdapter,
   type FsAdapter,
   type PathAdapter,
-} from "@blazetrails/ruby-compat";
+} from "@blazetrails/ruby-compat/fs-adapter";
 import { Application } from "../lib/application.js";
 import { Configuration } from "../lib/application/configuration.js";
 import type { MiddlewareStack } from "@blazetrails/actionpack";

@@ -9,7 +9,6 @@ import {
   File,
   FileUtils,
   Hash,
-  exit,
   include,
   LoadError,
   NameError,
@@ -21,6 +20,7 @@ import {
   type Included,
   resolveTsThenJs,
 } from "@blazetrails/ruby-compat";
+import { exit } from "@blazetrails/ruby-compat/process-adapter";
 import {
   Server as RackupServer,
   type ServerOptions as RackupServerOptions,

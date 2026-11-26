@@ -1,4 +1,5 @@
-import { classModule, env as ENV, setEnv } from "@blazetrails/ruby-compat";
+import { classModule } from "@blazetrails/ruby-compat/class-module";
+import { env as ENV, setEnv } from "@blazetrails/ruby-compat/process-adapter";
 import { _resetEnv } from "../../lib/trails.js";
 
 export class EnvHelpers {

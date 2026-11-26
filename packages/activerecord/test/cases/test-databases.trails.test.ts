@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeAll, afterAll, beforeEach, afterEach } from "vitest";
 import { getEnv } from "@blazetrails/activesupport";
-import { setEnv } from "@blazetrails/ruby-compat";
+import { setEnv } from "@blazetrails/ruby-compat/process-adapter";
 import { TestDatabases } from "../../lib/test-databases.js";
 import { Base } from "../../lib/index.js";
 import { DatabaseConfigurations } from "../../lib/database-configurations.js";

@@ -3,7 +3,7 @@ import { ActionController, Mapper } from "@blazetrails/actionpack";
 import { TestCase } from "@blazetrails/actionpack/testing";
 import { include } from "@blazetrails/activesupport";
 import { assert, assertNil } from "@blazetrails/activesupport/testing/assertions";
-import { block } from "@blazetrails/ruby-compat";
+import { block } from "@blazetrails/ruby-compat/hash";
 import { Application } from "../lib/application.js";
 import { InfoController } from "../lib/info-controller.js";
 import { Info, PropertyList } from "../lib/info.js";

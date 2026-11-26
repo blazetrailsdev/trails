@@ -166,6 +166,33 @@ describe("ActionCable::SubscriptionAdapter::SolidCableTest", () => {
     });
   });
 
+  it("does not send old messages", async () => {
+    await txAdapter.broadcast("channel", "channel1");
+    await txAdapter.broadcast("channel", "channel2");
+
+    await subscribeAsQueue("channel", undefined, async (queue) => {
+      expect(queue).toBeEmpty();
+
+      await txAdapter.broadcast("channel", "channel3");
+      await txAdapter.broadcast("channel", "channel4");
+      await txAdapter.broadcast("other", "other1");
+      await txAdapter.broadcast("other", "other2");
+
+      await subscribeAsQueue("other", undefined, async (otherQueue) => {
+        expect(otherQueue).toBeEmpty();
+      });
+      expect(await nextMessageInQueue(queue)).toBe("channel3");
+      expect(await nextMessageInQueue(queue)).toBe("channel4");
+    });
+
+    await txAdapter.broadcast("channel", "channel5");
+    await txAdapter.broadcast("channel", "channel6");
+
+    await subscribeAsQueue("channel", undefined, async (queue) => {
+      expect(queue).toBeEmpty();
+    });
+  });
+
   function cableConfig(): Record<string, unknown> {
     return {
       adapter: "solid_cable",

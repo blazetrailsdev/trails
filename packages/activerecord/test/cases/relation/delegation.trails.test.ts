@@ -13,7 +13,8 @@ import { CollectionProxy } from "../../../lib/associations/collection-proxy.js";
 import { Relation } from "../../../lib/relation.js";
 import { AssociationRelation } from "../../../lib/association-relation.js";
 import { DisableJoinsAssociationRelation } from "../../../lib/disable-joins-association-relation.js";
-import { rbObjRespondTo, constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { rbObjRespondTo, TopLevel } from "@blazetrails/ruby-compat/object";
 
 const defineClassMethod = (model: object, name: string, fn: (...args: never[]) => unknown) =>
   Object.defineProperty(model, name, { value: fn, writable: true, configurable: true });

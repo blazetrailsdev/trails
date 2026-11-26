@@ -1,5 +1,6 @@
 import { DSL } from "@blazetrails/rake";
-import { block, File, rbFSystem, STDOUT as $stdout, TopLevel } from "@blazetrails/ruby-compat";
+import { block, File, STDOUT as $stdout, TopLevel } from "@blazetrails/ruby-compat";
+import { rbFSystem } from "@blazetrails/ruby-compat/kernel-system";
 
 const STYLESHEETS: Record<string, [string, string, string]> = {
   tailwind: ["tailwindcss @tailwindcss/vite", "application.css", `@import "tailwindcss";\n`],

@@ -1,4 +1,4 @@
-import { stdout } from "@blazetrails/ruby-compat";
+import { stdout } from "@blazetrails/ruby-compat/process-adapter";
 import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";

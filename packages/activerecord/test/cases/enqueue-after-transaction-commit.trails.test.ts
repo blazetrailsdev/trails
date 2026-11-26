@@ -3,7 +3,8 @@ import { Base as JobBase } from "@blazetrails/activejob";
 import { EnqueueAfterTransactionCommit } from "@blazetrails/activejob/enqueue-after-transaction-commit";
 import { TestAdapter } from "@blazetrails/activejob/queue-adapters/test-adapter";
 import { EnqueueError } from "@blazetrails/activejob/enqueuing";
-import { include, TopLevel, constSet } from "@blazetrails/ruby-compat";
+import { include, constSet } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
 import { fixtures } from "../support/use-fixtures.js";
 import { Topic } from "../models/topic.js";
 

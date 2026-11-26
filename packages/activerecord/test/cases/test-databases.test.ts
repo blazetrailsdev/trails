@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { getEnv } from "@blazetrails/activesupport";
 import { stub } from "@blazetrails/activesupport/testing/method-call-assertions";
-import { setEnv } from "@blazetrails/ruby-compat";
+import { setEnv } from "@blazetrails/ruby-compat/process-adapter";
 import { TestDatabases } from "../../lib/test-databases.js";
 import { Base } from "../../lib/index.js";
 import type { HashConfig } from "../../lib/database-configurations/hash-config.js";

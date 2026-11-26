@@ -1,6 +1,9 @@
 import { snapshotReaperState } from "../support/reaper-state.js";
 import { mkdtemp, writeFile, readFile, rm } from "fs/promises";
-import { rbObjInspect, RuntimeError, Thread, ThreadPoolExecutor } from "@blazetrails/ruby-compat";
+import { rbObjInspect } from "@blazetrails/ruby-compat/object";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
+import { Thread } from "@blazetrails/ruby-compat/thread";
+import { ThreadPoolExecutor } from "@blazetrails/ruby-compat/thread-pool-executor";
 import { tmpdir } from "os";
 import { join } from "path";
 import { describe, it, expect, vi } from "vitest";

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { FrozenError } from "@blazetrails/ruby-compat";
+import { FrozenError } from "@blazetrails/ruby-compat/frozen-error";
 import { Coder } from "@blazetrails/pg";
 import { PG } from "@blazetrails/pg";
 

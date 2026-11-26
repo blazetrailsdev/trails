@@ -1,7 +1,9 @@
 import { DescendantsTracker } from "@blazetrails/activesupport";
 import { Admin } from "../models/admin.js";
 import { describe, it, expect } from "vitest";
-import { RuntimeError, constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
 import { DelegationError } from "@blazetrails/activesupport";
 import { Base, reflectOnAssociation } from "../../lib/index.js";
 import {

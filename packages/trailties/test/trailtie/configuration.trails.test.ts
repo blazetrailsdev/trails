@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { NoMethodError } from "@blazetrails/ruby-compat";
+import { NoMethodError } from "@blazetrails/ruby-compat/no-method-error";
 import { Configuration } from "../../lib/trailtie/configuration.js";
 import { Configuration as EngineConfiguration } from "../../lib/engine/configuration.js";
 

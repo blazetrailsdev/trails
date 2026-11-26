@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
 import { EncryptedAttributeType } from "../../../lib/encryption/encrypted-attribute-type.js";
 import { Scheme } from "../../../lib/encryption/scheme.js";
 import { Decryption } from "../../../lib/encryption/errors.js";
-import { rbInspect } from "@blazetrails/ruby-compat";
+import { rbInspect } from "@blazetrails/ruby-compat/object";
 import type { EncryptorLike } from "../../../lib/encryption/encryptor.js";
 import type { SchemeOptions } from "../../../lib/encryption/scheme.js";
 import { ExtendedDeterministicQueries } from "../../../lib/encryption/extended-deterministic-queries.js";

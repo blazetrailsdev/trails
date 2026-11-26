@@ -1,15 +1,12 @@
-import { Pathname } from "@blazetrails/ruby-compat";
+import { Pathname } from "@blazetrails/ruby-compat/pathname";
 import { assertNothingRaised } from "@blazetrails/activesupport/testing/assertions";
-import {
-  File,
-  FileUtils,
-  Dir,
-  setEnv,
-  env,
-  getFs,
-  include,
-  rbFBackquote,
-} from "@blazetrails/ruby-compat";
+import { Dir } from "@blazetrails/ruby-compat/dir";
+import { File } from "@blazetrails/ruby-compat/file";
+import { FileUtils } from "@blazetrails/ruby-compat/file-utils";
+import { getFs } from "@blazetrails/ruby-compat/fs-adapter";
+import { include } from "@blazetrails/ruby-compat/include";
+import { rbFBackquote } from "@blazetrails/ruby-compat/kernel-system";
+import { setEnv, env } from "@blazetrails/ruby-compat/process-adapter";
 import { TestCase } from "@blazetrails/activesupport/test-case";
 import { Isolation } from "@blazetrails/activesupport/testing/isolation";
 import type { Generation } from "../support/isolation/abstract-unit.js";

@@ -15,8 +15,8 @@ import type * as LineEditor from "../../lib/line-editor.js";
 const { readline, rbFSystem } = vi.hoisted(() => ({ readline: vi.fn(), rbFSystem: vi.fn() }));
 
 vi.mock("../../lib/line-editor.js", () => ({ readline }));
-vi.mock("@blazetrails/ruby-compat", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@blazetrails/ruby-compat")>()),
+vi.mock("@blazetrails/ruby-compat/kernel-system", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@blazetrails/ruby-compat/kernel-system")>()),
   rbFSystem,
 }));
 

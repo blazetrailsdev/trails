@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { IPAddr } from "@blazetrails/ruby-compat";
+import { IPAddr } from "@blazetrails/ruby-compat/ipaddr";
 
 import { Cidr } from "../../../../../lib/connection-adapters/postgresql/oid/cidr.js";
 

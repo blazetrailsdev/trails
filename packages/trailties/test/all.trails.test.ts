@@ -6,7 +6,7 @@ import { useInMemoryDatabaseUrl } from "./support/in-memory-database-url.js";
 import "../lib/all.js";
 import { Base } from "@blazetrails/activejob";
 import { Base as RecordBase } from "@blazetrails/activerecord";
-import { rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { rbObjRespondTo } from "@blazetrails/ruby-compat/object";
 import { Application } from "../lib/application.js";
 import { Trails } from "../lib/trails.js";
 

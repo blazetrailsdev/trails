@@ -2,21 +2,17 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PassThrough } from "node:stream";
 import type { REPLServer } from "node:repl";
 import { RouteSet } from "@blazetrails/actionpack";
+import { File } from "@blazetrails/ruby-compat/file";
+import { constSet, include } from "@blazetrails/ruby-compat/include";
+import { STDIN, STDOUT } from "@blazetrails/ruby-compat/io";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
+import { setEnv, getProcessAdapter } from "@blazetrails/ruby-compat/process-adapter";
 import {
-  STDIN,
-  STDOUT,
-  TopLevel,
-  constSet,
-  constGet,
-  include,
-  setEnv,
-  getProcessAdapter,
-  rbModRemoveConst,
-  File,
   TSREPL,
   registerReplAdapter,
   replAdapterConfig,
-} from "@blazetrails/ruby-compat";
+} from "@blazetrails/ruby-compat/repl-adapter";
+import { constGet, rbModRemoveConst } from "@blazetrails/ruby-compat/variable";
 import { Console, ConsoleCommand } from "../../lib/commands/console.js";
 import { Trails } from "../../lib/trails.js";
 import { Reloader } from "@blazetrails/activesupport";

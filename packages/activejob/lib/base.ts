@@ -101,6 +101,7 @@ export class Base {
    * @inventedArm getPrototypeOf — PERMANENT
    * @inventedArm throw — PERMANENT
    * @inlinedFrom ActiveJob::Core#initialize rails/v8.0.5.2/activejob/lib/active_job/core.rb:93-102
+   * @inlinedFrom ActiveJob::BatchId#initialize solid_queue/v1.7.2/lib/active_job/batch_id.rb:19-22
    */
   constructor(...arguments_: unknown[]) {
     const last = arguments_[arguments_.length - 1];

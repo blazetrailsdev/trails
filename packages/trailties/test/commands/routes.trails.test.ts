@@ -1,8 +1,10 @@
 import { capture } from "@blazetrails/activesupport/testing/stream";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Base } from "@blazetrails/activerecord";
-import "@blazetrails/activerecord/tasks/database-tasks.js";
-import { env, getFs, getOsAsync, getPath, setEnv, rbFLoad } from "@blazetrails/ruby-compat";
+import { getFs, getPath } from "@blazetrails/ruby-compat/fs-adapter";
+import { rbFLoad } from "@blazetrails/ruby-compat/load";
+import { getOsAsync } from "@blazetrails/ruby-compat/os-adapter";
+import { env, setEnv } from "@blazetrails/ruby-compat/process-adapter";
 import { Application } from "../../lib/application.js";
 import { invoke } from "../../lib/command.js";
 import { Trails, _resetTrailsEnv } from "../../lib/trails.js";

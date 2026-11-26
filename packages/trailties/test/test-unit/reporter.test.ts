@@ -1,4 +1,5 @@
-import { Interrupt, StringIO } from "@blazetrails/ruby-compat";
+import { Interrupt } from "@blazetrails/ruby-compat/signal-exception";
+import { StringIO } from "@blazetrails/ruby-compat/string-io";
 import { beforeEach, describe, expect, it } from "vitest";
 import { TestUnitReporter } from "../../lib/test-unit/reporter.js";
 

@@ -3,7 +3,8 @@ import { Nodes } from "@blazetrails/arel";
 import { ArgumentError } from "@blazetrails/activemodel";
 
 import { DeferredIdsIn } from "./deferred-distinct-pk-in.js";
-import { isEmpty, rbInspect } from "@blazetrails/ruby-compat";
+import { rbInspect } from "@blazetrails/ruby-compat/object";
+import { isEmpty } from "@blazetrails/ruby-compat/ruby-empty";
 
 export class RelationHandler {
   call(attribute: Arel.Attribute, value: any): Nodes.Node {

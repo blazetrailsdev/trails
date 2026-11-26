@@ -11,7 +11,7 @@ import { adapterSupports, describeIfSupports, itIfSupports } from "../../support
 import { adapterType } from "../../support/test-adapter.js";
 import { isMariaDb, serverVersion } from "../../support/mysql-server-version.js";
 import { dumpTableSchema } from "../../support/schema-dumping-helper.js";
-import { rbInspect } from "@blazetrails/ruby-compat";
+import { rbInspect } from "@blazetrails/ruby-compat/object";
 
 const supportsJsonSchemaValid = !isMariaDb && (serverVersion?.compare("8.0.17") ?? -1) >= 0;
 

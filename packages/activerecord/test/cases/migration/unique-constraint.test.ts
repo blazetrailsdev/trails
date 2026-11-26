@@ -5,7 +5,8 @@ import {
   assertNoChanges,
   assertRaises,
 } from "@blazetrails/activesupport/testing/assertions";
-import { constGet, constSet } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { constGet } from "@blazetrails/ruby-compat/variable";
 import { Base } from "../../../lib/base.js";
 import { Rollback, StatementInvalid } from "../../../lib/errors.js";
 import { PostgreSQLAdapter } from "../../../lib/connection-adapters/postgresql-adapter.js";

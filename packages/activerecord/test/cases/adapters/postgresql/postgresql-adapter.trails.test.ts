@@ -1,6 +1,7 @@
 import { stub } from "@blazetrails/activesupport/testing/method-call-assertions";
 import { fixtures } from "../../../support/use-fixtures.js";
-import { StringIO, Thread } from "@blazetrails/ruby-compat";
+import { StringIO } from "@blazetrails/ruby-compat/string-io";
+import { Thread } from "@blazetrails/ruby-compat/thread";
 import pg from "pg";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { Time as RubyTime } from "@blazetrails/date";

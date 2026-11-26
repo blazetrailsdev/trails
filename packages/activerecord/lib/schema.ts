@@ -1,7 +1,8 @@
 import { isPresent } from "@blazetrails/activesupport";
-import { extend, include, included } from "@blazetrails/ruby-compat";
+import { extend, include, included } from "@blazetrails/ruby-compat/include";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { Current, Migration } from "./migration.js";
+import { ActiveRecord } from "./namespaces.js";
 
 export interface SchemaDefineInfo {
   version?: string | number;
@@ -31,6 +32,7 @@ async function define<A extends DatabaseAdapter>(
   info: SchemaDefineInfo,
   block: DefineBlock<A>,
 ): Promise<void> {
+  await ActiveRecord.Tasks.loadPath["active_record/tasks/database_tasks"]();
   await this.connectionPool.withConnection(async (connection) => {
     this.connection = connection;
     await block(this);

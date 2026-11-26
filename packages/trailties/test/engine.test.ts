@@ -1,4 +1,4 @@
-import { Pathname } from "@blazetrails/ruby-compat";
+import { Pathname } from "@blazetrails/ruby-compat/pathname";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { resetLoadHooks, runLoadHooks } from "@blazetrails/activesupport";
 import {
@@ -6,8 +6,8 @@ import {
   registerFsAdapter,
   type FsAdapter,
   type PathAdapter,
-} from "@blazetrails/ruby-compat";
-import { env, setEnv } from "@blazetrails/ruby-compat";
+} from "@blazetrails/ruby-compat/fs-adapter";
+import { env, setEnv } from "@blazetrails/ruby-compat/process-adapter";
 import { RouteSet } from "@blazetrails/actionpack";
 import { MockRequest } from "@blazetrails/rack";
 import { Engine } from "../lib/engine.js";

@@ -3,7 +3,9 @@ import { Relation } from "../../../lib/index.js";
 import { fixtures } from "../../support/use-fixtures.js";
 import { Post } from "../../models/post.js";
 import { Comment } from "../../models/comment.js";
-import { regexpEscape, constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
+import { regexpEscape } from "@blazetrails/ruby-compat/regexp";
 
 constSet(TopLevel, "Post", Post);
 constSet(TopLevel, "Comment", Comment);

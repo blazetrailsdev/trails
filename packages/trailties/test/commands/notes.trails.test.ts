@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { stdout } from "@blazetrails/ruby-compat";
+import { stdout } from "@blazetrails/ruby-compat/process-adapter";
 import type { ThorClass } from "@blazetrails/thor";
 import { invoke } from "../../lib/command.js";
 import { NotesCommand } from "../../lib/commands/notes.js";

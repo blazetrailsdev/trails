@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { rbFSend, rbModName, constGet } from "@blazetrails/ruby-compat";
+import { rbFSend, rbModName } from "@blazetrails/ruby-compat/object";
+import { constGet } from "@blazetrails/ruby-compat/variable";
 import type { RackResponse } from "@blazetrails/rack";
 import type { Base } from "@blazetrails/activerecord";
 import { Application } from "../lib/application.js";

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { BigDecimal } from "@blazetrails/activesupport";
-import { Rational } from "@blazetrails/ruby-compat";
+import { Rational } from "@blazetrails/ruby-compat/rational";
 import { fixtures } from "../../../support/use-fixtures.js";
 import { currentAdapter } from "../../../support/adapter-helper.js";
 import { Post } from "../../../models/post.js";

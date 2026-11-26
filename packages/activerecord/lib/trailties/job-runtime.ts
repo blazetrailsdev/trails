@@ -1,5 +1,5 @@
 import "../constants.job-runtime.generated.js";
-import { rbCallSuper } from "@blazetrails/ruby-compat";
+import { rbCallSuper } from "@blazetrails/ruby-compat/include";
 import * as RuntimeRegistry from "../runtime-registry.js";
 
 /** @internal */

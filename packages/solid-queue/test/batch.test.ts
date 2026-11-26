@@ -10,6 +10,7 @@ import {
   cattrAccessor,
   Notifications,
   with as with_,
+  minutes,
   seconds,
   sole,
 } from "@blazetrails/activesupport";
@@ -34,6 +35,7 @@ import {
   Batch,
   BatchExecution,
   ClaimedExecution,
+  FailedExecution,
   Job,
   Process,
   ReadyExecution,
@@ -603,6 +605,64 @@ describe("SolidQueue::BatchTest", () => {
     });
 
     expect((await job.batch())!.id).toBe(batch.id);
+  });
+
+  it("sweep_stalled repairs tracking rows leaked by swallowed removal errors", async () => {
+    const batch = await Batch.enqueue({ onFinish: BatchCompletionJob }, async () => {
+      for (let i = 0; i < 2; i++) await NiceJob.performLater(i);
+    });
+
+    const jobs = await batch.jobs.order("id").toArray();
+    await jobs[0].updateColumns({ finished_at: Time.current() });
+    await FailedExecution.insertAllBang([
+      { job_id: jobs[1].id, error: JSON.stringify({ exception_class: "RuntimeError" }) },
+    ]);
+
+    expect(await BatchExecution.where({ batch_id: batch.id }).count()).toBe(2);
+    expect((await batch.reload()).isFinished()).toBeFalsy();
+
+    await Batch.sweepStalled();
+
+    await batch.reload();
+    expect(batch.isFinished()).toBeTruthy();
+    expect(batch.isFailed()).toBeTruthy();
+    expect(await batch.failedJobs()).toBe(1);
+    expect(await batch.completedJobs()).toBe(1);
+    expect(await Job.where({ class_name: "BatchCompletionJob" }).count()).toBe(1);
+  });
+
+  it("sweep_stalled finishes batches whose jobs were bulk discarded", async () => {
+    const batch = await Batch.enqueue({}, async () => {
+      for (let i = 0; i < 3; i++) await NiceJob.performLater(i);
+    });
+
+    await ReadyExecution.discardAllInBatches();
+
+    expect(await BatchExecution.count()).toBe(0);
+    expect((await batch.reload()).isFinished()).toBeFalsy();
+
+    await batch.updateColumns({ enqueued_at: seconds(5).ago() });
+    await Batch.sweepStalled();
+
+    await batch.reload();
+    expect(batch.isFinished()).toBeTruthy();
+    expect(await batch.pendingJobs()).toBe(0);
+    expect(await batch.completedJobs()).toBe(3);
+  });
+
+  it("sweep_stalled starts batches whose creating process died before starting them", async () => {
+    const batch = await Batch.enqueue({}, async () => {
+      await NiceJob.performLater("world");
+    });
+
+    await batch.updateColumns({ enqueued_at: null, created_at: minutes(10).ago() });
+    await (await batch.jobs.sole()).finishedBang();
+
+    expect((await batch.reload()).isFinished()).toBeFalsy();
+
+    await Batch.sweepStalled();
+
+    expect((await batch.reload()).isFinished()).toBeTruthy();
   });
 
   it("conflict-discarded jobs count the same for single and bulk enqueues", async () => {

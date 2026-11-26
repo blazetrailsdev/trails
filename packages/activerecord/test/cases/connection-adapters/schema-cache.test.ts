@@ -14,7 +14,11 @@ import {
 } from "../../../lib/active-record.js";
 import { StatementInvalid } from "../../../lib/errors.js";
 import { assertRaises } from "@blazetrails/activesupport/testing/assertions";
-import { File, FileUtils, Marshal, Tempfile, sort, toH } from "@blazetrails/ruby-compat";
+import { sort, toH } from "@blazetrails/ruby-compat/array";
+import { File } from "@blazetrails/ruby-compat/file";
+import { FileUtils } from "@blazetrails/ruby-compat/file-utils";
+import { Marshal } from "@blazetrails/ruby-compat/marshal";
+import { Tempfile } from "@blazetrails/ruby-compat/tempfile";
 import { Base } from "../../../lib/base.js";
 import { ASSETS_ROOT } from "../../config.js";
 import { fixtures } from "../../support/use-fixtures.js";

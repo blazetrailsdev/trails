@@ -12,19 +12,16 @@ import {
   singularize,
   uuidV5,
 } from "@blazetrails/activesupport";
-import {
-  ArgumentError,
-  Dir,
-  File as RubyFile,
-  type Hash,
-  RuntimeError,
-  StandardError,
-  Zlib,
-  rbObjRespondTo,
-  slice,
-  isModuleIncluded,
-  eachWithObject,
-} from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { Dir } from "@blazetrails/ruby-compat/dir";
+import { eachWithObject } from "@blazetrails/ruby-compat/enumerable";
+import { File as RubyFile } from "@blazetrails/ruby-compat/file";
+import { type Hash, slice } from "@blazetrails/ruby-compat/hash";
+import { isModuleIncluded } from "@blazetrails/ruby-compat/include";
+import { rbObjRespondTo } from "@blazetrails/ruby-compat/object";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
+import { StandardError } from "@blazetrails/ruby-compat/standard-error";
+import { Zlib } from "@blazetrails/ruby-compat/zlib";
 import { ActiveRecord } from "./namespaces.js";
 import { EncryptedFixtures } from "./encryption/encrypted-fixtures.js";
 import type { EncryptedFixtureHost } from "./encryption/encrypted-fixtures.js";

@@ -1,4 +1,4 @@
-import { TypeError } from "@blazetrails/ruby-compat";
+import { TypeError } from "@blazetrails/ruby-compat/type-error";
 import type * as Arel from "@blazetrails/arel";
 import {
   Expressions,
@@ -21,21 +21,14 @@ import {
   pluck as enumerablePluck,
   tryCall,
 } from "@blazetrails/activesupport";
-import {
-  block,
-  fetch,
-  hashAref,
-  Hash,
-  isEmpty,
-  isModuleIncluded,
-  rbFSend,
-  rbObjRespondTo,
-  rtest,
-  toD,
-  toI,
-  uniq,
-  eachWithObject,
-} from "@blazetrails/ruby-compat";
+import { uniq } from "@blazetrails/ruby-compat/array";
+import { toD } from "@blazetrails/ruby-compat/big-decimal";
+import { eachWithObject } from "@blazetrails/ruby-compat/enumerable";
+import { block, fetch, hashAref, Hash } from "@blazetrails/ruby-compat/hash";
+import { isModuleIncluded } from "@blazetrails/ruby-compat/include";
+import { toI } from "@blazetrails/ruby-compat/numeric";
+import { rbFSend, rbObjRespondTo, rtest } from "@blazetrails/ruby-compat/object";
+import { isEmpty } from "@blazetrails/ruby-compat/ruby-empty";
 import type { Base } from "../base.js";
 import type { JoinDependency } from "../associations/join-dependency.js";
 import { Result, type ColumnType, type ColumnTypes } from "../result.js";

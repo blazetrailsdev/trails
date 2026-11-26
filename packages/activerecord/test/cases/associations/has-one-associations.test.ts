@@ -1,5 +1,8 @@
 import { DescendantsTracker } from "@blazetrails/activesupport";
-import { Marshal, kernelThrow, rbFSend, constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { kernelThrow } from "@blazetrails/ruby-compat/kernel-catch";
+import { Marshal } from "@blazetrails/ruby-compat/marshal";
+import { rbFSend, TopLevel } from "@blazetrails/ruby-compat/object";
 import { Notifications, type NotificationEvent } from "@blazetrails/activesupport";
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { SingularAssociation } from "../../../lib/associations/singular-association.js";

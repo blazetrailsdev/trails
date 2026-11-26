@@ -4,7 +4,7 @@ import { DatabaseConfigurations } from "../../lib/database-configurations.js";
 import { Base } from "../../lib/base.js";
 import { DEFAULT_ENV } from "../../lib/connection-handling.js";
 import { getEnv } from "@blazetrails/activesupport";
-import { setEnv } from "@blazetrails/ruby-compat";
+import { setEnv } from "@blazetrails/ruby-compat/process-adapter";
 
 describe("DatabaseConfigurationsTest", () => {
   const previousEnv = getEnv("TRAILS_ENV");

@@ -1,5 +1,7 @@
 import { ArgumentError, ValueType } from "@blazetrails/activemodel";
-import { max, rbObjDup, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { max } from "@blazetrails/ruby-compat/comparable";
+import { rbObjDup } from "@blazetrails/ruby-compat/include";
+import { rbObjRespondTo } from "@blazetrails/ruby-compat/object";
 
 export class TypeConflictError extends Error {
   constructor(message?: string) {

@@ -1,20 +1,16 @@
 import { Nodes } from "@blazetrails/arel";
 import type { Table } from "@blazetrails/arel";
 import {
-  Enumerable,
-  type Each,
-  rbObjAsString,
-  rtest,
   first as aryFirst,
   last as aryLast,
   take as aryTake,
   uniq,
   arySlice,
-  cmp,
-  numericMinus,
-  rbCmpint,
-  rbInspect,
-} from "@blazetrails/ruby-compat";
+} from "@blazetrails/ruby-compat/array";
+import { cmp, rbCmpint } from "@blazetrails/ruby-compat/comparable";
+import { Enumerable, type Each } from "@blazetrails/ruby-compat/enumerable";
+import { numericMinus } from "@blazetrails/ruby-compat/numeric";
+import { rbObjAsString, rtest, rbInspect } from "@blazetrails/ruby-compat/object";
 import { inOrderOf, isPlainObject, wrap } from "@blazetrails/activesupport";
 import { pluralize } from "@blazetrails/activesupport/core-ext/string/inflections";
 import {

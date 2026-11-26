@@ -1,5 +1,5 @@
 import { Encryption } from "../namespaces.js";
-import type { Bytes } from "@blazetrails/ruby-compat";
+import type { Bytes } from "@blazetrails/ruby-compat/fs-adapter";
 import { Properties } from "./properties.js";
 import { ForbiddenClass } from "./errors.js";
 

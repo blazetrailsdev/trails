@@ -1,4 +1,4 @@
-import { Pathname } from "@blazetrails/ruby-compat";
+import { Pathname } from "@blazetrails/ruby-compat/pathname";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { Configuration } from "../../lib/application/configuration.js";
 import { Trailtie as BaseTrailtie } from "../../lib/trailtie.js";
@@ -13,7 +13,8 @@ beforeEach(() => {
 afterEach(() => {
   I18nTrailtie._i18nInited = false;
 });
-import { isModuleIncluded, setEnv } from "@blazetrails/ruby-compat";
+import { isModuleIncluded } from "@blazetrails/ruby-compat/include";
+import { setEnv } from "@blazetrails/ruby-compat/process-adapter";
 import { useInMemoryDatabaseUrl } from "../support/in-memory-database-url.js";
 import { Trailtie, type ActiveRecordConfig } from "../../lib/trailties/active-record.js";
 import {

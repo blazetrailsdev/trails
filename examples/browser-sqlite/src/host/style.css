@@ -566,3 +566,28 @@ body.resizing {
     height: 100%;
   }
 }
+#find input {
+  width: 10rem;
+  min-width: 0;
+  padding: 0.1rem 0.35rem;
+  color: var(--code-fg, inherit);
+  background: var(--code-bg);
+  border: 1px solid var(--code-border);
+  font: 12px var(--mono);
+}
+#find output {
+  font-size: 12px;
+}
+#find[hidden] {
+  display: none;
+}
+#editor::selection {
+  background: color-mix(in srgb, var(--accent) 35%, transparent);
+}
+#console details {
+  color: var(--code-muted);
+  white-space: pre-wrap;
+}
+#console summary {
+  cursor: pointer;
+}

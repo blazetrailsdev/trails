@@ -1,13 +1,11 @@
-import {
-  Bundler,
-  Dir,
-  File,
-  FileUtils,
-  Gem,
-  Process,
-  env,
-  rbFBackquote,
-} from "@blazetrails/ruby-compat";
+import { Bundler } from "@blazetrails/ruby-compat/bundler";
+import { Dir } from "@blazetrails/ruby-compat/dir";
+import { File } from "@blazetrails/ruby-compat/file";
+import { FileUtils } from "@blazetrails/ruby-compat/file-utils";
+import { Gem } from "@blazetrails/ruby-compat/gem";
+import { rbFBackquote } from "@blazetrails/ruby-compat/kernel-system";
+import { Process } from "@blazetrails/ruby-compat/process";
+import { env } from "@blazetrails/ruby-compat/process-adapter";
 import { buildTemplates } from "@blazetrails/trails-tsc";
 import { assertNoChanges, assertNoMatch } from "@blazetrails/activesupport/testing/assertions";
 import { capture, quietly } from "@blazetrails/activesupport/testing/stream";
@@ -146,7 +144,7 @@ function assertNotOption(generator: { options: unknown }, option: string): void 
   ).toBeFalsy();
 }
 
-describe("AppGeneratorTest", () => {
+describe("AppGeneratorTest", { timeout: 30_000 }, () => {
   it("version control initializes git repo", async () => {
     await t.runGenerator([t.destinationRoot]);
     await t.assertDirectory(".git");
@@ -1433,9 +1431,11 @@ describe("AppGeneratorTest", () => {
     });
     await t.assertFile("my-app/bin/trails", (trails: string) => {
       expect(trails).toContain(
-        'const APP_PATH = join(import.meta.dirname, "../config/application.ts");',
+        'const APP_PATH = join(import.meta.dirname, "../config/application");',
       );
-      expect(trails).toContain("setAppPath(APP_PATH);");
+      expect(trails).toContain(
+        "await access(`${APP_PATH}.ts`).then(\n    () => `${APP_PATH}.ts`,\n    () => `${APP_PATH}.js`,\n  ),",
+      );
       expect(trails).toContain('await import("@blazetrails/trailties/commands");');
     });
     await t.assertFile("my-app/bin/setup", /bin\/trails/);

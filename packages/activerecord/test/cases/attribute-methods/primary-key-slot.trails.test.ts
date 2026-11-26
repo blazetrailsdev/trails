@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { includedModules } from "@blazetrails/ruby-compat";
+import { includedModules } from "@blazetrails/ruby-compat/include";
 import { Base } from "../../../lib/base.js";
 import { AttributeMethods } from "../../../lib/namespaces.js";
 import { adapterDouble, establishConnectionTo } from "../../support/adapter-double.js";

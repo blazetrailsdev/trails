@@ -1,4 +1,9 @@
-import { Dir, File, FileUtils, Gem, chomp, rbFBackquote } from "@blazetrails/ruby-compat";
+import { Dir } from "@blazetrails/ruby-compat/dir";
+import { File } from "@blazetrails/ruby-compat/file";
+import { FileUtils } from "@blazetrails/ruby-compat/file-utils";
+import { Gem } from "@blazetrails/ruby-compat/gem";
+import { rbFBackquote } from "@blazetrails/ruby-compat/kernel-system";
+import { chomp } from "@blazetrails/ruby-compat/string/chomp";
 import { assertNoMatch } from "@blazetrails/activesupport/testing/assertions";
 import { capture } from "@blazetrails/activesupport/testing/stream";
 import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
@@ -234,12 +239,12 @@ describe("PluginGeneratorTest", () => {
     await t.runGenerator([t.destinationRoot, "--full"]);
     await t.assertFile(
       "bin/trails",
-      /ENGINE_PATH = File\.expandPath\("\.\.\/lib\/bukkits\/engine\.ts", __dir__\)/,
+      /ENGINE_PATH = resolveTsThenJs\(\n {2}File\.expandPath\("\.\.\/lib\/bukkits\/engine\.ts", __dir__\),\n\)/,
     );
     await t.assertFile("bin/trails", /ENGINE_ROOT = File\.expandPath\("\.\.", __dir__\)/);
     await t.assertFile(
       "bin/trails",
-      /APP_PATH = File\.expandPath\("\.\.\/test\/dummy\/config\/application\.ts", __dir__\)/,
+      /APP_PATH = resolveTsThenJs\(\n {2}File\.expandPath\("\.\.\/test\/dummy\/config\/application\.ts", __dir__\),\n\)/,
     );
     await t.assertFile("bin/trails", /import "@blazetrails\/activesupport\/node"/);
     await t.assertFile("bin/trails", /await import\("@blazetrails\/trailties\/engine\/commands"\)/);

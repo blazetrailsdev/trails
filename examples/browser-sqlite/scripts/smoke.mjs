@@ -1,4 +1,4 @@
-import { chromium } from "playwright";
+import * as playwright from "playwright";
 import { createServer, preview } from "vite";
 
 let server;
@@ -18,11 +18,18 @@ if (dist) {
   url = "http://localhost:4179/";
 }
 const shots = process.env.SCREENSHOTS;
-const browser = await chromium.launch();
+const engine = process.env.BROWSER ?? "chromium";
+if (!["chromium", "firefox", "webkit"].includes(engine)) {
+  throw new Error(`BROWSER must be chromium, firefox or webkit, not ${engine}`);
+}
+const browser = await playwright[engine].launch();
+console.log("browser:", engine);
 const colorScheme = process.env.COLOR_SCHEME === "dark" ? "dark" : "light";
 const context = await browser.newContext({ viewport: { width: 1600, height: 900 }, colorScheme });
 const page = await context.newPage();
 page.on("pageerror", (e) => console.log("[pageerror]", e.message));
+if (process.env.VERBOSE)
+  page.on("response", (r) => r.status() >= 400 && console.log("[bad]", r.status(), r.url()));
 if (process.env.VERBOSE) page.on("console", (m) => console.log(`[${m.type()}]`, m.text()));
 const frame = page.frameLocator("#preview");
 const shot = async (name) => {
@@ -138,25 +145,62 @@ try {
   await see("h1", "Edited posts");
   console.log("a syntax error names its file and line over the preview, and fixing it recovers");
 
-  const cdp = await context.newCDPSession(page);
-  await cdp.send("ServiceWorker.enable");
-  await cdp.send("ServiceWorker.stopAllWorkers");
-  await page.locator("#reload").click();
-  await see("h1", "Edited posts");
-  console.log("the preview survives the browser stopping the service worker");
+  if (engine === "chromium") {
+    const cdp = await context.newCDPSession(page);
+    await cdp.send("ServiceWorker.enable");
+    await cdp.send("ServiceWorker.stopAllWorkers");
+    await page.locator("#reload").click();
+    await see("h1", "Edited posts");
+    console.log("the preview survives the browser stopping the service worker");
+  }
 
   const other = await context.newPage();
   await other.goto(url);
   await other.locator("#status", { hasText: "Running" }).waitFor({ timeout: 120_000 });
+  await other.locator("#console", { hasText: "open in another tab" }).waitFor({ timeout: 30_000 });
   await other.close();
   await page.locator("#reload").click();
   await see("h1", "Edited posts");
   console.log("a second tab runs its own app and leaves this one serving");
 
+  await page.locator("#tree .file", { hasText: "index.html.tse" }).click();
+  await editor.focus();
+  await page.keyboard.press("Control+f");
+  await page.locator("#find [name=find]").fill("Edited posts");
+  await page.locator("#find [name=find]").press("Enter");
+  await page.locator("#find output", { hasText: "1 of 1" }).waitFor();
+  await page.locator("#find [name=replace]").fill("Found posts");
+  await page.locator("#find [name=all]").click();
+  await see("h1", "Found posts");
+  await page.keyboard.press("Escape");
+  console.log("find and replace changed the open view");
+
+  page.once("dialog", (dialog) => dialog.accept("model Tag name:string"));
+  await page.locator("#generate").click();
+  await page.locator("#tree .file", { hasText: "tag.ts" }).first().waitFor({ timeout: 60_000 });
+  await page.locator("#tree .file", { hasText: "_create_tags.ts" }).waitFor();
+  await page.locator("#status", { hasText: "Running" }).waitFor({ timeout: 60_000 });
+  await page.locator("#repl-input").fill("await Tag.count()");
+  await page.locator("#repl-input").press("Enter");
+  await consoleHas(/› await Tag\.count\(\)\s[\s\S]*\b0\b/);
+  console.log("bin/trails generate model wrote a model and a migration, and the migration ran");
+
+  await page.locator("#example").selectOption("library");
+  await page.waitForURL(/./);
+  await page.locator("#status", { hasText: "Running" }).waitFor({ timeout: 120_000 });
+  await frame.locator("body", { hasText: "Ursula K. Le Guin" }).waitFor({ timeout: 30_000 });
+  if (await page.locator("#tree .file", { hasText: "tag.ts" }).count())
+    throw new Error("the library example shows the blog's files");
+  console.log("the library example runs with its own files and database");
+  await page.locator("#example").selectOption("blog");
+  await page.locator("#status", { hasText: "Running" }).waitFor({ timeout: 120_000 });
+  await see("h1", "Found posts");
+  console.log("switching back to the blog keeps its edits");
+
   await page.setViewportSize({ width: 390, height: 844 });
   await page.locator("#phone-note").waitFor({ state: "visible" });
   if (await page.locator("#editor").isVisible()) throw new Error("the editor shows at phone width");
-  await see("h1", "Edited posts");
+  await see("h1", "Found posts");
   await shot("phone");
   console.log("at phone width the page is the running app alone");
 } finally {

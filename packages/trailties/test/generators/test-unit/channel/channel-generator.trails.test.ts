@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { Dir, File } from "@blazetrails/ruby-compat";
+import { Dir } from "@blazetrails/ruby-compat/dir";
+import { File } from "@blazetrails/ruby-compat/file";
 import { ChannelGenerator } from "../../../../lib/generators/test-unit/channel/channel-generator.js";
 
 async function generate(name: string): Promise<string> {

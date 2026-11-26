@@ -5723,3 +5723,42 @@ describe("Ruby extractor C extension scan", { timeout: RUBY_SUBPROCESS_TIMEOUT_M
     }
   });
 });
+
+describe(
+  "Ruby extractor Migration[] superclass and lambda-block scopes",
+  {
+    timeout: RUBY_SUBPROCESS_TIMEOUT_MS,
+  },
+  () => {
+    function extract(src: string): Record<string, { superclass?: string; params: unknown[] }> {
+      const dir = fs.mkdtempSync(path.join(os.tmpdir(), "aref-rb-"));
+      try {
+        fs.writeFileSync(path.join(dir, "m.rb"), src);
+        const driver = `
+        require_relative ${JSON.stringify(path.join(HERE, "extract-ruby-api.rb"))}
+        require "json"
+        ex = ApiExtractor.new
+        ex.process_file(File.join(${JSON.stringify(dir)}, "m.rb"), ${JSON.stringify(dir)})
+        out = {}
+        ex.classes.each do |fqn, info|
+          out[fqn] = { superclass: info[:superclass], params: info[:classMethods].map { |m| [m[:name], m[:params].size] } }
+        end
+        puts JSON.generate(out)
+      `;
+        return JSON.parse(execFileSync("ruby", ["-e", driver], { encoding: "utf-8" }));
+      } finally {
+        fs.rmSync(dir, { recursive: true, force: true });
+      }
+    }
+
+    it("reads `Migration[7.2]` as the Migration superclass", () => {
+      const out = extract("class CreateFoo < ActiveRecord::Migration[7.2]\nend\n");
+      expect(out.CreateFoo.superclass).toBe("ActiveRecord::Migration");
+    });
+
+    it("reads a `lambda { |a, b| }` scope's block params", () => {
+      const out = extract("class Msg\n  scope :ready, lambda { |a, b| where(a: a) }\nend\n");
+      expect(out.Msg.params).toEqual([["ready", 2]]);
+    });
+  },
+);

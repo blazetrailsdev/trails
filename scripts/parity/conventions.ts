@@ -865,12 +865,6 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
     packages: ["activesupport"],
   },
   {
-    reason: "CONVERGEABLE encrypted-configuration-invalid-content-error-message-override",
-    names: ["message"],
-    rubyFiles: ["encrypted_configuration.rb"],
-    packages: ["activesupport"],
-  },
-  {
     reason: "not called by activerecord",
     names: ["query_info", "info"],
     rubyFiles: ["client.rb"],

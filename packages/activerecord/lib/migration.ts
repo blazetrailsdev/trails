@@ -1,5 +1,5 @@
 import type { RackApp } from "@blazetrails/rack";
-import { groupBy, filterMap, sortBy } from "@blazetrails/ruby-compat";
+import { groupBy, filterMap, sortBy } from "@blazetrails/ruby-compat/enumerable";
 import {
   getEnv,
   camelize,
@@ -18,35 +18,32 @@ import {
   type Extended,
   wrap,
 } from "@blazetrails/activesupport";
+import { aryDelete } from "@blazetrails/ruby-compat/array";
+import { max } from "@blazetrails/ruby-compat/comparable";
+import { excToS } from "@blazetrails/ruby-compat/exc-to-s";
+import { block as rbBlock, rbBlockGivenP } from "@blazetrails/ruby-compat/hash";
+import { puts } from "@blazetrails/ruby-compat/io";
+import { format } from "@blazetrails/ruby-compat/kernel-format";
+import { rbFLoad } from "@blazetrails/ruby-compat/load";
+import { toI } from "@blazetrails/ruby-compat/numeric";
+import { rbFSend, rbInspect, rbObjRespondTo, rbProcCall } from "@blazetrails/ruby-compat/object";
+import { stdout } from "@blazetrails/ruby-compat/process-adapter";
+import { rbStrSend } from "@blazetrails/ruby-compat/string/method-table";
+import { rbModRemoveConst } from "@blazetrails/ruby-compat/variable";
 import {
-  format,
-  max,
-  stdout,
-  puts,
-  excToS,
-  rbFLoad,
-  rbFSend,
-  rbInspect,
-  rbModRemoveConst,
-  rbObjRespondTo,
-  block as rbBlock,
-  rbBlockGivenP,
-  rbStrSend,
-  toI,
-  aryDelete,
-  rbProcCall,
-} from "@blazetrails/ruby-compat";
-import {
-  Dir,
   excBacktraceLocations,
   excSetBacktrace,
-  excSetupMessage,
-  File,
-  FileUtils,
-  StandardError,
-} from "@blazetrails/ruby-compat";
+} from "@blazetrails/ruby-compat/backtrace-location";
+import { Dir } from "@blazetrails/ruby-compat/dir";
+import { excSetupMessage } from "@blazetrails/ruby-compat/exception";
+import { File } from "@blazetrails/ruby-compat/file";
+import { FileUtils } from "@blazetrails/ruby-compat/file-utils";
+import { StandardError } from "@blazetrails/ruby-compat/standard-error";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { NoMethodError, rbObjClassname, Struct, Zlib } from "@blazetrails/ruby-compat";
+import { NoMethodError } from "@blazetrails/ruby-compat/no-method-error";
+import { rbObjClassname } from "@blazetrails/ruby-compat/object";
+import { Struct } from "@blazetrails/ruby-compat/struct";
+import { Zlib } from "@blazetrails/ruby-compat/zlib";
 import { Time } from "@blazetrails/date";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import type { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
@@ -917,6 +914,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
 
   async migrate(direction: "up" | "down"): Promise<void> {
     if (!rbObjRespondTo(this, direction)) return;
+    await ActiveRecord.Tasks.loadPath["active_record/tasks/database_tasks"]();
 
     switch (direction) {
       case "up":
@@ -1067,7 +1065,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     this._disableDdlTransaction = true;
   }
 
-  static readonly MigrationFilenameRegexp = /^([0-9]+)_([_a-z0-9]*)\.?([_a-z0-9]*)\.(?:ts|js)$/;
+  static readonly MigrationFilenameRegexp = /^([0-9]+)_([-_a-z0-9]*)\.?([-_a-z0-9]*)\.(?:ts|js)$/;
 
   static isValidVersionFormat(versionString: string): boolean {
     return [Migration.MigrationFilenameRegexp, /^\d(_?\d)*$/].some((pattern) =>
@@ -1192,7 +1190,9 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     }
   }
 
+  /** @inventedArm loadPath — CONVERGEABLE tasks-database-tasks-awaited-load-ruling */
   static async checkAllPendingBang(): Promise<void> {
+    await ActiveRecord.Tasks.loadPath["active_record/tasks/database_tasks"]();
     const pendingMigrations: MigrationProxy[][] = [];
 
     await ActiveRecord.Tasks.DatabaseTasks.withTemporaryPoolForEach(
@@ -1311,6 +1311,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
 
   /** @internal */
   private static async anySchemaNeedsUpdate(): Promise<boolean> {
+    await ActiveRecord.Tasks.loadPath["active_record/tasks/database_tasks"]();
     const databaseTasks = ActiveRecord.Tasks.DatabaseTasks;
 
     for (const dbConfig of this.dbConfigsInCurrentEnv()) {
@@ -1345,6 +1346,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
 
   /** @internal */
   private static async loadSchemaBang(): Promise<void> {
+    await ActiveRecord.Tasks.loadPath["active_record/tasks/database_tasks"]();
     const databaseTasks = ActiveRecord.Tasks.DatabaseTasks;
 
     await ActiveRecord.Base.connectionHandler.clearAllConnectionsBang("all");
@@ -1648,7 +1650,7 @@ export class MigrationContext<
         throw new InvalidMigrationTimestampError(version, name);
       }
       version = toInteger(version);
-      name = camelize(name);
+      name = camelize(name.replaceAll("-", "_"));
       return new MigrationProxy(name, version, file, scope);
     });
 
@@ -1765,13 +1767,16 @@ export class Migrator {
     }
   }
 
+  /** @inventedArm loadPath — CONVERGEABLE tasks-database-tasks-awaited-load-ruling */
   async run(): Promise<string | number | undefined> {
+    await ActiveRecord.Tasks.loadPath["active_record/tasks/database_tasks"]();
     return (await this.isUseAdvisoryLock())
       ? this.withAdvisoryLock(() => this.runWithoutLock())
       : this.runWithoutLock();
   }
 
   async migrate(): Promise<MigrationProxy[]> {
+    await ActiveRecord.Tasks.loadPath["active_record/tasks/database_tasks"]();
     return (await this.isUseAdvisoryLock())
       ? this.withAdvisoryLock(() => this.migrateWithoutLock())
       : this.migrateWithoutLock();

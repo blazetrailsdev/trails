@@ -1,4 +1,4 @@
-import { Thread } from "@blazetrails/ruby-compat";
+import { Thread } from "@blazetrails/ruby-compat/thread";
 import { describe, expect, it } from "vitest";
 import "../../lib/index.js";
 import { Base } from "../../lib/base.js";

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { ArgumentError } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
 import { Base } from "../../lib/index.js";
 import { respondToMissing } from "../../lib/dynamic-matchers.js";
 import { Customer } from "../models/customer.js";

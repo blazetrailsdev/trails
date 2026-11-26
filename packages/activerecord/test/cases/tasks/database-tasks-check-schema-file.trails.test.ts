@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { setTrailsRoot } from "@blazetrails/activesupport";
-import { getProcessAdapter } from "@blazetrails/ruby-compat";
+import { getProcessAdapter } from "@blazetrails/ruby-compat/process-adapter";
 import { DatabaseTasks } from "../../../lib/tasks/database-tasks.js";
 
 describe("DatabaseTasksCheckSchemaFileTest", () => {

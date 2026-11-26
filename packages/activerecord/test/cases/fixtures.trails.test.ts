@@ -3,7 +3,8 @@ import { File as FixtureFile } from "../../lib/fixture-set/file.js";
 import { Fixture, FixtureError, FixtureSet, FormatError } from "../../lib/fixtures.js";
 import { WhereClause } from "../../lib/relation/where-clause.js";
 import { IndexedRow } from "../../lib/result.js";
-import { rbModName, StandardError } from "@blazetrails/ruby-compat";
+import { rbModName } from "@blazetrails/ruby-compat/object";
+import { StandardError } from "@blazetrails/ruby-compat/standard-error";
 import {
   HashWithIndifferentAccess,
   OID_NAMESPACE,

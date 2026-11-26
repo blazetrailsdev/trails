@@ -1,16 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Dependencies } from "@blazetrails/activesupport";
 import { Rake } from "@blazetrails/rake";
-import {
-  Dir,
-  File,
-  FileUtils,
-  STDOUT,
-  SystemExit,
-  rbFLoad,
-  setExitCode,
-  stderr,
-} from "@blazetrails/ruby-compat";
+import { Dir } from "@blazetrails/ruby-compat/dir";
+import { File } from "@blazetrails/ruby-compat/file";
+import { FileUtils } from "@blazetrails/ruby-compat/file-utils";
+import { STDOUT } from "@blazetrails/ruby-compat/io";
+import { rbFLoad } from "@blazetrails/ruby-compat/load";
+import { SystemExit, setExitCode, stderr } from "@blazetrails/ruby-compat/process-adapter";
 import { Loader, NameError } from "@blazetrails/zeitwerk";
 import { Trails } from "../../lib/trails.js";
 

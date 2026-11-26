@@ -26,15 +26,27 @@ pnpm dev     # Vite dev server; open the printed URL
 pnpm build && pnpm preview   # a static bundle in dist/, served by vite preview
 pnpm smoke   # headless Chromium: boot, create a post through the form, edit a view, restart
 DIST=dist pnpm smoke   # the same walk over a built bundle (BASE=/playground/ for one built with --base)
+BROWSER=firefox pnpm smoke   # or webkit; the service-worker stop step is Chromium-only (CDP)
 ```
 
 ![The editor: file tree, source, the app in the preview, and its log in the console](docs/screenshots/index-editor-light.png)
 
-The app (`template/`) is a small blog, laid out the way `trails generate scaffold` lays one out
+The picker in the header switches between two example apps, each with its own saved files and
+database: `templates/library/` is an API-only app (`config.apiOnly`, `ActionController.API`, JSON
+responses) centred on associations and validations, and `templates/blog/` is a small blog, laid out the way `trails generate scaffold` lays one out
 and styled with the trails website's brand (orange and mango, Bricolage Grotesque, Instrument
 Sans and Fira Code), light or dark by the browser's color scheme. The layout loads its fonts from Google Fonts on purpose: it is ordinary app code that renders the same
 under Node, and the editor's bundled fonts are not assets the app serves. Offline, the preview falls
-back to system fonts. It runs unchanged under Node. It exercises:
+back to system fonts. It runs unchanged under Node.
+
+**Generate** in the file tree runs a real `bin/trails generate` (`model`, `migration`, `scaffold`,
+`controller`…) in the runtime: trailties' generators and their templates are served from the
+virtual filesystem, and the files they write join the tree. Ctrl+F (Ctrl+H) finds and replaces in
+the open file. The database is kept in IndexedDB; a second tab on the same example runs its own
+copy and is told nothing it changes is saved. In the console, framework frames of a trace fold
+under "Framework Trace".
+
+The blog exercises:
 
 - **Routing**: `root`, `resources("posts")` with all seven actions, and `comments` nested under
   posts (`only: ["create", "destroy"]`)

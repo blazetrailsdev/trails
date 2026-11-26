@@ -21,7 +21,10 @@ import { SqlTypeMetadata } from "../../../lib/connection-adapters/sql-type-metad
 import { Column as MysqlColumn } from "../../../lib/connection-adapters/mysql/column.js";
 import { TypeMetadata as MysqlTypeMetadata } from "../../../lib/connection-adapters/mysql/type-metadata.js";
 import { Column as Sqlite3Column } from "../../../lib/connection-adapters/sqlite3/column.js";
-import { File, Hash, Marshal, rbStrStartWith } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat/file";
+import { Hash } from "@blazetrails/ruby-compat/hash";
+import { Marshal } from "@blazetrails/ruby-compat/marshal";
+import { rbStrStartWith } from "@blazetrails/ruby-compat/string/sub";
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";

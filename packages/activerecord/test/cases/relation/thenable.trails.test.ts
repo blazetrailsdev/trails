@@ -1,4 +1,5 @@
-import { constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
 import { presence } from "@blazetrails/activesupport";
 import { describe, it, expect } from "vitest";
 import { Relation } from "../../../lib/index.js";

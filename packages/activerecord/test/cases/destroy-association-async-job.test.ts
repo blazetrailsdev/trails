@@ -1,5 +1,7 @@
 import { NameError } from "@blazetrails/activesupport";
-import { TopLevel, constSet, constDefined, rbModRemoveConst } from "@blazetrails/ruby-compat";
+import { constSet, constDefined } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
+import { rbModRemoveConst } from "@blazetrails/ruby-compat/variable";
 import { afterAll, describe, expect, it } from "vitest";
 import { Base } from "../../lib/base.js";
 import { ConfigurationError } from "../../lib/errors.js";

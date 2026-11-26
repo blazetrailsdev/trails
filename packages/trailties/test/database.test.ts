@@ -1,4 +1,4 @@
-import { Pathname } from "@blazetrails/ruby-compat";
+import { Pathname } from "@blazetrails/ruby-compat/pathname";
 import { describe, it, expect, afterEach } from "vitest";
 import { Base } from "@blazetrails/activerecord";
 import * as nodeFs from "node:fs";
@@ -39,6 +39,20 @@ describe("Configuration#databaseConfiguration", () => {
     const dbConfig = RootConfigModel.connectionDbConfig();
     expect(dbConfig.adapter).toBe("sqlite3");
     expect(dbConfig.configurationHash.database).toBe("storage/primary.sqlite3");
+  });
+
+  it("loads config/database.js from a compiled root with no config/database.ts", async () => {
+    tmpRoot = nodeFs.mkdtempSync(nodePath.join(nodeOs.tmpdir(), "trailties-root-"));
+    nodeFs.mkdirSync(nodePath.join(tmpRoot, "config"));
+    nodeFs.writeFileSync(
+      nodePath.join(tmpRoot, "config", "database.js"),
+      exportDefault({ test: { adapter: "sqlite3", database: "storage/compiled.sqlite3" } }),
+    );
+
+    const config = (await new Configuration(
+      new Pathname(tmpRoot),
+    ).databaseConfiguration()) as Record<string, Record<string, unknown>>;
+    expect(config.test).toEqual({ adapter: "sqlite3", database: "storage/compiled.sqlite3" });
   });
 
   it("raises when no config file exists and DATABASE_URL is unset", async () => {

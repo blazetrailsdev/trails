@@ -10,7 +10,11 @@ import { travelTo } from "@blazetrails/activesupport/testing/time-helpers";
 import { Mail } from "@blazetrails/mail";
 import type {} from "@blazetrails/vitest-matchers";
 import { Time } from "@blazetrails/date";
-import { Base64, File, binaryBytes, getFs, include } from "@blazetrails/ruby-compat";
+import { Base64 } from "@blazetrails/ruby-compat/base64";
+import { File } from "@blazetrails/ruby-compat/file";
+import { getFs } from "@blazetrails/ruby-compat/fs-adapter";
+import { include } from "@blazetrails/ruby-compat/include";
+import { binaryBytes } from "@blazetrails/ruby-compat/io";
 import { Generation } from "../support/isolation/abstract-unit.js";
 import type { Rack } from "../support/isolation/abstract-unit.js";
 

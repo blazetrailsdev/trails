@@ -1,4 +1,4 @@
-import { Pathname } from "@blazetrails/ruby-compat";
+import { Pathname } from "@blazetrails/ruby-compat/pathname";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Deprecators, resetLoadHooks, runLoadHooks } from "@blazetrails/activesupport";
 import { ActionController, Request, Response, RouteSet } from "@blazetrails/actionpack";

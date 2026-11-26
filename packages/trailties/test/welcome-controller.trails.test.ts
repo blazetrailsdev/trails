@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Base, LookupContext, type Template } from "@blazetrails/actionview";
-import { File } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat/file";
 
 const distTemplates = decodeURIComponent(new URL("../dist/templates", import.meta.url).pathname);
 

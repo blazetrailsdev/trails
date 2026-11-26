@@ -1,23 +1,35 @@
 import "@fontsource-variable/bricolage-grotesque";
 import "@fontsource-variable/instrument-sans";
 import "@fontsource-variable/fira-code";
-import { latin1 } from "../runtime/latin1.ts";
 import { goToLine, installEditing } from "./editing.ts";
+import { installFind } from "./find.ts";
 import { highlight } from "./highlight.ts";
+import { loadDatabase, saveDatabase } from "./storage.ts";
 import { applyChanges, changesFrom, decodeChanges, encodeChanges, isFilePath } from "./share.ts";
 import { zip } from "./zip.ts";
 
-const TEMPLATE = import.meta.glob<string>("../../template/**/*", {
+const TEMPLATES = import.meta.glob<string>("../../templates/*/**/*", {
   query: "?raw",
   import: "default",
   eager: true,
 });
 
-const FILES_KEY = "trails-browser:files";
-const DB_KEY = "trails-browser:db";
-const COOKIES_KEY = "trails-browser:cookies";
-const TMP_KEY = "trails-browser:tmp";
-const CURRENT_KEY = "trails-browser:current";
+const EXAMPLES: Record<string, { title: string; open: string; path: string }> = {
+  blog: { title: "Blog", open: "/app/controllers/posts-controller.ts", path: "/" },
+  library: { title: "Library API", open: "/app/models/author.ts", path: "/authors" },
+};
+const EXAMPLE_KEY = "trails-browser:example";
+const requested = new URLSearchParams(location.search).get("example");
+const example =
+  requested && requested in EXAMPLES
+    ? requested
+    : (sessionStorage.getItem(EXAMPLE_KEY) ?? localStorage.getItem(EXAMPLE_KEY) ?? "blog");
+const FILES_KEY = `trails-browser:${example}:files`;
+const COOKIES_KEY = `trails-browser:${example}:cookies`;
+const TMP_KEY = `trails-browser:${example}:tmp`;
+const CURRENT_KEY = `trails-browser:${example}:current`;
+const LEGACY_KEYS = ["files", "cookies", "tmp", "current"];
+const LEGACY_DB_KEY = "trails-browser:db";
 const LAYOUT_KEY = "trails-browser:layout";
 const HINT_KEY = "trails-browser:hint-seen";
 const SHARE_PREFIX = "#code=";
@@ -29,16 +41,44 @@ type Table = { name: string; count: number };
 type Rows = { columns: string[]; values: unknown[][] };
 
 function templateFiles(): Record<string, string> {
+  const prefix = `../../templates/${example}/`;
   return Object.fromEntries(
-    Object.entries(TEMPLATE).map(([key, source]) => [
-      key.replace(/^\.\.\/\.\.\/template/, ""),
-      source,
-    ]),
+    Object.entries(TEMPLATES)
+      .filter(([key]) => key.startsWith(prefix))
+      .map(([key, source]) => [`/${key.slice(prefix.length)}`, source]),
   );
 }
 
+/**
+ * Moves what the playground kept before it had more than one example (the
+ * blog's files under unprefixed keys, its database as base64) to the blog's
+ * keys and IndexedDB.
+ */
+async function migrateLegacyStorage(): Promise<void> {
+  for (const name of LEGACY_KEYS) {
+    const value = localStorage.getItem(`trails-browser:${name}`);
+    if (value === null) continue;
+    localStorage.setItem(`trails-browser:blog:${name}`, value);
+    localStorage.removeItem(`trails-browser:${name}`);
+  }
+  const text = localStorage.getItem(LEGACY_DB_KEY);
+  if (text === null) return;
+  try {
+    await saveDatabase(
+      "blog",
+      Uint8Array.from(atob(text), (c) => c.charCodeAt(0)),
+    );
+  } catch {
+    log("warn", "The database saved by an older playground could not be read; it was discarded.");
+  }
+  localStorage.removeItem(LEGACY_DB_KEY);
+}
+
+/** False when another tab holds this example, so this tab's edits are not saved over that one's. */
+let owner = true;
 let storageFull = false;
 function store(key: string, value: string | null): void {
+  if (!owner) return;
   try {
     if (value === null) localStorage.removeItem(key);
     else localStorage.setItem(key, value);
@@ -58,11 +98,11 @@ function stored<T>(key: string, fallback: T): T {
 }
 
 const tabId = crypto.randomUUID().slice(0, 8);
-let files: Record<string, string> = stored(FILES_KEY, templateFiles());
-let db: Uint8Array | null = loadDb();
-let tmp: Record<string, string> = stored(TMP_KEY, {});
-let cookies: Record<string, string> = stored(COOKIES_KEY, {});
-let current = localStorage.getItem(CURRENT_KEY) ?? "/app/controllers/posts-controller.ts";
+let files: Record<string, string> = templateFiles();
+let db: Uint8Array | null = null;
+let tmp: Record<string, string> = {};
+let cookies: Record<string, string> = {};
+let current = EXAMPLES[example].open;
 let session = 0;
 let runtime: HTMLIFrameElement | null = null;
 let problems: Problem[] = [];
@@ -147,19 +187,13 @@ function renderProblems(): void {
   renderGutter();
 }
 
-function loadDb(): Uint8Array | null {
-  const text = localStorage.getItem(DB_KEY);
-  if (!text) return null;
-  try {
-    return Uint8Array.from(atob(text), (c) => c.charCodeAt(0));
-  } catch {
-    return null;
-  }
-}
-
+let dbWrites: Promise<void> = Promise.resolve();
 function saveDb(bytes: Uint8Array | null): void {
   db = bytes;
-  store(DB_KEY, bytes ? btoa(latin1(bytes)) : null);
+  if (!owner) return;
+  dbWrites = dbWrites
+    .then(() => saveDatabase(example, bytes))
+    .catch((e: unknown) => log("warn", `The database could not be saved: ${String(e)}`));
 }
 
 function appendAnsi(parent: HTMLElement, text: string): void {
@@ -185,6 +219,7 @@ function appendAnsi(parent: HTMLElement, text: string): void {
   }
 }
 
+const FRAMEWORK_TRACE = "\n\u0000framework\n";
 const SQL = /\b(SELECT|INSERT INTO|UPDATE|DELETE FROM|CREATE (TABLE|INDEX)|TRANSACTION)\b/;
 const ALWAYS = new Set(["system", "input", "result"]);
 
@@ -208,7 +243,16 @@ function log(level: string, text: string): void {
   line.className = level;
   line.dataset.level = level;
   line.dataset.text = text;
-  if (text.length > LONG_LINE) {
+  const [own, framework] = text.split(FRAMEWORK_TRACE);
+  if (framework !== undefined) {
+    appendAnsi(line, own);
+    const details = document.createElement("details");
+    const summary = document.createElement("summary");
+    const frames = framework.split("\n").filter(Boolean);
+    summary.textContent = `Framework Trace (${frames.length} frames)`;
+    details.append(summary, frames.join("\n"));
+    line.append(details);
+  } else if (text.length > LONG_LINE) {
     appendAnsi(line, text.slice(0, LONG_LINE));
     const more = document.createElement("button");
     more.className = "more";
@@ -314,6 +358,7 @@ editor.addEventListener("input", () => {
   }
   if ($<HTMLInputElement>("autorun").checked) restartTimer = setTimeout(restart, 800);
 });
+installFind(editor, $("find"));
 installEditing(editor, () => {
   clearTimeout(restartTimer);
   restart();
@@ -369,6 +414,38 @@ $("new-file").onclick = () => {
   open(path);
   editor.focus();
   if (!path.startsWith("/db/migrate/")) restart();
+};
+$("generate").onclick = async () => {
+  const line = prompt(
+    "bin/trails generate (model, migration, scaffold, controller…)",
+    "model Tag name:string",
+  )?.trim();
+  if (!line) return;
+  log("input", `$ bin/trails generate ${line}`);
+  try {
+    const { files: written } = await ask<{ files: Record<string, string | null> }>(
+      "host:generate",
+      {
+        args: line.split(/\s+/),
+      },
+    );
+    const paths = Object.keys(written).sort();
+    if (!paths.length) return log("system", "The generator wrote no files.");
+    for (const path of paths) {
+      if (written[path] === null) delete files[path];
+      else files[path] = written[path];
+    }
+    saveFiles();
+    const added = paths.filter((p) => written[p] !== null);
+    open(
+      added.find((p) => p.startsWith("/app/")) ??
+        added[0] ??
+        (current in files ? current : Object.keys(files).sort()[0]),
+    );
+    restart();
+  } catch (error) {
+    log("error", error instanceof Error ? error.message : String(error));
+  }
 };
 $("rename-file").onclick = () => {
   const path = askPath(`New path for ${current}`, current);
@@ -743,6 +820,31 @@ async function loadShared(): Promise<void> {
   }
 }
 
+/**
+ * Takes this example's Web Lock for as long as the tab is open, so a second
+ * tab on the same example finds it held. Answers whether this tab got it.
+ */
+function holdExample(): Promise<boolean> {
+  if (!("locks" in navigator)) return Promise.resolve(true);
+  return new Promise((resolve) => {
+    navigator.locks
+      .request(`trails-browser:${example}`, { ifAvailable: true }, (lock) => {
+        resolve(lock !== null);
+        return lock === null ? undefined : new Promise<never>(() => {});
+      })
+      .catch(() => resolve(true));
+  });
+}
+
+const picker = $<HTMLSelectElement>("example");
+for (const [name, { title }] of Object.entries(EXAMPLES)) picker.add(new Option(title, name));
+picker.value = example;
+picker.onchange = () => {
+  sessionStorage.setItem(EXAMPLE_KEY, picker.value);
+  localStorage.setItem(EXAMPLE_KEY, picker.value);
+  location.search = "";
+};
+
 async function start(): Promise<void> {
   if (!("serviceWorker" in navigator)) {
     throw new Error(
@@ -773,6 +875,20 @@ async function start(): Promise<void> {
       return;
     }
   }
+  owner = await holdExample();
+  if (owner && example === "blog") await migrateLegacyStorage();
+  if (!owner) {
+    log(
+      "warn",
+      `The ${EXAMPLES[example].title} example is open in another tab. This tab runs its own copy, and nothing you change here is saved.`,
+    );
+  }
+  files = stored(FILES_KEY, templateFiles());
+  tmp = stored(TMP_KEY, {});
+  cookies = stored(COOKIES_KEY, {});
+  current = localStorage.getItem(CURRENT_KEY) ?? current;
+  db = await loadDatabase(example);
+  if (!localStorage.getItem(FILES_KEY)) urlInput.value = EXAMPLES[example].path;
   await loadShared();
   open(current in files ? current : Object.keys(files).sort()[0]);
   restart();

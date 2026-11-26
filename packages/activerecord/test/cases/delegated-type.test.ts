@@ -1,4 +1,5 @@
-import { constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
 import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from "vitest";
 import { adapterType } from "../support/test-adapter.js";
 import { travel, travelBack } from "@blazetrails/activesupport/testing/time-helpers";

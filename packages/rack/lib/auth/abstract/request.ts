@@ -1,4 +1,4 @@
-import { warn } from "@blazetrails/ruby-compat";
+import { warn } from "@blazetrails/ruby-compat/kernel-warn";
 import { Request } from "../../request.js";
 
 const AUTHORIZATION_KEYS = ["HTTP_AUTHORIZATION", "X-HTTP_AUTHORIZATION", "X_HTTP_AUTHORIZATION"];

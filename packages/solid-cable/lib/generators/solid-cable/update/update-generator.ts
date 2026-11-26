@@ -30,7 +30,7 @@ export class UpdateGenerator extends Base {
 
   async copyFiles(): Promise<void> {
     await this.migrationTemplate(
-      "db/migrate/create_compact_channel.ts",
+      "db/migrate/create-compact-channel.ts",
       "db/cable_migrate/create_compact_channel.ts",
     );
   }

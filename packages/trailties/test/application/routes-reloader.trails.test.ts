@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { RouteSet, type DrawCallback, type Mapper } from "@blazetrails/actionpack";
-import { Dir, File, FileUtils } from "@blazetrails/ruby-compat";
+import { Dir } from "@blazetrails/ruby-compat/dir";
+import { File } from "@blazetrails/ruby-compat/file";
+import { FileUtils } from "@blazetrails/ruby-compat/file-utils";
 import { RoutesReloader, type RouteSetLike } from "../../lib/application/routes-reloader.js";
 import { Trails } from "../../lib/trails.js";
 

@@ -6,7 +6,9 @@ import { fixtures } from "../../support/use-fixtures.js";
 import { JoinDependency } from "../../../lib/associations/join-dependency.js";
 import { aliasTrackerFor } from "../../support/join-dependency-paths.js";
 import { Nodes } from "@blazetrails/arel";
-import { Hash, constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { Hash } from "@blazetrails/ruby-compat/hash";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
 import { AliasTracker } from "../../../lib/associations/alias-tracker.js";
 
 describe("JoinDependency AliasTracker wiring", () => {

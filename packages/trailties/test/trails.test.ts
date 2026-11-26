@@ -1,11 +1,11 @@
-import { Pathname } from "@blazetrails/ruby-compat";
+import { Pathname } from "@blazetrails/ruby-compat/pathname";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { EnvironmentInquirer, NullLogger, trailsRoot } from "@blazetrails/activesupport";
-import { env, setEnv } from "@blazetrails/ruby-compat";
-import { getFs } from "@blazetrails/ruby-compat";
+import { env, setEnv } from "@blazetrails/ruby-compat/process-adapter";
+import { getFs } from "@blazetrails/ruby-compat/fs-adapter";
 import { Trails, _resetTrailsEnv } from "../lib/trails.js";
 import { Application } from "../lib/application.js";
 import { BacktraceCleaner } from "../lib/backtrace-cleaner.js";

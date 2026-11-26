@@ -8,7 +8,9 @@ import { Topic as CanonicalTopic } from "../models/topic.js";
 import { ArgumentError } from "@blazetrails/activesupport";
 import { assertEmpty, assertRaise } from "@blazetrails/activesupport/testing/assertions";
 
-import { kernelThrow, constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { kernelThrow } from "@blazetrails/ruby-compat/kernel-catch";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
 import { fixtures } from "../support/use-fixtures.js";
 import { setRunAfterTransactionCallbacksInOrderDefined } from "../../lib/active-record.js";
 

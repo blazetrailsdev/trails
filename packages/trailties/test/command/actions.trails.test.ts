@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { TopLevel, constSet } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
 import { setAppPath, setEnginePath, setEngineRoot } from "../../lib/app-path.js";
 import { Engine } from "../../lib/engine.js";
 import { Generators } from "../../lib/generators.js";

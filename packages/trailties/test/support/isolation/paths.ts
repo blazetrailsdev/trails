@@ -1,4 +1,6 @@
-import { File, classModule, getFs } from "@blazetrails/ruby-compat";
+import { classModule } from "@blazetrails/ruby-compat/class-module";
+import { File } from "@blazetrails/ruby-compat/file";
+import { getFs } from "@blazetrails/ruby-compat/fs-adapter";
 
 export const TRAILS_FRAMEWORK_ROOT = File.expandPath(
   decodeURIComponent(new URL("../../../../..", import.meta.url).pathname),

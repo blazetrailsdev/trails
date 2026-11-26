@@ -1,6 +1,7 @@
 import { snapshotReaperState } from "../support/reaper-state.js";
 import { describe, it, expect, afterEach, vi, beforeEach } from "vitest";
-import { Thread, type Mutex } from "@blazetrails/ruby-compat";
+import type { Mutex } from "@blazetrails/ruby-compat/mutex";
+import { Thread } from "@blazetrails/ruby-compat/thread";
 import { Reaper } from "../../lib/connection-adapters/abstract/connection-pool/reaper.js";
 import type { ReapablePool } from "../../lib/connection-adapters/abstract/connection-pool/reaper.js";
 

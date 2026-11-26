@@ -13,5 +13,5 @@
       "@blazetrails/trails-tsc/plugins/tse": ["../../packages/trails-tsc/dist/plugins/tse.d.ts"]
     }
   },
-  "include": ["src", "template", "vite.config.ts"]
+  "include": ["src", "templates", "vite.config.ts"]
 }

@@ -1,4 +1,6 @@
-import { Base64, type Binding, File, rbFBinding } from "@blazetrails/ruby-compat";
+import { Base64 } from "@blazetrails/ruby-compat/base64";
+import { File } from "@blazetrails/ruby-compat/file";
+import { type Binding, rbFBinding } from "@blazetrails/ruby-compat/variable";
 
 import { ActiveRecord } from "../namespaces.js";
 

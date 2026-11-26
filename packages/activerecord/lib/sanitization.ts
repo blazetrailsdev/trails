@@ -1,13 +1,9 @@
 import * as Arel from "@blazetrails/arel";
 import { Nodes, arelNode, type ArelNode } from "@blazetrails/arel";
 import { actsLike, isBlank } from "@blazetrails/activesupport";
-import {
-  format,
-  isSymbol,
-  rbInspect,
-  rbObjAsString,
-  rbObjRespondTo,
-} from "@blazetrails/ruby-compat";
+import { format } from "@blazetrails/ruby-compat/kernel-format";
+import { rbInspect, rbObjAsString, rbObjRespondTo } from "@blazetrails/ruby-compat/object";
+import { isSymbol } from "@blazetrails/ruby-compat/symbol";
 import type { Quoting } from "./connection-adapters/abstract/quoting.js";
 import type { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
 import { PreparedStatementInvalid, UnknownAttributeReference } from "./errors.js";

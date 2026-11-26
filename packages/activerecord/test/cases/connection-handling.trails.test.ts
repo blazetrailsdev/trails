@@ -1,4 +1,4 @@
-import { Thread } from "@blazetrails/ruby-compat";
+import { Thread } from "@blazetrails/ruby-compat/thread";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { stripThenable } from "@blazetrails/activesupport";
 import { Nodes } from "@blazetrails/arel";

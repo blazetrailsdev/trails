@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { KeyGenerator as AsKeyGenerator } from "@blazetrails/activesupport/key-generator";
-import { OpenSSL } from "@blazetrails/ruby-compat";
+import { OpenSSL } from "@blazetrails/ruby-compat/openssl";
 import { KeyGenerator } from "../../../lib/encryption/key-generator.js";
 import { Encryption } from "../../../lib/encryption.js";
 

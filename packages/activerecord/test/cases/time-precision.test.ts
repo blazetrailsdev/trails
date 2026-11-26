@@ -6,7 +6,7 @@ import type { AbstractAdapter as DatabaseAdapter } from "../../lib/connection-ad
 import { adapterType } from "../support/test-adapter.js";
 import { fixtures } from "../support/use-fixtures.js";
 import { itIfSupports } from "../support/supports.js";
-import { Rational } from "@blazetrails/ruby-compat";
+import { Rational } from "@blazetrails/ruby-compat/rational";
 import { dumpTableSchema } from "../support/schema-dumping-helper.js";
 
 function nsecTime(v: RubyTime): number {

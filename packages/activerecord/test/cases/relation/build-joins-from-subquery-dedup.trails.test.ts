@@ -3,7 +3,7 @@ import { fixtures } from "../../support/use-fixtures.js";
 import "../../support/canonical-model-index.js";
 import { Post } from "../../models/post.js";
 import { Comment } from "../../models/comment.js";
-import { regexpEscape } from "@blazetrails/ruby-compat";
+import { regexpEscape } from "@blazetrails/ruby-compat/regexp";
 
 describe("build_joins from(subquery) dedup", () => {
   const { self } = fixtures([]);

@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { File, getOs } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat/file";
+import { getOs } from "@blazetrails/ruby-compat/os-adapter";
 import { SQLite3Adapter } from "../../lib/connection-adapters/sqlite3-adapter.js";
 
 const tursoUrl = typeof process !== "undefined" ? process.env["TURSO_DATABASE_URL"] : undefined;

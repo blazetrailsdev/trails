@@ -10,16 +10,12 @@ import {
   type MiddlewareStack,
 } from "@blazetrails/actionpack";
 import { Methods } from "@blazetrails/rack-test";
-import {
-  FileUtils,
-  Marshal,
-  env as ENV,
-  setEnv,
-  hashAref,
-  TopLevel,
-  constSet,
-  include,
-} from "@blazetrails/ruby-compat";
+import { FileUtils } from "@blazetrails/ruby-compat/file-utils";
+import { hashAref } from "@blazetrails/ruby-compat/hash";
+import { constSet, include } from "@blazetrails/ruby-compat/include";
+import { Marshal } from "@blazetrails/ruby-compat/marshal";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
+import { env as ENV, setEnv } from "@blazetrails/ruby-compat/process-adapter";
 import { Application } from "../../../lib/application.js";
 import { Trails } from "../../../lib/trails.js";
 import type { Generation } from "../../support/isolation/abstract-unit.js";

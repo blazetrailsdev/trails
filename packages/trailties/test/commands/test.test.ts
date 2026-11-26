@@ -1,5 +1,5 @@
 import { capture } from "@blazetrails/activesupport/testing/stream";
-import { stdout as STDOUT } from "@blazetrails/ruby-compat";
+import { stdout as STDOUT } from "@blazetrails/ruby-compat/process-adapter";
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from "vitest";
 import { setAppPath } from "../../lib/app-path.js";
 import { UnrecognizedCommandError } from "../../lib/command.js";

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ArgumentError } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
 import { Bit, Data as BitData } from "../../../../../lib/connection-adapters/postgresql/oid/bit.js";
 import { Hstore } from "../../../../../lib/connection-adapters/postgresql/oid/hstore.js";
 import { Interval } from "../../../../../lib/connection-adapters/postgresql/oid/interval.js";

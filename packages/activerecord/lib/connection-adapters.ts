@@ -1,5 +1,8 @@
 import { underscore } from "@blazetrails/activesupport";
-import { LoadError, NameError, constDefined, constGet } from "@blazetrails/ruby-compat";
+import { constDefined } from "@blazetrails/ruby-compat/include";
+import { LoadError } from "@blazetrails/ruby-compat/load-error";
+import { NameError } from "@blazetrails/ruby-compat/name-error";
+import { constGet } from "@blazetrails/ruby-compat/variable";
 import { AdapterNotFound } from "./errors.js";
 import { ActiveRecord, ConnectionAdapters } from "./namespaces.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";

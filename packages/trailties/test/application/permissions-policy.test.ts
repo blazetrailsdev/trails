@@ -4,7 +4,7 @@ import { Isolation } from "@blazetrails/activesupport/testing/isolation";
 import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
 import { ActionDispatch } from "@blazetrails/actionpack";
 import { Methods } from "@blazetrails/rack-test";
-import { include } from "@blazetrails/ruby-compat";
+import { include } from "@blazetrails/ruby-compat/include";
 import type { Generation, Rack } from "../support/isolation/abstract-unit.js";
 import "../support/isolation/abstract-unit.js";
 

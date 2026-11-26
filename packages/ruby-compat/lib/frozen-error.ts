@@ -40,5 +40,3 @@ export class FrozenError extends RuntimeError {
     throw new ArgumentError("no receiver is available");
   }
 }
-
-FrozenError.prototype.message = "FrozenError";

@@ -1,6 +1,7 @@
 import { readFile } from "fs/promises";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { File as RubyFile, Marshal } from "@blazetrails/ruby-compat";
+import { File as RubyFile } from "@blazetrails/ruby-compat/file";
+import { Marshal } from "@blazetrails/ruby-compat/marshal";
 import { Base } from "../../lib/base.js";
 import { TEST_ROOT } from "../config.js";
 import { formatVersion, setFormatVersion } from "../../lib/marshalling.js";

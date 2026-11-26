@@ -6,18 +6,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { isPlainObject } from "@blazetrails/activesupport";
 import { capture } from "@blazetrails/activesupport/testing/stream";
-import {
-  Kernel,
-  TopLevel,
-  autoloadDelete,
-  constSet,
-  getProcessAdapter,
-  rbAutoloadStr,
-  rbArgv,
-  rbModRemoveConst,
-  registerReplAdapter,
-  replAdapterConfig,
-} from "@blazetrails/ruby-compat";
+import { Kernel, constSet } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
+import { getProcessAdapter, rbArgv } from "@blazetrails/ruby-compat/process-adapter";
+import { registerReplAdapter, replAdapterConfig } from "@blazetrails/ruby-compat/repl-adapter";
+import { autoloadDelete, rbAutoloadStr, rbModRemoveConst } from "@blazetrails/ruby-compat/variable";
 import { invoke } from "../../lib/command.js";
 import { Trails } from "../../lib/trails.js";
 import { Console, ConsoleCommand } from "../../lib/commands/console.js";

@@ -1,4 +1,4 @@
-import { block as rbBlock } from "@blazetrails/ruby-compat";
+import { block as rbBlock } from "@blazetrails/ruby-compat/hash";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import {
   assertDifference,
@@ -6,7 +6,8 @@ import {
   assertNothingRaised,
   assertRaises,
 } from "@blazetrails/activesupport/testing/assertions";
-import { rbInspect, StandardError } from "@blazetrails/ruby-compat";
+import { rbInspect } from "@blazetrails/ruby-compat/object";
+import { StandardError } from "@blazetrails/ruby-compat/standard-error";
 import { Time as RubyTime } from "@blazetrails/date";
 import { Base, Migration, Migrator, NotNullViolation } from "../../../lib/index.js";
 import type { MigrationProxy } from "../../../lib/migration.js";

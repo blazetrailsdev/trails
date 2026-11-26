@@ -1,5 +1,5 @@
 import { NumericalityValidator as BaseNumericalityValidator } from "@blazetrails/activemodel";
-import { FLOAT_DIG } from "@blazetrails/ruby-compat";
+import { FLOAT_DIG } from "@blazetrails/ruby-compat/numeric";
 
 export class NumericalityValidator extends BaseNumericalityValidator {
   validateEach(

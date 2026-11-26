@@ -3,7 +3,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { randomUUID } from "node:crypto";
-import { getChildProcess } from "@blazetrails/ruby-compat";
+import { getChildProcess } from "@blazetrails/ruby-compat/child-process-adapter";
 import { SQLiteDatabaseTasks } from "../../../../lib/tasks/sqlite-database-tasks.js";
 import { HashConfig } from "../../../../lib/database-configurations/hash-config.js";
 import { SchemaDumper } from "../../../../lib/schema-dumper.js";

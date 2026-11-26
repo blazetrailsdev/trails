@@ -1,4 +1,5 @@
-import { Dir, File } from "@blazetrails/ruby-compat";
+import { Dir } from "@blazetrails/ruby-compat/dir";
+import { File } from "@blazetrails/ruby-compat/file";
 import { expect, it } from "vitest";
 import { Application } from "../../lib/application.js";
 import "../../lib/generators.js";

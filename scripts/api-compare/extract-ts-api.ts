@@ -3244,6 +3244,7 @@ function guardNames(guard: IncludedGuard, tag: InlinedFrom): boolean {
   if (guard.path.length > rubyPath.length) return false;
   const tail = rubyPath.slice(rubyPath.length - guard.path.length);
   if (tail.some((segment, i) => segment !== guard.path[i])) return false;
+  if (guard.path.length > 1 && guard.path.length === rubyPath.length) return true;
   return guard.pkg === undefined || guard.pkg === tag.file.split("/")[0];
 }
 
@@ -3321,7 +3322,11 @@ function includedGuardsOf(ctor: ts.ConstructorDeclaration): IncludedGuard[] {
       )
       .find((found) => found !== undefined);
     if (mod === undefined) continue;
-    const path = mod.getText(sf).split(".");
+    let unwrapped = mod;
+    while (ts.isAsExpression(unwrapped) || ts.isNonNullExpression(unwrapped)) {
+      unwrapped = unwrapped.expression;
+    }
+    const path = unwrapped.getText(sf).split(".");
     guards.push({ path, ...importedPackage(sf, path[0]) });
   }
   return guards;
@@ -5721,8 +5726,15 @@ export function extractClass(
   if (node.heritageClauses) {
     for (const clause of node.heritageClauses) {
       if (clause.token === ts.SyntaxKind.ExtendsKeyword) {
-        const expr = clause.types[0] && unwrapTsExpression(clause.types[0].expression);
+        let expr = clause.types[0] && unwrapTsExpression(clause.types[0].expression);
         if (!expr) continue;
+        if (
+          ts.isCallExpression(expr) &&
+          ts.isPropertyAccessExpression(expr.expression) &&
+          expr.expression.name.text === "get"
+        ) {
+          expr = expr.expression.expression;
+        }
         superclass = ts.isIdentifier(expr)
           ? importedName(expr, node.getSourceFile())
           : expr.getText();

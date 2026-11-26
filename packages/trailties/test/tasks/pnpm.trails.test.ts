@@ -1,14 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Rake } from "@blazetrails/rake";
 import {
-  Errno,
-  File,
-  STDERR,
   childProcessAdapterConfig,
-  rbFLoad,
   registerChildProcessAdapter,
-  setExitCode,
-} from "@blazetrails/ruby-compat";
+} from "@blazetrails/ruby-compat/child-process-adapter";
+import { Errno } from "@blazetrails/ruby-compat/errno";
+import { File } from "@blazetrails/ruby-compat/file";
+import { STDERR } from "@blazetrails/ruby-compat/io";
+import { rbFLoad } from "@blazetrails/ruby-compat/load";
+import { setExitCode } from "@blazetrails/ruby-compat/process-adapter";
 
 describe("tasks/pnpm", () => {
   let previousAdapter: typeof childProcessAdapterConfig.adapter;

@@ -27,4 +27,5 @@ fi
 
 echo "Re-running ${#failed[@]} file(s) in isolated forks:"
 printf '  %s\n' "${failed[@]}"
+printf '::warning title=AR non-isolated re-run::%s\n' "${failed[@]}"
 pnpm vitest run "${failed[@]}" --project activerecord

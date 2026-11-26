@@ -1,5 +1,7 @@
 import { describe, it, expect, afterEach, beforeEach } from "vitest";
-import { constSet, TopLevel, constGet } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
+import { constGet } from "@blazetrails/ruby-compat/variable";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
@@ -7,7 +9,8 @@ import { include } from "@blazetrails/activesupport";
 import { capture } from "@blazetrails/activesupport/testing/stream";
 import { ScaffoldControllerGenerator } from "../../../../lib/generators/trails/scaffold-controller/scaffold-controller-generator.js";
 import { ActionController, RouteSet } from "@blazetrails/actionpack";
-import { constDefined, rbModRemoveConst } from "@blazetrails/ruby-compat";
+import { constDefined } from "@blazetrails/ruby-compat/include";
+import { rbModRemoveConst } from "@blazetrails/ruby-compat/variable";
 import { parseTs, assertNoRubySource } from "../../../../lib/template-builder/testing.js";
 
 afterEach(() => {

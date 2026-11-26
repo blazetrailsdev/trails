@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import * as crypto from "crypto";
 import { Cipher } from "../../../lib/encryption/cipher.js";
 import { Decryption } from "../../../lib/encryption/errors.js";
-import { ArgumentError } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
 
 function generateKey(): string {
   return crypto.randomBytes(32).toString("base64");

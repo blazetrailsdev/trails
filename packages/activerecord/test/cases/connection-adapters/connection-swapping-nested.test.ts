@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { getFs, getPath, getOsAsync } from "@blazetrails/ruby-compat";
+import { getFs, getPath } from "@blazetrails/ruby-compat/fs-adapter";
+import { getOsAsync } from "@blazetrails/ruby-compat/os-adapter";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { assertRaises } from "@blazetrails/activesupport/testing/assertions";
 import { Base } from "../../../lib/base.js";

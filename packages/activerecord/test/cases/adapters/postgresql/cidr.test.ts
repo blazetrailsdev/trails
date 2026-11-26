@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { assertNot } from "@blazetrails/activesupport/testing/assertions";
-import { IPAddr } from "@blazetrails/ruby-compat";
+import { IPAddr } from "@blazetrails/ruby-compat/ipaddr";
 import { Cidr } from "../../../../lib/connection-adapters/postgresql/oid/cidr.js";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_CONFIG } from "./test-helper.js";
 

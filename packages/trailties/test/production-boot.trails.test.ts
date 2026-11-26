@@ -1,4 +1,4 @@
-import { getFs, getPath } from "@blazetrails/ruby-compat";
+import { getFs, getPath } from "@blazetrails/ruby-compat/fs-adapter";
 import { describe, expect, it } from "vitest";
 import "../lib/index.js";
 

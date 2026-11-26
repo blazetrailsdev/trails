@@ -1,4 +1,4 @@
-import { hashAref } from "@blazetrails/ruby-compat";
+import { hashAref } from "@blazetrails/ruby-compat/hash";
 import { describe, it, beforeEach, afterEach, expect } from "vitest";
 import { leaseMysqlAdapter, Mysql2Adapter } from "./test-helper.js";
 import { Base } from "../../../../lib/index.js";

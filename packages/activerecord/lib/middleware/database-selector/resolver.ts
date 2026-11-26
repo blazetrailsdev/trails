@@ -1,7 +1,7 @@
 import { Notifications, seconds, type Duration } from "@blazetrails/activesupport";
 import type { MiddlewareRequest } from "../database-selector.js";
 import { Time } from "@blazetrails/date";
-import { cmp, rbCmpint } from "@blazetrails/ruby-compat";
+import { cmp, rbCmpint } from "@blazetrails/ruby-compat/comparable";
 import { Session } from "./resolver/session.js";
 import { Base } from "../../base.js";
 import { readingRole, writingRole } from "../../active-record.js";

@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { Base } from "../../lib/index.js";
 import { formatForInspect } from "../../lib/attribute-methods.js";
 
-import { PP } from "@blazetrails/ruby-compat";
+import { PP } from "@blazetrails/ruby-compat/pp";
 import { fixtures } from "../support/use-fixtures.js";
 import { Topic, TitlePrimaryKeyTopic } from "../models/topic.js";
 import { LoosePerson } from "../models/person.js";
@@ -10,7 +10,7 @@ import {
   assertDifference,
   assertNoDifference,
 } from "@blazetrails/activesupport/testing/assertions";
-import { rbObjSingletonClass } from "@blazetrails/ruby-compat";
+import { rbObjSingletonClass } from "@blazetrails/ruby-compat/object";
 import { CpkBook } from "../models/cpk.js";
 
 describe("CoreTest", () => {

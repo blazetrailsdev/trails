@@ -1,10 +1,10 @@
 import { describe, it, expect, afterEach, beforeEach } from "vitest";
-import { Hash } from "@blazetrails/ruby-compat";
+import { Hash } from "@blazetrails/ruby-compat/hash";
 import { Psych } from "@blazetrails/ruby-compat/psych";
 import { assertRaises } from "@blazetrails/activesupport/testing/assertions";
 import { YAMLColumn } from "../../../lib/coders/yaml-column.js";
 import { Time } from "@blazetrails/date";
-import { ArgumentError } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
 import { SerializationTypeMismatch } from "../../../lib/errors.js";
 import {
   setUseYamlUnsafeLoad,

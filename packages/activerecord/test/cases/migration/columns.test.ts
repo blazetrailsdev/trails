@@ -2,7 +2,7 @@
    The test class spells `include ActiveRecord::Migration::TestHelper` (migration/helper.rb:10); the
    empty class/interface merge carries the mixed-in methods onto its type. */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { include } from "@blazetrails/ruby-compat";
+import { include } from "@blazetrails/ruby-compat/include";
 import { TestHelper, TestModel } from "../../support/migration-helper.js";
 import type { Column } from "../../../lib/connection-adapters/column.js";
 import type { Column as MysqlColumn } from "../../../lib/connection-adapters/mysql/column.js";
@@ -15,7 +15,7 @@ import { ArgumentError } from "@blazetrails/activemodel";
 import { assertDifference, assertRaises } from "@blazetrails/activesupport/testing/assertions";
 import { assertQueriesCount } from "../../../lib/testing/query-assertions.js";
 import { adapterSupports } from "../../support/supports.js";
-import { rbInspect } from "@blazetrails/ruby-compat";
+import { rbInspect } from "@blazetrails/ruby-compat/object";
 import { fixtures } from "../../support/use-fixtures.js";
 
 const mariaDbRejectsUniqueColumnDrop =

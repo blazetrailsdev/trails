@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { File, getFs, rbModName } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat/file";
+import { getFs } from "@blazetrails/ruby-compat/fs-adapter";
+import { rbModName } from "@blazetrails/ruby-compat/object";
 import { HealthController } from "../lib/health-controller.js";
 import { Trails } from "../lib/trails.js";
 

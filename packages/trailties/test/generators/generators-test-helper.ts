@@ -1,14 +1,12 @@
-import {
-  Dir,
-  File,
-  FileUtils,
-  JSON,
-  TSE,
-  rbFBinding,
-  rbFSystem,
-  stdout,
-  type Hash,
-} from "@blazetrails/ruby-compat";
+import { Dir } from "@blazetrails/ruby-compat/dir";
+import { File } from "@blazetrails/ruby-compat/file";
+import { FileUtils } from "@blazetrails/ruby-compat/file-utils";
+import type { Hash } from "@blazetrails/ruby-compat/hash";
+import { JSON } from "@blazetrails/ruby-compat/json";
+import { rbFSystem } from "@blazetrails/ruby-compat/kernel-system";
+import { stdout } from "@blazetrails/ruby-compat/process-adapter";
+import { TSE } from "@blazetrails/ruby-compat/tse";
+import { rbFBinding } from "@blazetrails/ruby-compat/variable";
 import { YAML } from "@blazetrails/ruby-compat/yaml";
 import { assertFile } from "../../lib/generators/testing/assertions.js";
 import { Base } from "@blazetrails/activerecord";

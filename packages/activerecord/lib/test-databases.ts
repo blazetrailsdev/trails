@@ -1,6 +1,6 @@
 import "./constants.test-databases.generated.js";
 import { getEnv } from "@blazetrails/activesupport";
-import { setEnv } from "@blazetrails/ruby-compat";
+import { setEnv } from "@blazetrails/ruby-compat/process-adapter";
 import { Base } from "./base.js";
 import { DatabaseTasks } from "./tasks/database-tasks.js";
 

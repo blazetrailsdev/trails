@@ -6,6 +6,7 @@
     "rootDir": "lib"
   },
   "include": ["lib"],
+  "exclude": ["lib/generators/solid-cable/update/templates"],
   "references": [
     { "path": "../actioncable" },
     { "path": "../activejob" },

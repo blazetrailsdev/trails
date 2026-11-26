@@ -1,7 +1,9 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { ActionController } from "@blazetrails/actionpack";
 import { Methods } from "@blazetrails/rack-test";
-import { TopLevel, constSet, extend, env as ENV, setEnv } from "@blazetrails/ruby-compat";
+import { constSet, extend } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
+import { env as ENV, setEnv } from "@blazetrails/ruby-compat/process-adapter";
 import { Application } from "../../lib/application.js";
 import { Trails } from "../../lib/trails.js";
 

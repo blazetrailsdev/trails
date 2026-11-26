@@ -8,7 +8,10 @@ import {
   kernelArray,
   wrap,
 } from "@blazetrails/activesupport";
-import { rbCallSuper, rbEqual, rbFSend, rtest, toSym, filterMap } from "@blazetrails/ruby-compat";
+import { filterMap } from "@blazetrails/ruby-compat/enumerable";
+import { rbCallSuper } from "@blazetrails/ruby-compat/include";
+import { rbFSend, rtest, toSym } from "@blazetrails/ruby-compat/object";
+import { rbEqual } from "@blazetrails/ruby-compat/rb-equal";
 import { ThroughReflection } from "./reflection.js";
 import { type CounterCacheTouchOption, type TouchAllOptions } from "./timestamp.js";
 

@@ -3,7 +3,7 @@ import pg from "pg";
 import { Date as RubyDate, Time as RubyTime } from "@blazetrails/date";
 import { PG } from "@blazetrails/pg";
 import { fakePgConnection } from "../../../support/fake-pg-connection.js";
-import { Rational } from "@blazetrails/ruby-compat";
+import { Rational } from "@blazetrails/ruby-compat/rational";
 
 const OID_DATE = 1082;
 const OID_TIMESTAMP = 1114;

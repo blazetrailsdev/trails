@@ -4,14 +4,13 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { randomUUID } from "node:crypto";
 import {
-  type ChildProcessAdapter,
   getChildProcess,
   getChildProcessAsync,
-  File,
-  FileUtils,
-  stdout,
-  stderr,
-} from "@blazetrails/ruby-compat";
+  type ChildProcessAdapter,
+} from "@blazetrails/ruby-compat/child-process-adapter";
+import { File } from "@blazetrails/ruby-compat/file";
+import { FileUtils } from "@blazetrails/ruby-compat/file-utils";
+import { stdout, stderr } from "@blazetrails/ruby-compat/process-adapter";
 import { NoMethodError } from "@blazetrails/activemodel";
 import { DatabaseTasks } from "../../../../lib/tasks/database-tasks.js";
 import "../../../../lib/tasks/sqlite-database-tasks.js";

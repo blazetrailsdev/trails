@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { MessageSerializer } from "../../../lib/encryption/message-serializer.js";
 import { Message } from "../../../lib/encryption/message.js";
-import { ArgumentError, JSON as RubyJSON } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { JSON as RubyJSON } from "@blazetrails/ruby-compat/json";
 import { Decryption, Encoding, ForbiddenClass } from "../../../lib/encryption/errors.js";
 
 describe("ActiveRecord::Encryption::MessageSerializerTest", () => {

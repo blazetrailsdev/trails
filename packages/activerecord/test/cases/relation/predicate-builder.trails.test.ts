@@ -10,13 +10,11 @@ import { PriceEstimate } from "../../models/price-estimate.js";
 import { CpkOrderWithSingularBookChapters } from "../../models/cpk.js";
 import { Base } from "../../../lib/index.js";
 import { quoteColumnName } from "../../support/quote-regex.js";
-import {
-  Range,
-  regexpEscape,
-  constSet,
-  TopLevel,
-  rbModRemoveConst,
-} from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
+import { Range } from "@blazetrails/ruby-compat/range";
+import { regexpEscape } from "@blazetrails/ruby-compat/regexp";
+import { rbModRemoveConst } from "@blazetrails/ruby-compat/variable";
 import { PredicateBuilder } from "../../../lib/relation/predicate-builder.js";
 import { TableMetadata } from "../../../lib/table-metadata.js";
 import { WhereClause } from "../../../lib/relation/where-clause.js";

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { env, setEnv } from "@blazetrails/ruby-compat";
+import { env, setEnv } from "@blazetrails/ruby-compat/process-adapter";
 import { _resetTrailsEnv } from "../../lib/trails.js";
 import { serverEnvironment, serverHost, serverPort } from "../../lib/server/boot.js";
 

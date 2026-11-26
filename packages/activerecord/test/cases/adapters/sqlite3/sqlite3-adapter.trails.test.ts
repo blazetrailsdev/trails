@@ -3,7 +3,9 @@ import { SQLite3Adapter } from "../../../../lib/connection-adapters/sqlite3-adap
 import { newSqlitePool } from "../../../support/pooled-sqlite-adapter.js";
 import type { ConnectionPool } from "../../../../lib/connection-adapters/abstract/connection-pool.js";
 import { fixtures } from "../../../support/use-fixtures.js";
-import { Errno, File, FileUtils } from "@blazetrails/ruby-compat";
+import { Errno } from "@blazetrails/ruby-compat/errno";
+import { File } from "@blazetrails/ruby-compat/file";
+import { FileUtils } from "@blazetrails/ruby-compat/file-utils";
 import { BusyException, CantOpenException } from "@blazetrails/sqlite3";
 import {
   ActiveRecordError,

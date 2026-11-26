@@ -1,6 +1,9 @@
-import { Pathname } from "@blazetrails/ruby-compat";
+import { Pathname } from "@blazetrails/ruby-compat/pathname";
+import { LoadError } from "@blazetrails/ruby-compat/load-error";
 import { beforeAll, describe, expect, it, vi } from "vitest";
-import { File, include, TopLevel, constSet } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat/file";
+import { include, constSet } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
 import { BacktraceCleaner } from "../lib/backtrace-cleaner.js";
 import { Application } from "../lib/application.js";
 import { Engine } from "../lib/engine.js";
@@ -88,12 +91,12 @@ describe("ParserExtractor", () => {
 describe("Annotation", () => {
   it("falls back to the regexp without typescript", async () => {
     vi.resetModules();
-    vi.doMock("@blazetrails/ruby-compat", async (importOriginal) => {
-      const original = await importOriginal<typeof import("@blazetrails/ruby-compat")>();
+    vi.doMock("@blazetrails/ruby-compat/load", async (importOriginal) => {
+      const original = await importOriginal<typeof import("@blazetrails/ruby-compat/load")>();
       return {
         ...original,
         rbFRequire: async (_loadPath: unknown, feature: string) => {
-          throw new original.LoadError(`cannot load such file -- ${feature}`);
+          throw new LoadError(`cannot load such file -- ${feature}`);
         },
       };
     });

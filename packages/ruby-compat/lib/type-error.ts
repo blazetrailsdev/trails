@@ -11,5 +11,3 @@ import { StandardError } from "./standard-error.js";
  * rather than defines.
  */
 export class TypeError extends StandardError {}
-
-TypeError.prototype.message = "TypeError";

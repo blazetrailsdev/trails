@@ -7,7 +7,9 @@ import {
   assertNothingRaised,
   assertRaises,
 } from "@blazetrails/activesupport/testing/assertions";
-import { regexpEscape, constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
+import { regexpEscape } from "@blazetrails/ruby-compat/regexp";
 import { adapterType } from "../../support/test-adapter.js";
 import { ActiveRecordError } from "../../../lib/errors.js";
 import { fixtures } from "../../support/use-fixtures.js";

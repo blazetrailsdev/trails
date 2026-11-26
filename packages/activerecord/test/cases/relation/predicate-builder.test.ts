@@ -5,7 +5,10 @@ import { PredicateBuilder } from "../../../lib/relation/predicate-builder.js";
 import { fixtures } from "../../support/use-fixtures.js";
 import { Topic } from "../../models/topic.js";
 import { Reply } from "../../models/reply.js";
-import { regexpEscape, constSet, TopLevel, rbModRemoveConst } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
+import { regexpEscape } from "@blazetrails/ruby-compat/regexp";
+import { rbModRemoveConst } from "@blazetrails/ruby-compat/variable";
 
 describe("PredicateBuilderTest", () => {
   class RegexFilter {

@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { HashConfig } from "../../../lib/database-configurations/hash-config.js";
 import { load, register, resolve } from "../../../lib/connection-adapters.js";
-import { LoadError } from "@blazetrails/ruby-compat";
+import { LoadError } from "@blazetrails/ruby-compat/load-error";
 import { AdapterNotFound } from "../../../lib/errors.js";
 import "../../../lib/connection-handling.js";
 

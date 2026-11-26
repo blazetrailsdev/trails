@@ -3,7 +3,7 @@ import { TimeZoneConverter } from "../../../lib/attribute-methods/time-zone-conv
 import { DateTime } from "../../../lib/type/date-time.js";
 import { TimeWithZone, TimeZone, setZone } from "@blazetrails/activesupport";
 import { Time as RubyTime, resetLocalTimeZoneId } from "@blazetrails/date";
-import { ArgumentError } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
 
 describe("TimeZoneConverterTest", () => {
   afterEach(() => {

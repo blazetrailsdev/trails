@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
 import { Base as JobBase } from "@blazetrails/activejob";
-import { include } from "@blazetrails/ruby-compat";
+import { include } from "@blazetrails/ruby-compat/include";
 import { JobRuntime } from "../../../lib/trailties/job-runtime.js";
 import * as RuntimeRegistry from "../../../lib/runtime-registry.js";
 

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { rbFSend } from "@blazetrails/ruby-compat";
+import { rbFSend } from "@blazetrails/ruby-compat/object";
 import { Base } from "../../lib/base.js";
 import { fixtures } from "../support/use-fixtures.js";
 

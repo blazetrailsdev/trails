@@ -5,7 +5,8 @@ import {
   assertPredicate,
   assertRaises,
 } from "@blazetrails/activesupport/testing/assertions";
-import { Thread, rbObjSingletonClass } from "@blazetrails/ruby-compat";
+import { rbObjSingletonClass } from "@blazetrails/ruby-compat/object";
+import { Thread } from "@blazetrails/ruby-compat/thread";
 import { leaseMysqlAdapter, Mysql2Adapter } from "./test-helper.js";
 import { fixtures } from "../../../support/use-fixtures.js";
 import { currentAdapter } from "../../../support/adapter-helper.js";

@@ -1,6 +1,6 @@
 import { Time as RubyTime } from "@blazetrails/date";
 import { describe, it, expect, beforeAll } from "vitest";
-import { regexpEscape } from "@blazetrails/ruby-compat";
+import { regexpEscape } from "@blazetrails/ruby-compat/regexp";
 import { UnknownAttributeError } from "@blazetrails/activemodel";
 import { Builder } from "../../lib/insert-all.js";
 import { fixtures } from "../support/use-fixtures.js";

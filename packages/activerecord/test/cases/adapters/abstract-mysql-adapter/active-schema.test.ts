@@ -1,4 +1,5 @@
-import { RuntimeError, rbObjSingletonClass } from "@blazetrails/ruby-compat";
+import { rbObjSingletonClass } from "@blazetrails/ruby-compat/object";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { leaseMysqlAdapter, Mysql2Adapter } from "./test-helper.js";

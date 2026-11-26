@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { Time as RubyTime } from "@blazetrails/date";
-import { toF } from "@blazetrails/ruby-compat";
+import { toF } from "@blazetrails/ruby-compat/numeric";
 import { base36, BigDecimal, TimeWithZone, TimeZone, toFs } from "@blazetrails/activesupport";
 import "../../../../lib/index.js";
 import { Base } from "../../../../lib/base.js";

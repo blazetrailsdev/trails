@@ -1,4 +1,5 @@
-import { constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
 import { beforeEach, describe, it, expect } from "vitest";
 import { publicInstanceMethods } from "@blazetrails/activesupport";
 import { assertNotRespondTo, assertRespondTo } from "@blazetrails/activesupport/testing/assertions";

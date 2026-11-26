@@ -19,6 +19,7 @@ import {
   rbObjSingletonClass,
   RuntimeError,
   loadIseqEval,
+  resolveTsThenJs,
 } from "@blazetrails/ruby-compat";
 import { Reflection, type Base } from "@blazetrails/activerecord";
 import { setMultipleFileFieldIncludeHidden } from "@blazetrails/actionview/helpers/form-helper";
@@ -242,12 +243,12 @@ export class Engine extends TrailsEngine {
     });
 
     this.initializer("active_storage.services", async () => {
-      let configFile = File.join(
-        TopLevel.Trails!.root()!,
-        `config/storage/${TopLevel.Trails!.env}.ts`,
+      /** @inventedArm resolveTsThenJs — PERMANENT */
+      let configFile = resolveTsThenJs(
+        File.join(TopLevel.Trails!.root()!, `config/storage/${TopLevel.Trails!.env}.ts`),
       );
       if (!(await File.isExistAsync(configFile)))
-        configFile = File.join(TopLevel.Trails!.root()!, "config/storage.ts");
+        configFile = resolveTsThenJs(File.join(TopLevel.Trails!.root()!, "config/storage.ts"));
       const configFileExist = await File.isExistAsync(configFile);
       const mod: { default?: Record<string, Record<string, unknown>> } | null =
         configFileExist &&

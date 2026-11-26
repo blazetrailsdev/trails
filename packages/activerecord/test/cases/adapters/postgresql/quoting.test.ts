@@ -4,7 +4,8 @@ import { IntegerOutOf64BitRange } from "../../../../lib/connection-adapters/post
 import { RangeType } from "../../../../lib/connection-adapters/postgresql/oid/range.js";
 import { Bit } from "../../../../lib/connection-adapters/postgresql/oid/bit.js";
 import { IntegerType } from "@blazetrails/activemodel";
-import { Range as OidRange, rational } from "@blazetrails/ruby-compat";
+import { Range as OidRange } from "@blazetrails/ruby-compat/range";
+import { rational } from "@blazetrails/ruby-compat/rational";
 import {
   raiseIntWiderThan64bit,
   setRaiseIntWiderThan64bit,

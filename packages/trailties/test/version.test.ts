@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Gem } from "@blazetrails/ruby-compat";
+import { Gem } from "@blazetrails/ruby-compat/gem";
 import { Trails } from "../lib/trails.js";
 
 describe("VersionTest", () => {

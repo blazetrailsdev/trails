@@ -1,5 +1,6 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
-import { NoMethodError, Thread } from "@blazetrails/ruby-compat";
+import { NoMethodError } from "@blazetrails/ruby-compat/no-method-error";
+import { Thread } from "@blazetrails/ruby-compat/thread";
 import { Encryption } from "../../../lib/encryption.js";
 import { Context } from "../../../lib/encryption/context.js";
 import { NullEncryptor } from "../../../lib/encryption/null-encryptor.js";

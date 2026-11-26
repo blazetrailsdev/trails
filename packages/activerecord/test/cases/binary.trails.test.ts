@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { TypeError } from "@blazetrails/ruby-compat";
+import { TypeError } from "@blazetrails/ruby-compat/type-error";
 import { Attribute, BinaryData, BinaryType } from "@blazetrails/activemodel";
 import { fixtures } from "../support/use-fixtures.js";
 import { Binary } from "../models/binary.js";

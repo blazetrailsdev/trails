@@ -1,7 +1,7 @@
 import "../constants.testing-query-assertions.generated.js";
 import { Notifications } from "@blazetrails/activesupport";
 import { _assertNothingRaisedOrWarn, assert } from "@blazetrails/activesupport/testing/assertions";
-import { rbEqq } from "@blazetrails/ruby-compat";
+import { rbEqq } from "@blazetrails/ruby-compat/rb-equal";
 import { Base } from "../base.js";
 
 /** @internal */

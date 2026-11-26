@@ -7,7 +7,7 @@ import "../lib/cli.js";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const system = vi.hoisted(() => vi.fn());
-vi.mock("@blazetrails/ruby-compat", async (importOriginal) => {
+vi.mock("@blazetrails/ruby-compat/kernel-system", async (importOriginal) => {
   const original = await importOriginal<Record<string, unknown>>();
   return {
     ...original,

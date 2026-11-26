@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { stdout } from "@blazetrails/ruby-compat";
+import { stdout } from "@blazetrails/ruby-compat/process-adapter";
 import { invoke } from "../../lib/command.js";
 
 describe("CredentialsCommand", { timeout: 30_000 }, () => {

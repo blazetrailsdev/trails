@@ -1,4 +1,4 @@
-import { Pathname } from "@blazetrails/ruby-compat";
+import { Pathname } from "@blazetrails/ruby-compat/pathname";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { resetLoadHooks, runLoadHooks } from "@blazetrails/activesupport";
 import { TestCase } from "@blazetrails/activesupport/test-case";
@@ -10,18 +10,15 @@ import {
   NullInternalMetadata,
   NullSchemaMigration,
 } from "@blazetrails/activerecord";
-import {
-  constGet,
-  publicInstanceMethods,
-  rbFRequireFile,
-  Dir,
-  File,
-  FileUtils,
-  getFs,
-  include,
-  NoMethodError,
-  TopLevel,
-} from "@blazetrails/ruby-compat";
+import { Dir } from "@blazetrails/ruby-compat/dir";
+import { File } from "@blazetrails/ruby-compat/file";
+import { FileUtils } from "@blazetrails/ruby-compat/file-utils";
+import { getFs } from "@blazetrails/ruby-compat/fs-adapter";
+import { publicInstanceMethods, include } from "@blazetrails/ruby-compat/include";
+import { rbFRequireFile } from "@blazetrails/ruby-compat/load";
+import { NoMethodError } from "@blazetrails/ruby-compat/no-method-error";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
+import { constGet } from "@blazetrails/ruby-compat/variable";
 import type { Bukkit, Generation } from "../support/isolation/abstract-unit.js";
 import "../support/isolation/abstract-unit.js";
 import { Methods } from "@blazetrails/rack-test";
@@ -30,7 +27,8 @@ import { I18n } from "@blazetrails/activesupport";
 import { Engine } from "../../lib/engine.js";
 import { Configuration } from "../../lib/trailtie/configuration.js";
 import { Trails } from "../../lib/trails.js";
-import { env, rbFSend, rbModName, setEnv } from "@blazetrails/ruby-compat";
+import { rbFSend, rbModName } from "@blazetrails/ruby-compat/object";
+import { env, setEnv } from "@blazetrails/ruby-compat/process-adapter";
 import { MockRequest } from "@blazetrails/rack";
 import { MiddlewareStackProxy } from "../../lib/configuration.js";
 import { loaded } from "../fixtures/loaded.js";

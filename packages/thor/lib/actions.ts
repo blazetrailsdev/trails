@@ -15,7 +15,6 @@ import {
   rbModAttrReader,
   rbModAttrWriter,
   type Process,
-  rbFSystem,
   rbInspect,
   rbObjIsKindOf,
   rbObjIvarGet,
@@ -25,6 +24,7 @@ import {
   URI,
   block,
 } from "@blazetrails/ruby-compat";
+import { rbFSystem } from "@blazetrails/ruby-compat/kernel-system";
 import { addFile, createFile } from "./actions/create-file.js";
 import { addLink, createLink } from "./actions/create-link.js";
 import { directory } from "./actions/directory.js";
