@@ -9,8 +9,8 @@ import { invoke } from "../../lib/command.js";
 
 const kernel = vi.hoisted(() => ({ exec: (..._args: unknown[]): unknown => undefined }));
 
-vi.mock("@blazetrails/ruby-compat", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@blazetrails/ruby-compat")>()),
+vi.mock("@blazetrails/ruby-compat/process-adapter", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@blazetrails/ruby-compat/process-adapter")>()),
   exec: (...args: unknown[]) => kernel.exec(...args),
 }));
 
