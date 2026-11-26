@@ -94,11 +94,11 @@
   },
   "ruby-compat": {
     "tarball": {
-      "value": 925329,
+      "value": 925431,
       "reason": "Zlib::GzipFile ports gzfile_* framing over a sync zstream and adds NoFooter/CRCError/LengthError (trails#10772)"
     },
     "unpacked": {
-      "value": 4451586,
+      "value": 4452377,
       "reason": "Zlib::GzipFile ports gzfile_* framing over a sync zstream and adds NoFooter/CRCError/LengthError (trails#10772)"
     },
     "entries": {

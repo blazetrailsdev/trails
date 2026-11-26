@@ -117,6 +117,21 @@ class GzipFile<IO extends { close(): void } = File> {
     return io;
   }
 
+  /** `gzfile_get16` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:2588`). */
+  protected static gzfileGet16(src: Uint8Array): number {
+    return new DataView(src.buffer, src.byteOffset, 2).getUint16(0, true);
+  }
+
+  /** `gzfile_get32` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:2597`). */
+  protected static gzfileGet32(src: Uint8Array): number {
+    return new DataView(src.buffer, src.byteOffset, 4).getUint32(0, true);
+  }
+
+  /** `gzfile_set32` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:2608`). */
+  protected static gzfileSet32(n: number, dst: Uint8Array): void {
+    new DataView(dst.buffer, dst.byteOffset, 4).setUint32(0, n >>> 0, true);
+  }
+
   /** `get_gzfile` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:3100`). */
   protected getGzfile(): this {
     if (!this.zstreamReady) {
@@ -281,18 +296,14 @@ class GzipReader extends GzipFile<File | StringIO<Uint8Array>> {
     } else {
       this.level = Zlib.DEFAULT_COMPRESSION;
     }
-    this._mtime = new DataView(head.buffer, head.byteOffset, head.byteLength).getUint32(4, true);
+    this._mtime = GzipFile.gzfileGet32(head.subarray(4));
     this.z.input = head.slice(10);
 
     if (flags & GZ_FLAG_EXTRA) {
       if (!this.gzfileReadRawEnsure(2)) {
         throw new GzError("unexpected end of file");
       }
-      const len = new DataView(
-        this.z.input.buffer,
-        this.z.input.byteOffset,
-        this.z.input.byteLength,
-      ).getUint16(0, true);
+      const len = GzipFile.gzfileGet16(this.z.input);
       if (!this.gzfileReadRawEnsure(2 + len)) {
         throw new GzError("unexpected end of file");
       }
@@ -326,13 +337,8 @@ class GzipReader extends GzipFile<File | StringIO<Uint8Array>> {
     if (!this.gzfileReadRawEnsure(8)) {
       throw new NoFooter("footer is not found");
     }
-    const footer = new DataView(
-      this.z.input.buffer,
-      this.z.input.byteOffset,
-      this.z.input.byteLength,
-    );
-    const crc = footer.getUint32(0, true);
-    const length = footer.getUint32(4, true);
+    const crc = GzipFile.gzfileGet32(this.z.input);
+    const length = GzipFile.gzfileGet32(this.z.input.subarray(4));
     this.z.totalIn += 8;
     this.z.input = this.z.input.slice(8);
     if (this.crc !== crc) {
@@ -518,7 +524,7 @@ class GzipWriter extends GzipFile<File | Tempfile | StringIO<Uint8Array>> {
     buf[1] = GZ_MAGIC2;
     buf[2] = GZ_METHOD_DEFLATE;
     buf[3] = 0;
-    new DataView(buf.buffer).setUint32(4, this._mtime, true);
+    GzipFile.gzfileSet32(this._mtime, buf.subarray(4));
     buf[8] = extraflags;
     buf[9] = OS_CODE;
     this.z.appendBuffer(buf);
@@ -528,9 +534,8 @@ class GzipWriter extends GzipFile<File | Tempfile | StringIO<Uint8Array>> {
   /** `gzfile_make_footer` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:2691`). */
   private gzfileMakeFooter(): void {
     const buf = new Uint8Array(8);
-    const footer = new DataView(buf.buffer);
-    footer.setUint32(0, this.crc, true);
-    footer.setUint32(4, this.z.totalIn >>> 0, true);
+    GzipFile.gzfileSet32(this.crc, buf);
+    GzipFile.gzfileSet32(this.z.totalIn, buf.subarray(4));
     this.z.appendBuffer(buf);
     this.footerFinished = true;
   }
@@ -588,8 +593,7 @@ class Inflate {
 
   /** `rb_inflate_inflate` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:2145`). */
   inflate(string: string | Uint8Array): Uint8Array {
-    const bytes =
-      typeof string === "string" ? Uint8Array.from(string, (c) => c.charCodeAt(0)) : string;
+    const bytes = typeof string === "string" ? binaryBytes(string) : string;
     try {
       this.z.run(bytes, Zlib.SYNC_FLUSH);
       return this.z.detachBuffer();
