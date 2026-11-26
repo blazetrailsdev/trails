@@ -415,7 +415,37 @@ function previewLocation(): string | null {
   return null;
 }
 
+const LAYOUT_VIEWPORT = 980;
+
+/**
+ * Lays out a page with no `<meta name="viewport">` the way a phone browser
+ * does: 980 CSS pixels wide, scaled down to fit. An iframe has no layout
+ * viewport of its own, so such a page would otherwise be laid out at the
+ * pane's width.
+ */
+function fitPreview(): void {
+  let declared = true;
+  try {
+    declared = preview.contentDocument?.querySelector('meta[name="viewport"]') != null;
+  } catch {
+    /* cross-origin */
+  }
+  const wrap = preview.parentElement!;
+  const scale = wrap.clientWidth / LAYOUT_VIEWPORT;
+  if (declared || scale >= 1) {
+    preview.style.removeProperty("width");
+    preview.style.removeProperty("height");
+    preview.style.removeProperty("transform");
+    return;
+  }
+  preview.style.width = `${LAYOUT_VIEWPORT}px`;
+  preview.style.height = `${wrap.clientHeight / scale}px`;
+  preview.style.transform = `scale(${scale})`;
+}
+new ResizeObserver(fitPreview).observe(preview.parentElement!);
+
 preview.addEventListener("load", () => {
+  fitPreview();
   const path = previewLocation();
   if (path) urlInput.value = path;
   if (!$("database").hidden) showDatabase();
