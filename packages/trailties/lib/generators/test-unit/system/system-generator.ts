@@ -4,7 +4,7 @@ import { File } from "@blazetrails/ruby-compat";
 import { dasherize } from "../../base.js";
 import { Base } from "../../test-unit.js";
 
-const __dir__ = File.dirname(decodeURIComponent(new URL(import.meta.url).pathname));
+const __dir__ = import.meta.dirname;
 
 export class SystemGenerator extends Base {
   static {

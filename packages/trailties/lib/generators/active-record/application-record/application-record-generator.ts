@@ -2,7 +2,7 @@ import "../../../constants.active-record-application-record-application-record-g
 import { File } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
 
-const __dir__ = File.dirname(decodeURIComponent(new URL(import.meta.url).pathname));
+const __dir__ = import.meta.dirname;
 
 export class ApplicationRecordGenerator extends Base {
   private _applicationRecordFileName?: string;

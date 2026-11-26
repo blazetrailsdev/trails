@@ -3,7 +3,7 @@ import { TopLevel } from "@blazetrails/activesupport";
 import { File, constDefined } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
 
-const __dir__ = File.dirname(decodeURIComponent(new URL(import.meta.url).pathname));
+const __dir__ = import.meta.dirname;
 
 export class AuthenticationGenerator extends Base {
   static {

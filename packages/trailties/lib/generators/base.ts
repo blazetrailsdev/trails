@@ -259,8 +259,7 @@ export abstract class Base extends (Group as unknown as (abstract new (
   }
 
   static baseRoot(): string {
-    const path = decodeURIComponent(new URL(import.meta.url).pathname);
-    return File.dirname(/^\/[A-Za-z]:/.test(path) ? path.slice(1) : path);
+    return import.meta.dirname;
   }
 
   /** @internal */

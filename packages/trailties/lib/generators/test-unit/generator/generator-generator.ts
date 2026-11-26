@@ -3,7 +3,7 @@ import type { GeneratorGeneratorOptions } from "../../trails/generator/generator
 import { File } from "@blazetrails/ruby-compat";
 import { Base } from "../../test-unit.js";
 
-const __dir__ = File.dirname(decodeURIComponent(new URL(import.meta.url).pathname));
+const __dir__ = import.meta.dirname;
 
 export class GeneratorGenerator extends Base {
   declare options: GeneratorGeneratorOptions;

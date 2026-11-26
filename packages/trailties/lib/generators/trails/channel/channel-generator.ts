@@ -4,7 +4,7 @@ import type * as ThorActions from "@blazetrails/thor/actions";
 import { dasherize, type GeneratorOptions } from "../../base.js";
 import { NamedBase } from "../../named-base.js";
 
-const __dir__ = File.dirname(decodeURIComponent(new URL(import.meta.url).pathname));
+const __dir__ = import.meta.dirname;
 
 export interface ChannelGeneratorOptions extends GeneratorOptions {
   assets?: boolean;

@@ -28,6 +28,12 @@ const colorScheme = process.env.COLOR_SCHEME === "dark" ? "dark" : "light";
 const context = await browser.newContext({ viewport: { width: 1600, height: 900 }, colorScheme });
 const page = await context.newPage();
 page.on("pageerror", (e) => console.log("[pageerror]", e.message));
+const mailerRequests = [];
+const infoRequests = [];
+context.on("request", (r) => {
+  if (/mailers-controller|\/actionmailer\//.test(r.url())) mailerRequests.push(r.url());
+  if (/info-controller/.test(r.url())) infoRequests.push(r.url());
+});
 if (process.env.VERBOSE)
   page.on("response", (r) => r.status() >= 400 && console.log("[bad]", r.status(), r.url()));
 if (process.env.VERBOSE) page.on("console", (m) => console.log(`[${m.type()}]`, m.text()));
@@ -60,6 +66,9 @@ try {
   );
   console.log("status:", await status.textContent());
   if ((await status.textContent()) !== "Running") throw new Error("the app did not boot");
+  if (!infoRequests.length) throw new Error("boot fetched no info controller to compare with");
+  if (mailerRequests.length) throw new Error(`boot fetched the mailers: ${mailerRequests[0]}`);
+  console.log("boot loaded no mailers controller");
 
   await see("h1", "Posts");
   await see("article", "Three days on the Wonderland Trail");

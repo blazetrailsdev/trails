@@ -1,3 +1,4 @@
+import { Trails } from "../trails.js";
 import "./active-job.js";
 import { constantize, include, onLoad, OrderedOptions, TopLevel } from "@blazetrails/activesupport";
 import { AbstractController, ActionDispatch } from "@blazetrails/actionpack";
@@ -140,10 +141,12 @@ export class Trailtie extends BaseTrailtie {
       });
     });
 
-    this.config.afterInitialize((app) => {
+    this.config.afterInitialize(async (app) => {
       const options = app.config.actionMailer;
 
       if (options.showPreviews) {
+        /** @inventedArm loadPath — PERMANENT */
+        await Trails.loadPath["trails/mailers_controller"]();
         app.routes().prepend(function () {
           this.get("/trails/mailers", { to: "trails/mailers#index", internal: true });
           this.get("/trails/mailers/download/*path", {

@@ -66,34 +66,23 @@ export async function generatorModule(path: string): Promise<string | null> {
 
 type Generators = {
   invoke(namespace: string, args: string[], config: { behavior: "invoke" }): Promise<void>;
-  configureBang(config: unknown): void;
 };
-type Application = {
-  config: { generators(): unknown };
-  runGeneratorsBlocks(app: unknown): void;
-};
+type Application = { loadGenerators(): Promise<unknown> };
 
-let configured = false;
+let loading: Promise<unknown> | undefined;
 
 /**
  * Runs `bin/trails generate <args>` against the virtual filesystem and
- * answers every app file it wrote, with `null` for one it removed. `Engine#load_generators`'s `require
- * "rails/generators"` is this module's import of `generators.js`, since a
- * bundle cannot resolve that file by name at run time.
+ * answers every app file it wrote, with `null` for one it removed.
  */
 export async function generate(
   vfs: VirtualFs,
   trails: { Generators?: Generators; application: Application },
   args: string[],
 ): Promise<Record<string, string | null>> {
-  await import("../../../../packages/trailties/dist/generators.js");
+  await (loading ??= trails.application.loadGenerators());
   const { Base } = await import("../../../../packages/trailties/dist/generators/base.js");
   const generators = trails.Generators!;
-  if (!configured) {
-    trails.application.runGeneratorsBlocks(trails.application);
-    generators.configureBang(trails.application.config.generators());
-    configured = true;
-  }
   const skip = [...(await seat(vfs, Base.baseRoot())), "/tmp/", "/log/", "/node_modules/"];
   const before = vfs.files();
   const [namespace, ...rest] = args;

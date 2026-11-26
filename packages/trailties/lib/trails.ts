@@ -63,6 +63,7 @@ export class Trails {
   declare static autoload: (constName: string, path?: string | null) => void;
   declare static eagerAutoload: (block: () => void) => void;
   declare static _autoloads?: Record<string, () => Promise<string>>;
+  declare static _eagerloadedConstants?: string[] | null;
 
   static loadPath: Record<string, () => Promise<unknown>> = {
     "trails/info": () => import("./info.js"),

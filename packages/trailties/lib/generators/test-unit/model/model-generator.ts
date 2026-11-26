@@ -3,7 +3,7 @@ import { File } from "@blazetrails/ruby-compat";
 import { dasherize, type GeneratorOptions } from "../../base.js";
 import { Base } from "../../test-unit.js";
 
-const __dir__ = File.dirname(decodeURIComponent(new URL(import.meta.url).pathname));
+const __dir__ = import.meta.dirname;
 
 export interface ModelGeneratorOptions extends GeneratorOptions {
   fixture?: boolean;
