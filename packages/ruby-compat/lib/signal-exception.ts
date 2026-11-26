@@ -20,6 +20,8 @@ export class SignalException extends Exception {
    * signal number, named by `rb_signo2signm` (`:323-332`, `SIG%s` or `SIG%u`)
    * unless a name follows it; a name is looked up by `signm2signo` and given
    * its `SIG` prefix.
+   *
+   * @noRailsEquivalent PERMANENT
    */
   constructor(...argv: unknown[]) {
     let argnum = 1;
@@ -72,7 +74,11 @@ export class SignalException extends Exception {
  * rather than defines.
  */
 export class Interrupt extends SignalException {
-  /** `interrupt_init` (`vendor/ruby/v3.3.11/signal.c:397-405`): `SIGINT`, and the message given. */
+  /**
+   * `interrupt_init` (`vendor/ruby/v3.3.11/signal.c:397-405`): `SIGINT`, and the message given.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
   constructor(...argv: unknown[]) {
     checkArity(argv.length, 0, 1);
     super(2, argv.length > 0 ? argv[0] : null);

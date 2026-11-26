@@ -20,6 +20,8 @@ export class Exception extends Error {
    * `exc_init` (`vendor/ruby/v3.3.11/error.c:1402-1408`) seats the `mesg` ivar.
    * `Error`'s constructor seats an own `message` instead, which would shadow
    * `exc_message`'s getter, so it is moved to the ivar's slot.
+   *
+   * @noRailsEquivalent PERMANENT
    */
   constructor(...args: ConstructorParameters<typeof Error>) {
     super(...args);
@@ -36,6 +38,7 @@ export interface Exception {
   detailedMessage(opt?: { highlight?: boolean | null } | null): string;
   /** @noRailsEquivalent PERMANENT */
   toS(): string;
+  /** @noRailsEquivalent PERMANENT */
   toString(): string;
 }
 /* eslint-enable @typescript-eslint/no-unsafe-declaration-merging */
