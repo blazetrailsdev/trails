@@ -193,3 +193,22 @@ describe("Zlib::GzipWriter and GzipReader streaming", () => {
     await expect(async () => gz.close()).rejects.toThrow("invalid compressed data -- length error");
   });
 });
+
+describe("Zlib::GzipReader header", () => {
+  it("skips the ORIG_NAME and COMMENT fields MRI's writer sets", async () => {
+    const io = new StringIO(new Uint8Array(0));
+    const gz = new Zlib.GzipWriter(io);
+    gz.write("named");
+    gz.finish();
+    const plain = io.string();
+    const named = new Uint8Array([
+      ...plain.subarray(0, 3),
+      0x18,
+      ...plain.subarray(4, 10),
+      ...new TextEncoder().encode("a.txt\0note\0"),
+      ...plain.subarray(10),
+    ]);
+
+    expect(await Zlib.GzipReader.wrap(new StringIO(named), (r) => r.read())).toBe("named");
+  });
+});
