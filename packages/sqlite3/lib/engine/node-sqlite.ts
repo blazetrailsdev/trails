@@ -13,7 +13,7 @@ import type {
 import type { EngineStatement } from "../statement.js";
 import type { SqliteBindValue } from "../driver.js";
 import { closedStatement, statementTail } from "./statement-tail.js";
-import { drive, withBusyHandler } from "./busy-handler.js";
+import { drive, lockKind, withBusyHandler, type LockKind } from "./busy-handler.js";
 import { bindParameterIndex, bindParameterNames } from "./bind-parameter-index.js";
 import { columnIntegers, columnText } from "./column-text.js";
 import { aggregateOptions, databaseListFilename, libversionNumber } from "./aggregator.js";
@@ -103,12 +103,13 @@ function prepareStatement(
   raw: DatabaseSync,
   sql: string,
   finalize: () => void,
-  locked: <T>(run: () => T, reader: boolean) => T,
+  locked: <T>(run: () => T, lock: LockKind) => T,
 ): EngineStatement {
   const stmt: StatementSync = raw.prepare(sql);
   stmt.setAllowBareNamedParameters(true);
   const columns = stmt.columns();
   const reader = columns.length > 0;
+  const lock = lockKind(sql, reader);
   if (reader) {
     stmt.setReturnArrays(true);
     stmt.setReadBigInts(true);
@@ -175,7 +176,7 @@ function prepareStatement(
           return null;
         }
         return columnIntegers(r.value as unknown[]);
-      }, reader),
+      }, lock),
     isDone: () => done,
     bindParameterCount: () => bindParameterNames(sql).length,
     columnCount: () => columns.length,
@@ -190,12 +191,12 @@ export const engine: SyncEngineOpenV2 = Object.assign((file: string, mode: numbe
   let changesStmt: StatementSync | null = null;
   let zombie = false;
   let liveStatements = 0;
-  let readLock = false;
-  const locked = <T>(run: () => T, reader: boolean): T => {
-    const held = raw.isTransaction;
-    if (!held) readLock = false;
+  let held: LockKind = null;
+  const locked = <T>(run: () => T, lock: LockKind): T => {
+    if (!raw.isTransaction) held = null;
     const result = run();
-    readLock = raw.isTransaction && (readLock || (held && reader));
+    if (!raw.isTransaction) held = null;
+    else if (lock === "write" || held === null) held = lock ?? held;
     return result;
   };
   const finalize = () => {
@@ -204,7 +205,7 @@ export const engine: SyncEngineOpenV2 = Object.assign((file: string, mode: numbe
   };
   const db: SyncEngineDatabase = {
     ...errors,
-    isDeadlock: () => raw.isTransaction && readLock,
+    isDeadlock: () => raw.isTransaction && held === "read",
     isClosed: () => zombie || !raw.isOpen,
     isDiscarded: () => false,
     close: () => {
@@ -271,7 +272,7 @@ export const engine: SyncEngineOpenV2 = Object.assign((file: string, mode: numbe
               yield withBusyHandler(
                 db,
                 () => handler,
-                () => locked(() => stmt.run(), false),
+                () => locked(() => stmt.run(), lockKind(head, false)),
               );
               continue;
             }
@@ -280,7 +281,7 @@ export const engine: SyncEngineOpenV2 = Object.assign((file: string, mode: numbe
             for (const row of (yield withBusyHandler(
               db,
               () => handler,
-              () => locked(() => stmt.all() as unknown as unknown[][], true),
+              () => locked(() => stmt.all() as unknown as unknown[][], lockKind(head, true)),
             )) as unknown[][]) {
               const vals = row.map(columnText);
               results.push(

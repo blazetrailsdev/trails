@@ -124,6 +124,27 @@ describe("SQLite3::Database over the better-sqlite3 engine", () => {
     await writer.close();
   });
 
+  it("calls the busy handler for a COMMIT that waits on a reader after the transaction wrote", async () => {
+    const path = `${getOs().tmpdir()}/engine-commitwait-${Date.now()}-${Math.random()}.sqlite3`;
+    paths.push(path);
+    const holder = new SQLite3.Database(path, { engine });
+    await holder.executeBatch2("CREATE TABLE t (a); INSERT INTO t VALUES (1);");
+    const writer = new SQLite3.Database(path, { engine });
+    const counts: number[] = [];
+    writer.busyHandler((count) => (counts.push(count), count < 2));
+    await writer.execute("BEGIN DEFERRED");
+    await writer.execute("SELECT * FROM t");
+    await writer.execute("INSERT INTO t VALUES (2)");
+    await holder.execute("BEGIN");
+    await holder.execute("SELECT * FROM t");
+    await expect(writer.execute("COMMIT")).rejects.toBeInstanceOf(SQLite3.BusyException);
+    expect(counts).toEqual([0, 1, 2]);
+    await holder.execute("ROLLBACK");
+    await writer.execute("ROLLBACK");
+    await holder.close();
+    await writer.close();
+  });
+
   it("reads an INTEGER as a number when it is safe and as a bigint past 2^53", async () => {
     const db = new SQLite3.Database(":memory:", { engine });
     expect(await db.execute("SELECT 7, 9007199254740993, -9007199254740993, 1.5")).toEqual([

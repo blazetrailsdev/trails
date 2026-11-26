@@ -72,3 +72,14 @@ export function drive<T>(body: Generator<unknown, T, unknown>): T | Promise<T> {
   }
   return step.value;
 }
+
+/** @internal */
+export type LockKind = "read" | "write" | null;
+
+/** @internal */
+export function lockKind(sql: string, reader: boolean): LockKind {
+  if (/^\s*begin\s+(immediate|exclusive)\b/i.test(sql)) return "write";
+  if (/^\s*(begin|commit|end|rollback|savepoint|release)\b/i.test(sql)) return null;
+  if (!reader || /\breturning\b/i.test(sql)) return "write";
+  return "read";
+}
