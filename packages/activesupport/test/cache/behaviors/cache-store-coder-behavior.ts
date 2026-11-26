@@ -2,7 +2,7 @@ import { Duration } from "../../../lib/duration.js";
 import { travelTo } from "../../../lib/testing/time-helpers.js";
 import { expect, it } from "vitest";
 import { Entry } from "../../../lib/cache/entry.js";
-import { coder } from "../../../lib/cache/coder.js";
+import { coder } from "../../../lib/cache/marshal-coder.js";
 import type { Store, StoreOptions } from "../../../lib/cache/store.js";
 import { assertSame } from "../../../lib/testing/assertions.js";
 

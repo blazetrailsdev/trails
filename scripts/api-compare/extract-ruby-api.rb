@@ -1003,11 +1003,17 @@ class ApiExtractor
     # def self.method_name or def obj.method_name
     return if @scanning_umbrella
 
-    _receiver = node[1]
+    receiver = node[1]
     _dot = node[2]
     name_node = node[3]
     name = ident_name(name_node)
     return unless name
+    # `def Null.complete!` (execution_wrapper.rb:11) is a singleton method on a
+    # constant's object, not a class method of the enclosing class; builder's
+    # `def XChar.unicode` inside `module XChar` names the enclosing module.
+    if receiver.is_a?(Array) && receiver[0] == :var_ref && receiver[1].is_a?(Array) && receiver[1][0] == :@const
+      return unless receiver[1][1] == current_fqn.to_s.split("::").last
+    end
 
     params = extract_params(find_params_defs(node), method(:string_opener_at))
     vis = current_visibility

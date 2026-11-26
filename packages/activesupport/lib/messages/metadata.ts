@@ -1,5 +1,5 @@
 import type { Duration } from "../duration.js";
-import { coder } from "../cache/coder.js";
+import { coder } from "../cache/marshal-coder.js";
 import { ActiveSupportJSON } from "../json.js";
 import { Encoding } from "../json/encoding.js";
 import { onLoad } from "../lazy-load-hooks.js";

@@ -4,7 +4,7 @@ import { rbCNumeric } from "@blazetrails/ruby-compat/object";
 import { rbEqual } from "@blazetrails/ruby-compat/rb-equal";
 import { deflate, inflate } from "../gzip.js";
 import { DeserializationError } from "./deserialization-error.js";
-import { coder } from "./coder.js";
+import { coder } from "./marshal-coder.js";
 import type { Duration } from "../duration.js";
 
 /** @internal */

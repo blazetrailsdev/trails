@@ -327,6 +327,13 @@ async function placement(dir: string) {
   const at = (file: string, lazyOk = true): Pick<ClassPathEntry, "excluded" | "table"> | null => {
     const rel = path.join("lib", file);
     if (testOnly.some((f) => rel === f || rel.startsWith(`${f}/`))) return null;
+    if (
+      !excluded.includes(rel) &&
+      excluded.some((glob) => rel.startsWith(`${glob}/`)) &&
+      !reachable.has(file)
+    ) {
+      return null;
+    }
     const separated = !reachable.has(file) && separateGraph.has(file);
     const lazy =
       lazyOk &&

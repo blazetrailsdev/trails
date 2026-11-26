@@ -477,6 +477,7 @@ rbClearMethodCache();
 Object.assign(RubyTime, { current, daysInMonth, daysInYear, rfc3339, atWithCoercion });
 
 RubyTime.at = atWithCoercion;
+export { atWithCoercion as at };
 
 Object.defineProperty(RubyTime, Symbol.hasInstance, {
   value(this: typeof RubyTime, other: unknown): boolean {

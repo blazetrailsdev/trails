@@ -22,6 +22,9 @@ import { contentTag } from "../../lib/helpers/tag-helper.js";
 import { Base } from "../../lib/base.js";
 import { I18n, inflections } from "@blazetrails/activesupport";
 import { assertNil } from "@blazetrails/activesupport/testing/assertions";
+import { HTML5 as SanitizerHTML5 } from "@blazetrails/html-sanitizer";
+import { HTML5 } from "@blazetrails/nokogiri";
+import type { SanitizeHelperClass } from "../../lib/helpers/sanitize-helper.js";
 
 const view = new (Base.withEmptyTemplateCache())(null, {}, null);
 const simpleFormat = _simpleFormat.bind(view);
@@ -826,5 +829,32 @@ describe("TextHelperTest", () => {
     expect(cycle.call(host, "red", "blue")).toBe("blue");
     expect(cycle.call(host, "red", "blue")).toBe("red");
     expect(host.cycles).toEqual(["Specialized", "Fuji", "Giant"]);
+  });
+});
+
+describe("TextHelperHTML5SanitizerTest", () => {
+  const klass = class extends Base.withEmptyTemplateCache() {};
+  (klass as unknown as SanitizeHelperClass).safeListSanitizer =
+    new SanitizerHTML5.SafeListSanitizer();
+  const html5View = new klass(null, {}, null);
+
+  it("highlight keeps markup inside attribute values inert", () => {
+    const html = _highlight.call(
+      html5View,
+      `<a title="x > y" class="<img src=x onerror=alert(1)>">z</a>`,
+      "class",
+    );
+
+    expect(HTML5.fragment(html.toString()).css("img")).toBeEmpty();
+  });
+
+  it("simple format keeps markup inside attribute values inert", () => {
+    const html = _simpleFormat.call(
+      html5View,
+      `<a title="x\n\n<img src=x onerror=alert(1)>">link</a>`,
+      { class: "post" },
+    );
+
+    expect(HTML5.fragment(html.toString()).css("img")).toBeEmpty();
   });
 });

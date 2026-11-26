@@ -63,6 +63,8 @@ export function readableInspect(datetime: DateTime): string {
   return toFs(datetime, "rfc822");
 }
 
+export { readableInspect as inspect };
+
 export function defaultInspect(datetime: DateTime): string {
   return datetime.inspect();
 }

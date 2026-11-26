@@ -5,5 +5,11 @@ export default async function setup(): Promise<void> {
   if (ENV["ISOLATION_TEST"] != null) return;
   await buildTemplates([
     decodeURIComponent(new URL("../../lib/generators", import.meta.url).pathname),
+    decodeURIComponent(
+      new URL(
+        "../../lib/generators/solid-queue/update/templates/db/add_batches_to_solid_queue.ts",
+        import.meta.url,
+      ).pathname,
+    ),
   ]);
 }

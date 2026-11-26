@@ -767,6 +767,7 @@ export function extractFromProgram(
     currentImportAliases = collectImportAliases(sourceFile);
     const sectionVisibility = collectModuleSectionVisibility(sourceFile);
     let attributeReceivers: Set<string | undefined> | undefined;
+    let mixedInPaths: Set<string> | undefined;
 
     ts.forEachChild(sourceFile, (node) => {
       if (ts.isClassDeclaration(node) && node.name) {
@@ -1100,6 +1101,35 @@ export function extractFromProgram(
                   )
                   .flatMap((o) => harvestObjectLiteralMethods(o, checker, relPath))
               : harvestModuleInstanceMethods(decl.initializer, checker, relPath);
+          // A Ruby module nested in a plain-object module
+          // (`LibXML::Conversions::Document`, `ForkTracker::CoreExt`) is a
+          // capitalised member holding its own object literal that the file
+          // mixes in with `include` / `prepend`. An `extend`ed one is a
+          // `ClassMethods` half, which the class-path walk reaches through its
+          // owner instead.
+          if (objectLiteral) {
+            mixedInPaths ??= collectMixedInPaths(sourceFile);
+            for (const prop of literal.properties) {
+              if (!ts.isPropertyAssignment(prop) || !ts.isIdentifier(prop.name)) continue;
+              if (!/^[A-Z]/.test(prop.name.text) || isConstantCaseName(prop.name.text)) continue;
+              const nested = unwrapAssertions(prop.initializer);
+              if (!ts.isObjectLiteralExpression(nested)) continue;
+              const nestedMethods = harvestObjectLiteralMethods(nested, checker, relPath);
+              const nestedKey = `${relPath}:${decl.name.text}.${prop.name.text}`;
+              if (!mixedInPaths.has(`${decl.name.text}.${prop.name.text}`)) continue;
+              if (nestedMethods.length === 0 || info.modules[nestedKey]) continue;
+              info.modules[nestedKey] = {
+                name: prop.name.text,
+                file: relPath,
+                includes: [],
+                extends: [],
+                instanceMethods: nestedMethods,
+                classMethods: [],
+                objectLiteral: true,
+              };
+              fileHasClassOrModule = true;
+            }
+          }
           if (methods.length === 0 && !isDefineModuleCall(unwrapAssertions(decl.initializer)))
             continue;
           const modKey = `${relPath}:${decl.name.text}`;
@@ -9949,4 +9979,24 @@ if (
 ) {
   const scope = scopeOf(process.argv.slice(2));
   void main(scope === null ? TS_EXTRACT_PACKAGES : [scope]);
+}
+
+/** The dotted paths (`Conversions.Document`) a file passes as the module
+ *  argument of `include` / `prepend`. */
+function collectMixedInPaths(sourceFile: ts.SourceFile): Set<string> {
+  const paths = new Set<string>();
+  const visit = (node: ts.Node): void => {
+    if (
+      ts.isCallExpression(node) &&
+      ts.isIdentifier(node.expression) &&
+      ["include", "prepend"].includes(node.expression.text)
+    ) {
+      for (const arg of node.arguments.slice(1)) {
+        if (ts.isPropertyAccessExpression(arg)) paths.add(arg.getText(sourceFile));
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sourceFile);
+  return paths;
 }

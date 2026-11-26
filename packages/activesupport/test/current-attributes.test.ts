@@ -296,6 +296,23 @@ describe("CurrentAttributesTest", () => {
     expect((MyCurrent as unknown as { bar: unknown }).bar).toBeInstanceOf(Object);
   });
 
+  it("instance delegators are eagerly defined", () => {
+    class MyCurrent extends CurrentAttributes {
+      static {
+        this.methodAdded("regular");
+        this.attribute("attr", { default: "att" });
+      }
+
+      regular(): string {
+        return "regular";
+      }
+    }
+
+    expect(Object.hasOwn(MyCurrent, "attr")).toBeTruthy();
+    expect(Object.getOwnPropertyDescriptor(MyCurrent, "attr")!.set).toBeTruthy();
+    expect(Object.hasOwn(MyCurrent, "regular")).toBeTruthy();
+  });
+
   it("attribute delegators have precise signature", () => {
     class MyCurrent extends CurrentAttributes {
       static {

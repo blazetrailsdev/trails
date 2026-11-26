@@ -43,6 +43,7 @@ export { MemoryStore } from "./memory-store.js";
 export { NullStore } from "./null-store.js";
 export { FileStore } from "./file-store.js";
 export { expandCacheKey, lookupStore } from "../cache.js";
-export { coder, Coder } from "./coder.js";
+export { Coder } from "./coder.js";
+export { coder } from "./marshal-coder.js";
 export type { CoderSerializer, CoderCompressor } from "./coder.js";
 export { Entry } from "./entry.js";

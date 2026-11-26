@@ -128,6 +128,25 @@ describe("Ruby extractor body call capture", { timeout: RUBY_SUBPROCESS_TIMEOUT_
     }
   }
 
+  it("does not file a def on a constant's object as a class method", () => {
+    const fixtures = {
+      "execution_wrapper.rb": `
+        class ExecutionWrapper
+          Null = Object.new
+          def Null.complete!; end
+          def self.wrap; end
+          def ExecutionWrapper.active?; end
+        end
+      `,
+    };
+    const names = (
+      rubyIncludes(fixtures, "classMethods")["ExecutionWrapper"] as unknown as {
+        name: string;
+      }[]
+    ).map((m) => m.name);
+    expect(names).toEqual(["wrap", "active?"]);
+  });
+
   it("files a module_function def as one module method, as module_function :name does", () => {
     const fixtures = {
       "action_cable.rb": `

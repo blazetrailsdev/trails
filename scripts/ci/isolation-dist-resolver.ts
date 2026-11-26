@@ -7,13 +7,15 @@ const LIB = /^(.*\/packages\/[^/]+)\/lib\/(.+?)(?<!\.d)\.ts$/;
  * Maps a workspace package's `lib/*.ts` path to its built `dist/*.js`, and
  * answers any other path unchanged. A `lib` file with no built counterpart
  * raises: loading it from source beside the rest from `dist` would give the
- * child two copies of a framework module.
+ * child two copies of a framework module. A generator template under
+ * `templates/` is data the generator renders, never built, so it is answered
+ * unchanged.
  *
  * @noRailsEquivalent PERMANENT
  */
 export function isolationDistPath(file: string): string {
   const match = LIB.exec(file);
-  if (!match) return file;
+  if (!match || match[2].includes("/templates/")) return file;
   const dist = `${match[1]}/dist/${match[2]}.js`;
   if (!existsSync(dist)) throw new Error(`ISOLATION_DIST=1 but ${dist} is not built`);
   return dist;
