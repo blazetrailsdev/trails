@@ -81,5 +81,7 @@ export function lockKind(sql: string, reader: boolean): LockKind {
   if (/^\s*begin\s+(immediate|exclusive)\b/i.test(sql)) return "write";
   if (/^\s*(begin|commit|end|rollback|savepoint|release)\b/i.test(sql)) return null;
   if (!reader || /\breturning\b/i.test(sql)) return "write";
+  if (/^\s*pragma\b/i.test(sql)) return null;
+  if (/\bfrom\s+pragma_\w+/i.test(sql) && !/\bjoin\b/i.test(sql)) return null;
   return "read";
 }

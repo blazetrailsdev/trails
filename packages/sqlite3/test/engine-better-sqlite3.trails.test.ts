@@ -113,6 +113,8 @@ describe("SQLite3::Database over the better-sqlite3 engine", () => {
     writer.busyHandler((count) => (counts.push(count), count < 2));
     await writer.execute("BEGIN DEFERRED");
     await writer.execute("SAVEPOINT a");
+    await writer.execute("PRAGMA table_xinfo(t)");
+    await writer.execute("SELECT name FROM pragma_table_list WHERE name = 't'");
     await holder.execute("BEGIN IMMEDIATE");
     await expect(writer.execute("INSERT INTO t VALUES (2)")).rejects.toBeInstanceOf(
       SQLite3.BusyException,
