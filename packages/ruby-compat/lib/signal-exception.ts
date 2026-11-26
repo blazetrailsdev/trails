@@ -54,7 +54,11 @@ export class SignalException extends Exception {
     this._signo = signo;
   }
 
-  /** `esignal_signo` (`vendor/ruby/v3.3.11/signal.c:389-393`). */
+  /**
+   * `esignal_signo` (`vendor/ruby/v3.3.11/signal.c:389-393`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
   signo(): number | undefined {
     return this._signo;
   }
