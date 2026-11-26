@@ -65,6 +65,20 @@ describe("Leaf::EditableTest", () => {
     expect(await Edit.count()).toBe(before);
   });
 
+  it("editing a leafable with an attachment includes the attachments in the new version", async () => {
+    const isImageAttached = async (leaf: Leaf) => {
+      const image = (await leaf.picture)!.image;
+      await image.load();
+      return image.isAttached();
+    };
+    expect(await isImageAttached(await leaves("reading_picture"))).toBe(true);
+
+    await (await leaves("reading_picture")).edit({ leafParams: { title: "New title" } });
+
+    expect((await leaves("reading_picture")).title).toBe("New title");
+    expect(await isImageAttached(await leaves("reading_picture"))).toBe(true);
+  });
+
   it("trashing a leaf records the edit", async () => {
     const leaf = await leaves("welcome_page");
     await leaf.trashedBang();

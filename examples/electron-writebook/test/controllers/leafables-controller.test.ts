@@ -1,17 +1,10 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { StringIO } from "@blazetrails/ruby-compat";
-import { ApplicationIntegrationTest, fixture, loadFixtures } from "../test-helper.ts";
+import { ApplicationIntegrationTest, fixture, loadFixtures, PIXEL_BMP } from "../test-helper.ts";
 import type { Book } from "../../app/models/book.ts";
 import { Leaf } from "../../app/models/leaf.ts";
 import type { Section } from "../../app/models/section.ts";
 import type { User } from "../../app/models/user.ts";
-
-// Writebook's test/fixtures/files/pixel.bmp, a 1x1 bitmap, kept inline because the
-// control-byte check refuses a raw .bmp outside its binary allowlist.
-const PIXEL_BMP = Buffer.from(
-  "Qk06AAAAAAAAADYAAAAoAAAAAQAAAAEAAAABABgAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAA/wAAAA==",
-  "base64",
-);
 
 describe("LeafablesControllerTest", () => {
   let t: ApplicationIntegrationTest;

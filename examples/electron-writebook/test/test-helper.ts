@@ -21,6 +21,13 @@ const { User } = await import("../app/models/user.ts");
 const { Markdown } = await import("../lib/trails-ext/action-text-markdown.ts");
 
 /** Empties the app's tables, children first, so each test starts from a blank database. */
+// Writebook's test/fixtures/files/pixel.bmp, a 1x1 bitmap, kept inline because the
+// control-byte check refuses a raw .bmp outside its binary allowlist.
+export const PIXEL_BMP = Buffer.from(
+  "Qk06AAAAAAAAADYAAAAoAAAAAQAAAAEAAAABABgAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAA/wAAAA==",
+  "base64",
+);
+
 export async function resetDatabase(): Promise<void> {
   for (const model of [
     Edit,

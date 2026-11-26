@@ -27,7 +27,7 @@ export class Picture extends ApplicationRecord {
     return this.image.isVariable() ? this.image.variant("large") : this.image;
   }
 
-  async markable(): Promise<string> {
-    return this.caption ?? "";
+  async markable(): Promise<string | null> {
+    return this.caption;
   }
 }

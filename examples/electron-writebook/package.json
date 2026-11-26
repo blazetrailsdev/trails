@@ -24,6 +24,7 @@
   },
   "dependencies": {
     "@blazetrails/actioncable": "workspace:*",
+    "@blazetrails/activejob": "workspace:*",
     "@blazetrails/actionpack": "workspace:*",
     "@blazetrails/actiontext": "workspace:*",
     "@blazetrails/actionview": "workspace:*",

@@ -1,3 +1,4 @@
+import type { Many } from "@blazetrails/activestorage";
 import {
   days,
   htmlSafe,
@@ -34,6 +35,7 @@ export class Markdown extends Record {
   declare static renderer: Renderer;
   declare content: string;
   declare name: string;
+  declare uploads: Many;
 
   static {
     mattrAccessor.call(this, "renderer", {
