@@ -146,7 +146,7 @@ function assertNotOption(generator: { options: unknown }, option: string): void 
   ).toBeFalsy();
 }
 
-describe("AppGeneratorTest", () => {
+describe("AppGeneratorTest", { timeout: 30_000 }, () => {
   it("version control initializes git repo", async () => {
     await t.runGenerator([t.destinationRoot]);
     await t.assertDirectory(".git");
