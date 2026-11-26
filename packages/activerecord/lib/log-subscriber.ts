@@ -8,7 +8,8 @@ import {
   NotificationEvent as Event,
   type Logger,
 } from "@blazetrails/activesupport";
-import { eachWithIndex, rbObjAsString, rbObjRespondTo, rtest } from "@blazetrails/ruby-compat";
+import { eachWithIndex } from "@blazetrails/ruby-compat/enumerable";
+import { rbObjAsString, rbObjRespondTo, rtest } from "@blazetrails/ruby-compat/object";
 import { verboseQueryLogs } from "./active-record.js";
 import { Base } from "./base.js";
 

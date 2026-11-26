@@ -7,7 +7,8 @@ import type { HashConfig } from "./database-configurations/hash-config.js";
 import { DatabaseConfig } from "./database-configurations/database-config.js";
 import { NotImplementedError, ActiveRecordError } from "./errors.js";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { rbEnsure, RuntimeError } from "@blazetrails/ruby-compat";
+import { rbEnsure } from "@blazetrails/ruby-compat/ensure";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
 import {
   connectedToStack,
   currentRole as coreCurrentRole,

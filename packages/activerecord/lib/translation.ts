@@ -1,4 +1,4 @@
-import { rbClassSuperclass } from "@blazetrails/ruby-compat";
+import { rbClassSuperclass } from "@blazetrails/ruby-compat/object";
 import type { Base } from "./base.js";
 import { ActiveRecord } from "./namespaces.js";
 

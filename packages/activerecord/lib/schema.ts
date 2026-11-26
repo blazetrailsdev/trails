@@ -1,5 +1,5 @@
 import { isPresent } from "@blazetrails/activesupport";
-import { extend, include, included } from "@blazetrails/ruby-compat";
+import { extend, include, included } from "@blazetrails/ruby-compat/include";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { Current, Migration } from "./migration.js";
 

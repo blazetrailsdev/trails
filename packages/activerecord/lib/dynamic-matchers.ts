@@ -1,10 +1,8 @@
 import { camelize, underscore } from "@blazetrails/activesupport";
-import {
-  ArgumentError,
-  NoMethodError,
-  NotImplementedError,
-  rbFSend,
-} from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { NoMethodError } from "@blazetrails/ruby-compat/no-method-error";
+import { NotImplementedError } from "@blazetrails/ruby-compat/not-implemented-error";
+import { rbFSend } from "@blazetrails/ruby-compat/object";
 import { ActiveRecord } from "./namespaces.js";
 
 interface DynamicMatchersHost {

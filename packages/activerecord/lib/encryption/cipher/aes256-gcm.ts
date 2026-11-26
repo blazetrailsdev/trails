@@ -1,14 +1,9 @@
-import {
-  ArgumentError,
-  Cipher,
-  NoMethodError,
-  OpenSSL,
-  rbDefineInspectCustom,
-  rbModName,
-  rbObjId,
-  sprintf,
-  type Bytes,
-} from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import type { Bytes } from "@blazetrails/ruby-compat/fs-adapter";
+import { sprintf } from "@blazetrails/ruby-compat/kernel-format";
+import { NoMethodError } from "@blazetrails/ruby-compat/no-method-error";
+import { rbDefineInspectCustom, rbModName, rbObjId } from "@blazetrails/ruby-compat/object";
+import { Cipher, OpenSSL } from "@blazetrails/ruby-compat/openssl";
 import { Encryption } from "../../namespaces.js";
 import { Decryption, EncryptedContentIntegrity } from "../errors.js";
 import { Message } from "../message.js";

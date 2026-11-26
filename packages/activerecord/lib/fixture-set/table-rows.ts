@@ -1,7 +1,8 @@
 import type { Base } from "../base.js";
 import type { Fixture } from "../fixtures.js";
 import { Time as RubyTime } from "@blazetrails/date";
-import { Hash, rbFSend, transformValues } from "@blazetrails/ruby-compat";
+import { Hash, transformValues } from "@blazetrails/ruby-compat/hash";
+import { rbFSend } from "@blazetrails/ruby-compat/object";
 import { defaultTimezone } from "../active-record.js";
 import { TableRow } from "./table-row.js";
 import { ModelMetadata } from "./model-metadata.js";

@@ -1,5 +1,5 @@
 import type { RackApp, RackResponse } from "@blazetrails/rack";
-import { rbProcCall } from "@blazetrails/ruby-compat";
+import { rbProcCall } from "@blazetrails/ruby-compat/object";
 import { TopLevel } from "@blazetrails/activesupport";
 import { Resolver } from "./database-selector/resolver.js";
 import type { ResolverContext } from "./database-selector/resolver.js";
