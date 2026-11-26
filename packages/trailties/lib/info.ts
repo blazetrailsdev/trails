@@ -1,6 +1,5 @@
 import "./constants.info.generated.js";
 import { htmlEscape } from "@blazetrails/activesupport";
-import { env } from "@blazetrails/ruby-compat";
 import { VERSION } from "./gem-version.js";
 import { Trails } from "./trails.js";
 
@@ -79,6 +78,6 @@ export class Info {
 }
 
 Info.property("Trails version", VERSION.STRING);
-Info.property("Environment", () => env.TRAILS_ENV ?? env.NODE_ENV ?? "development");
+Info.property("Environment", () => Trails.env.toString());
 
 Trails.Info = Info;

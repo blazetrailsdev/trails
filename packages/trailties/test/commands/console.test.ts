@@ -33,7 +33,7 @@ describe("Trails::ConsoleTest", () => {
   const prevEnv = Trails.env;
   let app: ReturnType<typeof buildApp>;
   let output: string;
-  const saved = { TRAILS_ENV: env.TRAILS_ENV, NODE_ENV: env.NODE_ENV };
+  const saved = { TRAILS_ENV: env.TRAILS_ENV, RACK_ENV: env.RACK_ENV };
 
   beforeEach(() => {
     FakeConsole._started = false;
@@ -55,12 +55,12 @@ describe("Trails::ConsoleTest", () => {
   }
 
   async function withEnv(
-    name: "TRAILS_ENV" | "NODE_ENV",
+    name: "TRAILS_ENV" | "RACK_ENV",
     value: string | undefined,
     block: () => Promise<void>,
   ) {
     setEnv("TRAILS_ENV", undefined);
-    setEnv("NODE_ENV", undefined);
+    setEnv("RACK_ENV", undefined);
     if (value !== undefined) setEnv(name, value);
     await block();
   }
@@ -134,7 +134,7 @@ describe("Trails::ConsoleTest", () => {
   });
 
   it("default environment with rack env", async () => {
-    await withEnv("NODE_ENV", "production", async () => {
+    await withEnv("RACK_ENV", "production", async () => {
       await start();
       expect(output).toMatch(/\sproduction\s/);
     });

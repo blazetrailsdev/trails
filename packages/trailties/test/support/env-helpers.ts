@@ -8,13 +8,13 @@ export class EnvHelpers {
   /** @internal */
   async withTrailsEnv<T>(env: string | undefined, block: () => T | Promise<T>): Promise<T> {
     _resetEnv();
-    return this.switchEnv("TRAILS_ENV", env, () => this.switchEnv("NODE_ENV", undefined, block));
+    return this.switchEnv("TRAILS_ENV", env, () => this.switchEnv("RACK_ENV", undefined, block));
   }
 
   /** @internal */
   async withRackEnv<T>(env: string | undefined, block: () => T | Promise<T>): Promise<T> {
     _resetEnv();
-    return this.switchEnv("NODE_ENV", env, () => this.switchEnv("TRAILS_ENV", undefined, block));
+    return this.switchEnv("RACK_ENV", env, () => this.switchEnv("TRAILS_ENV", undefined, block));
   }
 
   /** @internal */

@@ -937,9 +937,9 @@ export default { development };
 
   it("db:seed uses primary database connection", async () => {
     const oldTrailsEnv = env.TRAILS_ENV;
-    const oldRackEnv = env.NODE_ENV;
+    const oldRackEnv = env.RACK_ENV;
     setEnv("TRAILS_ENV", undefined);
-    setEnv("NODE_ENV", undefined);
+    setEnv("RACK_ENV", undefined);
     try {
       await dbMigrateAndSchemaDumpAndLoad();
 
@@ -955,7 +955,7 @@ STDOUT.print((await Book.leaseConnection()).pool.dbConfig.database);
       expect(output).toBe("storage/development.sqlite3");
     } finally {
       setEnv("TRAILS_ENV", oldTrailsEnv);
-      setEnv("NODE_ENV", oldRackEnv);
+      setEnv("RACK_ENV", oldRackEnv);
     }
   });
 

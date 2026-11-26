@@ -5,22 +5,22 @@ import { serverEnvironment, serverHost, serverPort } from "../../lib/server/boot
 
 describe("server boot options (trails)", () => {
   let savedTrailsEnv: string | undefined;
-  let savedNodeEnv: string | undefined;
+  let savedRackEnv: string | undefined;
   let savedPort: string | undefined;
   let savedBinding: string | undefined;
 
   beforeEach(() => {
     savedTrailsEnv = env.TRAILS_ENV;
-    savedNodeEnv = env.NODE_ENV;
+    savedRackEnv = env.RACK_ENV;
     savedPort = env.PORT;
     savedBinding = env.BINDING;
-    for (const key of ["TRAILS_ENV", "NODE_ENV", "PORT", "BINDING"]) setEnv(key, undefined);
+    for (const key of ["TRAILS_ENV", "RACK_ENV", "PORT", "BINDING"]) setEnv(key, undefined);
     _resetTrailsEnv();
   });
 
   afterEach(() => {
     setEnv("TRAILS_ENV", savedTrailsEnv);
-    setEnv("NODE_ENV", savedNodeEnv);
+    setEnv("RACK_ENV", savedRackEnv);
     setEnv("PORT", savedPort);
     setEnv("BINDING", savedBinding);
     _resetTrailsEnv();
@@ -31,8 +31,8 @@ describe("server boot options (trails)", () => {
       expect(serverEnvironment()).toBe("development");
     });
 
-    it("prefers the option, then TRAILS_ENV, then NODE_ENV", () => {
-      setEnv("NODE_ENV", "staging");
+    it("prefers the option, then TRAILS_ENV, then RACK_ENV", () => {
+      setEnv("RACK_ENV", "staging");
       expect(serverEnvironment()).toBe("staging");
       setEnv("TRAILS_ENV", "test");
       expect(serverEnvironment()).toBe("test");

@@ -3,6 +3,7 @@ import { getPath, setEnv } from "@blazetrails/ruby-compat";
 import type { HttpServer } from "@blazetrails/ruby-compat";
 import { Handler } from "@blazetrails/rackup";
 import { APP_PATH } from "../app-path.js";
+import { environment } from "../command.js";
 import { Trails } from "../trails.js";
 
 /** @noRailsEquivalent PERMANENT */
@@ -15,12 +16,7 @@ export interface ServeOptions {
 
 /** @noRailsEquivalent PERMANENT */
 export function serverEnvironment(options: ServeOptions = {}): string {
-  return (
-    presence(options.environment) ||
-    presence(getEnv("TRAILS_ENV")) ||
-    presence(getEnv("NODE_ENV")) ||
-    "development"
-  );
+  return presence(options.environment) || environment();
 }
 
 /** @noRailsEquivalent PERMANENT */

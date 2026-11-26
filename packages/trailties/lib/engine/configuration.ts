@@ -1,9 +1,8 @@
 import { RouteSet, type MiddlewareStack } from "@blazetrails/actionpack";
-import { Pathname } from "@blazetrails/ruby-compat";
+import { Pathname, TopLevel } from "@blazetrails/ruby-compat";
 import { Configuration as RailtieConfiguration } from "../trailtie/configuration.js";
 import { Root } from "../paths.js";
 import { Generators, MiddlewareStackProxy } from "../configuration.js";
-import { resolveEnv } from "../database.js";
 
 export type RouteSetClass = { newWithConfig(config: Configuration): RouteSet };
 
@@ -56,7 +55,7 @@ export class Configuration extends RailtieConfiguration {
     paths.add("lib/assets", { glob: "*" });
     paths.add("lib/tasks", { glob: "**/*.rake.{ts,js}" });
     paths.add("config");
-    paths.add("config/environments", { glob: `${resolveEnv()}.{ts,js}` });
+    paths.add("config/environments", { glob: `${TopLevel.Trails!.env}.{ts,js}` });
     paths.add("config/initializers", { glob: "**/*.{ts,js}" });
     paths.add("config/locales", { glob: "**/*.{ts,js,json}" });
     paths.add("config/routes.ts");
