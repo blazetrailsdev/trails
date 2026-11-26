@@ -4,6 +4,10 @@ import type { Loader } from "../lib/loader.js";
 import "../lib/core-ext/kernel.js";
 import { get, newLoader, teardown, withLoadPath, withSetup } from "./support/loader-test.js";
 
+async function assertRequired(str: string): Promise<void> {
+  expect(await Kernel.require(str)).toBe(true);
+}
+
 describe("TestRequireInteraction", () => {
   let loader: Loader;
 
@@ -24,9 +28,9 @@ describe("TestRequireInteraction", () => {
     const files: [string, string][] = [["user.ts", "export class User {}"]];
     await withSetup(loader, files, {}, async () => {
       await withLoadPath(".", async () => {
-        expect(await Kernel.require("user")).toBe(true);
+        await assertRequired("user");
         await loader.unload();
-        expect(Object.hasOwn(TopLevel, "User")).toBe(false);
+        expect(!Object.hasOwn(TopLevel, "User")).toBeTruthy();
 
         await loader.setup();
         expect(await get(Object, "User")).toBeTruthy();
