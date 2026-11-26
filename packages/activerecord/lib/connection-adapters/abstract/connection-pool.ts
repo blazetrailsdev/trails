@@ -443,7 +443,7 @@ export class ConnectionPool implements ReapablePool {
     return false;
   }
 
-  /** @inventedArm if — CONVERGEABLE lease-connection-holds-pending-checkout */
+  /** @inventedArm if — CONVERGEABLE lease-holds-count-overlapping-blocks */
   async withConnection<T>(
     fn: (conn: DatabaseAdapter) => T | Promise<T>,
     options: { preventPermanentCheckout?: boolean } = {},
