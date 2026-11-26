@@ -1,4 +1,5 @@
 import { Model } from "@blazetrails/activemodel";
+import { include } from "@blazetrails/activesupport";
 import type { Html5Node } from "@blazetrails/nokogiri";
 import { rbInspect, rbModName, toS } from "@blazetrails/ruby-compat";
 import { ActionText } from "./action-text.js";
@@ -7,7 +8,17 @@ import { Fragment } from "./fragment.js";
 
 const TAG_NAME = "div";
 
-export class AttachmentGallery extends Model {
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type -- Ruby `include ActiveModel::Model` (attachment_gallery.rb:7); the class/interface merge is how `include()` surfaces on the type side.
+export interface AttachmentGallery extends Model {}
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export class AttachmentGallery {
+  declare static modelName: typeof Model.modelName;
+
+  static {
+    include(this, Model);
+  }
+
   static fragmentByCanonicalizingAttachmentGalleries(content: unknown): Promise<Fragment> {
     return this.fragmentByReplacingAttachmentGalleryNodes(
       content,
@@ -58,7 +69,6 @@ export class AttachmentGallery extends Model {
   private _attachments?: Array<Attachment | null>;
 
   constructor(node: Html5Node) {
-    super();
     this.node = node;
   }
 

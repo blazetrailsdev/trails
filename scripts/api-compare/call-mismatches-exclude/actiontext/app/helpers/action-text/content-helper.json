@@ -1,0 +1,13 @@
+[
+  {
+    "package": "actiontext",
+    "tsFile": "app/helpers/action-text/content-helper.ts",
+    "rubyName": "render_action_text_attachments",
+    "call": "render",
+    "kind": "args",
+    "rubyArgs": [
+      "kwargs{layout=ref:attachmentGallery,object=ref:attachmentGallery}"
+    ],
+    "reason": "Ruby's `&block` rides past the skipped `locals` positional; the TS call passes `undefined` in that slot, per CLAUDE.md \"An optional positional before trailing options or a block\"."
+  }
+]

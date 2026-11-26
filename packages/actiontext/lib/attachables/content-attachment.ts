@@ -1,9 +1,22 @@
 import { Model } from "@blazetrails/activemodel";
+import { include } from "@blazetrails/activesupport";
 import type { Html5Node } from "@blazetrails/nokogiri";
 import { ActionText } from "../action-text.js";
 import type { Content } from "../content.js";
 
-export class ContentAttachment extends Model {
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type -- Ruby `include ActiveModel::Model` (content_attachment.rb:8); the class/interface merge is how `include()` surfaces on the type side.
+export interface ContentAttachment extends Model {}
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export class ContentAttachment {
+  declare static validatesFormatOf: typeof Model.validatesFormatOf;
+  declare static validatesPresenceOf: typeof Model.validatesPresenceOf;
+
+  /** @inlinedFrom ActiveModel::API#initialize rails/v8.0.5.2/activemodel/lib/active_model/api.rb:80-84 */
+  constructor(attributes: Record<string, unknown> | null = {}) {
+    if (attributes != null) this.assignAttributes(attributes);
+  }
+
   static async fromNode(node: Html5Node): Promise<ContentAttachment | null> {
     const attachment = new this({
       contentType: node.get("content-type"),
@@ -39,6 +52,7 @@ export class ContentAttachment extends Model {
   }
 
   static {
+    include(this, Model);
     this.validatesFormatOf("contentType", { with: /html/ });
     this.validatesPresenceOf("content");
   }
