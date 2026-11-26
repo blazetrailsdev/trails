@@ -1234,7 +1234,13 @@ function walkTsFileSurface(
  * `eslint/rails-private-methods.json` and the privates lane's `credited`
  * column come from). A member named there is a faithful port whose `@internal`
  * `rails-private-jsdoc` requires, so it is not counted: the mark measures the
- * unbacked internals RFC 0121 receipts, not ported Rails privates.
+ * unbacked internals RFC 0121 receipts, not ported Rails privates. Given
+ * `railsPrivateKeyed` (the walk's `ownerKeyed` out-param), a class or module
+ * member is matched on its owner, its static-ness and its name, so a member
+ * colliding with a private of another Ruby class in the same `.rb` is
+ * counted. A file-level function or constant, an `interface` member and a
+ * synthesized mixin's member have no Ruby owner of their own and keep the
+ * name match.
  *
  * A `#`-private field is a Ruby ivar, not surface, so it is not counted either.
  */
@@ -1246,26 +1252,32 @@ export function countTsInternalNames(
   internalConstants: string[],
   railsPrivate: ReadonlySet<string> = new Set(),
   names: string[] = [],
+  railsPrivateKeyed?: ReadonlySet<string>,
 ): number {
-  const isInternal = (m: MethodInfo): boolean =>
+  const isInternal = (m: MethodInfo, owner?: string): boolean =>
     m.internal === true &&
     m.declaredIn === undefined &&
     !m.name.startsWith("_") &&
     !m.name.startsWith("#") &&
     m.name !== "constructor" &&
-    !railsPrivate.has(m.name);
+    !(owner !== undefined && railsPrivateKeyed !== undefined
+      ? isPrivateOwnerCredited(railsPrivateKeyed, railsPrivate, owner, m.isStatic === true, m.name)
+      : railsPrivate.has(m.name));
   const functionNames = new Set((fileFunctions ?? []).map((fn) => fn.name));
   const fileFunctionKey = (m: MethodInfo): string => `${m.name}:${m.line}:${m.isStatic === true}`;
   const fileFunctionEntries = new Set((fileFunctions ?? []).map(fileFunctionKey));
-  const isOwnMember = (m: MethodInfo): boolean =>
-    isInternal(m) && !(m.bodyless === true && functionNames.has(m.name));
+  const isOwnMember = (m: MethodInfo, owner: string | undefined): boolean =>
+    isInternal(m, owner) && !(m.bodyless === true && functionNames.has(m.name));
   const start = names.length;
   names.push(...internalConstants.filter((n) => !n.startsWith("_") && !railsPrivate.has(n)));
   for (const c of [...classes, ...modules]) {
     if (c.file !== file) continue;
     for (const m of [...c.instanceMethods, ...c.classMethods])
       if (
-        isOwnMember(m) &&
+        isOwnMember(
+          m,
+          c.isInterface === true || c.synthesizedMixin === true ? undefined : c.name,
+        ) &&
         !(c.synthesizedFileModule === true && fileFunctionEntries.has(fileFunctionKey(m)))
       )
         names.push(m.name);
@@ -1706,8 +1718,19 @@ export function collectAllowedNames(
    * reads for its `visibility` column.
    */
   visibility: "any" | "private" | "public" = "any",
+  /**
+   * Out-param: each method name a Ruby CLASS defines, keyed by that class and
+   * whether it is a class or instance method there ({@link privateOwnerKey}),
+   * so a match is scoped to the TS declaration that ports the class rather
+   * than to the whole file. A module's methods, and a mixin's, are keyed to
+   * the `*` owner: trails ports them onto the including class, a `this`-typed
+   * function or a `ClassMethods` static, so they keep the file-wide match.
+   */
+  ownerKeyed?: Set<string>,
 ): Set<string> {
   const allowed = new Set<string>();
+  let hosts: string[] = [];
+  let hostIsModule = false;
   const methodsOnly = visibility !== "any";
   // File-level constants are declared per Ruby *file*, not per entity, so they
   // enter the allow-set once for the whole file rather than through the
@@ -1729,9 +1752,14 @@ export function collectAllowedNames(
     ownerFqn: string,
     methodFile?: string,
     target: Set<string> = allowed,
+    isStatic = false,
+    fromMixin = false,
   ): void => {
     const allow = (c: string): void => {
       target.add(c);
+      if (ownerKeyed === undefined) return;
+      if (fromMixin || hostIsModule) ownerKeyed.add(privateOwnerKey("*", false, c));
+      else for (const host of hosts) ownerKeyed.add(privateOwnerKey(host, isStatic, c));
     };
     for (const m of methods) {
       if (methodFile !== undefined && m.file !== methodFile) continue;
@@ -1775,6 +1803,7 @@ export function collectAllowedNames(
     contextFqn: string,
     target: Set<string> = allowed,
     methodFile?: string,
+    isStatic = false,
   ): void => {
     let fqn = resolveModuleName(incName, contextFqn, moduleFqnByShort);
     if (!rubyModules[fqn] && !crossPackageModules[fqn] && incName.endsWith("::ClassMethods")) {
@@ -1786,7 +1815,7 @@ export function collectAllowedNames(
       visited = new Set<string>();
       visitedByTarget.set(target, visited);
     }
-    const visitKey = `${methodFile ?? ""}\u0000${fqn}`;
+    const visitKey = `${methodFile ?? ""}\u0000${fqn}\u0000${isStatic}`;
     if (visited.has(visitKey)) return;
     visited.add(visitKey);
     // A Ruby core module (`include Enumerable`) supplies methods no vendored
@@ -1799,7 +1828,7 @@ export function collectAllowedNames(
       addRubyName(name, target);
     }
     for (const inc of HOOK_INJECTED_MIXINS[fqn]?.includes ?? [])
-      walkMixin(inc, fqn, target, methodFile);
+      walkMixin(inc, fqn, target, methodFile, isStatic);
     // Fall back to the cross-package map: a railtie-injected mixin (see
     // AMBIENT_RAILTIE_MIXINS) or a fully-qualified cross-gem include lives
     // in another package's modules, not this package's.
@@ -1819,7 +1848,7 @@ export function collectAllowedNames(
     // Only the module's instance methods cross into the host. Class
     // methods on the module itself stay on the module (Ruby `include`
     // semantics; matches compare.flattenIncludedMethodInfos).
-    addMethods(mod.instanceMethods, fqn, methodFile, target);
+    addMethods(mod.instanceMethods, fqn, methodFile, target, isStatic, true);
     // `include M` where `M extend ActiveSupport::Concern` also runs
     // `base.extend M::ClassMethods` and the `included` block
     // (activesupport/lib/active_support/concern.rb:137-138), so the includer
@@ -1843,12 +1872,14 @@ export function collectAllowedNames(
         fqn,
         methodFile,
         target,
+        true,
+        true,
       );
-      walkMixin(`${fqn}::ClassMethods`, fqn, target, methodFile);
+      walkMixin(`${fqn}::ClassMethods`, fqn, target, methodFile, true);
       for (const ext of mod.extends ?? [])
-        if (!isConcern(ext)) walkMixin(ext, fqn, target, methodFile);
+        if (!isConcern(ext)) walkMixin(ext, fqn, target, methodFile, true);
     }
-    for (const inc of mod.includes ?? []) walkMixin(inc, fqn, target, methodFile);
+    for (const inc of mod.includes ?? []) walkMixin(inc, fqn, target, methodFile, isStatic);
   };
 
   const addDelegated = (
@@ -1896,6 +1927,17 @@ export function collectAllowedNames(
     // either as a real TS nested class or as `static readonly Inner = Inner`
     // re-attaching a sibling export.
     const short = fqn.split("::").pop();
+    hostIsModule = rubyModules[fqn] !== undefined || crossPackageModules[fqn] !== undefined;
+    hosts =
+      short === undefined
+        ? []
+        : [
+            ...rubyConstantCandidates(short),
+            ...[TS_CLASS_RENAMES[short]].filter((n) => n !== undefined),
+            ...TS_PARENT_ALIASES.map(({ transform }) => transform(short)),
+          ];
+    if (ownerKeyed !== undefined && !hostIsModule && !nameOnly)
+      for (const h of hosts) ownerKeyed.add(privateOwnerHostKey(h));
     if (short && !methodsOnly) {
       for (const c of rubyConstantCandidates(short)) allowed.add(c);
       // The renamed spelling `parity:api` already resolves this Ruby class to
@@ -1919,10 +1961,10 @@ export function collectAllowedNames(
       scoped.set(short, target);
     }
     addMethods(info.instanceMethods, fqn, methodFile, target);
-    addMethods(info.classMethods, fqn, methodFile, target);
+    addMethods(info.classMethods, fqn, methodFile, target, true);
     for (const inc of info.includes ?? []) walkMixin(inc, fqn, target, methodFile);
     for (const pre of info.prepends ?? []) walkMixin(pre, fqn, target, methodFile);
-    for (const ext of info.extends ?? []) walkMixin(ext, fqn, target, methodFile);
+    for (const ext of info.extends ?? []) walkMixin(ext, fqn, target, methodFile, true);
 
     for (const inc of AMBIENT_RAILTIE_MIXINS[fqn]?.includes ?? [])
       walkMixin(inc, fqn, target, methodFile);
@@ -1945,6 +1987,40 @@ export function collectAllowedNames(
     }
   }
   return allowed;
+}
+
+/**
+ * The key {@link collectAllowedNames}'s `ownerKeyed` out-param records a
+ * Ruby private under: the TS declaration name of the entity it lands on,
+ * whether it is a class method there, and the TS spelling.
+ */
+export function privateOwnerHostKey(owner: string): string {
+  return `${owner}\u0000`;
+}
+
+/**
+ * Whether `ownerKeyed` credits `name` declared on TS `owner`: by owner when
+ * `owner` ports a Ruby class of the file ({@link privateOwnerHostKey}),
+ * else by name alone, as a declaration that ports no class of the file has
+ * no Ruby owner to match.
+ */
+export function isPrivateOwnerCredited(
+  ownerKeyed: ReadonlySet<string>,
+  flat: ReadonlySet<string>,
+  owner: string,
+  isStatic: boolean,
+  name: string,
+): boolean {
+  if (!ownerKeyed.has(privateOwnerHostKey(owner))) return flat.has(name);
+  return (
+    ownerKeyed.has(privateOwnerKey(owner, isStatic, name)) ||
+    ownerKeyed.has(privateOwnerKey("*", false, name))
+  );
+}
+
+export function privateOwnerKey(owner: string, isStatic: boolean, name: string): string {
+  if (owner === "*") return `*\u0000${name}`;
+  return `${owner}\u0000${isStatic ? "static" : "instance"}\u0000${name}`;
 }
 
 /**
@@ -2710,6 +2786,7 @@ function buildPackageReport(
       (n) => !internalConsts.has(n),
     );
     if (!(rubyFile !== null && foldsOntoPathMirror(rubyFile, expectedTs))) {
+      const railsPrivateKeyed = new Set<string>();
       const railsPrivate =
         rubyFile === null
           ? new Set<string>()
@@ -2727,6 +2804,7 @@ function buildPackageReport(
               [],
               undefined,
               "private",
+              railsPrivateKeyed,
             );
       const internalNames: string[] = [];
       result.totalInternal += countTsInternalNames(
@@ -2737,6 +2815,7 @@ function buildPackageReport(
         [...internalConsts],
         railsPrivate,
         internalNames,
+        railsPrivateKeyed,
       );
       if (internalNames.length > 0)
         result.internalFiles.push({ tsFile: expectedTs, names: internalNames });

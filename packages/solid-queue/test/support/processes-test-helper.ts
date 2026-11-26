@@ -59,7 +59,7 @@ export async function runSupervisorAsForkWithCapturedIo(
   const pid = forkSupervisor(options, true, [outWriter, errWriter]);
   outWriter.close();
   errWriter.close();
-  await waitForRegisteredProcesses(4, { timeout: 10 });
+  await waitForRegisteredProcesses(4, { timeout: 3 });
   const [out, err] = [outReader, errReader].map((reader) => {
     const bytes = reader.readNonblock(1 << 20, null, { exception: false });
     return bytes instanceof Uint8Array ? new TextDecoder().decode(bytes) : "";
