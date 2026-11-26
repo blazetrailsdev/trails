@@ -31,7 +31,7 @@
   ],
   "scripts": {
     "build": "tsc && pnpm build:templates",
-    "build:templates": "node -e \"for (const g of ['install', 'update']) require('fs').cpSync('lib/generators/solid-queue/' + g + '/templates', 'dist/generators/solid-queue/' + g + '/templates', { recursive: true })\" && trails-tsc-views build-templates dist/generators dist/generators/solid-queue/update/templates/db/add_batches_to_solid_queue.ts"
+    "build:templates": "node -e \"for (const g of ['install', 'update']) require('fs').cpSync('lib/generators/solid-queue/' + g + '/templates', 'dist/generators/solid-queue/' + g + '/templates', { recursive: true })\" && trails-tsc-views build-templates dist/generators dist/generators/solid-queue/update/templates/db/add-batches-to-solid-queue.ts"
   },
   "dependencies": {
     "@blazetrails/activejob": "workspace:*",
