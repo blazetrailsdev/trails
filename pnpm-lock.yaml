@@ -6,6 +6,9 @@ settings:
 
 pnpmfileChecksum: sha256-m94al5RXbZmYyJTzF/8YZUmYuQ2kyYUM2tKx/sZyXyY=
 
+patchedDependencies:
+  vite-node@3.2.4: abca2a4290af4785436bab54bffbe5bdac965e7dfee989301ca0a8ebc6b07510
+
 importers:
 
   .:
@@ -14107,7 +14110,7 @@ snapshots:
       '@types/unist': 3.0.3
       vfile-message: 4.0.3
 
-  vite-node@3.2.4(@types/node@25.3.5)(jiti@2.6.1)(lightningcss@1.32.0)(supports-color@8.1.1)(terser@5.47.1)(tsx@4.23.15)(yaml@2.8.3):
+  vite-node@3.2.4(patch_hash=abca2a4290af4785436bab54bffbe5bdac965e7dfee989301ca0a8ebc6b07510)(@types/node@25.3.5)(jiti@2.6.1)(lightningcss@1.32.0)(supports-color@8.1.1)(terser@5.47.1)(tsx@4.23.15)(yaml@2.8.3):
     dependencies:
       cac: 6.7.14
       debug: 4.4.3(supports-color@8.1.1)
@@ -14255,7 +14258,7 @@ snapshots:
       tinypool: 1.1.1
       tinyrainbow: 2.0.0
       vite: 7.3.1(@types/node@25.3.5)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.47.1)(tsx@4.23.15)(yaml@2.8.3)
-      vite-node: 3.2.4(@types/node@25.3.5)(jiti@2.6.1)(lightningcss@1.32.0)(supports-color@8.1.1)(terser@5.47.1)(tsx@4.23.15)(yaml@2.8.3)
+      vite-node: 3.2.4(patch_hash=abca2a4290af4785436bab54bffbe5bdac965e7dfee989301ca0a8ebc6b07510)(@types/node@25.3.5)(jiti@2.6.1)(lightningcss@1.32.0)(supports-color@8.1.1)(terser@5.47.1)(tsx@4.23.15)(yaml@2.8.3)
       why-is-node-running: 2.3.0
     optionalDependencies:
       '@types/node': 25.3.5

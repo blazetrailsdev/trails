@@ -1,8 +1,10 @@
 import { runtime } from "@blazetrails/ruby-compat";
 
+/** @noRailsEquivalent PERMANENT */
+declare const require: ((id: string) => unknown) | undefined;
+
 if (runtime() === "bun") {
   const host = globalThis as { Temporal?: unknown };
-  host.Temporal ??= (import.meta as { require?(id: string): { Temporal: unknown } }).require!(
-    "@js-temporal/polyfill",
-  ).Temporal;
+  const load = (import.meta as { require?(id: string): unknown }).require ?? require!;
+  host.Temporal ??= (load("@js-temporal/polyfill") as { Temporal: unknown }).Temporal;
 }
