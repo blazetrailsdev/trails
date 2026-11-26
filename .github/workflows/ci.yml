@@ -1446,14 +1446,17 @@ jobs:
         run: pnpm vitest run scripts/test-deps scripts/parity/pipeline/query/node scripts/mixin-declaration-drift.test.ts
       - if: needs.changes.outputs.ar_scope == '' || contains(needs.changes.outputs.ar_scope, 'packages/activestorage')
         uses: ./.github/actions/activestorage-media-binaries
-      - if: needs.changes.outputs.ar_scope == ''
+      # The scheduled and dispatched runs skip the non-isolated cases step and
+      # run every case file isolated, so a test that passes only because an
+      # earlier file in its fork leaked state is caught.
+      - if: needs.changes.outputs.ar_scope == '' && github.event_name != 'schedule' && github.event_name != 'workflow_dispatch'
         run: scripts/ci/ar-non-isolated-cases.sh ${{ matrix.shard }}/${{ strategy.job-total }}
         env:
           VITEST_SHARD_DURATIONS: sqlite3
       - if: needs.changes.outputs.ar_scope == ''
         run: pnpm vitest run packages/activerecord/ packages/solid-queue/ packages/solid-cable/ packages/solid-cache/ packages/activestorage/ packages/actionmailbox/ packages/actiontext/ packages/turbo/ --project '!system' --shard=${{ matrix.shard }}/${{ strategy.job-total }}
         env:
-          AR_SPLIT: rest
+          AR_SPLIT: ${{ (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && 'all' || 'rest' }}
           VITEST_SHARD_DURATIONS: sqlite3
           VITEST_SHARD_ONE_EXTRA_MS: "110000"
       - if: needs.changes.outputs.ar_scope != ''
