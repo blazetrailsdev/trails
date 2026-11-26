@@ -1104,7 +1104,9 @@ export function extractFromProgram(
           // A Ruby module nested in a plain-object module
           // (`LibXML::Conversions::Document`, `ForkTracker::CoreExt`) is a
           // capitalised member holding its own object literal that the file
-          // mixes in with `include` / `prepend` / `extend`.
+          // mixes in with `include` / `prepend`. An `extend`ed one is a
+          // `ClassMethods` half, which the class-path walk reaches through its
+          // owner instead.
           if (objectLiteral) {
             mixedInPaths ??= collectMixedInPaths(sourceFile);
             for (const prop of literal.properties) {
@@ -9980,14 +9982,14 @@ if (
 }
 
 /** The dotted paths (`Conversions.Document`) a file passes as the module
- *  argument of `include` / `prepend` / `extend`. */
+ *  argument of `include` / `prepend`. */
 function collectMixedInPaths(sourceFile: ts.SourceFile): Set<string> {
   const paths = new Set<string>();
   const visit = (node: ts.Node): void => {
     if (
       ts.isCallExpression(node) &&
       ts.isIdentifier(node.expression) &&
-      ["include", "prepend", "extend"].includes(node.expression.text)
+      ["include", "prepend"].includes(node.expression.text)
     ) {
       for (const arg of node.arguments.slice(1)) {
         if (ts.isPropertyAccessExpression(arg)) paths.add(arg.getText(sourceFile));
