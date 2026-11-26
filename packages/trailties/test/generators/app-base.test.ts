@@ -224,6 +224,7 @@ describe("AppBase run tasks", () => {
         expect.anything(),
         null,
         expect.objectContaining({ out: "/dev/null" }),
+        null,
       ]);
 
       const loud = generator({});

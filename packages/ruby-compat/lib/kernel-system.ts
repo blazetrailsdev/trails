@@ -40,9 +40,7 @@ export async function rbFSystem(
     throw new NotImplementedError("system() function is unimplemented on this machine");
   }
 
-  const data = await (argv0 === null
-    ? adapter.system(prog, env, args, opthash)
-    : adapter.system(prog, env, args, opthash, argv0));
+  const data = await adapter.system(prog, env, args, opthash, argv0);
   rbLastStatusSet(new Process.Status(data));
 
   if (data.pid != null && data.pid > 0) {
