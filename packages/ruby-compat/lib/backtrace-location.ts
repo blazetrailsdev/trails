@@ -24,7 +24,8 @@ export class Location {
    * `Thread::Backtrace::Location#path` (`vendor/ruby/v3.3.11/vm_backtrace.c:314`),
    * always a String. An `eval` frame answers `(eval at <caller>)`, MRI 3.3's
    * eval path (`vendor/ruby/v3.3.11/vm_eval.c:1628-1636`), an ES module frame
-   * answers its filesystem path rather than its `file://` URL, and a frame with no
+   * answers its filesystem path rather than its module URL (a browser
+   * host's path adapter maps its `http:` module URLs back to files), and a frame with no
    * position answers its location text (`<anonymous>`, `native`).
    *
    * @noRailsEquivalent PERMANENT
@@ -53,7 +54,9 @@ export class Location {
       this.path = `(${location.slice(0, location.lastIndexOf(", "))})`;
     } else {
       const file = path ? path[1] : location;
-      this.path = file.startsWith("file://") ? getPath().fileURLToPath!(file) : file;
+      const fileURLToPath = getPath().fileURLToPath;
+      this.path =
+        fileURLToPath && /^[a-z][a-z\d+.-]*:\/\//i.test(file) ? fileURLToPath(file) : file;
     }
 
     const position = /:(\d+):(\d+)\)?$/.exec(this._frame);

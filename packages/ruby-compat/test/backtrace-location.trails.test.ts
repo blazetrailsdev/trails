@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { TypeError } from "../lib/type-error.js";
+import { getPath } from "../lib/fs-adapter.js";
 import { Thread, rbIterBreakValue } from "../lib/thread.js";
 import {
   Location,
@@ -41,6 +42,20 @@ describe("Thread::Backtrace::Location", () => {
     );
     expect(new Location("    at <anonymous>").path).toBe("<anonymous>");
     expect(new Location("    at new Promise (<anonymous>)").path).toBe("<anonymous>");
+  });
+
+  it("hands a non-file module URL to the path adapter", () => {
+    const adapter = getPath();
+    const original = adapter.fileURLToPath;
+    adapter.fileURLToPath = (url) =>
+      url.startsWith("http://host/vfs/") ? `/${url.slice(16).split("?")[0]}` : url;
+    try {
+      expect(new Location("    at http://host/vfs/config/routes.ts?1:3:5").path).toBe(
+        "/config/routes.ts",
+      );
+    } finally {
+      adapter.fileURLToPath = original;
+    }
   });
 });
 
