@@ -165,6 +165,7 @@ export default defineConfig(
       "packages/vite-assets/test/test_app/**",
       "packages/vite-assets/templates/**",
       "packages/vite-trails/templates/**",
+      "packages/solid-queue/lib/generators/solid-queue/update/templates/**",
       // The Journey visualizer's shipped assets: fsm.js and fsm.css are
       // byte-for-byte copies of
       // vendor/rails/v8.0.5.2/actionpack/lib/action_dispatch/journey/visualizer/, and

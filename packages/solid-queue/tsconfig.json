@@ -6,6 +6,7 @@
     "rootDir": "lib"
   },
   "include": ["lib"],
+  "exclude": ["lib/generators/solid-queue/update/templates"],
   "references": [
     {
       "path": "../activejob"

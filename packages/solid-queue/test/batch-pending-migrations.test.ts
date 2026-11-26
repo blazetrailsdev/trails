@@ -15,7 +15,7 @@ import { destroyRecords } from "./test-helper.js";
 
 const template = decodeURIComponent(
   new URL(
-    "../lib/generators/solid-queue/update/templates/db/add_batches_to_solid_queue.ts.tt",
+    "../lib/generators/solid-queue/update/templates/db/add_batches_to_solid_queue.ts",
     import.meta.url,
   ).pathname,
 );

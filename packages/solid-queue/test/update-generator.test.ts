@@ -21,11 +21,11 @@ async function withMigrationTemplate(name: string, block: () => Promise<void>) {
   try {
     await FileUtils.mkdirPAsync(File.join(sourceRoot, "db"));
     await File.writeAsync(
-      File.join(sourceRoot, "db", `${name}.ts.tt`),
+      File.join(sourceRoot, "db", `${name}.ts`),
       `export class ${camelize(name)} extends Migration.get(7.1) {\n  async change(): Promise<void> {}\n}\n`,
     );
 
-    await buildTemplates([sourceRoot]);
+    await buildTemplates([File.join(sourceRoot, "db", `${name}.ts`)]);
 
     vi.spyOn(UpdateGenerator, "sourceRoot").mockReturnValue(sourceRoot);
     await block();

@@ -28,14 +28,10 @@ export class UpdateGenerator extends Base {
     this.methodAdded("copyNewMigrations");
   }
 
-  /**
-   * @missingRailsArgs basename — CONVERGEABLE solid-queue-update-generator-migration-templates-are-plain-ts
-   * @missingRailsArgs join — CONVERGEABLE solid-queue-update-generator-migration-templates-are-plain-ts
-   */
   async copyNewMigrations(): Promise<void> {
     const sourceRoot = (await (this.constructor as typeof UpdateGenerator).sourceRoot())!;
-    for (const migrationFile of await Dir.globAsync(File.join(sourceRoot, "db", "*.ts.tt"))) {
-      const name = File.basename(migrationFile, ".tt");
+    for (const migrationFile of await Dir.globAsync(File.join(sourceRoot, "db", "*.ts"))) {
+      const name = File.basename(migrationFile);
       await this.migrationTemplate(File.join("db", name), File.join(this.dbMigratePath(), name), {
         skip: true,
       });

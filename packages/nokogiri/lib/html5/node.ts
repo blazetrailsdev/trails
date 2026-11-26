@@ -1,10 +1,4 @@
-import {
-  defaultTreeAdapter,
-  html,
-  parseFragment,
-  serializeOuter,
-  type DefaultTreeAdapterMap,
-} from "parse5";
+import { defaultTreeAdapter, html, parseFragment, type DefaultTreeAdapterMap } from "parse5";
 
 import { Attr } from "../xml/attr.js";
 import { Namespace } from "../xml/namespace.js";
@@ -356,10 +350,7 @@ export class Node extends XmlNode {
 
   /** @internal */
   private htmlStandardSerialize(preserveNewline: boolean): string {
-    const html = serializeOuter(this._node);
-    if (!preserveNewline || !this.isPrependNewline()) return html;
-    const start = html.indexOf(">") + 1;
-    return `${html.slice(0, start)}\n${html.slice(start)}`;
+    return _outputNode(this._node, preserveNewline);
   }
 
   get attributes(): Record<string, Attr> {
@@ -563,7 +554,7 @@ export class Node extends XmlNode {
   }
 
   toString(): string {
-    return serializeOuter(this._node, { treeAdapter: _cdataTreeAdapter });
+    return this.htmlStandardSerialize(false);
   }
 }
 
@@ -608,19 +599,131 @@ function _nextSibling(node: Parse5Node): Parse5Node | null {
   return siblings[siblings.indexOf(node) + 1] ?? null;
 }
 
-const _cdataRawTextParent = { tagName: "style", namespaceURI: "http://www.w3.org/1999/xhtml" };
+const _HTML_NS = "http://www.w3.org/1999/xhtml";
 
-const _cdataTreeAdapter: typeof defaultTreeAdapter = {
-  ...defaultTreeAdapter,
-  isTextNode: (node): node is DefaultTreeAdapterMap["textNode"] =>
-    defaultTreeAdapter.isTextNode(node) || node.nodeName === ("#cdata-section" as string),
-  getTextNodeContent: (node) =>
-    node.nodeName === ("#cdata-section" as string) ? `<![CDATA[${node.value}]]>` : node.value,
-  getParentNode: (node) =>
-    node.nodeName === ("#cdata-section" as string)
-      ? (_cdataRawTextParent as unknown as Parse5Parent)
-      : defaultTreeAdapter.getParentNode(node),
+const _OUTPUT_VOID_ELEMENTS = new Set([
+  "area",
+  "base",
+  "basefont",
+  "bgsound",
+  "br",
+  "col",
+  "embed",
+  "frame",
+  "hr",
+  "img",
+  "input",
+  "keygen",
+  "link",
+  "meta",
+  "param",
+  "source",
+  "track",
+  "wbr",
+]);
+
+const _UNESCAPED_TEXT_ELEMENTS = new Set([
+  "style",
+  "script",
+  "xmp",
+  "iframe",
+  "noembed",
+  "noframes",
+  "plaintext",
+  "noscript",
+]);
+
+type _OutputNode = {
+  nodeName: string;
+  tagName?: string;
+  namespaceURI?: string;
+  attrs?: Parse5Attr[];
+  childNodes?: _OutputNode[];
+  content?: _OutputNode;
+  parentNode?: _OutputNode | null;
+  value?: string;
+  data?: string;
+  name?: string;
 };
+
+function _children(node: _OutputNode): _OutputNode[] {
+  return node.content?.childNodes ?? node.childNodes ?? [];
+}
+
+function _isOneOf(node: _OutputNode, tagnames: Set<string>): boolean {
+  if (node.tagName == null) return false;
+  if (node.namespaceURI != null && node.namespaceURI !== _HTML_NS) return false;
+  return tagnames.has(node.tagName);
+}
+
+function _shouldPrependNewline(node: _OutputNode): boolean {
+  const name = node.tagName;
+  const child = _children(node)[0];
+  if (!name || !child || (name !== "pre" && name !== "textarea" && name !== "listing")) {
+    return false;
+  }
+  return child.nodeName === "#text" && !!child.value && child.value[0] === "\n";
+}
+
+function _outputEscapedString(start: string, attr: boolean): string {
+  return start.replace(attr ? /[&\u00A0"<>]/g : /[&\u00A0<>]/g, (ch) =>
+    ch === "&"
+      ? "&amp;"
+      : ch === "\u00A0"
+        ? "&nbsp;"
+        : ch === '"'
+          ? "&quot;"
+          : ch === "<"
+            ? "&lt;"
+            : "&gt;",
+  );
+}
+
+function _outputAttrName(attr: Parse5Attr): string {
+  const uri = attr.namespace;
+  const name = attr.name;
+  if (uri) {
+    if (uri === "http://www.w3.org/XML/1998/namespace") return `xml:${name}`;
+    if (uri === "http://www.w3.org/2000/xmlns/") return name === "xmlns" ? name : `xmlns:${name}`;
+    if (uri === "http://www.w3.org/1999/xlink") return `xlink:${name}`;
+    if (attr.prefix) return `${attr.prefix}:${name}`;
+  }
+  return name;
+}
+
+function _outputNode(node: _OutputNode, preserveNewline: boolean): string {
+  let out = "";
+  switch (node.nodeName) {
+    case "#text":
+      if (node.parentNode && _isOneOf(node.parentNode, _UNESCAPED_TEXT_ELEMENTS)) {
+        return node.value!;
+      }
+      return _outputEscapedString(node.value!, false);
+    case "#cdata-section":
+      return `<![CDATA[${node.value}]]>`;
+    case "#comment":
+      return `<!--${node.data}-->`;
+    case "#documentType":
+      return `<!DOCTYPE ${node.name}>`;
+    case "#document":
+    case "#document-fragment":
+      for (const child of _children(node)) out += _outputNode(child, preserveNewline);
+      return out;
+    default: {
+      out += `<${node.tagName}`;
+      for (const attr of node.attrs ?? []) {
+        out += ` ${_outputAttrName(attr)}="${_outputEscapedString(attr.value, true)}"`;
+      }
+      out += ">";
+      if (!_isOneOf(node, _OUTPUT_VOID_ELEMENTS)) {
+        if (preserveNewline && _shouldPrependNewline(node)) out += "\n";
+        for (const child of _children(node)) out += _outputNode(child, preserveNewline);
+        out += `</${node.tagName}>`;
+      }
+      return out;
+    }
+  }
+}
 HTML5.Node = Node;
 
 /** @noRailsEquivalent PERMANENT */
