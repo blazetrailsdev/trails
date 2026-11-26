@@ -1,5 +1,5 @@
 import "@blazetrails/activesupport/node";
-import { argv } from "@blazetrails/ruby-compat/process-adapter";
+import { argv } from "@blazetrails/ruby-compat";
 import { TestUnitReporter } from "../test-unit/reporter.js";
 import { Runner } from "../test-unit/runner.js";
 

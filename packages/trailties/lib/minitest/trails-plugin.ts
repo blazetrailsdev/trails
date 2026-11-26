@@ -1,5 +1,5 @@
 import { Minitest } from "@blazetrails/activesupport/testing/assertions";
-import { env } from "@blazetrails/ruby-compat/process-adapter";
+import { env } from "@blazetrails/ruby-compat";
 import { Trails } from "../trails.js";
 
 /** @noRailsEquivalent PERMANENT */

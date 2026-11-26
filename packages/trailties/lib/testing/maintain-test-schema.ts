@@ -1,6 +1,6 @@
 import { Base, Migration } from "@blazetrails/activerecord";
 import { PendingMigrationError } from "@blazetrails/activerecord/migration";
-import { exit, stdout } from "@blazetrails/ruby-compat/process-adapter";
+import { exit, stdout } from "@blazetrails/ruby-compat";
 import { Trails } from "../trails.js";
 
 try {

@@ -1,4 +1,4 @@
-import { Pathname } from "@blazetrails/ruby-compat/pathname";
+import { Pathname } from "@blazetrails/ruby-compat";
 import "./constants.engine.generated.js";
 import {
   Callbacks as ASCallbacks,
@@ -11,13 +11,21 @@ import {
   type Extended,
   type Included,
 } from "@blazetrails/activesupport";
-import { File } from "@blazetrails/ruby-compat/file";
-import { getFs, getPath } from "@blazetrails/ruby-compat/fs-adapter";
-import { LOAD_PATH, rbFLoad, rbFRequireFile, resolveTsThenJs } from "@blazetrails/ruby-compat/load";
-import { rbModName, rbObjRespondTo, rbProcCall } from "@blazetrails/ruby-compat/object";
-import { block } from "@blazetrails/ruby-compat/hash";
-import { setEnv } from "@blazetrails/ruby-compat/process-adapter";
-import { uniqBang } from "@blazetrails/ruby-compat/array";
+import {
+  File,
+  getFs,
+  getPath,
+  LOAD_PATH,
+  rbFLoad,
+  rbFRequireFile,
+  rbModName,
+  rbObjRespondTo,
+  rbProcCall,
+  resolveTsThenJs,
+  block,
+  setEnv,
+  uniqBang,
+} from "@blazetrails/ruby-compat";
 import { DSL, Task } from "@blazetrails/rake";
 import {
   AbstractController,

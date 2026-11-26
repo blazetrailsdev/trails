@@ -1,4 +1,4 @@
-import { rbProcCall } from "@blazetrails/ruby-compat/object";
+import { rbProcCall } from "@blazetrails/ruby-compat";
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
 import { Trails } from "../trails.js";
 

@@ -2,13 +2,19 @@ import "./constants.command.generated.js";
 import { Trails } from "./trails.js";
 import { presence } from "@blazetrails/activesupport";
 import { Correctable, SpellChecker } from "@blazetrails/did-you-mean";
-import { File } from "@blazetrails/ruby-compat/file";
-import { Pathname } from "@blazetrails/ruby-compat/pathname";
-import { StandardError } from "@blazetrails/ruby-compat/standard-error";
-import { env, exit, rbArgv, stdout } from "@blazetrails/ruby-compat/process-adapter";
-import { prepend, rbObjDup } from "@blazetrails/ruby-compat/include";
-import { rbAryReplace } from "@blazetrails/ruby-compat/array";
-import { rbInspect } from "@blazetrails/ruby-compat/object";
+import {
+  File,
+  Pathname,
+  StandardError,
+  env,
+  exit,
+  prepend,
+  rbArgv,
+  rbAryReplace,
+  rbInspect,
+  rbObjDup,
+  stdout,
+} from "@blazetrails/ruby-compat";
 import { APP_PATH, ENGINE_ROOT } from "./app-path.js";
 import type { ThorClass } from "@blazetrails/thor";
 import type { Base } from "./command/base.js";

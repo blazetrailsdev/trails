@@ -1,7 +1,7 @@
 import "./constants.autoloaders.generated.js";
 import { Loader } from "@blazetrails/zeitwerk";
 import { include } from "@blazetrails/activesupport";
-import { Enumerable } from "@blazetrails/ruby-compat/enumerable";
+import { Enumerable } from "@blazetrails/ruby-compat";
 import { Inflector } from "./autoloaders/inflector.js";
 
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging

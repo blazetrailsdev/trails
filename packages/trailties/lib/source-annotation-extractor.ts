@@ -1,8 +1,11 @@
-import { Dir } from "@blazetrails/ruby-compat/dir";
-import { File } from "@blazetrails/ruby-compat/file";
-import { LoadError } from "@blazetrails/ruby-compat/load-error";
-import { STDOUT } from "@blazetrails/ruby-compat/io";
-import { rbFRequire, rbRequireLoaded } from "@blazetrails/ruby-compat/load";
+import {
+  Dir,
+  File,
+  LoadError,
+  STDOUT,
+  rbFRequire,
+  rbRequireLoaded,
+} from "@blazetrails/ruby-compat";
 import type * as Ast from "typescript/unstable/ast";
 import type { Node } from "typescript/unstable/ast";
 import type * as Scanner from "typescript/unstable/ast/scanner";

@@ -1,6 +1,4 @@
-import { File } from "@blazetrails/ruby-compat/file";
-import { getFs } from "@blazetrails/ruby-compat/fs-adapter";
-import { StringIO } from "@blazetrails/ruby-compat/string-io";
+import { File, getFs, StringIO } from "@blazetrails/ruby-compat";
 
 export type FileType =
   | "rb"

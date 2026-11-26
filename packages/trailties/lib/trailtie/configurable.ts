@@ -1,4 +1,4 @@
-import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
+import { RuntimeError } from "@blazetrails/ruby-compat";
 import { Trailtie } from "../trailtie.js";
 import type { Configuration } from "./configuration.js";
 import { ownState, readOwnState } from "./per-class-state.js";
