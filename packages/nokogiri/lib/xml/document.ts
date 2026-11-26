@@ -35,8 +35,9 @@ export class XmlDocument extends XmlNode {
 
   private _doc: LibXmlDocument | null;
 
-  /** @missingRailsArgs xmlNewDoc — CONVERGEABLE nokogiri-xml-document-new-version-and-wrap */
-  constructor(cDocument: number = Nokogiri.LibXml2!.xmlNewDoc()) {
+  constructor(version: string = "1.0") {
+    const cDocument = _cDocumentToWrap ?? Nokogiri.LibXml2!.xmlNewDoc(version);
+    _cDocumentToWrap = null;
     super(Nokogiri.LibXml2!.createNode(cDocument));
     this._doc = Nokogiri.LibXml2!.XmlDocument.getInstance(cDocument);
     this.document = this;
@@ -140,7 +141,7 @@ export class XmlDocument extends XmlNode {
       }
     }
 
-    const document = new XmlDocument(cDocument);
+    const document = nokoXmlDocumentWrap(XmlDocument, cDocument);
     document._root = new XmlNode(document._doc!.root, document);
     document.url = url;
     document.errors = rbErrors;
@@ -197,3 +198,11 @@ export class XmlDocument extends XmlNode {
 
 include(XmlDocument, Searchable);
 XML.Document = XmlDocument;
+
+let _cDocumentToWrap: number | null = null;
+
+/** @internal */
+function nokoXmlDocumentWrap(klass: typeof XmlDocument, cDocument: number): XmlDocument {
+  _cDocumentToWrap = cDocument;
+  return new klass();
+}
