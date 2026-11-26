@@ -1,5 +1,7 @@
 import { Executor } from "@blazetrails/activesupport";
 import { Concurrent } from "@blazetrails/ruby-compat/concurrent/map";
+import "@blazetrails/ruby-compat/concurrent/atomic-boolean";
+import "@blazetrails/ruby-compat/concurrent/read-write-lock";
 import { ActiveRecordError } from "./errors.js";
 import type { Base } from "./base.js";
 
