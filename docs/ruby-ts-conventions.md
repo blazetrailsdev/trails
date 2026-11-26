@@ -221,8 +221,6 @@ a genuine gap:
   - `initialize`, `include?` (only in: `descendants_tracker.rb`)
 - PERMANENT: `require_rexml` (xml_mini/rexml.rb:41-46) loads the rexml gem on first parse; trails' REXML port is a static ES import, so `defined?(REXML::Document)` always holds and there is nothing to load.
   - `require_rexml` (only in: `xml_mini/rexml.rb`)
-- CONVERGEABLE encrypted-configuration-invalid-content-error-message-override
-  - `message` (only in: `encrypted_configuration.rb`)
 - not called by activerecord
   - `query_info`, `info` (only in: `client.rb`)
 - not called by activerecord or actioncable (packages/pg/CLAUDE.md, "The pg port carries only what trails calls"). PERMANENT.
