@@ -38,7 +38,9 @@ describe("Attachment", () => {
   it("does not forward to an unloaded blob, and the blob still awaits", async () => {
     const found = await Attachment.find(attachment.id);
 
-    expect(() => (found as unknown as { isText(): boolean }).isText()).toThrow(NoMethodError);
+    expect(() => (found as unknown as { isText(): boolean }).isText()).toThrow(
+      "isText needs blob loaded",
+    );
     expect(found.signedId()).toBe((await attachment.blob)!.signedId());
     expect(found.association("blob").isLoaded()).toBe(false);
     expect((await found.blob)!.key).toBe((await attachment.blob)!.key);

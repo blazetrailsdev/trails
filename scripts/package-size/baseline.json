@@ -27,7 +27,8 @@
   },
   "activesupport": {
     "tarball": {
-      "value": 456478
+      "value": 461072,
+      "reason": "generateMethodMissing's pending-target and nilTargetClasses arms plus their JSDoc, in .js, .d.ts and maps (trails#10792)"
     },
     "unpacked": {
       "value": 2323937,
