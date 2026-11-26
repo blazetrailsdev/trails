@@ -13,7 +13,21 @@ import { rbClassPath } from "./classpath.js";
  * @noRailsEquivalent PERMANENT — Ruby core `Exception`, which Rails inherits
  * rather than defines.
  */
-export class Exception extends Error {}
+export class Exception extends Error {
+  /**
+   * `exc_initialize` (`vendor/ruby/v3.3.11/error.c:1386`) seats the message in
+   * the `mesg` ivar. `Error`'s constructor seats it as an own `message`
+   * property, which would shadow the `message` getter below that dispatches
+   * to `to_s`, so it is moved into the ivar.
+   */
+  constructor(message?: string, options?: ErrorOptions) {
+    super(message, options);
+    if (Object.hasOwn(this, "message")) {
+      mesgs.set(this, Reflect.get(this, "message", this));
+      delete (this as { message?: unknown }).message;
+    }
+  }
+}
 
 export interface Exception {
   /** @noRailsEquivalent PERMANENT */
@@ -24,6 +38,7 @@ export interface Exception {
 /* eslint-enable @typescript-eslint/no-unsafe-declaration-merging */
 
 const declaredNames = new WeakMap<object, unknown>();
+const mesgs = new WeakMap<object, unknown>();
 
 /**
  * `rb_class_name` (`vendor/ruby/v3.3.11/variable.c:483`) of the exception's
@@ -57,7 +72,9 @@ Object.defineProperty(Exception.prototype, "name", {
  * @noRailsEquivalent PERMANENT
  */
 Exception.prototype.toS = function (this: Exception): string {
-  const mesg: unknown = Object.hasOwn(this, "message") ? Reflect.get(this, "message", this) : null;
+  const mesg: unknown = Object.hasOwn(this, "message")
+    ? Reflect.get(this, "message", this)
+    : (mesgs.get(this) ?? null);
 
   if (mesg == null) {
     const klass = this.constructor;
@@ -77,12 +94,7 @@ Object.defineProperty(Exception.prototype, "message", {
     return this.toS();
   },
   set(this: Exception, value: unknown) {
-    Object.defineProperty(this, "message", {
-      value,
-      writable: true,
-      configurable: true,
-      enumerable: false,
-    });
+    mesgs.set(this, value);
   },
 });
 

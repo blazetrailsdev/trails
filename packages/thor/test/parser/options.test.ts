@@ -154,7 +154,7 @@ describe("Thor::Options", () => {
       const expected = 'Unknown switches "--baz"' + (Correctable ? '\nDid you mean?  "--bar"' : "");
 
       const error = await assertRaises([UnknownArgumentError], {}, () => checkUnknownBang());
-      expect(error.toString()).toEqual(expected);
+      expect(error.toS()).toEqual(expected);
     });
 
     it("skips leading non-switches", () => {

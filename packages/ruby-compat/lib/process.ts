@@ -21,6 +21,39 @@ type ExecargOpthash = {
 };
 
 /**
+ * `rb_check_argv` (`vendor/ruby/v3.3.11/process.c:2469-2497`): at least one
+ * argument, a two-element Array first argument read as `[program, argv0]`, and
+ * every argument a String with no NUL byte.
+ */
+function rbCheckArgv(argv: unknown[]): string | null {
+  if (argv.length < 1) {
+    throw new ArgumentError(`wrong number of arguments (given ${argv.length}, expected 1+)`);
+  }
+
+  let prog: string | null = null;
+  const tmp = argv[0];
+  if (Array.isArray(tmp)) {
+    if (tmp.length !== 2) {
+      throw new ArgumentError("wrong first argument");
+    }
+    prog = stringValueCStr(tmp[0]);
+    argv[0] = tmp[1];
+  }
+  for (let i = 0; i < argv.length; i++) {
+    argv[i] = stringValueCStr(argv[i]);
+  }
+  return prog;
+}
+
+function stringValueCStr(arg: unknown): string {
+  if (typeof arg !== "string") {
+    throw new TypeError(`no implicit conversion of ${rbBuiltinClassName(arg)} into String`);
+  }
+  if (arg.includes("\0")) throw new ArgumentError("string contains null byte");
+  return arg;
+}
+
+/**
  * `rb_execarg_new` (`vendor/ruby/v3.3.11/process.c:2767`): `rb_exec_getargs`
  * (`process.c:2511-2538`) takes a trailing Hash as the options and a leading
  * Hash as the env, laid over `ENV` with `nil` unsetting a name. One remaining
@@ -32,7 +65,6 @@ type ExecargOpthash = {
  * `unsetenv_others: true` (`process.c:2195-2200`) starts the env empty rather
  * than from `ENV`, as `rb_execarg_parent_start1` does (`process.c:2887-2892`).
  *
- * @inventedArm throw — CONVERGEABLE rb-exec-getargs-ports-rb-check-argv
  * @noRailsEquivalent PERMANENT — Ruby core `rb_execarg_new`
  * (`vendor/ruby/v3.3.11/process.c:2767`).
  */
@@ -44,6 +76,7 @@ export function rbExecargNew(
   env: Record<string, string | undefined>,
   args: string[] | null,
   opthash: ExecargOpthash,
+  argv0: string | null,
 ] {
   const rest = [...argv];
   let opthash: ExecargOpthash = {};
@@ -76,16 +109,14 @@ export function rbExecargNew(
       else env[name] = value;
     }
   }
-  for (const arg of rest) {
-    if (typeof arg === "string") continue;
-    throw new TypeError(`no implicit conversion of ${rbBuiltinClassName(arg)} into String`);
-  }
-  const [prog, ...args] = rest as string[];
+  const prog = rbCheckArgv(rest);
+  const [argv0, ...args] = rest as string[];
+  if (prog !== null) return [prog, env, args, opthash, argv0];
   if (args.length === 0) {
-    const argvBuf = rbExecFillarg(prog);
-    if (argvBuf !== null) return [argvBuf[0], env, argvBuf.slice(1), opthash];
+    const argvBuf = rbExecFillarg(argv0);
+    if (argvBuf !== null) return [argvBuf[0], env, argvBuf.slice(1), opthash, null];
   }
-  return [prog, env, args.length === 0 ? null : args, opthash];
+  return [argv0, env, args.length === 0 ? null : args, opthash, null];
 }
 
 /** The option names `rb_execarg_addopt` (`vendor/ruby/v3.3.11/process.c:2145-2290`) accepts, camelCased. */

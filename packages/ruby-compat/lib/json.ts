@@ -6,31 +6,39 @@ import { rbObjClassname } from "./object.js";
 
 const globalJSON = globalThis.JSON;
 
-function stripJsonComments(value: string): string {
+/**
+ * The parser's `ignore = ws | comment` (`vendor/ruby/v3.3.11/ext/json/parser/parser.rl:100-108`),
+ * read between tokens as the source is scanned: a C-style block comment and a `//`
+ * comment, which runs to and includes its newline, each read as whitespace. A
+ * comment left open raises `SyntaxError`, JS's `JSON::ParserError`.
+ */
+function ignore(source: string): string {
   let out = "";
+  let start = 0;
   let index = 0;
-  while (index < value.length) {
-    const char = value[index];
+  while (index < source.length) {
+    const char = source[index];
     if (char === '"') {
-      const start = index++;
-      while (index < value.length && value[index] !== '"') {
-        index += value[index] === "\\" ? 2 : 1;
+      index++;
+      while (index < source.length && source[index] !== '"') {
+        index += source[index] === "\\" ? 2 : 1;
       }
-      out += value.slice(start, ++index);
-    } else if (char === "/" && value[index + 1] === "*") {
-      const end = value.indexOf("*/", index + 2);
-      index = end === -1 ? value.length : end + 2;
-      out += end === -1 ? "/*" : " ";
-    } else if (char === "/" && value[index + 1] === "/") {
-      const end = value.indexOf("\n", index + 2);
-      index = end === -1 ? value.length : end;
-      out += " ";
+      index++;
+    } else if (char === "/" && source[index + 1] === "*") {
+      const end = source.indexOf("*/", index + 2);
+      if (end === -1) throw new SyntaxError(`unexpected token at '${source.slice(index)}'`);
+      out += source.slice(start, index) + " ";
+      index = start = end + 2;
+    } else if (char === "/" && source[index + 1] === "/") {
+      const end = source.indexOf("\n", index + 2);
+      if (end === -1) throw new SyntaxError(`unexpected token at '${source.slice(index)}'`);
+      out += source.slice(start, index) + " ";
+      index = start = end + 1;
     } else {
-      out += char;
       index++;
     }
   }
-  return out;
+  return start === 0 ? source : out + source.slice(start);
 }
 
 /**
@@ -80,7 +88,6 @@ export namespace JSON {
    * or into a new `objectClass` instance filled through its `[]=`
    * (`parser.rl:139-143,179`).
    *
-   * @inventedArm try — CONVERGEABLE json-parse-skips-comments-in-one-pass-and-takes-options
    * @noRailsEquivalent PERMANENT — Ruby stdlib `JSON.parse`
    * (`vendor/ruby/v3.3.11/ext/json/lib/json/common.rb:219`).
    */
@@ -90,6 +97,7 @@ export namespace JSON {
       symbolizeNames?: boolean;
       freeze?: boolean;
       objectClass?: new () => Hash<string, unknown>;
+      quirksMode?: boolean;
     },
   ): unknown {
     if (source instanceof Uint8Array) {
@@ -103,7 +111,7 @@ export namespace JSON {
       throw new TypeError(`no implicit conversion of ${rbObjClassname(source)} into String`);
     }
     const reviver =
-      opts === undefined
+      opts?.symbolizeNames == null && opts?.freeze == null && opts?.objectClass == null
         ? undefined
         : (_key: string, value: unknown): unknown => {
             if (Array.isArray(value)) return opts.freeze ? Object.freeze(value) : value;
@@ -114,12 +122,7 @@ export namespace JSON {
             }
             return opts.freeze ? hash.freeze() : hash;
           };
-    try {
-      return globalJSON.parse(source, reviver);
-    } catch (error) {
-      if (!(error instanceof SyntaxError)) throw error;
-      return globalJSON.parse(stripJsonComments(source), reviver);
-    }
+    return globalJSON.parse(ignore(source), reviver);
   }
 
   /**

@@ -5,7 +5,8 @@ import {
   registerChildProcessAdapter,
 } from "../lib/child-process-adapter.js";
 import { Dir } from "../lib/dir.js";
-import { Errno } from "../lib/errno.js";
+import { ArgumentError } from "../lib/argument-error.js";
+import { Errno, SystemCallError } from "../lib/errno.js";
 import { File } from "../lib/file.js";
 import { IO, STDERR, STDIN, STDOUT } from "../lib/io.js";
 import { IOError } from "../lib/io-error.js";
@@ -59,6 +60,43 @@ describe("Kernel#system", () => {
     expect(() => rbExecargNew(["true", { exception: true }])).toThrow(
       "exception option is not allowed",
     );
+  });
+
+  it("raises the Errno class for any spawn errno, and SystemCallError for an unknown one", async () => {
+    const looping = { pid: 7, status: null, signal: null, error: { code: "ELOOP" } as never };
+    registerChildProcessAdapter("failing", {
+      spawnSync: getChildProcess().spawnSync,
+      system: async () => looping,
+    });
+    childProcessAdapterConfig.adapter = "failing";
+    const loop = rbFSystem("a", "b", { exception: true });
+    await expect(loop).rejects.toBeInstanceOf(Errno.ELOOP);
+    await expect(loop).rejects.toThrow("Too many levels of symbolic links - a");
+    looping.error = { code: "EWHAT", errno: -9999 } as never;
+    await expect(rbFSystem("a", "b", { exception: true })).rejects.toThrow(
+      new SystemCallError("Unknown error 9999 - a"),
+    );
+  });
+
+  it("checks its argv as rb_check_argv does", async () => {
+    expect(() => rbExecargNew([])).toThrow(
+      new ArgumentError("wrong number of arguments (given 0, expected 1+)"),
+    );
+    expect(() => rbExecargNew([{ A: "1" }])).toThrow(ArgumentError);
+    expect(() => rbExecargNew([["ls"]])).toThrow(new ArgumentError("wrong first argument"));
+    expect(() => rbExecargNew(["a\0b"])).toThrow(new ArgumentError("string contains null byte"));
+    expect(rbExecargNew([["sh", "my-sh"], "-c", "true"]).slice(2)).toEqual([
+      ["-c", "true"],
+      {},
+      "my-sh",
+    ]);
+    const out = File.join(Dir.tmpdir(), `trails-argv0-${Process.pid}.out`);
+    try {
+      expect(await rbFSystem(["sh", "my-sh"], "-c", "echo $0", { out })).toBe(true);
+      expect(File.read(out)).toBe("my-sh\n");
+    } finally {
+      FileUtils.rmF(out);
+    }
   });
 
   it("is nil when the command could not be executed", async () => {
