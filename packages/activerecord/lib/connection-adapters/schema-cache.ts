@@ -680,20 +680,11 @@ export class SchemaCache {
   }
 }
 
-/**
- * @internal
- * @inventedArm if — CONVERGEABLE psych-to-ruby-revives-a-mapping-as-a-record-where-marshal-answers-a-map
- */
+/** @internal */
 export function deepDeduplicate<T>(value: T): T {
-  if (
-    value instanceof Map ||
-    (typeof value === "object" && value && !Object.getPrototypeOf(value))
-  ) {
+  if (value instanceof Map) {
     return new Map(
-      [...(value instanceof Map ? value : Object.entries(value))].map(([k, v]) => [
-        deepDeduplicate(k),
-        deepDeduplicate(v),
-      ]),
+      [...value].map(([k, v]) => [deepDeduplicate(k), deepDeduplicate(v)]),
     ) as unknown as T;
   }
   if (Array.isArray(value)) return value.map((i) => deepDeduplicate(i)) as unknown as T;
