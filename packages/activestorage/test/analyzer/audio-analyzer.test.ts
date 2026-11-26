@@ -5,6 +5,7 @@ import "../support/database/setup.js";
 import { ActiveStorage } from "../../lib/active-storage.js";
 import {
   createFileBlob,
+  createPlaylistBlob,
   extractMetadataFrom,
   subscribeEventsFrom,
 } from "../support/test-helper.js";
@@ -27,6 +28,18 @@ describe("ActiveStorage::Analyzer::AudioAnalyzerTest", () => {
     expect((metadata.get("tags") as { get(k: string): unknown }).get("encoder")).toEqual(
       "Lavc57.64",
     );
+  });
+
+  it("analyzing a playlist declared as audio", async () => {
+    const blob = await createPlaylistBlob({
+      referencing: "audio.mp3",
+      filename: "audio.m3u8",
+      contentType: "audio/mpeg",
+    });
+    const metadata = await extractMetadataFrom(blob);
+
+    expect(metadata.get("duration")).toBeUndefined();
+    expect(metadata.get("bitRate")).toBeUndefined();
   });
 
   it("instrumenting analysis", async () => {
