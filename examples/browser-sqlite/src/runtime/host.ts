@@ -34,10 +34,8 @@ export function installHost(vfs: VirtualFs, moduleBase: string, sink: ConsoleSin
   const browserProcess: ProcessAdapter = {
     envSnapshot: () => ({ ...env }),
     argvSnapshot: () => ["browser", "trails"],
-    cwd: () => "/",
-    chdir: () => {
-      throw new Error("chdir is not supported in the browser");
-    },
+    cwd: () => vfs.cwd,
+    chdir: (dir) => vfs.chdir(dir),
     platform: () => "browser",
     pid: () => 1,
     setEnv(key, value) {
@@ -72,7 +70,7 @@ export function installHost(vfs: VirtualFs, moduleBase: string, sink: ConsoleSin
   registerOsAdapter("browser", {
     tmpdir: () => "/tmp",
     platform: () => "browser",
-    cwd: () => "/",
+    cwd: () => vfs.cwd,
     availableParallelism: () => 1,
   });
   osAdapterConfig.adapter = "browser";

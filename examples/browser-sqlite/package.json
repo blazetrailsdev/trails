@@ -5,11 +5,12 @@
   "type": "module",
   "description": "A trails app that runs in the browser on SQLite (sql.js), with an editor, a preview and the app's console",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
+    "dev": "pnpm templates && vite",
+    "build": "pnpm templates && vite build",
     "preview": "vite preview",
-    "smoke": "node scripts/smoke.mjs",
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "smoke": "pnpm templates && node scripts/smoke.mjs",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "templates": "pnpm --filter @blazetrails/trailties run build:templates"
   },
   "dependencies": {
     "@blazetrails/actionpack": "workspace:*",
