@@ -112,13 +112,9 @@ export class Pathname {
   /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/ext/pathname/pathname.c:1055` `path_empty_p` */
   isEmpty(): boolean {
     if (File.isDirectory(this._path)) {
-      return Dir.children(this._path).length === 0;
+      return Dir.isEmpty(this._path);
     } else {
-      try {
-        return File.stat(this._path).size === 0;
-      } catch {
-        return false;
-      }
+      return File.isEmpty(this._path);
     }
   }
 
