@@ -51,8 +51,8 @@ import { Book } from "../../app/models/book.ts";
 
 describe("generated app", () => {
   it("seats the class the test imported", () => {
-    expect(TopLevel.Author).toBe(Author);
-    expect(TopLevel.Book).toBe(Book);
+    expect((TopLevel as Record<string, unknown>).Author).toBe(Author);
+    expect((TopLevel as Record<string, unknown>).Book).toBe(Book);
   });
 
   it("queries an association", async () => {
@@ -64,3 +64,47 @@ describe("generated app", () => {
 });
 EOF
 pnpm test
+
+# RFC 0258: build, drop dev dependencies, boot from dist/ with type stripping off.
+pnpm trails solid_queue:install
+pnpm trails generate scaffold Post title:string
+pnpm trails generate job Ping
+node -e '
+const fs=require("fs"),f="app/jobs/ping-job.ts";
+const s=fs.readFileSync(f,"utf8").replace(/perform\(\.\.\.args: unknown\[\]\): void \{\n.*\n  \}/,
+  "async perform(): Promise<void> {\n    await (await import(\"node:fs/promises\")).writeFile(\"tmp/ping-performed\", \"ok\");\n  }");
+if(!s.includes("ping-performed"))throw new Error("could not edit "+f);
+fs.writeFileSync(f,s);'
+pnpm trails db:migrate
+pnpm build
+# As Dockerfile.tt does: copy what tsc does not emit into dist/, build its entry there, prune.
+tar --exclude=./dist --exclude=./node_modules --exclude="*.ts" -cf - . | tar -xf - -C dist
+(cd dist && ../node_modules/.bin/trails build)
+pnpm prune --prod
+for dep in tsx typescript; do
+  if (cd dist && node --input-type=module -e "import.meta.resolve('$dep')") 2>/dev/null; then
+    echo "$dep resolves under production dependencies" >&2; exit 1
+  fi
+done
+
+cd dist
+export TRAILS_ENV=production SECRET_KEY_BASE_DUMMY=1
+TRAILS="node --no-experimental-strip-types bin/trails"
+$TRAILS db:prepare
+PORT=3917
+$TRAILS server -p "$PORT" &
+SERVER=$!
+trap 'kill $SERVER 2>/dev/null || true' EXIT
+for _ in $(seq 60); do curl -fs "http://127.0.0.1:$PORT/up" >/dev/null && break; sleep 0.5; done
+curl -fsS "http://127.0.0.1:$PORT/up" >/dev/null
+curl -fsS "http://127.0.0.1:$PORT/posts" | grep -q "<h1>Posts</h1>"
+$TRAILS runner 'await PingJob.performLater()'
+rm -f tmp/ping-performed
+node --no-experimental-strip-types bin/jobs &
+JOBS=$!
+for _ in $(seq 60); do [ -f tmp/ping-performed ] && break; sleep 0.5; done
+kill -TERM "$JOBS"; wait "$JOBS" || true
+[ -f tmp/ping-performed ] || { echo "PingJob was not performed" >&2; exit 1; }
+kill -INT "$SERVER"; wait "$SERVER"
+trap - EXIT
+echo "compiled app booted without tsx"

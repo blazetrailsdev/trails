@@ -90,6 +90,7 @@ export async function buildAutoload({
   const dirs: string[] = [];
   const tagged: [string, string][] = [];
   for (const loader of [...Registry.loaders]) {
+    if (application?.initialized?.()) await loader.unload();
     loader.manifestRoot ??= root;
     const dir = await writeArtifacts(loader);
     dirs.push(dir);

@@ -86,6 +86,7 @@ export type GeneratorsConfigHash = Hash<unknown, Record<string, unknown>>;
 
 export type AfterGenerateCallback = (files: string[]) => void | Promise<void>;
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Generators {
   aliases: GeneratorsConfigHash;
   options: GeneratorsConfigHash;
@@ -176,6 +177,11 @@ export class Generators {
     }
     return undefined;
   }
+}
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface Generators {
+  [option: string]: unknown;
 }
 
 Object.setPrototypeOf(
