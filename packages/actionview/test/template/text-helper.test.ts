@@ -845,7 +845,7 @@ describe("TextHelperHTML5SanitizerTest", () => {
       "class",
     );
 
-    expect(HTML5.fragment(html.toString()).css("img").length).toBe(0);
+    expect(HTML5.fragment(html.toString()).css("img")).toBeEmpty();
   });
 
   it("simple format keeps markup inside attribute values inert", () => {
@@ -855,6 +855,6 @@ describe("TextHelperHTML5SanitizerTest", () => {
       { class: "post" },
     );
 
-    expect(HTML5.fragment(html.toString()).css("img").length).toBe(0);
+    expect(HTML5.fragment(html.toString()).css("img")).toBeEmpty();
   });
 });

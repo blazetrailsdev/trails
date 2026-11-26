@@ -308,9 +308,9 @@ describe("CurrentAttributesTest", () => {
       }
     }
 
-    expect(Object.hasOwn(MyCurrent, "attr")).toBe(true);
-    expect(Object.getOwnPropertyDescriptor(MyCurrent, "attr")!.set).toBeDefined();
-    expect(Object.hasOwn(MyCurrent, "regular")).toBe(true);
+    expect(Object.hasOwn(MyCurrent, "attr")).toBeTruthy();
+    expect(Object.getOwnPropertyDescriptor(MyCurrent, "attr")!.set).toBeTruthy();
+    expect(Object.hasOwn(MyCurrent, "regular")).toBeTruthy();
   });
 
   it("attribute delegators have precise signature", () => {
