@@ -96,7 +96,7 @@ const { SOURCES, testPathsManifest, vendoredRoot } = await import("../../../vend
 const { extractTargetApi } = await import("../../api-compare/drift.js");
 const { compareArms } = await import("../../api-compare/report-arms.js");
 const { buildReport, loadConcernHooks } = await import("../../api-compare/extra-surface.js");
-const { loadManifest } = await import("../../api-compare/body-pins.js");
+const { comparePinKeys, loadManifest } = await import("../../api-compare/body-pins.js");
 const { rubyFileToTs } = await import("../conventions.js");
 
 type Env = Record<string, string | undefined>;
@@ -400,7 +400,7 @@ async function main(argv: string[], env: Env): Promise<number> {
       ),
     );
     await fs.mkdir(path.dirname(ledgerFile), { recursive: true });
-    await fs.writeFile(ledgerFile, serializeLedger(pairRows));
+    await fs.writeFile(ledgerFile, serializeLedger([...pairRows].sort(comparePinKeys)));
     const candidateComparison = path.join(outDir, "candidate/test/convention-comparison.json");
     const missing = await missingOf(candidateComparison);
     const mergedTests = await readJson<RubyTestManifest>(
