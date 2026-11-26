@@ -53,7 +53,7 @@ export class Supervised {
     return rbFFork(
       new URL("./fork-entry.js", import.meta.url).pathname,
       {
-        boot: `${TopLevel.Trails!.root()}/config/environment.ts`,
+        boot: `${TopLevel.Trails!.root()}/config/environment`,
         processClass: rbModName(this.constructor),
         attributes: this._configuredProcess!.attributes,
         name: this.name,

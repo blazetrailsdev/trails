@@ -1,4 +1,5 @@
 import {
+  File,
   TopLevel,
   constGet,
   exitBang,
@@ -17,7 +18,7 @@ const { boot, processClass, attributes, name, supervisorId } = rbForkPayload() a
   supervisorId: unknown;
 };
 
-await import(boot);
+await import((await File.isExistAsync(`${boot}.ts`)) ? `${boot}.ts` : `${boot}.js`);
 
 if (processClass === rbModName(Scheduler)) {
   await RecurringTask.loadSchema();

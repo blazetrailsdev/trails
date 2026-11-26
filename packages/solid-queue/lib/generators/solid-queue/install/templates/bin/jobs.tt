@@ -1,6 +1,8 @@
 #!/usr/bin/env node
-import { rbArgv } from "@blazetrails/ruby-compat";
-import "../config/environment.ts";
+import { File, rbArgv } from "@blazetrails/ruby-compat";
+
+const ENVIRONMENT = `${import.meta.dirname}/../config/environment`;
+await import((await File.isExistAsync(`${ENVIRONMENT}.ts`)) ? `${ENVIRONMENT}.ts` : `${ENVIRONMENT}.js`);
 
 const { Cli } = await import("@blazetrails/solid-queue/cli");
 await Cli.start(rbArgv());

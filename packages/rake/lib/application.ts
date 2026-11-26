@@ -73,7 +73,7 @@ export interface ApplicationOptions {
   traceRules?: boolean;
 }
 
-const DEFAULT_RAKEFILES = ["rakefile.ts", "Rakefile.ts"] as const;
+const DEFAULT_RAKEFILES = ["rakefile.ts", "Rakefile.ts", "rakefile.js", "Rakefile.js"] as const;
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Application {
