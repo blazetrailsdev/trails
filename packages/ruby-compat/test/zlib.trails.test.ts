@@ -130,7 +130,7 @@ describe("Zlib::GzipFile.open", () => {
       await Zlib.GzipWriter.open(explicit, async (gz) => {
         gz.mtime = 0;
         gz.write('{"version":1}');
-        await gz.close();
+        gz.close();
       });
 
       expect(File.size(explicit)).toBe(File.size(implicit));
@@ -171,7 +171,7 @@ describe("Zlib::GzipWriter and GzipReader streaming", () => {
     const gz = new Zlib.GzipReader(new StringIO(gzipped("hello world")));
 
     expect([gz.read(5), gz.read(100), gz.read(1)]).toEqual(["hello", " world", null]);
-    await gz.close();
+    gz.close();
   });
 
   it("raises NoFooter, CRCError and LengthError at the footer", async () => {
@@ -190,7 +190,7 @@ describe("Zlib::GzipWriter and GzipReader streaming", () => {
     expect(() => crcError.read(1)).toThrow(Zlib.GzipFile.CRCError);
     const gz = new Zlib.GzipReader(new StringIO(badLength));
     gz.read();
-    await expect(async () => gz.close()).rejects.toThrow("invalid compressed data -- length error");
+    expect(() => gz.close()).toThrow("invalid compressed data -- length error");
   });
 });
 
@@ -210,5 +210,36 @@ describe("Zlib::GzipReader header", () => {
     ]);
 
     expect(await Zlib.GzipReader.wrap(new StringIO(named), (r) => r.read())).toBe("named");
+  });
+});
+
+describe("Zlib::GzipReader at a read boundary", () => {
+  const stored = (): Uint8Array => {
+    const io = new StringIO(new Uint8Array(0));
+    const gz = new Zlib.GzipWriter(io, 0);
+    gz.write("a".repeat(2033));
+    gz.finish();
+    return io.string();
+  };
+
+  it("finds the footer in the read after a deflate stream ending on a 2048-byte boundary", () => {
+    const bytes = stored();
+    const gz = new Zlib.GzipReader(new StringIO(bytes));
+
+    expect(bytes.length).toBe(2048 + 8);
+    expect(gz.read()).toBe("a".repeat(2033));
+    expect(gz.read(1)).toBeNull();
+    gz.close();
+  });
+
+  it("raises NoFooter, not an unexpected end of file, when the boundary is the end of the io", () => {
+    const gz = new Zlib.GzipReader(new StringIO(stored().slice(0, 2048)));
+
+    expect(gz.read(5000)).toBe("a".repeat(2033));
+    expect(() => gz.read(1)).toThrow(new Zlib.GzipFile.NoFooter("footer is not found"));
+  });
+
+  it("raises NoFooter as a Zlib::Error", () => {
+    expect(new Zlib.GzipFile.NoFooter("x")).toBeInstanceOf(Zlib.Error);
   });
 });

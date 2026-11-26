@@ -39,7 +39,7 @@ export interface ZlibAdapter {
  */
 export interface ZStream {
   input: Uint8Array;
-  readonly totalIn: number;
+  totalIn: number;
   readonly totalOut: number;
   run(src: Uint8Array, flush: number): Uint8Array;
   /**

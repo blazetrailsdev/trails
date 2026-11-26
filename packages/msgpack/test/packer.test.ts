@@ -103,7 +103,7 @@ describe("MessagePack::Packer", () => {
     p3.write(sampleData);
     p3.flush();
     await writer.flush(Zlib.FINISH);
-    await writer.close();
+    writer.close();
     dio.rewind();
     const compressed = dio.string();
     const str = await Zlib.GzipReader.wrap(new StringIO(compressed), (gz) => gz.read());
