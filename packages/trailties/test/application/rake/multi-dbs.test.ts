@@ -744,28 +744,25 @@ export class AnimalsBase extends Base {
     await t.bootTrails();
     await dbMigrateAndSchemaCacheDump();
 
-    const runner = async (code: string) =>
+    const runner = async (code: string, options: { stderr?: boolean } = {}) =>
       (
         await t.trails(
           "runner",
           `const { rbInspect } = await import("@blazetrails/ruby-compat"); console.log(rbInspect(${code}))`,
+          options,
         )
       ).trim();
 
     const cacheSizeA = await runner("await ActiveRecord.Base.schemaCache().size()");
     expect(cacheSizeA).toBe("12");
 
-    const cacheTablesA = await runner(
-      "(await ActiveRecord.Base.schemaCache().columns('books')).map((c) => c.name)",
-    );
+    const cacheTablesA = await runner("await ActiveRecord.Base.schemaCache().columns('books')");
     expect(cacheTablesA).toContain("title");
 
-    const cacheSizeB = await runner("await AnimalsBase.schemaCache().size()");
+    const cacheSizeB = await runner("await AnimalsBase.schemaCache().size()", { stderr: true });
     expect(cacheSizeB).toBe("12");
 
-    const cacheTablesB = await runner(
-      "(await AnimalsBase.schemaCache().columns('dogs')).map((c) => c.name)",
-    );
+    const cacheTablesB = await runner("await AnimalsBase.schemaCache().columns('dogs')");
     expect(cacheTablesB).toContain("name");
   });
 
