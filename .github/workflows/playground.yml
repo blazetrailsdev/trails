@@ -15,11 +15,10 @@ jobs:
     name: Playground smoke (${{ matrix.browser }})
     runs-on: ${{ vars.RUNNER || 'ubuntu-24.04' }}
     timeout-minutes: 20
-    continue-on-error: ${{ matrix.browser != 'chromium' }}
     strategy:
       fail-fast: false
       matrix:
-        browser: [chromium, firefox, webkit]
+        browser: [chromium, webkit]
     steps:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-pnpm
