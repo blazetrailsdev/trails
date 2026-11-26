@@ -35,9 +35,9 @@ export class XmlDocument extends XmlNode {
 
   private _doc: LibXmlDocument | null;
 
-  constructor(version: string = "1.0") {
-    const cDocument = _cDocumentToWrap ?? Nokogiri.LibXml2!.xmlNewDoc(version);
-    _cDocumentToWrap = null;
+  constructor(version: string | null = null) {
+    if (version == null) version = "1.0";
+    const cDocument = Nokogiri.LibXml2!.xmlNewDoc(version);
     super(Nokogiri.LibXml2!.createNode(cDocument));
     this._doc = Nokogiri.LibXml2!.XmlDocument.getInstance(cDocument);
     this.document = this;
@@ -199,10 +199,17 @@ export class XmlDocument extends XmlNode {
 include(XmlDocument, Searchable);
 XML.Document = XmlDocument;
 
-let _cDocumentToWrap: number | null = null;
-
 /** @internal */
 function nokoXmlDocumentWrap(klass: typeof XmlDocument, cDocument: number): XmlDocument {
-  _cDocumentToWrap = cDocument;
-  return new klass();
+  const rbDocument: XmlDocument = Object.create(klass.prototype);
+  Object.assign(rbDocument, {
+    _node: Nokogiri.LibXml2!.createNode(cDocument),
+    _doc: Nokogiri.LibXml2!.XmlDocument.getInstance(cDocument),
+    _root: null,
+    document: rbDocument,
+    errors: [],
+    url: null,
+    encoding: null,
+  });
+  return rbDocument;
 }
