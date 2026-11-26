@@ -1803,7 +1803,6 @@ export function collectAllowedNames(
     contextFqn: string,
     target: Set<string> = allowed,
     methodFile?: string,
-    isStatic = false,
   ): void => {
     let fqn = resolveModuleName(incName, contextFqn, moduleFqnByShort);
     if (!rubyModules[fqn] && !crossPackageModules[fqn] && incName.endsWith("::ClassMethods")) {
@@ -1815,7 +1814,7 @@ export function collectAllowedNames(
       visited = new Set<string>();
       visitedByTarget.set(target, visited);
     }
-    const visitKey = `${methodFile ?? ""}\u0000${fqn}\u0000${isStatic}`;
+    const visitKey = `${methodFile ?? ""}\u0000${fqn}`;
     if (visited.has(visitKey)) return;
     visited.add(visitKey);
     // A Ruby core module (`include Enumerable`) supplies methods no vendored
@@ -1828,7 +1827,7 @@ export function collectAllowedNames(
       addRubyName(name, target);
     }
     for (const inc of HOOK_INJECTED_MIXINS[fqn]?.includes ?? [])
-      walkMixin(inc, fqn, target, methodFile, isStatic);
+      walkMixin(inc, fqn, target, methodFile);
     // Fall back to the cross-package map: a railtie-injected mixin (see
     // AMBIENT_RAILTIE_MIXINS) or a fully-qualified cross-gem include lives
     // in another package's modules, not this package's.
@@ -1848,7 +1847,7 @@ export function collectAllowedNames(
     // Only the module's instance methods cross into the host. Class
     // methods on the module itself stay on the module (Ruby `include`
     // semantics; matches compare.flattenIncludedMethodInfos).
-    addMethods(mod.instanceMethods, fqn, methodFile, target, isStatic, true);
+    addMethods(mod.instanceMethods, fqn, methodFile, target, false, true);
     // `include M` where `M extend ActiveSupport::Concern` also runs
     // `base.extend M::ClassMethods` and the `included` block
     // (activesupport/lib/active_support/concern.rb:137-138), so the includer
@@ -1872,14 +1871,14 @@ export function collectAllowedNames(
         fqn,
         methodFile,
         target,
-        true,
+        false,
         true,
       );
-      walkMixin(`${fqn}::ClassMethods`, fqn, target, methodFile, true);
+      walkMixin(`${fqn}::ClassMethods`, fqn, target, methodFile);
       for (const ext of mod.extends ?? [])
-        if (!isConcern(ext)) walkMixin(ext, fqn, target, methodFile, true);
+        if (!isConcern(ext)) walkMixin(ext, fqn, target, methodFile);
     }
-    for (const inc of mod.includes ?? []) walkMixin(inc, fqn, target, methodFile, isStatic);
+    for (const inc of mod.includes ?? []) walkMixin(inc, fqn, target, methodFile);
   };
 
   const addDelegated = (
@@ -1964,7 +1963,7 @@ export function collectAllowedNames(
     addMethods(info.classMethods, fqn, methodFile, target, true);
     for (const inc of info.includes ?? []) walkMixin(inc, fqn, target, methodFile);
     for (const pre of info.prepends ?? []) walkMixin(pre, fqn, target, methodFile);
-    for (const ext of info.extends ?? []) walkMixin(ext, fqn, target, methodFile, true);
+    for (const ext of info.extends ?? []) walkMixin(ext, fqn, target, methodFile);
 
     for (const inc of AMBIENT_RAILTIE_MIXINS[fqn]?.includes ?? [])
       walkMixin(inc, fqn, target, methodFile);

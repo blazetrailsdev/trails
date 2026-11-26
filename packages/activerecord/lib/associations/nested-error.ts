@@ -24,6 +24,7 @@ interface InnerErrorLike {
 export class NestedError extends ActiveModelNestedError {
   private readonly _association: AssociationLike;
 
+  /** @inventedArm create — PERMANENT */
   constructor(association: AssociationLike, innerError: InnerErrorLike) {
     const self: NestedError = Object.assign(Object.create(NestedError.prototype) as NestedError, {
       _association: association,
