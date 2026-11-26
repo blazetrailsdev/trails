@@ -158,10 +158,12 @@ describe("collection replace diffs instead of clearing", () => {
 
     expect(firm.isPersisted()).toBe(true);
     expect((await Client.find(client.id)).firm_id).toBe(9001);
+    expect((await firm.clients).map((c) => c.id)).toEqual([client.id]);
   });
 
   it("runs the replace an update owes on a persisted owner", async () => {
     const firm = await Firm.find(companies("first_firm").id);
+    expect(await Client.where({ firm_id: firm.id })).not.toEqual([]);
     await firm.update({ clients: [] });
 
     expect(await Client.where({ firm_id: firm.id })).toEqual([]);
