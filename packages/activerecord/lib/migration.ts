@@ -912,7 +912,6 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     if (!this.isReverting()) await this.executeBlock(block);
   }
 
-  /** @inventedArm loadPath — PERMANENT */
   async migrate(direction: "up" | "down"): Promise<void> {
     if (!rbObjRespondTo(this, direction)) return;
     await ActiveRecord.Tasks.loadPath["active_record/tasks/database_tasks"]();
@@ -1191,7 +1190,9 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     }
   }
 
+  /** @inventedArm loadPath — CONVERGEABLE tasks-database-tasks-awaited-load-ruling */
   static async checkAllPendingBang(): Promise<void> {
+    await ActiveRecord.Tasks.loadPath["active_record/tasks/database_tasks"]();
     const pendingMigrations: MigrationProxy[][] = [];
 
     await ActiveRecord.Tasks.DatabaseTasks.withTemporaryPoolForEach(
@@ -1310,6 +1311,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
 
   /** @internal */
   private static async anySchemaNeedsUpdate(): Promise<boolean> {
+    await ActiveRecord.Tasks.loadPath["active_record/tasks/database_tasks"]();
     const databaseTasks = ActiveRecord.Tasks.DatabaseTasks;
 
     for (const dbConfig of this.dbConfigsInCurrentEnv()) {
@@ -1344,6 +1346,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
 
   /** @internal */
   private static async loadSchemaBang(): Promise<void> {
+    await ActiveRecord.Tasks.loadPath["active_record/tasks/database_tasks"]();
     const databaseTasks = ActiveRecord.Tasks.DatabaseTasks;
 
     await ActiveRecord.Base.connectionHandler.clearAllConnectionsBang("all");
@@ -1764,7 +1767,7 @@ export class Migrator {
     }
   }
 
-  /** @inventedArm loadPath — PERMANENT */
+  /** @inventedArm loadPath — CONVERGEABLE tasks-database-tasks-awaited-load-ruling */
   async run(): Promise<string | number | undefined> {
     await ActiveRecord.Tasks.loadPath["active_record/tasks/database_tasks"]();
     return (await this.isUseAdvisoryLock())
