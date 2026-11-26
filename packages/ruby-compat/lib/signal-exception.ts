@@ -1,7 +1,7 @@
 import { ArgumentError } from "./argument-error.js";
 import { Exception } from "./exception.js";
 import { NSIG, signo2signm, trapSignm } from "./process-adapter.js";
-import { checkArity, num2long, rbCheckStringType } from "./string/support.js";
+import { checkArity, num2int, rbCheckStringType } from "./string/support.js";
 import { rbCheckToInteger, rbObjClassname } from "./object.js";
 
 /**
@@ -33,7 +33,7 @@ export class SignalException extends Exception {
     }
     checkArity(argv.length, 1, argnum);
     if (argnum === 2) {
-      signo = num2long(sig);
+      signo = num2int(sig);
       if (signo < 0 || signo > NSIG) {
         throw new ArgumentError(`invalid signal number (${signo})`);
       }

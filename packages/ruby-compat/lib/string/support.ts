@@ -133,6 +133,20 @@ export function num2long(val: unknown): number {
 }
 
 /**
+ * `rb_num2int` (`vendor/ruby/v3.3.11/numeric.c:3241-3246`): {@link num2long},
+ * then `check_int` (`:3218-3223`), which raises outside a C `int`.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function num2int(val: unknown): number {
+  const num = num2long(val);
+  if (num < -(2 ** 31) || num > 2 ** 31 - 1) {
+    throw new RbRangeError(`integer ${num} too ${num < 0 ? "small" : "big"} to convert to \`int'`);
+  }
+  return num;
+}
+
+/**
  * `rb_error_arity` (`vendor/ruby/v3.3.11/vm_insnhelper.c:466` `rb_arity_error_new`).
  *
  * @noRailsEquivalent PERMANENT

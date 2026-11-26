@@ -107,6 +107,9 @@ describe("SignalException.new", () => {
       "wrong number of arguments (given 2, expected 1)",
     );
     expect(() => new SignalException(2n ** 70n)).toThrow(RangeError);
+    expect(() => new SignalException(2 ** 40)).toThrow(
+      "integer 1099511627776 too big to convert to `int'",
+    );
     expect(() => new SignalException({})).toThrow("bad signal type Hash");
     expect(new SignalException({ toInt: () => 2 }).message).toBe("SIGINT");
     expect(() => new Interrupt(1, 2)).toThrow("wrong number of arguments (given 2, expected 0..1)");
