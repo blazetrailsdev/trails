@@ -1,13 +1,59 @@
 /**
- * Entries scoped to `package: "nokogiri"`. The `package` field, not this file's
- * name, is what scopes the match. Schema: ./types.ts.
+ * Entries scoped to `package: "nokogiri"`. The denominator is what trails'
+ * callers reach: rails-dom-testing, rails-html-sanitizer, loofah, actionview,
+ * actiontext and ActiveSupport's `XmlMini_Nokogiri`, closed over the Ruby
+ * bodies they reach. A gem file none of them reaches is listed here with
+ * `NOT_CALLED`; a partly reached file's unreached members are
+ * `SCOPED_SKIP_GROUPS` rows in ../conventions.ts. Schema: ./types.ts.
  */
 
 import type { UnportedFile } from "./types.js";
 
+const NOT_CALLED = "not called by trails";
+
 const NOT_YET_PORTED = "No TS test file, under any name, ports a test of this Ruby file yet.";
 
 export const NOKOGIRI_UNPORTED_FILES: UnportedFile[] = [
+  { pattern: "/encoding_handler.rb", package: "nokogiri", reason: NOT_CALLED },
+  { pattern: "/html4.rb", package: "nokogiri", reason: NOT_CALLED },
+  { pattern: "/html4/builder.rb", package: "nokogiri", reason: NOT_CALLED },
+  { pattern: "/html4/entity_lookup.rb", package: "nokogiri", reason: NOT_CALLED },
+  { pattern: "/html5/builder.rb", package: "nokogiri", reason: NOT_CALLED },
+  { pattern: "/xml/attribute_decl.rb", package: "nokogiri", reason: NOT_CALLED },
+  { pattern: "/xml/builder.rb", package: "nokogiri", reason: NOT_CALLED },
+  { pattern: "/xml/element_content.rb", package: "nokogiri", reason: NOT_CALLED },
+  { pattern: "/xml/element_decl.rb", package: "nokogiri", reason: NOT_CALLED },
+  { pattern: "/xml/entity_decl.rb", package: "nokogiri", reason: NOT_CALLED },
+  { pattern: "/xml/notation.rb", package: "nokogiri", reason: NOT_CALLED },
+  { pattern: "/xml/reader.rb", package: "nokogiri", reason: NOT_CALLED },
+  { pattern: "/xml/relax_ng.rb", package: "nokogiri", reason: NOT_CALLED },
+  { pattern: "/xml/sax/push_parser.rb", package: "nokogiri", reason: NOT_CALLED },
+  { pattern: "/xml/schema.rb", package: "nokogiri", reason: NOT_CALLED },
+  { pattern: "/xslt.rb", package: "nokogiri", reason: NOT_CALLED },
+  { pattern: "/xslt/stylesheet.rb", package: "nokogiri", reason: NOT_CALLED },
+  {
+    testFile: "/namespaces/test_serializing_namespaces.rb",
+    package: "nokogiri",
+    reason: NOT_CALLED,
+  },
+  {
+    testFile: "xml/test_document.rb",
+    reason: NOT_CALLED,
+    tests: [
+      "default namespace inheritance",
+      "collect namespaces",
+      "create comment",
+      "create comment with block",
+      "validate",
+      "validate no internal subset",
+      "write xml to with indent",
+    ],
+  },
+  {
+    testFile: "xml/sax/test_parser.rb",
+    reason: NOT_CALLED,
+    tests: ["parses a file", "parses a compressed file"],
+  },
   { testFile: "/css/test_css.rb", package: "nokogiri", reason: NOT_YET_PORTED },
   { testFile: "/css/test_css_integration.rb", package: "nokogiri", reason: NOT_YET_PORTED },
   { testFile: "/css/test_selector_cache.rb", package: "nokogiri", reason: NOT_YET_PORTED },
@@ -22,7 +68,7 @@ export const NOKOGIRI_UNPORTED_FILES: UnportedFile[] = [
     package: "nokogiri",
     reason: NOT_YET_PORTED,
   },
-  { testFile: "/html4/test_builder.rb", package: "nokogiri", reason: NOT_YET_PORTED },
+  { testFile: "/html4/test_builder.rb", package: "nokogiri", reason: NOT_CALLED },
   { testFile: "/html4/test_comments.rb", package: "nokogiri", reason: NOT_YET_PORTED },
   { testFile: "/html4/test_document.rb", package: "nokogiri", reason: NOT_YET_PORTED },
   { testFile: "/html4/test_document_encoding.rb", package: "nokogiri", reason: NOT_YET_PORTED },
@@ -32,7 +78,7 @@ export const NOKOGIRI_UNPORTED_FILES: UnportedFile[] = [
   { testFile: "/html4/test_node.rb", package: "nokogiri", reason: NOT_YET_PORTED },
   { testFile: "/html4/test_node_encoding.rb", package: "nokogiri", reason: NOT_YET_PORTED },
   { testFile: "/html5/test_attributes.rb", package: "nokogiri", reason: NOT_YET_PORTED },
-  { testFile: "/html5/test_builder.rb", package: "nokogiri", reason: NOT_YET_PORTED },
+  { testFile: "/html5/test_builder.rb", package: "nokogiri", reason: NOT_CALLED },
   { testFile: "/html5/test_encoding.rb", package: "nokogiri", reason: NOT_YET_PORTED },
   { testFile: "/html5/test_errors.rb", package: "nokogiri", reason: NOT_YET_PORTED },
   { testFile: "/html5/test_monkey_patch.rb", package: "nokogiri", reason: NOT_YET_PORTED },
@@ -43,7 +89,7 @@ export const NOKOGIRI_UNPORTED_FILES: UnportedFile[] = [
   {
     testFile: "/namespaces/test_additional_namespaces_in_builder_doc.rb",
     package: "nokogiri",
-    reason: NOT_YET_PORTED,
+    reason: NOT_CALLED,
   },
   {
     testFile: "/namespaces/test_namespace_definitions.rb",
@@ -58,7 +104,7 @@ export const NOKOGIRI_UNPORTED_FILES: UnportedFile[] = [
   {
     testFile: "/namespaces/test_namespaces_in_builder_doc.rb",
     package: "nokogiri",
-    reason: NOT_YET_PORTED,
+    reason: NOT_CALLED,
   },
   {
     testFile: "/namespaces/test_namespaces_in_cloned_doc.rb",
@@ -82,7 +128,7 @@ export const NOKOGIRI_UNPORTED_FILES: UnportedFile[] = [
   },
   { testFile: "/test_class_resolver.rb", package: "nokogiri", reason: NOT_YET_PORTED },
   { testFile: "/test_compaction.rb", package: "nokogiri", reason: NOT_YET_PORTED },
-  { testFile: "/test_encoding_handler.rb", package: "nokogiri", reason: NOT_YET_PORTED },
+  { testFile: "/test_encoding_handler.rb", package: "nokogiri", reason: NOT_CALLED },
   { testFile: "/test_gem_platform.rb", package: "nokogiri", reason: NOT_YET_PORTED },
   { testFile: "/test_html.rb", package: "nokogiri", reason: NOT_YET_PORTED },
   { testFile: "/test_iso.rb", package: "nokogiri", reason: NOT_YET_PORTED },
@@ -93,7 +139,7 @@ export const NOKOGIRI_UNPORTED_FILES: UnportedFile[] = [
   { testFile: "/test_serialization_encoding.rb", package: "nokogiri", reason: NOT_YET_PORTED },
   { testFile: "/test_soap4r_sax.rb", package: "nokogiri", reason: NOT_YET_PORTED },
   { testFile: "/test_version.rb", package: "nokogiri", reason: NOT_YET_PORTED },
-  { testFile: "/test_xslt_transforms.rb", package: "nokogiri", reason: NOT_YET_PORTED },
+  { testFile: "/test_xslt_transforms.rb", package: "nokogiri", reason: NOT_CALLED },
   { testFile: "/xml/node/test_attribute_methods.rb", package: "nokogiri", reason: NOT_YET_PORTED },
   { testFile: "/xml/node/test_save_options.rb", package: "nokogiri", reason: NOT_YET_PORTED },
   { testFile: "/xml/node/test_subclass.rb", package: "nokogiri", reason: NOT_YET_PORTED },
@@ -101,8 +147,8 @@ export const NOKOGIRI_UNPORTED_FILES: UnportedFile[] = [
   { testFile: "/xml/sax/test_parser_context.rb", package: "nokogiri", reason: NOT_YET_PORTED },
   { testFile: "/xml/sax/test_parser_text.rb", package: "nokogiri", reason: NOT_YET_PORTED },
   { testFile: "/xml/test_attr.rb", package: "nokogiri", reason: NOT_YET_PORTED },
-  { testFile: "/xml/test_attribute_decl.rb", package: "nokogiri", reason: NOT_YET_PORTED },
-  { testFile: "/xml/test_builder.rb", package: "nokogiri", reason: NOT_YET_PORTED },
+  { testFile: "/xml/test_attribute_decl.rb", package: "nokogiri", reason: NOT_CALLED },
+  { testFile: "/xml/test_builder.rb", package: "nokogiri", reason: NOT_CALLED },
   { testFile: "/xml/test_c14n.rb", package: "nokogiri", reason: NOT_YET_PORTED },
   { testFile: "/xml/test_cdata.rb", package: "nokogiri", reason: NOT_YET_PORTED },
   { testFile: "/xml/test_comment.rb", package: "nokogiri", reason: NOT_YET_PORTED },
@@ -110,9 +156,9 @@ export const NOKOGIRI_UNPORTED_FILES: UnportedFile[] = [
   { testFile: "/xml/test_document_fragment.rb", package: "nokogiri", reason: NOT_YET_PORTED },
   { testFile: "/xml/test_dtd.rb", package: "nokogiri", reason: NOT_YET_PORTED },
   { testFile: "/xml/test_dtd_encoding.rb", package: "nokogiri", reason: NOT_YET_PORTED },
-  { testFile: "/xml/test_element_content.rb", package: "nokogiri", reason: NOT_YET_PORTED },
-  { testFile: "/xml/test_element_decl.rb", package: "nokogiri", reason: NOT_YET_PORTED },
-  { testFile: "/xml/test_entity_decl.rb", package: "nokogiri", reason: NOT_YET_PORTED },
+  { testFile: "/xml/test_element_content.rb", package: "nokogiri", reason: NOT_CALLED },
+  { testFile: "/xml/test_element_decl.rb", package: "nokogiri", reason: NOT_CALLED },
+  { testFile: "/xml/test_entity_decl.rb", package: "nokogiri", reason: NOT_CALLED },
   { testFile: "/xml/test_entity_reference.rb", package: "nokogiri", reason: NOT_YET_PORTED },
   { testFile: "/xml/test_namespace.rb", package: "nokogiri", reason: NOT_YET_PORTED },
   { testFile: "/xml/test_node.rb", package: "nokogiri", reason: NOT_YET_PORTED },
@@ -123,16 +169,16 @@ export const NOKOGIRI_UNPORTED_FILES: UnportedFile[] = [
   { testFile: "/xml/test_node_set.rb", package: "nokogiri", reason: NOT_YET_PORTED },
   { testFile: "/xml/test_parse_options.rb", package: "nokogiri", reason: NOT_YET_PORTED },
   { testFile: "/xml/test_processing_instruction.rb", package: "nokogiri", reason: NOT_YET_PORTED },
-  { testFile: "/xml/test_reader.rb", package: "nokogiri", reason: NOT_YET_PORTED },
-  { testFile: "/xml/test_reader_encoding.rb", package: "nokogiri", reason: NOT_YET_PORTED },
-  { testFile: "/xml/test_relax_ng.rb", package: "nokogiri", reason: NOT_YET_PORTED },
-  { testFile: "/xml/test_schema.rb", package: "nokogiri", reason: NOT_YET_PORTED },
+  { testFile: "/xml/test_reader.rb", package: "nokogiri", reason: NOT_CALLED },
+  { testFile: "/xml/test_reader_encoding.rb", package: "nokogiri", reason: NOT_CALLED },
+  { testFile: "/xml/test_relax_ng.rb", package: "nokogiri", reason: NOT_CALLED },
+  { testFile: "/xml/test_schema.rb", package: "nokogiri", reason: NOT_CALLED },
   { testFile: "/xml/test_syntax_error.rb", package: "nokogiri", reason: NOT_YET_PORTED },
   { testFile: "/xml/test_text.rb", package: "nokogiri", reason: NOT_YET_PORTED },
   { testFile: "/xml/test_unparented_node.rb", package: "nokogiri", reason: NOT_YET_PORTED },
   { testFile: "/xml/test_xinclude.rb", package: "nokogiri", reason: NOT_YET_PORTED },
   { testFile: "/xml/test_xpath.rb", package: "nokogiri", reason: NOT_YET_PORTED },
   { testFile: "/xml/test_xpath_context.rb", package: "nokogiri", reason: NOT_YET_PORTED },
-  { testFile: "/xslt/test_custom_functions.rb", package: "nokogiri", reason: NOT_YET_PORTED },
-  { testFile: "/xslt/test_exception_handling.rb", package: "nokogiri", reason: NOT_YET_PORTED },
+  { testFile: "/xslt/test_custom_functions.rb", package: "nokogiri", reason: NOT_CALLED },
+  { testFile: "/xslt/test_exception_handling.rb", package: "nokogiri", reason: NOT_CALLED },
 ];
