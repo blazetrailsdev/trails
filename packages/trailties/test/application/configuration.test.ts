@@ -2905,7 +2905,7 @@ describe("ApplicationTests::ConfigurationTest", { concurrent: true, timeout: 120
     await app("development");
 
     await t.get("/posts");
-    expect(t.lastResponse().body).not.toMatch(/data-remote/);
+    expect(t.lastResponse().body).toMatch(/label/);
   });
 
   it("default method for update can be changed", async () => {
@@ -3379,6 +3379,62 @@ ${POSTS_ROUTES}
 
     await t.post("/posts", { post: { title: "zomg" }, format: "json" });
     expect(t.lastResponse().status).toBe(200);
+  });
+
+  it("config.action_controller.action_on_unpermitted_parameters = :raise", async () => {
+    await t.appFile(
+      "app/controllers/posts-controller.ts",
+      postsController(
+        `
+        async create() {
+          await this.render({ plain: this.params.permit({ post: ["name"] }) });
+        }
+`,
+        "ActionController.Base",
+      ),
+    );
+    await t.addToConfig(`
+      this.routes().prepend(function () {
+        this.resources("posts");
+      });
+      this.config.actionController.actionOnUnpermittedParameters = "raise";
+`);
+
+    await app("development");
+
+    expect(ActionController.Parameters.actionOnUnpermittedParameters).toBe("raise");
+
+    await t.post("/posts", { post: { title: "zomg" } });
+    expect(t.lastResponse().body).toMatch("We’re sorry, but something went wrong");
+  });
+
+  it("config.action_controller.action_on_unpermitted_parameters = :raise is ignored with expect", async () => {
+    await t.appFile(
+      "app/controllers/posts-controller.ts",
+      postsController(
+        `
+        async create() {
+          await this.render({ plain: this.params.expect({ post: ["name"] }) });
+        }
+`,
+        "ActionController.Base",
+      ),
+    );
+    await t.addToConfig(`
+      this.routes().prepend(function () {
+        this.resources("posts");
+      });
+      this.config.actionController.actionOnUnpermittedParameters = "raise";
+`);
+
+    await app("development");
+
+    expect(ActionController.Parameters.actionOnUnpermittedParameters).toBe("raise");
+
+    await t.post("/posts", { post: { title: "zomg" } });
+    expect(t.lastResponse().body).toMatch(
+      "The server cannot process the request due to a client error",
+    );
   });
 
   it("config.action_controller.action_on_unpermitted_parameters is :log by default in development", async () => {
