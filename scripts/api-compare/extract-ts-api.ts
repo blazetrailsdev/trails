@@ -767,6 +767,7 @@ export function extractFromProgram(
     currentImportAliases = collectImportAliases(sourceFile);
     const sectionVisibility = collectModuleSectionVisibility(sourceFile);
     let attributeReceivers: Set<string | undefined> | undefined;
+    let mixedInPaths: Set<string> | undefined;
 
     ts.forEachChild(sourceFile, (node) => {
       if (ts.isClassDeclaration(node) && node.name) {
@@ -1102,8 +1103,10 @@ export function extractFromProgram(
               : harvestModuleInstanceMethods(decl.initializer, checker, relPath);
           // A Ruby module nested in a plain-object module
           // (`LibXML::Conversions::Document`, `ForkTracker::CoreExt`) is a
-          // capitalised member holding its own object literal.
+          // capitalised member holding its own object literal that the file
+          // mixes in with `include` / `prepend` / `extend`.
           if (objectLiteral) {
+            mixedInPaths ??= collectMixedInPaths(sourceFile);
             for (const prop of literal.properties) {
               if (!ts.isPropertyAssignment(prop) || !ts.isIdentifier(prop.name)) continue;
               if (!/^[A-Z]/.test(prop.name.text) || isConstantCaseName(prop.name.text)) continue;
@@ -1111,6 +1114,7 @@ export function extractFromProgram(
               if (!ts.isObjectLiteralExpression(nested)) continue;
               const nestedMethods = harvestObjectLiteralMethods(nested, checker, relPath);
               const nestedKey = `${relPath}:${decl.name.text}.${prop.name.text}`;
+              if (!mixedInPaths.has(`${decl.name.text}.${prop.name.text}`)) continue;
               if (nestedMethods.length === 0 || info.modules[nestedKey]) continue;
               info.modules[nestedKey] = {
                 name: prop.name.text,
@@ -9973,4 +9977,24 @@ if (
 ) {
   const scope = scopeOf(process.argv.slice(2));
   void main(scope === null ? TS_EXTRACT_PACKAGES : [scope]);
+}
+
+/** The dotted paths (`Conversions.Document`) a file passes as the module
+ *  argument of `include` / `prepend` / `extend`. */
+function collectMixedInPaths(sourceFile: ts.SourceFile): Set<string> {
+  const paths = new Set<string>();
+  const visit = (node: ts.Node): void => {
+    if (
+      ts.isCallExpression(node) &&
+      ts.isIdentifier(node.expression) &&
+      ["include", "prepend", "extend"].includes(node.expression.text)
+    ) {
+      for (const arg of node.arguments.slice(1)) {
+        if (ts.isPropertyAccessExpression(arg)) paths.add(arg.getText(sourceFile));
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sourceFile);
+  return paths;
 }

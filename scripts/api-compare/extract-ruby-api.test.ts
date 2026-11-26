@@ -135,6 +135,7 @@ describe("Ruby extractor body call capture", { timeout: RUBY_SUBPROCESS_TIMEOUT_
           Null = Object.new
           def Null.complete!; end
           def self.wrap; end
+          def ExecutionWrapper.active?; end
         end
       `,
     };
@@ -143,7 +144,7 @@ describe("Ruby extractor body call capture", { timeout: RUBY_SUBPROCESS_TIMEOUT_
         name: string;
       }[]
     ).map((m) => m.name);
-    expect(names).toEqual(["wrap"]);
+    expect(names).toEqual(["wrap", "active?"]);
   });
 
   it("files a module_function def as one module method, as module_function :name does", () => {

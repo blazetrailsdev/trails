@@ -80,6 +80,7 @@ export class LazyEntry extends Entry {
     this.resolved = false;
   }
 
+  /** @missingRailsName value — PERMANENT */
   override get value(): unknown {
     if (!this.resolved) {
       this._value = this.serializer.load(
