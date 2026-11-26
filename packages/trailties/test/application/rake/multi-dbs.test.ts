@@ -9,7 +9,7 @@ import { File } from "@blazetrails/ruby-compat/file";
 import { FileUtils } from "@blazetrails/ruby-compat/file-utils";
 import { include } from "@blazetrails/ruby-compat/include";
 import { TopLevel } from "@blazetrails/ruby-compat/object";
-import { env } from "@blazetrails/ruby-compat/process-adapter";
+import { env, setEnv } from "@blazetrails/ruby-compat/process-adapter";
 import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
 import { constGet } from "@blazetrails/ruby-compat/variable";
 import { Trails } from "../../../lib/trails.js";
@@ -740,6 +740,32 @@ export class AnimalsBase extends Base {
     },
   );
 
+  it("schema_cache is loaded on all connection db in multi-db app if it exists for the connection", async () => {
+    await t.bootTrails();
+    await dbMigrateAndSchemaCacheDump();
+
+    const runner = async (code: string, options: { stderr?: boolean } = {}) =>
+      (
+        await t.trails(
+          "runner",
+          `const { rbInspect } = await import("@blazetrails/ruby-compat"); console.log(rbInspect(${code}))`,
+          options,
+        )
+      ).trim();
+
+    const cacheSizeA = await runner("await ActiveRecord.Base.schemaCache().size()");
+    expect(cacheSizeA).toBe("12");
+
+    const cacheTablesA = await runner("await ActiveRecord.Base.schemaCache().columns('books')");
+    expect(cacheTablesA).toContain("title");
+
+    const cacheSizeB = await runner("await AnimalsBase.schemaCache().size()", { stderr: true });
+    expect(cacheSizeB).toBe("12");
+
+    const cacheTablesB = await runner("await AnimalsBase.schemaCache().columns('dogs')");
+    expect(cacheTablesB).toContain("name");
+  });
+
   it("db:schema:cache:clear works on all databases", async () => {
     await t.bootTrails();
     await dbMigrateAndSchemaCacheDumpAndSchemaCacheClear();
@@ -907,6 +933,30 @@ export default { development };
     );
 
     await dbCreateAndDropNamespace("shard_3", "storage/development_shard_3.sqlite3");
+  });
+
+  it("db:seed uses primary database connection", async () => {
+    const oldTrailsEnv = env.TRAILS_ENV;
+    const oldRackEnv = env.NODE_ENV;
+    setEnv("TRAILS_ENV", undefined);
+    setEnv("NODE_ENV", undefined);
+    try {
+      await dbMigrateAndSchemaDumpAndLoad();
+
+      await t.appFile(
+        "db/seeds.ts",
+        `import { constGet, STDOUT, TopLevel } from "@blazetrails/ruby-compat";
+const Book = constGet(TopLevel, "Book") as { leaseConnection(): Promise<{ pool: { dbConfig: { database: string } } }> };
+STDOUT.print((await Book.leaseConnection()).pool.dbConfig.database);
+`,
+      );
+
+      const output = await t.trails("db:seed");
+      expect(output).toBe("storage/development.sqlite3");
+    } finally {
+      setEnv("TRAILS_ENV", oldTrailsEnv);
+      setEnv("NODE_ENV", oldRackEnv);
+    }
   });
 
   it("schema generation when dump_schema_after_migration is true schema_dump is false", async () => {
