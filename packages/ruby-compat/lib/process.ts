@@ -110,13 +110,13 @@ export function rbExecargNew(
     }
   }
   const prog = rbCheckArgv(rest);
-  const [argv0, ...args] = rest as string[];
-  if (prog !== null) return [prog, env, args, opthash, argv0];
+  const [command, ...args] = rest as string[];
+  if (prog !== null) return [prog, env, args, opthash, command];
   if (args.length === 0) {
-    const argvBuf = rbExecFillarg(argv0);
+    const argvBuf = rbExecFillarg(command);
     if (argvBuf !== null) return [argvBuf[0], env, argvBuf.slice(1), opthash, null];
   }
-  return [argv0, env, args.length === 0 ? null : args, opthash, null];
+  return [command, env, args.length === 0 ? null : args, opthash, null];
 }
 
 /** The option names `rb_execarg_addopt` (`vendor/ruby/v3.3.11/process.c:2145-2290`) accepts, camelCased. */
