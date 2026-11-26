@@ -1,3 +1,4 @@
+import { camelize, underscore } from "@blazetrails/activesupport";
 import {
   Dir,
   File,
@@ -5,6 +6,7 @@ import {
   LoadError,
   loadIseqEval,
   regexpEscape,
+  STDOUT,
 } from "@blazetrails/ruby-compat";
 import { Base as ThorBase } from "@blazetrails/thor/shell";
 import { Basic } from "@blazetrails/thor/shell/basic";
@@ -22,6 +24,18 @@ let _subclasses: (typeof Base)[] | undefined;
 
 export function subclasses(): (typeof Base)[] {
   return (_subclasses ??= []);
+}
+
+/** @internal */
+export function printList(base: string, namespaces: string[]): void {
+  if (namespaces.length === 0) return;
+  STDOUT.puts(`${camelize(underscore(base))}:`);
+
+  for (const namespace of namespaces) {
+    STDOUT.puts(`  ${namespace}`);
+  }
+
+  STDOUT.puts();
 }
 
 /** @internal */

@@ -1,10 +1,4 @@
-import {
-  camelize,
-  dasherize,
-  deepMergeBang,
-  mattrAccessor,
-  underscore,
-} from "@blazetrails/activesupport";
+import { dasherize, deepMergeBang, mattrAccessor, underscore } from "@blazetrails/activesupport";
 import "@blazetrails/activesupport/core-ext/string/inflections";
 import {
   Dir,
@@ -17,7 +11,7 @@ import {
   regexpEscape,
 } from "@blazetrails/ruby-compat";
 import type { Base, GeneratorConfig } from "./generators/base.js";
-import { noColorBang } from "./command/behavior.js";
+import { noColorBang, printList as behaviorPrintList } from "./command/behavior.js";
 import { CorrectableNameError } from "./command.js";
 import { Trails } from "./trails.js";
 import type {
@@ -283,9 +277,9 @@ export class Generators {
 
   static hiddenNamespaces(): string[] {
     if (_hiddenNamespaces === undefined) {
-      const orm = Generators.options().trails.orm;
-      const test = Generators.options().trails.testFramework;
-      const template = Generators.options().trails.templateEngine;
+      const orm = dasherize(underscore(`${Generators.options().trails.orm ?? ""}`));
+      const test = dasherize(underscore(`${Generators.options().trails.testFramework ?? ""}`));
+      const template = dasherize(underscore(`${Generators.options().trails.templateEngine ?? ""}`));
 
       _hiddenNamespaces = [
         "trails",
@@ -411,10 +405,7 @@ export class Generators {
 
   private static printList(base: string, namespaces: string[]): void {
     namespaces = namespaces.filter((n) => !Generators.hiddenNamespaces().includes(n));
-    if (namespaces.length === 0) return;
-    STDOUT.puts(`${camelize(underscore(base))}:`);
-    for (const n of namespaces) STDOUT.puts(`  ${n}`);
-    STDOUT.puts();
+    behaviorPrintList(base, namespaces);
   }
 }
 
