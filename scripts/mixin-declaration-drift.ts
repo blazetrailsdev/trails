@@ -69,12 +69,25 @@ function signatureOf(node: ts.SignatureDeclarationBase): string {
     .map((p) => {
       const dots = p.dotDotDotToken ? "..." : "";
       const optional = p.questionToken || p.initializer ? "?" : "";
-      const name = bindingNameText(p.name).replace(/^_+/, "");
+      const name = parameterNameText(p.name).replace(/^_+/, "");
       const type = p.type ? typeText(p.type) : p.initializer ? WILDCARD : "";
       return `${dots}${name}${optional}: ${type}`;
     })
     .join(", ");
   return `${typeParams}(${params}): ${typeText(node.type) ?? ""}`;
+}
+
+/**
+ * A declaration has no body to bind into, and typescript-5 rejects an optional
+ * destructured parameter with no initializer (TS2339), so an interface names a
+ * kwargs pattern by its `**options` rest: `{ ifExists, ...options }` is `options`.
+ */
+function parameterNameText(name: ts.BindingName): string {
+  if (ts.isObjectBindingPattern(name)) {
+    const rest = name.elements.find((e) => e.dotDotDotToken && ts.isIdentifier(e.name));
+    if (rest) return (rest.name as ts.Identifier).text;
+  }
+  return bindingNameText(name);
 }
 
 function bindingNameText(name: ts.BindingName): string {

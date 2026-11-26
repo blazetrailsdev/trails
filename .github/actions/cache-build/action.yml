@@ -46,3 +46,13 @@ runs:
           packages/*/dist-test
           packages/*/tsconfig.test.tsbuildinfo
         key: build-v2-${{ runner.os }}-${{ hashFiles('packages/**/src/**', 'tsconfig*.json', 'packages/*/tsconfig*.json', 'pnpm-lock.yaml') }}
+    # tzinfo's `build:data` clones tzinfo-data from github.com when
+    # vendor/tzinfo-data/<ref>/.git is absent. Restoring the pinned checkout
+    # keeps a warm full build off the network; the key follows the ref named in
+    # packages/tzinfo/package.json, so a bump misses and re-clones (with
+    # vendor/fetch.ts's backoff retry).
+    - if: runner.environment == 'github-hosted'
+      uses: actions/cache@v4
+      with:
+        path: vendor/tzinfo-data
+        key: tzinfo-data-v1-${{ hashFiles('packages/tzinfo/package.json') }}

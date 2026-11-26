@@ -3,8 +3,8 @@ import { HashWithIndifferentAccess } from "../../hash-with-indifferent-access.js
 
 type AnyObject = Record<string, unknown>;
 
-export function withIndifferentAccess(
-  obj: AnyObject | Hash<unknown, unknown>,
+export function withIndifferentAccess<K>(
+  obj: AnyObject | Hash<K, unknown>,
 ): HashWithIndifferentAccess<unknown> {
   return new HashWithIndifferentAccess(obj);
 }
