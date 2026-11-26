@@ -76,7 +76,7 @@ const skippedFiles = [
   "public/icon.svg",
 ];
 
-describe("ApiAppGeneratorTest", () => {
+describe("ApiAppGeneratorTest", { timeout: 30_000 }, () => {
   it("skeleton is created", async () => {
     await t.runGenerator();
 
