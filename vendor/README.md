@@ -307,7 +307,10 @@ bump inside a line moves only `TINY` / `PRE`.
 6. **Generate** the burn-down stories:
    `pnpm parity:bump:stories --source <name> --from <old> --to <new> --from-tests … --rfc <rfc> --out <dir>`
    writes one story per package, split where a package is too large, into a
-   new burn-down RFC. Write the story ids into the ledger rows.
+   new burn-down RFC. File each with
+   `pnpm tasks new <rfc> <id> --title "<its frontmatter title>" --body-file <file>`:
+   `--body-file` reads only the body, so the title is lost without `--title`.
+   Write the story ids into the ledger rows.
 7. **Burn down.** Each story re-verifies its ledgered bodies against the new
    tree, fixes the port, and runs
    `pnpm tsx scripts/api-compare/body-pins.ts --pin <ruby-file>`, which

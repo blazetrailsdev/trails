@@ -11,6 +11,7 @@ import {
 import { libxml2Patches, usesLibxml } from "../version/info.js";
 import { GLOBAL_SEARCH_PREFIX } from "../xml/xpath.js";
 import { methodName, Node } from "./node.js";
+import { Parser } from "./parser.js";
 import { SyntaxError } from "./syntax-error.js";
 
 export const BuiltinsConfig = {
@@ -34,6 +35,10 @@ export class XPathVisitor {
   static readonly WILDCARD_NAMESPACES = libxml2Patches().includes(
     "0009-allow-wildcard-namespaces.patch",
   );
+
+  /** @internal */
+  private static readonly XPATH_NAME =
+    /^(?:[A-Za-z_]|[\u0080-\u{10FFFF}])(?:[A-Za-z0-9_.-]|[\u0080-\u{10FFFF}])*$/u;
 
   static readonly BuiltinsConfig = BuiltinsConfig;
   static readonly DoctypeConfig = DoctypeConfig;
@@ -121,7 +126,7 @@ export class XPathVisitor {
     } else if (/^(last|last-of-type)\(/m.test(fn)) {
       return "position()=last()";
     } else if (/^contains\(/m.test(fn)) {
-      return `contains(.,${node.value[1]})`;
+      return `contains(.,${this.xpathFunctionArgument(node.value[1])})`;
     } else if (/^gt\(/m.test(fn)) {
       return `position()>${node.value[1]}`;
     } else if (/^only-child\(/m.test(fn)) {
@@ -134,10 +139,7 @@ export class XPathVisitor {
     } else {
       this.validateXpathFunctionName(fn);
 
-      const args = [
-        ".",
-        ...node.value.slice(1).map((n) => (n instanceof Node ? n.accept(this) : n)),
-      ];
+      const args = [".", ...node.value.slice(1).map((arg) => this.xpathFunctionArgument(arg))];
       return `nokogiri:${fn}${args.join(",")})`;
     }
   }
@@ -152,23 +154,16 @@ export class XPathVisitor {
   }
 
   visitId(node: Node): string {
-    const m = /^#(.*)$/m.exec(node.value[0]);
-    return `@id='${m?.[1] ?? ""}'`;
+    const id: string = node.value[0];
+    return `@id=${this.xpathStringLiteral(id.startsWith("#") ? id.slice(1) : id)}`;
   }
 
   visitAttributeCondition(node: Node): string {
     const attribute = node.value[0].accept(this);
     if (node.value.length === 1) return attribute;
 
-    let value: string = String(node.value.at(-1));
-    if (!/^['"]/m.test(value)) value = `'${value}'`;
-
-    if (value[0] === value.at(-1) && `"'`.includes(value[0])) {
-      const strValue = value.slice(1, -1);
-      if (strValue.includes(value[0])) {
-        value = 'concat("' + strValue.split('"').join(`",'"',"`) + '","")';
-      }
-    }
+    const strValue: string = node.value.at(-1);
+    const value = this.xpathStringLiteral(strValue);
 
     switch (node.value[1]) {
       case "equal":
@@ -182,8 +177,7 @@ export class XPathVisitor {
       case "dash_match":
         return `${attribute}=${value} or starts-with(${attribute},concat(${value},'-'))`;
       case "includes":
-        value = value.slice(1, -1);
-        return this.cssClass(attribute, value);
+        return this.cssClass(attribute, strValue);
       case "suffix_match":
         return `substring(${attribute},string-length(${attribute})-string-length(${value})+1,string-length(${value}))=${value}`;
       default:
@@ -261,18 +255,23 @@ export class XPathVisitor {
   }
 
   visitElementName(node: Node): string {
-    if (this.doctype === DoctypeConfig.HTML5 && this.html5ElementNameNeedsNamespaceHandling(node)) {
+    const html5LocalName =
+      this.doctype === DoctypeConfig.HTML5 && this.html5ElementNameNeedsNamespaceHandling(node);
+    if (!html5LocalName) for (const name of node.value) this.validateXpathElementName(name);
+
+    if (html5LocalName) {
+      const name: string = node.value[0];
       if (
         this.builtins === BuiltinsConfig.ALWAYS ||
         (this.builtins === BuiltinsConfig.OPTIMAL && usesLibxml())
       ) {
-        if (XPathVisitor.WILDCARD_NAMESPACES) {
-          return `*:${node.value[0]}`;
+        if (XPathVisitor.WILDCARD_NAMESPACES && this.isXpathName(name)) {
+          return `*:${name}`;
         } else {
-          return `*[nokogiri-builtin:local-name-is('${node.value[0]}')]`;
+          return `*[nokogiri-builtin:local-name-is(${this.xpathStringLiteral(name)})]`;
         }
       } else {
-        return `*[local-name()='${node.value[0]}']`;
+        return `*[local-name()=${this.xpathStringLiteral(name)}]`;
       }
     } else if (node.value.length === 2) {
       if (node.value[0] == null) {
@@ -292,7 +291,17 @@ export class XPathVisitor {
   }
 
   visitAttribName(node: Node): string {
-    return `@${node.value[0]}`;
+    if (node.value.length === 2) {
+      if (!node.value.every((name: string) => this.isXpathName(name))) {
+        throw new SyntaxError(`Invalid attribute name '${node.value.join("|")}'`);
+      }
+
+      return `@${node.value.join(":")}`;
+    } else if (this.isXpathName(node.value[0])) {
+      return `@${node.value[0]}`;
+    } else {
+      return `@*[namespace-uri()='' and name()=${this.xpathStringLiteral(node.value[0])}]`;
+    }
   }
 
   accept(node: Node): string {
@@ -303,6 +312,29 @@ export class XPathVisitor {
   protected validateXpathFunctionName(name: string): void {
     if (name.startsWith("-")) {
       throw new SyntaxError(`Invalid XPath function name '${name}'`);
+    }
+  }
+
+  /** @internal */
+  protected validateXpathElementName(name: string | null): void {
+    if (!(name == null || name === "*" || this.isXpathName(name))) {
+      throw new SyntaxError(`Invalid element name '${name}'`);
+    }
+  }
+
+  /** @internal */
+  protected isXpathName(name: string): boolean {
+    return XPathVisitor.XPATH_NAME.test(name);
+  }
+
+  /** @internal */
+  protected xpathFunctionArgument(arg: unknown): unknown {
+    if (arg instanceof Node) {
+      return arg.accept(this);
+    } else if (typeof arg === "string" && (arg.startsWith("'") || arg.startsWith('"'))) {
+      return this.xpathStringLiteral(Parser.unescapeCssString(arg.slice(1, -1)));
+    } else {
+      return arg;
     }
   }
 
@@ -329,7 +361,9 @@ export class XPathVisitor {
       position = options.last ? "(last()-position()+1)" : "position()";
     }
 
-    if (b === 0) {
+    if (a === 0) {
+      return `${position}=${b}`;
+    } else if (b === 0 && a > 0) {
       return `(${position} mod ${a})=0`;
     } else {
       const compare = a < 0 ? "<=" : ">=";
@@ -351,7 +385,7 @@ export class XPathVisitor {
       b = Number(toI(values[3]));
     } else if (op === "-") {
       a = Number(toI(values[0]));
-      b = a - fixMod(Number(toI(values[3])), a);
+      b = a === 0 ? -Number(toI(values[3])) : a - fixMod(Number(toI(values[3])), a);
     } else {
       throw new ArgumentError(
         `expected an+b node to have either + or - as the operator, but is ${rbInspect(op)}`,
@@ -378,9 +412,20 @@ export class XPathVisitor {
       this.builtins === BuiltinsConfig.ALWAYS ||
       (this.builtins === BuiltinsConfig.OPTIMAL && usesLibxml())
     ) {
-      return `nokogiri-builtin:css-class(${hay},'${needle}')`;
+      return `nokogiri-builtin:css-class(${hay},${this.xpathStringLiteral(needle)})`;
     } else {
-      return `contains(concat(' ',normalize-space(${hay}),' '),' ${needle} ')`;
+      return `contains(concat(' ',normalize-space(${hay}),' '),${this.xpathStringLiteral(` ${needle} `)})`;
+    }
+  }
+
+  /** @internal */
+  protected xpathStringLiteral(string: string): string {
+    if (!string.includes("'")) {
+      return `'${string}'`;
+    } else if (!string.includes('"')) {
+      return `"${string}"`;
+    } else {
+      return "concat('" + string.split("'").join(`',"'",'`) + "')";
     }
   }
 }

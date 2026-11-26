@@ -793,7 +793,7 @@ export const SOURCES: readonly UpstreamSource[] = [
     origin: {
       type: "git",
       url: "https://github.com/flavorjones/loofah.git",
-      ref: "v2.24.0",
+      ref: "v2.25.3",
     },
     packages: [
       {

@@ -122,7 +122,7 @@ export function fragment(
   const maxErrors = options.maxErrors ?? DEFAULT_MAX_ERRORS;
   const rerrors: SyntaxError[] = [];
   const parser = Parser.getFragmentParser<DefaultTreeAdapterMap>(ctxElement, {
-    scriptingEnabled: !options.parseNoscriptContentAsText,
+    scriptingEnabled: options.parseNoscriptContentAsText === true,
     onParseError: (err) => {
       if (maxErrors < 0 || rerrors.length < maxErrors) {
         rerrors.push(new SyntaxError(err.code, 2, err.startLine, err.startCol, "#fragment"));

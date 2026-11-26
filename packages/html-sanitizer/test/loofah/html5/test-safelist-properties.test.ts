@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { HTML5 } from "@blazetrails/nokogiri";
+
 import { SafeList } from "../../../lib/loofah/html5/safelist.js";
 
 describe("Html5TestSafelistProperties", () => {
@@ -12,6 +14,15 @@ describe("Html5TestSafelistProperties", () => {
   for (const attrName of SafeList.SVG_ALLOW_LOCAL_HREF) {
     it(`test_svg_attr_allow_local_ref_${attrName}_is_in_svg_elements`, () => {
       expect(SafeList.SVG_ELEMENTS).toContain(attrName);
+    });
+  }
+
+  for (const tagName of SafeList.SVG_ALLOW_LOCAL_HREF) {
+    it(`test_svg_attr_allow_local_ref_${tagName}_matches_the_html5_parsed_element_name`, () => {
+      const parsedName = HTML5.fragment(`<svg><${tagName}></${tagName}></svg>`).atCss("svg")!
+        .elementChildren[0].name;
+
+      expect(SafeList.SVG_ALLOW_LOCAL_HREF).toContain(parsedName);
     });
   }
 });

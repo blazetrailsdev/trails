@@ -91,6 +91,15 @@ describe("burn-down stories", () => {
     expect(md).toContain('packages: ["gem-core"]');
   });
 
+  it("closes the gaps an interpolated test name leaves inside its code span", () => {
+    const i = input({
+      toTests: tests("core", "a/x_test.rb", ["XTest > kept", "S > via  scheme  > x", "S >  is"]),
+    });
+    const md = renderStory(i, planStories(i)[1], "burn-down");
+    expect(md).toContain("- `S > via scheme > x`");
+    expect(md).toContain("- `S > is`");
+  });
+
   it("drops an added test the comparer matches and keeps a same-path test in another file", () => {
     const stories = planStories(
       input({

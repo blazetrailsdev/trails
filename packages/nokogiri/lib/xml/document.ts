@@ -80,7 +80,7 @@ export class XmlDocument extends XmlNode {
       doc = XmlDocument.readMemory(stringOrIo as string, url, encoding, options.toI());
     }
 
-    if (options.isXinclude()) doc.doXinclude(options);
+    if (options.isXinclude()) doc.doXinclude(options, { safeCopy: false });
 
     return doc;
   }
@@ -147,8 +147,10 @@ export class XmlDocument extends XmlNode {
     return document;
   }
 
+  /** @missingRailsCall safeProcessXinclude — CONVERGEABLE nokogiri-do-xinclude-safe-copy-arm */
   doXinclude(
     options: ParseOptions | number = ParseOptions.DEFAULT_XML,
+    { safeCopy: _safeCopy = true }: { safeCopy?: boolean } = {},
     block?: (options: ParseOptions) => void,
   ): void {
     if (typeof options === "number") options = new ParseOptions(options);

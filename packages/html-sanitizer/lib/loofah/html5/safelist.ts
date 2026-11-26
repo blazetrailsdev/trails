@@ -107,10 +107,13 @@ const SVG_ATTR_VAL_ALLOWS_REF = new Set([
   "marker-start", "mask", "stroke",
 ]);
 
+const SVG_HREF_ATTRIBUTES = new Set(["xlink:href", "href"]);
+
 // prettier-ignore
 const SVG_ALLOW_LOCAL_HREF = new Set([
   "altGlyph", "animate", "animateColor", "animateMotion", "animateTransform", "cursor", "feImage",
-  "filter", "linearGradient", "pattern", "radialGradient", "set", "textpath", "tref", "use",
+  "filter", "linearGradient", "pattern", "radialGradient", "set", "mpath", "textPath", "tref",
+  "use",
 ]);
 
 // prettier-ignore
@@ -191,11 +194,11 @@ const ACCEPTABLE_SVG_PROPERTIES = new Set([
   "stroke-linejoin", "stroke-opacity",
 ]);
 
-const PROTOCOL_SEPARATOR = /:|(&#0*58)|(&#x70)|(&#x0*3a)|(%|&#37;)3A/i;
+const PROTOCOL_SEPARATOR = /:|(&#0*58)|(&#x0*3a)|(%|&#37;)3A/i;
 
 // prettier-ignore
 const ACCEPTABLE_PROTOCOLS = new Set([
-  "afs", "aim", "callto", "data", "ed2k", "fax", "feed", "ftp", "gopher", "http", "https", "irc",
+  "afs", "aim", "callto", "data", "ed2k", "fax", "ftp", "gopher", "http", "https", "irc",
   "line", "mailto", "modem", "news", "nntp", "rsync", "rtsp", "sftp", "sms", "ssh", "tag", "tel",
   "telnet", "urn", "webcal", "xmpp",
 ]);
@@ -252,6 +255,7 @@ export const SafeList = {
   ARIA_ATTRIBUTES,
   ATTR_VAL_IS_URI,
   SVG_ATTR_VAL_ALLOWS_REF,
+  SVG_HREF_ATTRIBUTES,
   SVG_ALLOW_LOCAL_HREF,
   ACCEPTABLE_CSS_PROPERTIES,
   ACCEPTABLE_CSS_KEYWORDS,

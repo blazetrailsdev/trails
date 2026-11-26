@@ -28,6 +28,8 @@ export class Document extends Node {
   url: string | null = null;
   encoding: string | null = null;
   quirksMode: number | null = null;
+  /** @internal */
+  parseNoscriptContentAsText: boolean | null = null;
 
   constructor(_node: Parse5Document = defaultTreeAdapter.createDocument()) {
     super(_node as never);
@@ -62,13 +64,17 @@ export class Document extends Node {
     stringOrIo: string | Readable,
     url: string | null,
     encoding: string | null,
-    _options: Record<string, unknown>,
+    options: Record<string, unknown>,
   ): Document {
     const string = HTML5.readAndEncode(stringOrIo, encoding);
 
-    const doc = new Document(parse(string));
+    const noscriptContentAsText =
+      options.parseNoscriptContentAsText != null && options.parseNoscriptContentAsText !== false;
+
+    const doc = new Document(parse(string, { scriptingEnabled: noscriptContentAsText }));
     doc.url = url;
     doc.encoding = "UTF-8";
+    doc.parseNoscriptContentAsText = noscriptContentAsText;
     return doc;
   }
 
@@ -118,6 +124,13 @@ export class Document extends Node {
 
   fragment(markup: string | null = null): DocumentFragment {
     return new DocumentFragment(this, markup);
+  }
+
+  createTextNode(string: string): Node {
+    return new Node(
+      { nodeName: "#text", value: string, parentNode: null } as unknown as Node["_node"],
+      this,
+    );
   }
 
   createCdata(string: string): Node {
