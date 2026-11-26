@@ -1,11 +1,11 @@
 import "../constants.active-record.generated.js";
-import { File, extend, include, type Extended, type Included } from "@blazetrails/ruby-compat";
+import { extend, include, type Extended, type Included } from "@blazetrails/ruby-compat";
 import { NamedBase } from "./named-base.js";
 import * as Generators from "./migration.js";
 import type { CreateMigrationConfig, MigrationRenderer } from "./actions/create-migration.js";
 import { ClassMethods, Migration } from "./active-record/migration.js";
 
-const __dir__ = File.dirname(decodeURIComponent(new URL(import.meta.url).pathname));
+const __dir__ = import.meta.dirname;
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Base

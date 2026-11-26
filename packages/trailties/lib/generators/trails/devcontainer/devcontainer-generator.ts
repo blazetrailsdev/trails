@@ -5,7 +5,7 @@ import { Base, type GeneratorOptions, type GeneratorConfig } from "../../base.js
 import { Database, DATABASES, type DatabaseName } from "../../database.js";
 import { Generators } from "../../../generators.js";
 
-const __dir__ = File.dirname(decodeURIComponent(new URL(import.meta.url).pathname));
+const __dir__ = import.meta.dirname;
 
 export type SqliteDriver = "better-sqlite3" | "node-sqlite" | "expo-sqlite";
 export interface DevcontainerGeneratorOptions extends GeneratorOptions {

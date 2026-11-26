@@ -173,9 +173,9 @@ Finisher.initializer("eager_load!", async function (this: FinisherHost) {
   }
 
   /** @inventedArm for — PERMANENT */
-  for (const [constName, resolvePath] of Object.entries(Trails._autoloads ?? {})) {
+  for (const constName of Trails._eagerloadedConstants ?? []) {
     if ((Trails as unknown as Record<string, unknown>)[constName] === undefined) {
-      await Trails.loadPath[await resolvePath()]();
+      await Trails.loadPath[await Trails._autoloads![constName]()]();
     }
   }
 
@@ -228,8 +228,12 @@ Finisher.initializer("configure_executor_for_concurrency", function (this: Finis
   }
 });
 
-Finisher.initializer("add_internal_routes", function (this: FinisherHost) {
+Finisher.initializer("add_internal_routes", async function (this: FinisherHost) {
   if (!Trails.env.isDevelopment()) return;
+  /** @inventedArm for — PERMANENT */
+  for (const feature of ["trails/info_controller", "trails/welcome_controller"]) {
+    await Trails.loadPath[feature]();
+  }
   this.routes().prepend(function () {
     this.get("/trails/info/properties", { to: "trails/info#properties", internal: true });
     this.get("/trails/info/routes", { to: "trails/info#routes", internal: true });

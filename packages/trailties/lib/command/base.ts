@@ -28,7 +28,7 @@ declare module "@blazetrails/thor" {
   }
 }
 
-const __dir__ = File.dirname(decodeURIComponent(new URL(import.meta.url).pathname));
+const __dir__ = import.meta.dirname;
 
 /* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging */
 export interface Base extends Included<typeof Actions>, ThorBase, Shell {}

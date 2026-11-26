@@ -13,7 +13,7 @@ import { Basic } from "@blazetrails/thor/shell/basic";
 import type { Base } from "./base.js";
 import { EXTENSION, commandType, fileLookupPaths, lookupPaths } from "../command.js";
 
-const FRAMEWORK_LIB = File.expandPath(decodeURIComponent(new URL("..", import.meta.url).pathname));
+const FRAMEWORK_LIB = File.expandPath("..", import.meta.dirname);
 if (!LOAD_PATH.includes(FRAMEWORK_LIB)) LOAD_PATH.push(FRAMEWORK_LIB);
 
 export function noColorBang(): void {
