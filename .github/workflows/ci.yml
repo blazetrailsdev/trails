@@ -1804,7 +1804,7 @@ jobs:
           PGPORT: "5432"
           PGUSER: rails
           PG_TEST_URL: postgres://rails@localhost:5432/activerecord_unittest
-      - if: needs.changes.outputs.ar_scope == ''
+      - if: needs.changes.outputs.ar_scope == '' && github.event_name != 'schedule' && github.event_name != 'workflow_dispatch'
         run: scripts/ci/ar-non-isolated-cases.sh ${{ matrix.shard }}/${{ strategy.job-total }}
         env:
           VITEST_SHARD_DURATIONS: postgresql
@@ -1815,7 +1815,7 @@ jobs:
       - if: needs.changes.outputs.ar_scope == ''
         run: pnpm vitest run packages/activerecord/ packages/solid-queue/ packages/solid-cable/ packages/solid-cache/ packages/activestorage/ packages/actionmailbox/ packages/actiontext/ packages/turbo/ --project '!system' --shard=${{ matrix.shard }}/${{ strategy.job-total }}
         env:
-          AR_SPLIT: rest
+          AR_SPLIT: ${{ (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && 'all' || 'rest' }}
           VITEST_SHARD_DURATIONS: postgresql
           VITEST_SHARD_ONE_EXTRA_MS: "110000"
           ARCONN: postgresql
@@ -2189,7 +2189,7 @@ jobs:
           MYSQL_HOST: localhost
           MYSQL_PORT: "3306"
           MYSQL_TEST_URL: mysql://rails@localhost:3306/activerecord_unittest
-      - if: needs.changes.outputs.ar_scope == ''
+      - if: needs.changes.outputs.ar_scope == '' && github.event_name != 'schedule' && github.event_name != 'workflow_dispatch'
         run: scripts/ci/ar-non-isolated-cases.sh ${{ matrix.shard }}/${{ strategy.job-total }}
         env:
           VITEST_SHARD_DURATIONS: mysql2
@@ -2199,7 +2199,7 @@ jobs:
       - if: needs.changes.outputs.ar_scope == ''
         run: pnpm vitest run packages/activerecord/ packages/solid-queue/ packages/solid-cable/ packages/solid-cache/ packages/activestorage/ packages/actionmailbox/ packages/actiontext/ packages/turbo/ --project '!system' --shard=${{ matrix.shard }}/${{ strategy.job-total }}
         env:
-          AR_SPLIT: rest
+          AR_SPLIT: ${{ (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && 'all' || 'rest' }}
           VITEST_SHARD_DURATIONS: mysql2
           VITEST_SHARD_ONE_EXTRA_MS: "110000"
           ARCONN: mysql2

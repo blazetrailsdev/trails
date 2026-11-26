@@ -23,8 +23,8 @@ if (dyBoot.__arDyBootDbConfig !== undefined) {
   await resetTestTables(await Base.leaseConnection());
   const { FixtureSet } = await import("../../lib/fixtures.js");
   FixtureSet.resetCache();
-  const { TestFixtures } = await import("../../lib/test-fixtures.js");
-  TestFixtures.invalidateAlreadyLoadedFixtures.call(undefined as never);
+  const { rootTestCase } = await import("./use-fixtures.js");
+  rootTestCase().prototype.invalidateAlreadyLoadedFixtures();
 } else {
   const { adapter, envConfig } = await connect();
 
