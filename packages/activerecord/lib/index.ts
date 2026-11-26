@@ -256,4 +256,5 @@ import "./associations/disable-joins-association-scope.js";
 
 ActiveRecord.Type = TypeModule;
 
+import "./tasks/database-tasks.js";
 import "./constants.generated.js";

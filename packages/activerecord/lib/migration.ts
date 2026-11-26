@@ -90,7 +90,6 @@ export { ExecutionStrategy, DefaultStrategy };
 export { PendingMigrationConnection } from "./migration/pending-migration-connection.js";
 
 import { ActiveRecordError, NoDatabaseError } from "./errors.js";
-import "./tasks/database-tasks.js";
 import {
   maintainTestSchema,
   migrationStrategy,
