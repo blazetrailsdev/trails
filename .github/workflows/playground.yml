@@ -1,0 +1,29 @@
+name: Playground
+
+# ci.yml's `changes` job classes a PR that touches only examples/ as docs-only,
+# so System Tests (which runs this smoke in chromium) skips it. This runs the
+# playground's smoke walk on such a PR, before the Pages build on main is the
+# first to see it. Firefox and WebKit are `BROWSER=` options of the smoke and
+# are not run here until playground-smoke-firefox-service-worker-bypass lands.
+on:
+  pull_request:
+    paths:
+      - "examples/browser-sqlite/**"
+      - ".github/workflows/playground.yml"
+
+concurrency:
+  group: playground-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    name: Playground smoke (chromium)
+    runs-on: ${{ vars.RUNNER || 'ubuntu-24.04' }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-pnpm
+      - run: pnpm install --frozen-lockfile --prefer-offline
+      - run: pnpm exec tsc --build tsconfig.json
+      - run: pnpm --filter @blazetrails/example-browser-sqlite exec playwright install chromium
+      - run: pnpm --filter @blazetrails/example-browser-sqlite smoke

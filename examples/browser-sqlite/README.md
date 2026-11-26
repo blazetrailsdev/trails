@@ -26,6 +26,7 @@ pnpm dev     # Vite dev server; open the printed URL
 pnpm build && pnpm preview   # a static bundle in dist/, served by vite preview
 pnpm smoke   # headless Chromium: boot, create a post through the form, edit a view, restart
 DIST=dist pnpm smoke   # the same walk over a built bundle (BASE=/playground/ for one built with --base)
+BROWSER=firefox pnpm smoke   # or webkit; the service-worker stop step is Chromium-only (CDP)
 ```
 
 ![The editor: file tree, source, the app in the preview, and its log in the console](docs/screenshots/index-editor-light.png)
