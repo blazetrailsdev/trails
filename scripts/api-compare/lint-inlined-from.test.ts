@@ -466,3 +466,60 @@ describe("inlinedFromFindings", () => {
     ]);
   });
 });
+
+describe("inlinedFromFindings on a Ruby superclass from an unvendored gem", () => {
+  const AD = "rails/v8.0.2/actionpack/lib/action_dispatch";
+  const store = {
+    packages: {
+      actiondispatch: {
+        classes: {
+          "ActionDispatch::Session::AbstractSecureStore": entity(
+            "middleware/session/abstract_store.rb",
+            [],
+            {
+              includes: ["Compatibility"],
+            },
+          ),
+          "ActionDispatch::Session::CacheStore": {
+            ...entity("middleware/session/cache_store.rb"),
+            superclass: "AbstractSecureStore",
+          },
+          "ActionDispatch::Session::MemCacheStore": {
+            ...entity("middleware/session/mem_cache_store.rb", [], { includes: ["Compatibility"] }),
+            superclass: "Rack::Session::Dalli",
+          },
+        },
+        modules: {
+          "ActionDispatch::Session::Compatibility": entity("middleware/session/abstract_store.rb", [
+            def("initialize", `${AD}/abstract_store.rb`, 25, 31),
+          ]),
+        },
+      },
+    },
+  } as unknown as ApiManifest;
+  const tsStore = (superclass: string | undefined) =>
+    ({
+      packages: {
+        actiondispatch: {
+          classes: {
+            MemCacheStore: {
+              ...entity("middleware/session/mem-cache-store.ts", [
+                { ...def("constructor", "", 1, 1), file: "middleware/session/mem-cache-store.ts" },
+              ]),
+              superclass,
+              superclassFile: superclass && "middleware/session/cache-store.ts",
+            },
+          },
+          modules: {},
+        },
+      },
+    }) as unknown as ApiManifest;
+
+  it("reads the TS superclass, so a module it already holds is skipped as include_modules_at skips it", () => {
+    const enrolled = ["actiondispatch"];
+    expect(inlinedFromFindings(store, tsStore("CacheStore"), enrolled)).toEqual([]);
+    expect(inlinedFromFindings(store, tsStore(undefined), enrolled).map((f) => f.hook)).toEqual([
+      "ActionDispatch::Session::Compatibility#initialize",
+    ]);
+  });
+});

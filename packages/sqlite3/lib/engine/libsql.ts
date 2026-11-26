@@ -185,6 +185,7 @@ function openEngine(
       disableQuirkMode: () => {},
       loadExtensionInternal: (file) => void raw.loadExtension(file),
       enableLoadExtension: () => {},
+      interrupt: () => (raw as typeof raw & { interrupt(): void }).interrupt(),
       libversion: () =>
         libversionNumber((raw.prepare("select sqlite_version() v").get() as { v: string }).v),
       dbFilename: (dbName) =>

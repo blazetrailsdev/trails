@@ -16,7 +16,7 @@ import { Cookies } from "../../lib/action-controller/metal/cookies.js";
 import { Helpers, setHelpersPath } from "../../lib/action-controller/metal/helpers.js";
 import type { HelpersClass } from "../../lib/abstract-controller/helpers.js";
 import { Request } from "../../lib/action-dispatch/http/request.js";
-import { Buffer, Response } from "../../lib/action-dispatch/http/response.js";
+import { Response } from "../../lib/action-dispatch/http/response.js";
 
 class ApplicationController extends Base {}
 
@@ -177,6 +177,8 @@ describe("ActionController::Streaming#_render_template", () => {
   });
 });
 
+type StreamedBody = { body?(): Promise<string> };
+
 describe("ActionController::Streaming layout content_for fallback", () => {
   class StreamLayoutController extends ApplicationController {
     async show(): Promise<void> {
@@ -194,7 +196,7 @@ describe("ActionController::Streaming layout content_for fallback", () => {
   it("falls back to the app name when no view provides a title on a streamed render", async () => {
     const controller = new StreamLayoutController();
     await controller.dispatch("show", makeRequest(), await Response.new());
-    expect(await (controller.response.stream as Buffer).awaitBody()).toBe(
+    expect(await (controller.response.stream as StreamedBody).body!()).toBe(
       "<title>Blog</title>body",
     );
   });
@@ -235,23 +237,14 @@ describe("ActionController::Streaming chunked response body", () => {
     expect(rest.join("")).toBe("body");
   });
 
-  it("raises on a sync body read while the streamed Body is pending", async () => {
-    const controller = new StreamGateController();
-    await controller.dispatch("show", makeRequest(), await Response.new());
-
-    expect(() => controller.response.body).toThrow(/await awaitBody before body/);
-    expect(() => controller.response.body).toThrow(/await awaitBody before body/);
-    release();
-    expect(await (controller.response.stream as Buffer).awaitBody()).toBe("<head></head>body");
-  });
-
   it("rescues a template that rejects after a sync body read", async () => {
     const controller = new StreamGateController();
     await controller.dispatch("show", makeRequest(), await Response.new());
 
-    expect(() => controller.response.body).toThrow(/await awaitBody before body/);
+    expect(controller.response.body).toBeDefined();
+    const body = (controller.response.stream as StreamedBody).body!();
     fail(new Error("boom"));
-    expect(await (controller.response.stream as Buffer).awaitBody()).toMatch(/^<head><\/head>/);
+    expect(await body).toMatch(/^<head><\/head>/);
   });
 });
 

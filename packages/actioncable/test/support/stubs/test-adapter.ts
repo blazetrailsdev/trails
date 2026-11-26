@@ -1,4 +1,4 @@
-import { Hash, aryDelete } from "@blazetrails/ruby-compat";
+import { Hash, aryDelete, rbFSleep } from "@blazetrails/ruby-compat";
 import { Base } from "../../../lib/subscription-adapter/base.js";
 
 type Callback = (message: unknown) => unknown;
@@ -10,6 +10,8 @@ export class SuccessAdapter extends Base {
     successCallback: (() => unknown) | null;
   };
   static unsubscribeCalled: { channel: string; callback: Callback };
+
+  unsubscribeLatency: number | null = null;
 
   private _subscribers?: Hash<string, Callback[]>;
 
@@ -27,6 +29,7 @@ export class SuccessAdapter extends Base {
   }
 
   override async unsubscribe(channel: string, callback: Callback): Promise<unknown> {
+    if (this.unsubscribeLatency != null) await rbFSleep(this.unsubscribeLatency);
     aryDelete(this.subscriberMap.get(channel)!, callback);
     if (this.subscriberMap.get(channel)!.length === 0) this.subscriberMap.delete(channel);
     return (SuccessAdapter.unsubscribeCalled = { channel, callback });

@@ -72,6 +72,44 @@ const NULL_CONTENT_TYPE_HEADER = new ContentTypeHeader(null, null);
 type RubyArgs = unknown[] | [...unknown[], (...args: never[]) => unknown];
 const BODY_METHODS = { toAry: true, each: true, call: true, toPath: true } as const;
 
+/** @noRailsEquivalent PERMANENT */
+async function* _eachChunks(
+  each: (block: (chunk: unknown) => Promise<void>) => unknown,
+): AsyncIterableIterator<unknown> {
+  const yielded: Array<{ chunk: unknown; resume: () => void }> = [];
+  let wake: (() => void) | null = null;
+  let done = false;
+  const eachChunk = Promise.resolve(
+    each(
+      (chunk) =>
+        new Promise<void>((resume) => {
+          yielded.push({ chunk, resume });
+          wake?.();
+        }),
+    ),
+  )
+    .then(
+      () => null,
+      (error: unknown) => ({ error }),
+    )
+    .finally(() => {
+      done = true;
+      wake?.();
+    });
+  while (yielded.length > 0 || !done) {
+    const next = yielded.shift();
+    if (next) {
+      yield next.chunk;
+      next.resume();
+    } else {
+      await new Promise<void>((resolve) => (wake = resolve));
+      wake = null;
+    }
+  }
+  const failure = await eachChunk;
+  if (failure) throw failure.error;
+}
+
 export class Buffer<Buf extends { push(obj: unknown): unknown } = Array<unknown>> {
   /** @internal */
   protected _response: Response | null;
@@ -185,38 +223,7 @@ export class Buffer<Buf extends { push(obj: unknown): unknown } = Array<unknown>
         await reader.cancel();
       }
     } else {
-      const yielded: Array<{ chunk: unknown; resume: () => void }> = [];
-      let wake: (() => void) | null = null;
-      let done = false;
-      const eachChunk = Promise.resolve(
-        this.eachChunk(
-          (chunk) =>
-            new Promise<void>((resume) => {
-              yielded.push({ chunk, resume });
-              wake?.();
-            }),
-        ),
-      )
-        .then(
-          () => null,
-          (error: unknown) => ({ error }),
-        )
-        .finally(() => {
-          done = true;
-          wake?.();
-        });
-      while (yielded.length > 0 || !done) {
-        const next = yielded.shift();
-        if (next) {
-          yield next.chunk;
-          next.resume();
-        } else {
-          await new Promise<void>((resolve) => (wake = resolve));
-          wake = null;
-        }
-      }
-      const failure = await eachChunk;
-      if (failure) throw failure.error;
+      yield* _eachChunks((block) => this.eachChunk(block));
     }
   }
 
@@ -315,7 +322,9 @@ export class RackBody {
       for await (const chunk of stream as AsyncIterable<unknown>)
         yield chunk as string | Uint8Array;
     } else {
-      for (const chunk of this._response.bodyParts()) yield chunk as string | Uint8Array;
+      const each = stream as { each(block: (chunk: unknown) => unknown): unknown };
+      for await (const chunk of _eachChunks((block) => each.each(block)))
+        yield chunk as string | Uint8Array;
     }
     this._response.sentBang();
   }
@@ -489,11 +498,7 @@ export class Response {
       this.stream = await this.buildBuffer(this, [body]);
     } else if (rbObjRespondTo(body, "toPath")) {
       this.stream = body as { toPath(): string };
-    } else if (
-      rbObjRespondTo(body, "toAry") ||
-      rbObjRespondTo(body, "each") ||
-      body instanceof ReadableStream
-    ) {
+    } else if (rbObjRespondTo(body, "toAry") || body instanceof ReadableStream) {
       this.stream = await this.buildBuffer(this, body);
     } else {
       this.stream = body as Response["stream"];

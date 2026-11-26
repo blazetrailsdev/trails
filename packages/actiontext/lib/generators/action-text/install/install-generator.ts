@@ -1,4 +1,5 @@
-import { File } from "@blazetrails/ruby-compat";
+import "../../../constants.action-text-install-install-generator.generated.js";
+import { File, Pathname } from "@blazetrails/ruby-compat";
 import type * as ThorActions from "@blazetrails/thor/actions";
 import { Base } from "@blazetrails/trailties/generators";
 
@@ -80,15 +81,16 @@ export class InstallGenerator extends Base {
   }
 
   async enableImageProcessingGem(): Promise<void> {
-    const gemfilePath = File.join(this.destinationRoot, "package.json");
-    if (await File.isExistAsync(gemfilePath)) {
+    const gemfilePath = new Pathname(this.destinationRoot).join("package.json");
+    if (await File.isExistAsync(gemfilePath.toPath())) {
       this.say(
         "Ensure image_processing gem has been enabled so image uploads will work (remember to bundle!)",
       );
       const imageProcessingRegex = /"@blazetrails\/image-processing"/;
       if (
-        (await File.readlinesAsync(gemfilePath)).filter((l) => imageProcessingRegex.test(l))
-          .length > 0
+        (await File.readlinesAsync(gemfilePath.toPath())).filter((l) =>
+          imageProcessingRegex.test(l),
+        ).length > 0
       ) {
         await this.uncommentLines(gemfilePath, imageProcessingRegex);
       } else {
@@ -105,20 +107,22 @@ export class InstallGenerator extends Base {
 
   async isUsingJsRuntime(): Promise<boolean> {
     return (this._usingJsRuntime ||= await File.isExistAsync(
-      File.join(this.destinationRoot, "package.json"),
+      new Pathname(this.destinationRoot).join("package.json").toPath(),
     ));
   }
 
   async isUsingBun(): Promise<boolean> {
     return (this._usingBun ||=
       (await this.isUsingJsRuntime()) &&
-      (await File.isExistAsync(File.join(this.destinationRoot, "bun.config.js"))));
+      (await File.isExistAsync(new Pathname(this.destinationRoot).join("bun.config.js").toPath())));
   }
 
   async isUsingNode(): Promise<boolean> {
     return (this._usingNode ||=
       (await this.isUsingJsRuntime()) &&
-      !(await File.isExistAsync(File.join(this.destinationRoot, "bun.config.js"))));
+      !(await File.isExistAsync(
+        new Pathname(this.destinationRoot).join("bun.config.js").toPath(),
+      )));
   }
 
   static {
@@ -127,7 +131,3 @@ export class InstallGenerator extends Base {
 }
 
 InstallGenerator.sourceRoot(File.expandPath("templates", __dir__));
-
-Object.defineProperty(InstallGenerator, "name", {
-  value: "ActionText::Generators::InstallGenerator",
-});

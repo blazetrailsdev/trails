@@ -39,5 +39,3 @@ export class StimulusGenerator extends NamedBase {
     return controllerName.replaceAll("/", "--").replaceAll("_", "-");
   }
 }
-
-Object.defineProperty(StimulusGenerator, "name", { value: "StimulusGenerator" });

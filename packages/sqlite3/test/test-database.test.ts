@@ -405,6 +405,11 @@ describe("TestDatabase", () => {
     expect(thing!.isClosed()).toBeTruthy();
   });
 
+  it("interrupt closed", async () => {
+    await db.close();
+    expect(() => db.interrupt()).toThrow(SQLite3.Exception);
+  });
+
   it("default transaction mode", async () => {
     const tf = Tempfile.new("database_default_transaction_mode");
     try {

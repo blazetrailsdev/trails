@@ -222,6 +222,38 @@ function methodChain(
 }
 
 /**
+ * A Ruby superclass from a gem trails does not vendor (`MemCacheStore <
+ * Rack::Session::Dalli`, `mem_cache_store.rb:23`) has no manifest entry, so
+ * `include_modules_at` (`vendor/ruby/v3.3.11/class.c:1281,1291,1296`) would
+ * see none of the modules the TS stand-in superclass already holds. The TS
+ * class's own superclass is read through its Rails pair in that case.
+ */
+function withTsSuperclass(
+  entity: Entity,
+  klass: ClassInfo,
+  pkg: string,
+  classes: ReadonlyMap<string, Entity>,
+): Entity {
+  const superclass = entity.info.superclass;
+  if (superclass == null || klass.superclass == null || klass.superclassFile === undefined) {
+    return entity;
+  }
+  const byShort = new Map<string, string[]>();
+  for (const fqn of classes.keys()) {
+    byShort.set(shortName(fqn), [...(byShort.get(shortName(fqn)) ?? []), fqn]);
+  }
+  if (classes.has(resolveModuleName(superclass, entity.fqn, byShort))) return entity;
+  const standIn = [...classes.values()].find(
+    (c) =>
+      c.package === pkg &&
+      c.info.file !== undefined &&
+      rubyFileToTs(c.info.file, pkg) === klass.superclassFile &&
+      shortName(c.fqn) === klass.superclass,
+  );
+  return standIn ? { ...entity, info: { ...entity.info, superclass: standIn.fqn } } : entity;
+}
+
+/**
  * Every finding over the two manifests; `enrolled` gates the missing-tag arm.
  * A constructor in `pairs` takes the Rails class compare.ts compared it
  * against, so the two gates never pair it differently; any other is paired by
@@ -295,7 +327,8 @@ export function inlinedFromFindings(
         (paired && rubyEntities.find((e) => e.package === name && e.fqn === paired.rubyModule)) ??
         mirrored.find((entity) => entity.fqn.split("::").pop() === short) ??
         (classes.length === 1 && declared.length === 1 ? classes[0] : undefined);
-      const reached = counterpart && reachedHooks(counterpart, modules, rubyClasses);
+      const ancestry = counterpart && withTsSuperclass(counterpart, klass, name, rubyClasses);
+      const reached = ancestry && reachedHooks(ancestry, modules, rubyClasses);
       let member: string | undefined;
       const report = (hook: string, message: string, fix?: InlinedFromFinding["fix"]) =>
         findings.push({
@@ -343,7 +376,7 @@ export function inlinedFromFindings(
         member = tagged.name;
         const written = tagged.inlinedFrom ?? [];
         const chain =
-          counterpart && methodChain(counterpart, written[0]?.hook ?? "", modules, rubyClasses);
+          ancestry && methodChain(ancestry, written[0]?.hook ?? "", modules, rubyClasses);
         for (const [index, tag] of written.entries()) {
           const hook = `${tag.module}#${tag.hook}`;
           if (tag.hook !== written[0].hook) {

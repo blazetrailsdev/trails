@@ -1,7 +1,15 @@
 import { ActiveSupportJSON, withIndifferentAccess } from "@blazetrails/activesupport";
 import { Mock, stub } from "@blazetrails/activesupport/testing/method-call-assertions";
 import { MockRequest } from "@blazetrails/rack";
-import { Thread, hashAref, constSet, rbModName, rbObjClass } from "@blazetrails/ruby-compat";
+import {
+  Concurrent,
+  Thread,
+  hashAref,
+  constSet,
+  rbFSleep,
+  rbModName,
+  rbObjClass,
+} from "@blazetrails/ruby-compat";
 import { beforeEach, describe, expect, it } from "vitest";
 import { TestCase } from "../support/test-helper.js";
 import { ActionCable } from "../../lib/namespaces.js";
@@ -89,7 +97,7 @@ function mockPubsub(): [{ subscribe: Handler; unsubscribe: Handler }, Mock, Mock
     {
       subscribe: (...args: unknown[]) => subscribe.call(...args),
       unsubscribe: (...args: unknown[]) => unsubscribe.call(...args),
-    } as never,
+    },
     subscribe,
     unsubscribe,
   ];
@@ -350,6 +358,69 @@ describe("StreamTest", () => {
       expect(subscribers.get(ChatChannel.broadcastingFor(new Room(2)))!.length).toBe(1);
     });
   });
+
+  it("concurrent unsubscribe_from_channel and stream_from do not raise RuntimeError", async () => {
+    const threads: Thread<unknown>[] = [];
+    try {
+      await tc.runInEventmachine(async () => {
+        const connection = new TestConnection();
+        (connection.pubsub as SuccessAdapter).unsubscribeLatency = 0.1;
+
+        const channel = new ChatChannel(
+          connection as never,
+          "{id: 1}",
+          withIndifferentAccess({ id: 1 }),
+        );
+        await channel.subscribeToChannel();
+
+        channel.streamFrom("room_one");
+        channel.streamFrom("room_two");
+        await tc.waitForAsync();
+
+        const barrier = new Concurrent.CyclicBarrier(2);
+
+        let exceptionCaught: unknown = null;
+
+        const thread1 = new Thread(async () => {
+          try {
+            await barrier.wait();
+            await rbFSleep(0.001);
+            await channel.unsubscribeFromChannel();
+          } catch (e) {
+            exceptionCaught = e;
+          } finally {
+            await barrier.wait();
+          }
+        });
+        threads.push(thread1);
+
+        const thread2 = new Thread(async () => {
+          try {
+            await barrier.wait();
+            for (let i = 0; i < 10; i++) {
+              channel.streamFrom(`concurrent_room_${i}`);
+              await rbFSleep(0.0001);
+            }
+          } catch (e) {
+            exceptionCaught = e;
+          } finally {
+            await barrier.wait();
+          }
+        });
+        threads.push(thread2);
+
+        await thread1.join();
+        await thread2.join();
+
+        expect(
+          exceptionCaught,
+          `Concurrent unsubscribe_from_channel and stream_from should not raise RuntimeError: ${String(exceptionCaught)}`,
+        ).toBeNull();
+      });
+    } finally {
+      for (const thread of threads) thread.kill();
+    }
+  });
 });
 
 class UserCallbackChannel extends Base {
@@ -392,7 +463,7 @@ describe("StreamFromTest", () => {
       await subscribeTo(connection, { identifiers: { id: 1 } });
 
       await tc.assertCalled(websocketOf(connection), "transmit", null, {}, async () => {
-        await server.broadcast("test_room_1", { foo: "bar" }, { coder: DummyEncoder } as never);
+        await server.broadcast("test_room_1", { foo: "bar" }, { coder: DummyEncoder });
         await tc.waitForAsync();
         await tc.waitForExecutor(
           (connection.server as unknown as { workerPool: Worker }).workerPool.executor,

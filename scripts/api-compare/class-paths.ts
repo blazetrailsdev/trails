@@ -86,6 +86,7 @@ const LAZY_DIRS: Record<string, string[]> = {
   actionmailbox: [
     "app/models/action-mailbox/inbound-email.ts",
     "app/models/action-mailbox/inbound-email/",
+    "generators/",
   ],
   actionmailer: ["test-case.ts", "test-helper.ts"],
   actionview: ["test-case.ts", "testing/resolvers.ts"],
@@ -99,10 +100,11 @@ const LAZY_DIRS: Record<string, string[]> = {
     "service/s3-service.ts",
   ],
   activesupport: ["executor/test-helper.ts"],
-  actiontext: ["encrypted-rich-text.ts", "rich-text.ts"],
+  actiontext: ["encrypted-rich-text.ts", "generators/", "rich-text.ts"],
   "solid-cable": ["generators/"],
   "solid-cache": ["generators/"],
   "solid-queue": ["generators/"],
+  stimulus: ["generators/"],
   trailties: [
     "application-controller.ts",
     "commands/",

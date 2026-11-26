@@ -37,7 +37,7 @@
     }
   },
   "actionmailbox": {
-    "rows": 32,
+    "rows": 33,
     "excluded": ["app/controllers/action-mailbox/base-controller.ts::BaseController"],
     "unwalked": [
       "app/controllers/action-mailbox/ingresses/mailgun/inbound-emails-controller.ts::InboundEmailsController.Authenticator",
@@ -49,6 +49,7 @@
     "residue": {
       "app/models/action-mailbox/inbound-email/message-id.ts::ClassMethods": "ActionMailbox::InboundEmail::MessageId::ClassMethods",
       "callbacks.ts::ClassMethods": "ActionMailbox::Callbacks::ClassMethods",
+      "generators/action-mailbox/install/install-generator.ts::InstallGenerator": "ActionMailbox::Generators::InstallGenerator",
       "routing.ts::ClassMethods": "ActionMailbox::Routing::ClassMethods"
     }
   },
@@ -226,7 +227,7 @@
     }
   },
   "actiontext": {
-    "rows": 28,
+    "rows": 29,
     "excluded": [],
     "unwalked": [],
     "residue": {
@@ -249,6 +250,7 @@
       "engine.ts::Engine": "ActionText::Engine",
       "fragment.ts::Fragment": "ActionText::Fragment",
       "gem-version.ts::VERSION": "ActionText::VERSION",
+      "generators/action-text/install/install-generator.ts::InstallGenerator": "ActionText::Generators::InstallGenerator",
       "html-conversion.ts::HtmlConversion": "ActionText::HtmlConversion",
       "plain-text-conversion.ts::PlainTextConversion": "ActionText::PlainTextConversion",
       "rendering.ts::Rendering": "ActionText::Rendering",
@@ -1335,7 +1337,7 @@
   },
   "stimulus": {
     "rows": 1,
-    "excluded": [],
+    "excluded": ["generators/stimulus/stimulus-generator.ts::StimulusGenerator"],
     "unwalked": [],
     "residue": { "engine.ts::Engine": "Stimulus::Engine" }
   },

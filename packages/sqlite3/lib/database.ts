@@ -21,7 +21,7 @@ import { Pragmas } from "./pragmas.js";
 import { ForkSafety } from "./fork-safety.js";
 import { Statement, type EngineStatement } from "./statement.js";
 import { HashResultSet, ResultSet } from "./resultset.js";
-import { rbSqlite3Raise } from "./errors.js";
+import { Exception, rbSqlite3Raise } from "./errors.js";
 import { withBusyHandler } from "./engine/busy-handler.js";
 
 export type BusyHandler = (count: number) => unknown;
@@ -68,6 +68,7 @@ export interface EngineDatabase extends EngineErrors {
     block: (...args: unknown[]) => unknown,
   ): void;
   defineAggregator2?(aggregator: Aggregator, name: string): void;
+  interrupt?(): void;
 }
 
 export type EngineOpenV2 = ((file: string, mode: number, zvfs: string | null) => EngineDatabase) &
@@ -613,6 +614,17 @@ export class Database<E extends EngineDatabase = EngineDatabase> {
     }
     this.#functions[name] = block;
     this._engine.defineFunctionWithFlags(name, flags, block);
+    return this;
+  }
+
+  interrupt(): this {
+    if (this.isClosed()) throw new Exception("cannot use a closed database");
+
+    if (!this._engine.interrupt) {
+      throw new NotImplementedError("interrupt() function is unimplemented on this machine");
+    }
+    this._engine.interrupt();
+
     return this;
   }
 
