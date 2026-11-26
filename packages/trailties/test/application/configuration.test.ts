@@ -2465,10 +2465,11 @@ const POST_MODEL = `
   }
 `;
 
-const postsController = (body: string, parent = "ApplicationController"): string => `
+const postsController = (body: string, parent = "ApplicationController", imports = ""): string => `
   import { ApplicationController } from "./application-controller.ts";
   import { ActionController } from "@blazetrails/actionpack";
   import { Post } from "../models/post.ts";
+  ${imports}
   export class PostsController extends ${parent} {
     ${body}
   }
@@ -2973,13 +2974,14 @@ describe("ApplicationTests::ConfigurationTest", { concurrent: true, timeout: 120
     );
     await t.appFile(
       "app/controllers/posts-controller.ts",
-      postsController(`
+      postsController(
+        `
         async create() {
           await this.render({ plain: rbInspect(this.params.get("post")) });
         }
-`).replace(
-        `import { Post } from "../models/post.ts";`,
-        `import { Post } from "../models/post.ts";\n  import { rbInspect } from "@blazetrails/ruby-compat";`,
+`,
+        undefined,
+        `import { rbInspect } from "@blazetrails/ruby-compat";`,
       ),
     );
     await t.addToConfig(POSTS_ROUTES);
