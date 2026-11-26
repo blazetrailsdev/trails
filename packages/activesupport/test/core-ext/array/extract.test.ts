@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Enumerator } from "@blazetrails/ruby-compat";
+import { Enumerator } from "@blazetrails/ruby-compat/enumerator";
 import { extractBang } from "../../../lib/index.js";
 
 describe("ExtractTest", () => {

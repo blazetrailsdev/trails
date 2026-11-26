@@ -1,5 +1,6 @@
 import { DescendantsTracker } from "@blazetrails/activesupport";
-import { constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
 import { Zine } from "./zine.js";
 
 export class StrictZine extends Zine {

@@ -1,6 +1,6 @@
 import { DescendantsTracker } from "@blazetrails/activesupport";
 import { Admin } from "../admin.js";
-import { constSet } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
 import {
   ActiveSupportJSON,
   isPresent,

@@ -1,5 +1,6 @@
 import { expect, it as vitestIt } from "vitest";
-import { SecureRandom, Thread } from "@blazetrails/ruby-compat";
+import { SecureRandom } from "@blazetrails/ruby-compat/secure-random";
+import { Thread } from "@blazetrails/ruby-compat/thread";
 import type { Store, StoreOptions } from "../../../lib/cache/store.js";
 import { lookupStore } from "../../../lib/cache.js";
 import { assertNothingRaised } from "../../../lib/testing/assertions.js";

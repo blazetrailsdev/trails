@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 
 import { include } from "@blazetrails/ruby-compat/include";
-import { block } from "@blazetrails/ruby-compat";
+import { block } from "@blazetrails/ruby-compat/hash";
 import { Configurable } from "../lib/configurable.js";
 import { NameError } from "../lib/core-ext/name-error.js";
 

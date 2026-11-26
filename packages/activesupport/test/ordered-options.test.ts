@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { assertRespondTo } from "../lib/testing/assertions.js";
-import { KeyError } from "@blazetrails/ruby-compat";
+import { KeyError } from "@blazetrails/ruby-compat/key-error";
 import { OrderedOptions, InheritableOptions } from "../lib/ordered-options.js";
 
 type Options = { [key: string]: any };

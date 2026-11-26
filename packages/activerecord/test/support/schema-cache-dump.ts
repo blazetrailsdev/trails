@@ -1,7 +1,9 @@
 /** @internal */
 import { getEnv } from "@blazetrails/activesupport";
 import { Digest } from "@blazetrails/activesupport/digest";
-import { getOsAsync, File, rbObjDup } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat/file";
+import { rbObjDup } from "@blazetrails/ruby-compat/include";
+import { getOsAsync } from "@blazetrails/ruby-compat/os-adapter";
 import type {
   AbstractAdapter as DatabaseAdapter,
   AdapterName,

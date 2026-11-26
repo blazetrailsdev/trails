@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { LoadError } from "@blazetrails/ruby-compat";
+import { LoadError } from "@blazetrails/ruby-compat/load-error";
 import { ActiveSupport } from "../../lib/namespaces.js";
 import { SerializerWithFallback as CacheSerializerWithFallback } from "../../lib/cache/serializer-with-fallback.js";
 import { SerializerWithFallback } from "../../lib/messages/serializer-with-fallback.js";

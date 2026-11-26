@@ -1,6 +1,7 @@
 import type { Callback } from "../lib/callbacks.js";
 import { afterAll, afterEach, beforeAll, beforeEach, describe as suite, expect, it } from "vitest";
-import { SecureRandom, kernelRand } from "@blazetrails/ruby-compat";
+import { kernelRand } from "@blazetrails/ruby-compat/kernel-rand";
+import { SecureRandom } from "@blazetrails/ruby-compat/secure-random";
 import { NameError } from "../lib/core-ext/name-error.js";
 import { ArgumentError } from "../lib/hash-utils.js";
 import { Logger } from "../lib/logger.js";

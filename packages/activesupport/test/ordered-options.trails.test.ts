@@ -5,7 +5,8 @@
  * reaches only through nested Hashes.
  */
 import { describe, it, expect } from "vitest";
-import { KeyError, rbEqual } from "@blazetrails/ruby-compat";
+import { KeyError } from "@blazetrails/ruby-compat/key-error";
+import { rbEqual } from "@blazetrails/ruby-compat/rb-equal";
 import { OrderedOptions } from "../lib/ordered-options.js";
 import { HashWithIndifferentAccess } from "../lib/hash-with-indifferent-access.js";
 

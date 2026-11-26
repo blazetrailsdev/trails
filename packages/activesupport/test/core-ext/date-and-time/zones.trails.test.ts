@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { Time as RubyTime } from "@blazetrails/date";
-import { NoMethodError, rbFSend } from "@blazetrails/ruby-compat";
+import { NoMethodError } from "@blazetrails/ruby-compat/no-method-error";
+import { rbFSend } from "@blazetrails/ruby-compat/object";
 import { inTimeZone } from "../../../lib/core-ext/date-and-time/zones.js";
 import { setZone, useZone } from "../../../lib/time-zone-config.js";
 import { TimeWithZone } from "../../../lib/time-with-zone.js";

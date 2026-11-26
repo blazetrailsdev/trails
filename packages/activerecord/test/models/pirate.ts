@@ -1,5 +1,9 @@
 import { DescendantsTracker } from "@blazetrails/activesupport";
-import { hashDelete, isEmpty, kernelThrow, constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { hashDelete } from "@blazetrails/ruby-compat/hash";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { kernelThrow } from "@blazetrails/ruby-compat/kernel-catch";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
+import { isEmpty } from "@blazetrails/ruby-compat/ruby-empty";
 import { isPresent } from "@blazetrails/activesupport";
 import type { AssociationProxy } from "../../lib/associations/collection-proxy.js";
 import { CollectionProxy } from "../../lib/associations/collection-proxy.js";

@@ -1,7 +1,9 @@
 import { DescendantsTracker } from "@blazetrails/activesupport";
 import type { AssociationProxy } from "../../lib/associations/collection-proxy.js";
 import type { Student } from "./student.js";
-import { Exception, constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { Exception } from "@blazetrails/ruby-compat/exception";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
 import { Base } from "../../lib/base.js";
 
 export class LessonError extends Exception {}

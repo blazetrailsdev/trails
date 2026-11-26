@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { Logger } from "../lib/logger.js";
-import { rbInspect } from "@blazetrails/ruby-compat";
+import { rbInspect } from "@blazetrails/ruby-compat/object";
 
 describe("CleanLoggerTest", () => {
   it("format message", () => {

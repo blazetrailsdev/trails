@@ -1,5 +1,6 @@
 import { DescendantsTracker } from "@blazetrails/activesupport";
-import { constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
 import "../../lib/destroy-association-async-job.js";
 import type { DestroyAsyncParentSoftDelete } from "./destroy-async-parent-soft-delete.js";
 import { Base } from "../../lib/base.js";

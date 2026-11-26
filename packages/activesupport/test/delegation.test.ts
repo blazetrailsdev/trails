@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { NoMethodError, rbObjRespondTo, rbObjSingletonClass } from "@blazetrails/ruby-compat";
+import { NoMethodError } from "@blazetrails/ruby-compat/no-method-error";
+import { rbObjRespondTo, rbObjSingletonClass } from "@blazetrails/ruby-compat/object";
 import { DelegationError, Delegation } from "../lib/delegation.js";
 
 describe("DelegationError", () => {

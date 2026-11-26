@@ -1,7 +1,10 @@
 import { describe, it, expect } from "vitest";
 import { enableWarnings, silenceWarnings } from "../../lib/core-ext/kernel/reporting.js";
 import { suppress } from "../../lib/core-ext/kernel/reporting.js";
-import { ArgumentError, LoadError, rbObjSingletonClass, verbose } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { LoadError } from "@blazetrails/ruby-compat/load-error";
+import { rbObjSingletonClass } from "@blazetrails/ruby-compat/object";
+import { verbose } from "@blazetrails/ruby-compat/verbose";
 import { classEval } from "../../lib/core-ext/kernel/singleton-class.js";
 import { assertNil } from "../../lib/testing/assertions.js";
 

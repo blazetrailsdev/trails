@@ -1,5 +1,9 @@
 import { DescendantsTracker } from "@blazetrails/activesupport";
-import { Exception, RuntimeError, kernelThrow, constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { Exception } from "@blazetrails/ruby-compat/exception";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { kernelThrow } from "@blazetrails/ruby-compat/kernel-catch";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
 import type { AssociationProxy } from "../../lib/associations/collection-proxy.js";
 import type { BestHardback } from "./hardback.js";
 import type { Book } from "./book.js";

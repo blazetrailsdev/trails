@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { BigDecimal, FrozenError, IPAddr, Pathname, Range, URI } from "@blazetrails/ruby-compat";
+import { BigDecimal } from "@blazetrails/ruby-compat/big-decimal";
+import { FrozenError } from "@blazetrails/ruby-compat/frozen-error";
+import { IPAddr } from "@blazetrails/ruby-compat/ipaddr";
+import { Pathname } from "@blazetrails/ruby-compat/pathname";
+import { Range } from "@blazetrails/ruby-compat/range";
+import { URI } from "@blazetrails/ruby-compat/uri/common";
 
 import { DateTime, Time } from "@blazetrails/date";
 

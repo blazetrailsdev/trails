@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
 import "../../lib/message-pack.js";
 import { SerializerWithFallback } from "../../lib/cache/serializer-with-fallback.js";
-import { KeyError, StringIO } from "@blazetrails/ruby-compat";
+import { KeyError } from "@blazetrails/ruby-compat/key-error";
+import { StringIO } from "@blazetrails/ruby-compat/string-io";
 import { Logger } from "../../lib/logger.js";
 import { Entry } from "../../lib/cache/entry.js";
 import { Store } from "../../lib/cache/index.js";

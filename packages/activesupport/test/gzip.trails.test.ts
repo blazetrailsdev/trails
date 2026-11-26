@@ -1,4 +1,4 @@
-import { b } from "@blazetrails/ruby-compat";
+import { b } from "@blazetrails/ruby-compat/string/b";
 import { describe, it, expect } from "vitest";
 import { Stream } from "../lib/gzip.js";
 

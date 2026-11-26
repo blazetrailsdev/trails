@@ -1,4 +1,4 @@
-import { include } from "@blazetrails/ruby-compat";
+import { include } from "@blazetrails/ruby-compat/include";
 import type { Extended, Included } from "@blazetrails/ruby-compat/include";
 import { beforeEach, describe, expect, it } from "vitest";
 import { Callbacks } from "../lib/callbacks.js";

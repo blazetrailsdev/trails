@@ -1,5 +1,6 @@
 import { getEnv } from "@blazetrails/activesupport";
-import { File, FileUtils } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat/file";
+import { FileUtils } from "@blazetrails/ruby-compat/file-utils";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { Base } from "../../lib/base.js";
 import { setAsyncQueryExecutor } from "../../lib/active-record.js";

@@ -1,5 +1,6 @@
 import { DescendantsTracker } from "@blazetrails/activesupport";
-import { constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
 import type { Carrier } from "./carrier.js";
 import type { Customer } from "./customer.js";
 import type { CustomerCarrier } from "./customer-carrier.js";

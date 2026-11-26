@@ -1,6 +1,8 @@
 import { DescendantsTracker } from "@blazetrails/activesupport";
 import type { ScopeOn } from "../../lib/scoping/named.js";
-import { kernelThrow, rbCallSuper, constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { rbCallSuper, constSet } from "@blazetrails/ruby-compat/include";
+import { kernelThrow } from "@blazetrails/ruby-compat/kernel-catch";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
 import type { Relation } from "../../lib/relation.js";
 import type { Author } from "./author.js";
 import type { AuthorAddress } from "./author.js";

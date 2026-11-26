@@ -1,4 +1,4 @@
-import { rbEqual } from "@blazetrails/ruby-compat";
+import { rbEqual } from "@blazetrails/ruby-compat/rb-equal";
 import { afterEach, beforeEach, expect, it } from "vitest";
 import { Entry } from "../../../lib/cache/entry.js";
 import { coder } from "../../../lib/cache/marshal-coder.js";

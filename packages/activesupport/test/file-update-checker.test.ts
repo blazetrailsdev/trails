@@ -1,7 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { ArgumentError, Dir, File, FileUtils } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { Dir } from "@blazetrails/ruby-compat/dir";
+import { File } from "@blazetrails/ruby-compat/file";
+import { FileUtils } from "@blazetrails/ruby-compat/file-utils";
 import { FileUpdateChecker } from "../lib/file-update-checker.js";
-import { rbObjIvarGet } from "@blazetrails/ruby-compat";
+import { rbObjIvarGet } from "@blazetrails/ruby-compat/object";
 import { Time } from "@blazetrails/date";
 import { travelTo } from "../lib/testing/time-helpers.js";
 

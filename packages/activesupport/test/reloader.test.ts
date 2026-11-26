@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { RuntimeError } from "@blazetrails/ruby-compat";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
 import { Reloader } from "../lib/reloader.js";
 import { Executor } from "../lib/executor.js";
 import { assertNot, assertRaises } from "../lib/testing/assertions.js";

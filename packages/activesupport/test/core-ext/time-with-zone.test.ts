@@ -23,19 +23,15 @@ import { toTime as dateToTime } from "../../lib/core-ext/date/conversions.js";
 import { current } from "../../lib/time-ext.js";
 import "../../lib/core-ext/time/calculations.js";
 import { setPreserveTimezone } from "../../lib/core-ext/date-and-time/compatibility.js";
-import {
-  Rational,
-  rational,
-  rbEqual,
-  rbHash,
-  rbInspect,
-  rbObjRespondTo,
-} from "@blazetrails/ruby-compat";
+import { rbInspect, rbObjRespondTo } from "@blazetrails/ruby-compat/object";
+import { Rational, rational } from "@blazetrails/ruby-compat/rational";
+import { rbEqual } from "@blazetrails/ruby-compat/rb-equal";
+import { rbHash } from "@blazetrails/ruby-compat/rb-hash";
 import { YAML, toYaml } from "@blazetrails/ruby-compat/yaml";
 import { assertDeprecated, assertNotDeprecated } from "../../lib/testing/deprecation.js";
 import { assertNotCalled } from "../../lib/testing/method-call-assertions.js";
 import { toTimePreservesTimezone } from "../../lib/active-support.js";
-import { NoMethodError } from "@blazetrails/ruby-compat";
+import { NoMethodError } from "@blazetrails/ruby-compat/no-method-error";
 import {
   assert,
   assertNot,

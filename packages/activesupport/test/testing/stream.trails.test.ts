@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { stderr, stdout } from "@blazetrails/ruby-compat";
+import { stderr, stdout } from "@blazetrails/ruby-compat/process-adapter";
 import { capture, quietly, silenceStream } from "../../lib/testing/stream.js";
 
 describe("ActiveSupport::Testing::Stream", () => {

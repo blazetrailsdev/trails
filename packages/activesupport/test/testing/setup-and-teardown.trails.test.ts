@@ -3,7 +3,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { Assertion, Skip, UnexpectedError } from "../../lib/testing/assertions.js";
 import { _takeAssertions, assertNot, assertRaises } from "../../lib/testing/assertions.js";
 import { TestCase } from "../../lib/test-case.js";
-import { iseqLocationSetup, rbObjMethod, TopLevel, constSet } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { iseqLocationSetup, rbObjMethod } from "@blazetrails/ruby-compat/method";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
 
 function testCase(): typeof TestCase {
   return class extends TestCase {};
@@ -145,7 +147,7 @@ describe("TestCase lifecycle hooks", () => {
   async function includedBeneath(ran: string[]): Promise<typeof TestCase> {
     vi.resetModules();
     const { TestCase: Reloaded } = await import("../../lib/test-case.js");
-    const { include, rbCallSuper } = await import("@blazetrails/ruby-compat");
+    const { include, rbCallSuper } = await import("@blazetrails/ruby-compat/include");
     async function beforeSetup(this: object) {
       await Promise.resolve();
       ran.push("before_setup");

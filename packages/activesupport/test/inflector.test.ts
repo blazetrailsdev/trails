@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, beforeEach, describe, it, expect, vi } from "vitest";
-import { LoadError } from "@blazetrails/ruby-compat";
+import { LoadError } from "@blazetrails/ruby-compat/load-error";
 import { ActiveSupport } from "../lib/namespaces.js";
 import { assertRaises } from "../lib/testing/assertions.js";
 import {
@@ -21,7 +21,7 @@ import {
   ordinal,
   ordinalize,
 } from "../lib/index.js";
-import { resetConstants } from "@blazetrails/ruby-compat";
+import { resetConstants } from "@blazetrails/ruby-compat/variable";
 import { Inflections, Uncountables, inflections } from "../lib/inflector/inflections.js";
 import { I18n } from "../lib/i18n.js";
 import {

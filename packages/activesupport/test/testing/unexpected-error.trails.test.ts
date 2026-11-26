@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { Dir, env, setEnv } from "@blazetrails/ruby-compat";
+import { Dir } from "@blazetrails/ruby-compat/dir";
+import { env, setEnv } from "@blazetrails/ruby-compat/process-adapter";
 import { BacktraceFilter, Minitest, UnexpectedError } from "../../lib/testing/assertions.js";
 
 describe("UnexpectedErrorTest", () => {

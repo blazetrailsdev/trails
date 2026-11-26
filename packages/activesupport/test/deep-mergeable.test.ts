@@ -2,7 +2,7 @@
    Wrapper spells `include ActiveSupport::DeepMergeable` in its body (deep_mergeable_test.rb:6-8); the
    empty class/interface merge carries the mixed-in methods onto its type. */
 import { describe, expect, it, beforeEach } from "vitest";
-import { include } from "@blazetrails/ruby-compat";
+import { include } from "@blazetrails/ruby-compat/include";
 import { DeepMergeable, type DeepMergeableHost } from "../lib/deep-mergeable.js";
 
 type MergeBlock = (key: unknown, thisVal: unknown, otherVal: unknown) => unknown;

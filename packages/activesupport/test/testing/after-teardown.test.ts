@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { UnexpectedError, assert, assertChanges } from "../../lib/testing/assertions.js";
 import { TestCase } from "../../lib/test-case.js";
-import { include, rbCallSuper } from "@blazetrails/ruby-compat";
+import { include, rbCallSuper } from "@blazetrails/ruby-compat/include";
 
 class MyError extends Error {}
 

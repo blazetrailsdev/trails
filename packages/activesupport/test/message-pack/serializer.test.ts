@@ -1,27 +1,19 @@
 import { describe, it, expect } from "vitest";
 import { MessagePack, UnserializableObjectError } from "../../lib/message-pack.js";
 import { DateTime, Time } from "@blazetrails/date";
-import {
-  BigDecimal,
-  Complex,
-  Generic,
-  IPAddr,
-  Marshal,
-  Pathname,
-  Range,
-  Rational,
-  RuntimeError,
-  URI,
-  complex,
-  env as ENV,
-  rational,
-  rbCDate,
-  rbCDateTime,
-  rbCInteger,
-  rbCSymbol,
-  rbEqual,
-  setEnv,
-} from "@blazetrails/ruby-compat";
+import { BigDecimal } from "@blazetrails/ruby-compat/big-decimal";
+import { Complex, complex } from "@blazetrails/ruby-compat/complex";
+import { IPAddr } from "@blazetrails/ruby-compat/ipaddr";
+import { Marshal } from "@blazetrails/ruby-compat/marshal";
+import { rbCDate, rbCDateTime, rbCInteger, rbCSymbol } from "@blazetrails/ruby-compat/object";
+import { Pathname } from "@blazetrails/ruby-compat/pathname";
+import { env as ENV, setEnv } from "@blazetrails/ruby-compat/process-adapter";
+import { Range } from "@blazetrails/ruby-compat/range";
+import { Rational, rational } from "@blazetrails/ruby-compat/rational";
+import { rbEqual } from "@blazetrails/ruby-compat/rb-equal";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
+import { URI } from "@blazetrails/ruby-compat/uri/common";
+import { Generic } from "@blazetrails/ruby-compat/uri/generic";
 import {
   Duration,
   days,

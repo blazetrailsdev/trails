@@ -1,5 +1,5 @@
 import { beforeEach, expect, it } from "vitest";
-import { Hash } from "@blazetrails/ruby-compat";
+import { Hash } from "@blazetrails/ruby-compat/hash";
 import { Notifications } from "../../../lib/notifications.js";
 import type { Event } from "../../../lib/notifications/instrumenter.js";
 import type { Store, StoreOptions } from "../../../lib/cache/store.js";

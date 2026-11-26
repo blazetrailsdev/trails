@@ -1,4 +1,4 @@
-import { RuntimeError } from "@blazetrails/ruby-compat";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
 import * as mysqlQuoting from "../../lib/connection-adapters/mysql/quoting.js";
 import * as pgQuoting from "../../lib/connection-adapters/postgresql/quoting.js";
 import * as sqliteQuoting from "../../lib/connection-adapters/sqlite3/quoting.js";

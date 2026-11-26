@@ -1,4 +1,4 @@
-import { RuntimeError } from "@blazetrails/ruby-compat";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
 import { describe, it, type SuiteFactory, type TestFunction } from "vitest";
 import { adapterType } from "./test-adapter.js";
 import {

@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { createHash } from "crypto";
-import { OpenSSL } from "@blazetrails/ruby-compat";
+import { OpenSSL } from "@blazetrails/ruby-compat/openssl";
 import { ArgumentError } from "../lib/hash-utils.js";
 import { Digest } from "../lib/digest.js";
 

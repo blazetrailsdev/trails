@@ -1,11 +1,8 @@
 import { describe, it, expect } from "vitest";
-import {
-  Range,
-  TopLevel,
-  constSet,
-  constDefined,
-  rbModRemoveConst,
-} from "@blazetrails/ruby-compat";
+import { constSet, constDefined } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
+import { Range } from "@blazetrails/ruby-compat/range";
+import { rbModRemoveConst } from "@blazetrails/ruby-compat/variable";
 import { Date as RubyDate, DateTime, Time } from "@blazetrails/date";
 import { Psych } from "@blazetrails/ruby-compat/psych";
 import { HashWithIndifferentAccess } from "../lib/hash-with-indifferent-access.js";

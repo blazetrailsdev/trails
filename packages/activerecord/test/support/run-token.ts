@@ -1,6 +1,6 @@
 /** @internal */
 
-import { regexpEscape } from "@blazetrails/ruby-compat";
+import { regexpEscape } from "@blazetrails/ruby-compat/regexp";
 
 export const RUN_TOKEN_ENV = "AR_TEST_RUN_TOKEN";
 

@@ -1,4 +1,4 @@
-import { extend, type Extended } from "@blazetrails/ruby-compat";
+import { extend, type Extended } from "@blazetrails/ruby-compat/include";
 import * as Autoload from "../../../lib/dependencies/autoload.js";
 
 type AutoloadModule = Autoload.Autoload & Extended<typeof Autoload>;

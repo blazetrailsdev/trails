@@ -1,12 +1,9 @@
 import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
 import { Time, resetLocalTimeZoneId } from "@blazetrails/date";
-import {
-  ArgumentError,
-  Rational,
-  rbCInteger,
-  rbCNumeric,
-  rbFloatTypeP,
-} from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { rbFloatTypeP } from "@blazetrails/ruby-compat/numeric";
+import { rbCInteger, rbCNumeric } from "@blazetrails/ruby-compat/object";
+import { Rational } from "@blazetrails/ruby-compat/rational";
 import { Duration, Scalar, days, hours, months, seconds } from "../lib/duration.js";
 
 describe("Scalar", () => {
@@ -142,7 +139,7 @@ describe("Time.at with a Duration", () => {
 
 describe("rb_obj_classname without a brand", () => {
   it("answers the generated class path of Duration, Scalar and TimeWithZone", async () => {
-    const { rbObjClassname } = await import("@blazetrails/ruby-compat");
+    const { rbObjClassname } = await import("@blazetrails/ruby-compat/object");
     const { TimeZone } = await import("../lib/values/time-zone.js");
     expect(rbObjClassname(days(1))).toBe("ActiveSupport::Duration");
     expect(rbObjClassname(new Scalar(1))).toBe("ActiveSupport::Duration::Scalar");

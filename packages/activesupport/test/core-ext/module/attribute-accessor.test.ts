@@ -1,5 +1,8 @@
 import { beforeEach, describe, it, expect } from "vitest";
-import { block, classModule, include, NameError } from "@blazetrails/ruby-compat";
+import { classModule } from "@blazetrails/ruby-compat/class-module";
+import { block } from "@blazetrails/ruby-compat/hash";
+import { include } from "@blazetrails/ruby-compat/include";
+import { NameError } from "@blazetrails/ruby-compat/name-error";
 
 import {
   cattrAccessor,

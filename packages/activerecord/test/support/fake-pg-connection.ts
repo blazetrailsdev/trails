@@ -1,5 +1,5 @@
 import pg from "pg";
-import { rbClassNewInstance } from "@blazetrails/ruby-compat";
+import { rbClassNewInstance } from "@blazetrails/ruby-compat/include";
 import { vi } from "vitest";
 import { Connection } from "@blazetrails/pg";
 

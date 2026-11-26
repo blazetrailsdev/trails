@@ -1,5 +1,5 @@
 import { beforeEach, expect, it } from "vitest";
-import { SecureRandom } from "@blazetrails/ruby-compat";
+import { SecureRandom } from "@blazetrails/ruby-compat/secure-random";
 import type { Store, StoreOptions } from "../../../lib/cache/store.js";
 
 class ModelWithKeyAndVersion {

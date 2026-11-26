@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { include } from "@blazetrails/ruby-compat";
+import { include } from "@blazetrails/ruby-compat/include";
 import { includedModules, prepend, publicInstanceMethods } from "@blazetrails/ruby-compat/include";
 import { concern, concerning } from "../../../lib/core-ext/module/concerning.js";
 import {

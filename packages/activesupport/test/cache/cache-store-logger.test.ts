@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { StringIO } from "@blazetrails/ruby-compat";
+import { StringIO } from "@blazetrails/ruby-compat/string-io";
 import { lookupStore } from "../../lib/cache.js";
 import type { Store } from "../../lib/cache/store.js";
 import { Logger } from "../../lib/logger.js";

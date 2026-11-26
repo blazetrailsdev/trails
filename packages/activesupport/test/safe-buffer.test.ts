@@ -1,5 +1,7 @@
 import { beforeEach, describe, it, expect } from "vitest";
-import { Range, block, camelized } from "@blazetrails/ruby-compat";
+import { block } from "@blazetrails/ruby-compat/hash";
+import { camelized } from "@blazetrails/ruby-compat/object";
+import { Range } from "@blazetrails/ruby-compat/range";
 import { YAML, toYaml } from "@blazetrails/ruby-compat/yaml";
 import { titleize, underscore } from "../lib/inflector.js";
 import { SafeBuffer, htmlSafe, isHtmlSafe } from "../lib/core-ext/string/output-safety.js";

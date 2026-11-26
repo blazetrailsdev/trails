@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Time } from "@blazetrails/date";
-import { ArgumentError, RuntimeError } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
 import { Notifications } from "../lib/notifications.js";
 import { Fanout, type Evented } from "../lib/notifications/fanout.js";
 import { travelTo, travelBack } from "../lib/testing/time-helpers.js";

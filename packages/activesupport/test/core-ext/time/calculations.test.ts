@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Time as RubyTime } from "@blazetrails/date";
-import { Rational } from "@blazetrails/ruby-compat";
+import { Rational } from "@blazetrails/ruby-compat/rational";
 import { ArgumentError } from "../../../lib/hash-utils.js";
 import "../../../lib/core-ext/time/calculations.js";
 

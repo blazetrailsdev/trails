@@ -15,7 +15,7 @@ describe("trailties subpath exports", () => {
           "--input-type=module",
           "-e",
           `const { Inflector } = await import("./dist/autoloaders/inflector.js");
-const { rbModName } = await import("@blazetrails/ruby-compat");
+const { rbModName } = await import("@blazetrails/ruby-compat/object");
 console.log(rbModName(Inflector));`,
         ],
         { cwd: root, encoding: "utf8" },

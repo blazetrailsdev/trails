@@ -8,7 +8,7 @@ import {
   numberToHumanSize,
   numberToHuman,
 } from "../lib/number-helper.js";
-import { Rational } from "@blazetrails/ruby-compat";
+import { Rational } from "@blazetrails/ruby-compat/rational";
 import { BigDecimal } from "../lib/core-ext/big-decimal/conversions.js";
 import { SafeBuffer } from "../lib/core-ext/string/output-safety.js";
 import { assertNil } from "../lib/testing/assertions.js";

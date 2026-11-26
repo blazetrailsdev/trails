@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { parse } from "../../lib/xml-mini/nokogirisax.js";
 import { parse as parseDom } from "../../lib/xml-mini/nokogiri.js";
-import { StringIO } from "@blazetrails/ruby-compat";
+import { StringIO } from "@blazetrails/ruby-compat/string-io";
 
 describe("NokogiriSAX parse readable input", () => {
   it("parses a readable input", async () => {

@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 
-import { NameError, Range } from "@blazetrails/ruby-compat";
+import { NameError } from "@blazetrails/ruby-compat/name-error";
+import { Range } from "@blazetrails/ruby-compat/range";
 import { Assertion } from "../../lib/testing/assertions.js";
 import {
   MockExpectationError,

@@ -1,4 +1,5 @@
-import { File, FileUtils } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat/file";
+import { FileUtils } from "@blazetrails/ruby-compat/file-utils";
 
 export type DdlOp =
   | "CREATE_TABLE"

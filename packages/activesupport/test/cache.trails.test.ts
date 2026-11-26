@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { constGet } from "@blazetrails/ruby-compat";
+import { constGet } from "@blazetrails/ruby-compat/variable";
 import { Store, lookupStore } from "../lib/cache.js";
 
 describe("ActiveSupport::Cache seat", () => {

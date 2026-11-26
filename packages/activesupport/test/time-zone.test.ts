@@ -9,7 +9,8 @@ import { Duration } from "../lib/duration.js";
 import { TimeWithZone } from "../lib/time-with-zone.js";
 import { DateTime, Time } from "@blazetrails/date";
 import { travelTo, travelBack } from "../lib/testing/time-helpers.js";
-import { Rational, RuntimeError } from "@blazetrails/ruby-compat";
+import { Rational } from "@blazetrails/ruby-compat/rational";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
 import {
   Assertion,
   assert,

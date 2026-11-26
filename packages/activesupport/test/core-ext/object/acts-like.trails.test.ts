@@ -1,4 +1,4 @@
-import { rbFSend } from "@blazetrails/ruby-compat";
+import { rbFSend } from "@blazetrails/ruby-compat/object";
 import { describe, expect, it } from "vitest";
 import "@blazetrails/date";
 import "../../../lib/core-ext/string/behavior.js";

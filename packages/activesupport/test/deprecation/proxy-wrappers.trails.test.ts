@@ -1,14 +1,10 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { Deprecation } from "../../lib/deprecation.js";
-import {
-  NameError,
-  rbEqual,
-  constGet,
-  constSet,
-  TopLevel,
-  constDefined,
-  rbModRemoveConst,
-} from "@blazetrails/ruby-compat";
+import { constSet, constDefined } from "@blazetrails/ruby-compat/include";
+import { NameError } from "@blazetrails/ruby-compat/name-error";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
+import { rbEqual } from "@blazetrails/ruby-compat/rb-equal";
+import { constGet, rbModRemoveConst } from "@blazetrails/ruby-compat/variable";
 import {
   DeprecatedConstantProxy,
   DeprecatedInstanceVariableProxy,

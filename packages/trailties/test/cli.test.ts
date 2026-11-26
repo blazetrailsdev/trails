@@ -11,7 +11,8 @@ const dir = Dir.mktmpdir();
 
 async function trails(...argv: string[]): Promise<string> {
   vi.resetModules();
-  const rb = await import("@blazetrails/ruby-compat");
+  const rb = await import("@blazetrails/ruby-compat/process-adapter");
+  const { rbAryReplace } = await import("@blazetrails/ruby-compat/array");
   const { GemHelpCommand } = await import("../lib/commands/gem-help.js");
   vi.spyOn(GemHelpCommand, "usagePath").mockResolvedValue(File.join(dir, "USAGE"));
   let output = "";
@@ -26,11 +27,11 @@ async function trails(...argv: string[]): Promise<string> {
   onTestFinished(() => {
     adapter.exit = exit;
     Dir.chdir(cwd);
-    rb.rbAryReplace(rb.rbArgv(), []);
+    rbAryReplace(rb.rbArgv(), []);
     rb.setExitCode(0);
   });
   Dir.chdir(dir);
-  rb.rbAryReplace(rb.rbArgv(), argv);
+  rbAryReplace(rb.rbArgv(), argv);
   await import("../lib/bin.js");
   return output;
 }

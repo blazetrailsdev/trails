@@ -1,5 +1,8 @@
 import { describe, it, expect, vi } from "vitest";
-import { classModule, NameError, NoMethodError, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { classModule } from "@blazetrails/ruby-compat/class-module";
+import { NameError } from "@blazetrails/ruby-compat/name-error";
+import { NoMethodError } from "@blazetrails/ruby-compat/no-method-error";
+import { rbObjRespondTo } from "@blazetrails/ruby-compat/object";
 
 import { Delegation, DelegationError } from "../lib/delegation.js";
 import { delegate, delegateMissingTo } from "../lib/module-ext.js";

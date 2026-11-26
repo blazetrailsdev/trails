@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { tryCall } from "../../../lib/try.js";
 import { assertNotRespondTo } from "../../../lib/testing/assertions.js";
-import { block, NoMethodError } from "@blazetrails/ruby-compat";
+import { block } from "@blazetrails/ruby-compat/hash";
+import { NoMethodError } from "@blazetrails/ruby-compat/no-method-error";
 import { Tryable, Delegator } from "../../../lib/core-ext/object/try.js";
 
 class PrivateKlass {

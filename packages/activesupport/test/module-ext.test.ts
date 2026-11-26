@@ -1,6 +1,7 @@
 import { suppress } from "../lib/core-ext/kernel/reporting.js";
 import { describe, it, expect } from "vitest";
-import { block, isAbsentHalf, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { block } from "@blazetrails/ruby-compat/hash";
+import { isAbsentHalf, rbObjRespondTo } from "@blazetrails/ruby-compat/object";
 import {
   delegate,
   mattrAccessor,

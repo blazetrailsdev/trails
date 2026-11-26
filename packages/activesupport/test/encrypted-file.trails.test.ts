@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { EncryptedFile } from "../lib/encrypted-file.js";
-import { getFs, getPath, getOsAsync } from "@blazetrails/ruby-compat";
+import { getFs, getPath } from "@blazetrails/ruby-compat/fs-adapter";
+import { getOsAsync } from "@blazetrails/ruby-compat/os-adapter";
 
 describe("EncryptedFile cipher", () => {
   let tmpdir: string;

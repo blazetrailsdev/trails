@@ -1,4 +1,4 @@
-import { b } from "@blazetrails/ruby-compat";
+import { b } from "@blazetrails/ruby-compat/string/b";
 import { afterEach, expect, it } from "vitest";
 import "../../../lib/message-pack.js";
 import "../../../lib/cache.js";

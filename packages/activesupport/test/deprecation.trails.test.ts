@@ -1,5 +1,6 @@
 import { beforeEach, describe, it, expect, vi } from "vitest";
-import { Thread, stderr } from "@blazetrails/ruby-compat";
+import { stderr } from "@blazetrails/ruby-compat/process-adapter";
+import { Thread } from "@blazetrails/ruby-compat/thread";
 import { Deprecation, DeprecationException, callerLocations } from "../lib/deprecation.js";
 import type { CallerLocation } from "../lib/deprecation.js";
 import { deprecator } from "../lib/deprecator.js";

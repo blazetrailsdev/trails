@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { rbInspect } from "@blazetrails/ruby-compat";
+import { rbInspect } from "@blazetrails/ruby-compat/object";
 import { YAML } from "@blazetrails/ruby-compat/yaml";
 import { Psych } from "@blazetrails/ruby-compat/psych";
 import { OrderedHash } from "../lib/ordered-hash.js";

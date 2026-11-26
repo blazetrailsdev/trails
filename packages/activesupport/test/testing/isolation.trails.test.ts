@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { Marshal, Process, env, include } from "@blazetrails/ruby-compat";
+import { include } from "@blazetrails/ruby-compat/include";
+import { Marshal } from "@blazetrails/ruby-compat/marshal";
+import { Process } from "@blazetrails/ruby-compat/process";
+import { env } from "@blazetrails/ruby-compat/process-adapter";
 import { TestCase } from "../../lib/test-case.js";
 import { registerSpecType } from "../../lib/testing/autorun.js";
 import { Isolation, SubprocessCrashed } from "../../lib/testing/isolation.js";

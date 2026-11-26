@@ -1,4 +1,5 @@
-import { Fiber, Thread } from "@blazetrails/ruby-compat";
+import { Fiber } from "@blazetrails/ruby-compat/fiber";
+import { Thread } from "@blazetrails/ruby-compat/thread";
 import { describe, expect, it, beforeEach, afterEach } from "vitest";
 import { IsolatedExecutionState } from "../lib/isolated-execution-state.js";
 

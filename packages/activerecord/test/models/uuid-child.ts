@@ -1,5 +1,6 @@
 import { DescendantsTracker } from "@blazetrails/activesupport";
-import { constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
 import type { UuidParent } from "./uuid-parent.js";
 import { Base } from "../../lib/base.js";
 

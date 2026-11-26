@@ -9,7 +9,8 @@ import {
   type Format,
   type Serializer,
 } from "../../lib/messages/serializer-with-fallback.js";
-import { KeyError, Marshal } from "@blazetrails/ruby-compat";
+import { KeyError } from "@blazetrails/ruby-compat/key-error";
+import { Marshal } from "@blazetrails/ruby-compat/marshal";
 import "../../lib/messages/message-metadata-tests.js";
 
 const FORMATS = [...SERIALIZERS.keys()];

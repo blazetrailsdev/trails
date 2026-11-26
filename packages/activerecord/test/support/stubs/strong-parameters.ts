@@ -1,5 +1,6 @@
 import { type HashWithIndifferentAccess, withIndifferentAccess } from "@blazetrails/activesupport";
-import { type Hash, eachPair, isEmpty, keys } from "@blazetrails/ruby-compat";
+import { eachPair, keys, type Hash } from "@blazetrails/ruby-compat/hash";
+import { isEmpty } from "@blazetrails/ruby-compat/ruby-empty";
 
 export class ProtectedParams {
   [key: string]: unknown;

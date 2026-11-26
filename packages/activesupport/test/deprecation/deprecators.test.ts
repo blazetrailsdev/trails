@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { Enumerator, Thread } from "@blazetrails/ruby-compat";
+import { Enumerator } from "@blazetrails/ruby-compat/enumerator";
+import { Thread } from "@blazetrails/ruby-compat/thread";
 import { Deprecation } from "../../lib/deprecation.js";
 import { assertNotPredicate, assertPredicate } from "../../lib/testing/assertions.js";
 import { Deprecators } from "../../lib/deprecation/deprecators.js";

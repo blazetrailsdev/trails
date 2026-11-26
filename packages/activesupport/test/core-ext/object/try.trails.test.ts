@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { block } from "@blazetrails/ruby-compat";
+import { block } from "@blazetrails/ruby-compat/hash";
 import { Delegator } from "../../../lib/core-ext/object/try.js";
 
 describe("Delegator", () => {

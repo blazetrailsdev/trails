@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { Fiber, Thread } from "@blazetrails/ruby-compat";
+import { Fiber } from "@blazetrails/ruby-compat/fiber";
+import { Thread } from "@blazetrails/ruby-compat/thread";
 import { ThreadLoadInterlockAwareMonitor } from "../../lib/concurrency/load-interlock-aware-monitor.js";
 import { Dependencies } from "../../lib/dependencies.js";
 

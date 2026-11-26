@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { inherited } from "@blazetrails/ruby-compat";
+import { inherited } from "@blazetrails/ruby-compat/include";
 import { DescendantsTracker } from "../lib/descendants-tracker.js";
 
 describe("DescendantsTracker.registerSubclass", () => {

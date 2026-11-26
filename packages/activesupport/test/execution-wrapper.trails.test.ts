@@ -54,7 +54,7 @@ describe("a hook whose complete answers a promise", () => {
 
 describe("ExecutionWrapper.wrap on concurrent flows of one Thread", () => {
   it("runs the hooks for each flow and excludes them under a monitor", async () => {
-    const { Monitor } = await import("@blazetrails/ruby-compat");
+    const { Monitor } = await import("@blazetrails/ruby-compat/monitor");
     const executor = class extends ExecutionWrapper {};
     const monitor = new Monitor();
     const events: string[] = [];
@@ -90,7 +90,7 @@ describe("ExecutionWrapper.wrap on concurrent flows of one Thread", () => {
 
 describe("ExecutionWrapper.run!(reset: true) on concurrent flows", () => {
   it("completes only the current fiber's execution", async () => {
-    const { Fiber } = await import("@blazetrails/ruby-compat");
+    const { Fiber } = await import("@blazetrails/ruby-compat/fiber");
     const executor = class extends ExecutionWrapper {};
     let release!: () => void;
     const held = new Promise<void>((resolve) => (release = resolve));

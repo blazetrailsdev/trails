@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { KeyGenerator, CachingKeyGenerator } from "../lib/key-generator.js";
-import { getCrypto, OpenSSL } from "@blazetrails/ruby-compat";
+import { getCrypto } from "@blazetrails/ruby-compat/crypto-adapter";
+import { OpenSSL } from "@blazetrails/ruby-compat/openssl";
 import { ArgumentError } from "../lib/hash-utils.js";
 import { assertRaises } from "../lib/testing/assertions.js";
 

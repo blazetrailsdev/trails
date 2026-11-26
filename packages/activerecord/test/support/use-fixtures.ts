@@ -1,13 +1,9 @@
 import { describe } from "@blazetrails/activesupport/testing/autorun";
 import { getCurrentSuite } from "vitest/suite";
-import {
-  RuntimeError,
-  StandardError,
-  rbClassInheritedP,
-  constSet,
-  rbModName,
-  TopLevel,
-} from "@blazetrails/ruby-compat";
+import { rbClassInheritedP, constSet } from "@blazetrails/ruby-compat/include";
+import { rbModName, TopLevel } from "@blazetrails/ruby-compat/object";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
+import { StandardError } from "@blazetrails/ruby-compat/standard-error";
 import { underscore } from "@blazetrails/activesupport";
 import { File as FixtureFile } from "../../lib/fixture-set/file.js";
 import {

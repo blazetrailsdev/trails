@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Range } from "@blazetrails/ruby-compat";
+import { Range } from "@blazetrails/ruby-compat/range";
 import { kernelArray } from "../lib/array-utils.js";
 import { inGroupsOf } from "../lib/core-ext/array/grouping.js";
 import { toFs } from "../lib/core-ext/array/conversions.js";

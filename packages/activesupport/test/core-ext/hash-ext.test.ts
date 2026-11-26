@@ -23,7 +23,9 @@ import {
 } from "../../lib/core-ext/hash/conversions.js";
 
 import * as HashExt from "../../lib/hash-utils.js";
-import { ArgumentError, FrozenError, isSymbol, symbolToS } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { FrozenError } from "@blazetrails/ruby-compat/frozen-error";
+import { isSymbol, symbolToS } from "@blazetrails/ruby-compat/symbol";
 import {
   deepMerge,
   deepMergeBang,
@@ -50,7 +52,7 @@ import {
   toParam,
   toXml,
 } from "../../lib/hash-utils.js";
-import { Hash } from "@blazetrails/ruby-compat";
+import { Hash } from "@blazetrails/ruby-compat/hash";
 
 describe("HashExtTest", () => {
   const strings = () => ({ a: 1, b: 2 });

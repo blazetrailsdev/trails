@@ -20,7 +20,10 @@ import {
   assertPredicate,
 } from "../../../lib/testing/assertions.js";
 import { Store } from "../../../lib/cache/store.js";
-import { File, Pathname, regexpEscape, TypeError } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat/file";
+import { Pathname } from "@blazetrails/ruby-compat/pathname";
+import { regexpEscape } from "@blazetrails/ruby-compat/regexp";
+import { TypeError } from "@blazetrails/ruby-compat/type-error";
 import { isPresent } from "../../../lib/core-ext/object/blank.js";
 import { cacheInstrumentationBehavior } from "../behaviors/cache-instrumentation-behavior.js";
 import { cacheLoggingBehavior } from "../behaviors/cache-logging-behavior.js";

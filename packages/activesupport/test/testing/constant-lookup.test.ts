@@ -1,15 +1,12 @@
 import { afterAll, describe, expect, it } from "vitest";
+import { include, constSet, constDefined } from "@blazetrails/ruby-compat/include";
+import { isPlainHash, TopLevel } from "@blazetrails/ruby-compat/object";
 import {
-  include,
-  isPlainHash,
-  TopLevel,
-  constSet,
-  constDefined,
   rbModRemoveConst,
   autoloadDelete,
   rbAutoloadLoad,
   rbAutoloadStr,
-} from "@blazetrails/ruby-compat";
+} from "@blazetrails/ruby-compat/variable";
 import { assertRaises } from "../../lib/testing/assertions.js";
 import { TestCase } from "../../lib/test-case.js";
 import { ClassMethods, ConstantLookup } from "../../lib/testing/constant-lookup.js";

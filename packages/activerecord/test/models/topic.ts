@@ -7,7 +7,8 @@ import type { UniqueReply } from "./reply.js";
 import type { WebReply } from "./reply.js";
 import { Time as RubyTime } from "@blazetrails/date";
 import type { TimeWithZone } from "@blazetrails/activesupport";
-import { constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
 import { Base } from "../../lib/base.js";
 import type { ScopeOn } from "../../lib/scoping/named.js";
 

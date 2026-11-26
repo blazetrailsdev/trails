@@ -1,5 +1,7 @@
 import { DescendantsTracker } from "@blazetrails/activesupport";
-import { RuntimeError, constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
 import type { AssociationProxy } from "../../lib/associations/collection-proxy.js";
 import type { Relation } from "../../lib/relation.js";
 import type { Time as RubyTime } from "@blazetrails/date";

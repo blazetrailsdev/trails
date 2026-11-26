@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Hash } from "@blazetrails/ruby-compat";
+import { Hash } from "@blazetrails/ruby-compat/hash";
 import { indexWith, pluck } from "../lib/core-ext/enumerable.js";
 
 describe("Enumerable#pluck sends each element []", () => {
