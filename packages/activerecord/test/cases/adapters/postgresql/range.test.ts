@@ -3,7 +3,7 @@ import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { Range } from "../../../../lib/relation.js";
 import { Base } from "../../../../lib/index.js";
 import { defaultTimezone } from "../../../../lib/active-record.js";
-import { ArgumentError } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
 import { inTimeZone } from "../../helper.js";
 import { Time as RubyTime } from "@blazetrails/date";
 import { TimeZone, setZone, zone, BigDecimal } from "@blazetrails/activesupport";

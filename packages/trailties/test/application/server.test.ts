@@ -1,7 +1,9 @@
-import { Pathname } from "@blazetrails/ruby-compat";
+import { Pathname } from "@blazetrails/ruby-compat/pathname";
 import { BroadcastLogger, Logger } from "@blazetrails/activesupport";
 import { afterAll, beforeAll, describe, it, vi } from "vitest";
-import { Dir, env, setEnv, StringIO } from "@blazetrails/ruby-compat";
+import { Dir } from "@blazetrails/ruby-compat/dir";
+import { env, setEnv } from "@blazetrails/ruby-compat/process-adapter";
+import { StringIO } from "@blazetrails/ruby-compat/string-io";
 import { Handler } from "@blazetrails/rackup";
 import { Builder } from "@blazetrails/rack";
 import { Trails } from "../../lib/trails.js";

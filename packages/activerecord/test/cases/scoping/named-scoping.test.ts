@@ -1,4 +1,6 @@
-import { Enumerable, constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { Enumerable } from "@blazetrails/ruby-compat/enumerable";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
 import { describe, it, expect } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { assertNotCalled } from "@blazetrails/activesupport/testing/method-call-assertions";

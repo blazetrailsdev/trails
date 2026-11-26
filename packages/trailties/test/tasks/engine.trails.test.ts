@@ -1,6 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Rake } from "@blazetrails/rake";
-import { Dir, File, FileUtils, TopLevel, rbFLoad } from "@blazetrails/ruby-compat";
+import { Dir } from "@blazetrails/ruby-compat/dir";
+import { File } from "@blazetrails/ruby-compat/file";
+import { FileUtils } from "@blazetrails/ruby-compat/file-utils";
+import { rbFLoad } from "@blazetrails/ruby-compat/load";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
 import type {} from "../../lib/tasks/engine.js";
 import { ENGINE_ROOT, setEngineRoot } from "../../lib/app-path.js";
 

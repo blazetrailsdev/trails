@@ -1,11 +1,11 @@
-import { exec } from "@blazetrails/ruby-compat";
+import { exec } from "@blazetrails/ruby-compat/process-adapter";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Runner } from "../lib/runner.js";
 import { ViteAssets } from "../lib/vite-assets.js";
 import { refreshConfig, withRailsEnv } from "./support/test-helper.js";
 
-vi.mock("@blazetrails/ruby-compat", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@blazetrails/ruby-compat")>()),
+vi.mock("@blazetrails/ruby-compat/process-adapter", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@blazetrails/ruby-compat/process-adapter")>()),
   exec: vi.fn(),
 }));
 

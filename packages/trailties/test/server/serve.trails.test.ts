@@ -1,9 +1,9 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { env, setEnv } from "@blazetrails/ruby-compat";
+import { env, setEnv } from "@blazetrails/ruby-compat/process-adapter";
 import { Application } from "../../lib/application.js";
 import { Trails, _resetTrailsEnv } from "../../lib/trails.js";
 import { serve } from "../../lib/server/boot.js";
-import type { HttpServer } from "@blazetrails/ruby-compat";
+import type { HttpServer } from "@blazetrails/ruby-compat/http-adapter";
 
 describe("serve (trails)", () => {
   let server: HttpServer | null = null;

@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { Dir, File } from "@blazetrails/ruby-compat";
+import { Dir } from "@blazetrails/ruby-compat/dir";
+import { File } from "@blazetrails/ruby-compat/file";
 import { setEngineRoot } from "../../../../lib/app-path.js";
 import { Generators } from "../../../../lib/generators.js";
 import { ScaffoldGenerator } from "../../../../lib/generators/test-unit/scaffold/scaffold-generator.js";

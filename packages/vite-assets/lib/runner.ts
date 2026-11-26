@@ -1,4 +1,5 @@
-import { ArgumentError, Errno, exec, File, partition, rbInspect } from "@blazetrails/ruby-compat";
+import { ArgumentError, Errno, File, partition, rbInspect } from "@blazetrails/ruby-compat";
+import { exec } from "@blazetrails/ruby-compat/process-adapter";
 import type { Config } from "./config.js";
 import { IO } from "./io.js";
 import { MissingExecutableError } from "./missing-executable-error.js";

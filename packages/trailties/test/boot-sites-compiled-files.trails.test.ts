@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, it, onTestFinished } from "vitest";
-import { Dir, env, File, FileUtils, registerCompiledFiles, setEnv } from "@blazetrails/ruby-compat";
+import { Dir } from "@blazetrails/ruby-compat/dir";
+import { File } from "@blazetrails/ruby-compat/file";
+import { FileUtils } from "@blazetrails/ruby-compat/file-utils";
+import { registerCompiledFiles } from "@blazetrails/ruby-compat/load";
+import { env, setEnv } from "@blazetrails/ruby-compat/process-adapter";
 import { Application } from "../lib/application.js";
 import { Engine } from "../lib/engine.js";
 import { Trails } from "../lib/trails.js";

@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 
-import { TopLevel, constSet, constDefined, rbModRemoveConst } from "@blazetrails/ruby-compat";
+import { constSet, constDefined } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
+import { rbModRemoveConst } from "@blazetrails/ruby-compat/variable";
 
 import { Base } from "../../lib/index.js";
 import { reload as persistenceReload } from "../../lib/persistence.js";

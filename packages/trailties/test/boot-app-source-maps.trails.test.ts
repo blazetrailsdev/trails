@@ -1,6 +1,6 @@
 import { spawnSync } from "node:child_process";
 import { describe, expect, it } from "vitest";
-import { getProcessAdapter } from "@blazetrails/ruby-compat";
+import { getProcessAdapter } from "@blazetrails/ruby-compat/process-adapter";
 
 describe("Trails boot enables source maps for precompiled templates", () => {
   it("names the .tse line in a failing template's TemplateError under plain node", () => {

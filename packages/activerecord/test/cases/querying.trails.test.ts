@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
-import { block } from "@blazetrails/ruby-compat";
+import { block } from "@blazetrails/ruby-compat/hash";
 import { Base, Relation } from "../../lib/index.js";
 import { _queryBySql, _loadFromSql } from "../../lib/querying.js";
 import { Result } from "../../lib/result.js";

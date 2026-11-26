@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ActionController, ActionDispatch } from "@blazetrails/actionpack";
 import { Base } from "@blazetrails/activerecord";
-import { StringIO } from "@blazetrails/ruby-compat";
+import { StringIO } from "@blazetrails/ruby-compat/string-io";
 
 type FindByTitle = { findByTitle(title: unknown): Promise<unknown> };
 

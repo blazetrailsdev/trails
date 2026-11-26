@@ -1,6 +1,9 @@
-import { Pathname } from "@blazetrails/ruby-compat";
+import { Pathname } from "@blazetrails/ruby-compat/pathname";
 import { describe, it, expect, vi } from "vitest";
-import { env, setEnv, getFs, getOsAsync, getPath, rbObjClassname } from "@blazetrails/ruby-compat";
+import { getFs, getPath } from "@blazetrails/ruby-compat/fs-adapter";
+import { rbObjClassname } from "@blazetrails/ruby-compat/object";
+import { getOsAsync } from "@blazetrails/ruby-compat/os-adapter";
+import { env, setEnv } from "@blazetrails/ruby-compat/process-adapter";
 import { useInMemoryDatabaseUrl } from "../support/in-memory-database-url.js";
 import { runTrailtieInitializers } from "../support/trailtie-initializers.js";
 import { Trailtie } from "../../lib/trailties/active-record.js";

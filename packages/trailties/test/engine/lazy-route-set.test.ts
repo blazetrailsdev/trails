@@ -2,7 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MockRequest } from "@blazetrails/rack";
 import { ActionController, RouteSet } from "@blazetrails/actionpack";
 import { LazyRouteSet } from "../../lib/engine/lazy-route-set.js";
-import { rbObjRespondTo, constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { rbObjRespondTo, TopLevel } from "@blazetrails/ruby-compat/object";
 import { Trails } from "../../lib/trails.js";
 
 class StubController extends ActionController.Base {

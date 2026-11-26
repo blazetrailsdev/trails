@@ -20,7 +20,7 @@ import { quoteDefaultExpression } from "../../lib/connection-adapters/abstract/q
 import type { AbstractAdapter as DatabaseAdapter } from "../../lib/connection-adapters/abstract-adapter.js";
 import type { Column } from "../../lib/connection-adapters/column.js";
 import type { IndexDefinition } from "../../lib/connection-adapters/abstract/schema-definitions.js";
-import { rbObjDup } from "@blazetrails/ruby-compat";
+import { rbObjDup } from "@blazetrails/ruby-compat/include";
 import type { Column as MysqlColumn } from "../../lib/connection-adapters/mysql/column.js";
 import { Migration, InvalidMigrationTimestampError } from "../../lib/migration.js";
 import { GiveMeBigNumbers } from "../migrations/decimal/1_give_me_big_numbers.js";
@@ -45,15 +45,12 @@ import { Person } from "../models/person.js";
 import { loadSchemaFromAdapter } from "../../lib/model-schema.js";
 import { itIfSupports, describeIfSupports } from "../support/supports.js";
 import { Time } from "@blazetrails/date";
-import {
-  Dir,
-  File,
-  RuntimeError,
-  StandardError,
-  Zlib,
-  block,
-  fetch,
-} from "@blazetrails/ruby-compat";
+import { Dir } from "@blazetrails/ruby-compat/dir";
+import { File } from "@blazetrails/ruby-compat/file";
+import { block, fetch } from "@blazetrails/ruby-compat/hash";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
+import { StandardError } from "@blazetrails/ruby-compat/standard-error";
+import { Zlib } from "@blazetrails/ruby-compat/zlib";
 import { Mysql2Adapter } from "../../lib/connection-adapters/mysql2-adapter.js";
 import { leaseMysqlAdapter } from "./adapters/abstract-mysql-adapter/test-helper.js";
 import { anonymousMigration } from "../support/anonymous-migration.js";

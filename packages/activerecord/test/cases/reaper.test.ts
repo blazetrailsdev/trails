@@ -3,7 +3,7 @@ import { describe, it, expect, afterEach, vi, beforeEach } from "vitest";
 import { Reaper } from "../../lib/connection-adapters/abstract/connection-pool/reaper.js";
 import { assertNothingRaised } from "@blazetrails/activesupport/testing/assertions";
 import type { ReapablePool } from "../../lib/connection-adapters/abstract/connection-pool/reaper.js";
-import { Thread } from "@blazetrails/ruby-compat";
+import { Thread } from "@blazetrails/ruby-compat/thread";
 import { Base } from "../../lib/base.js";
 import { ConnectionPool } from "../../lib/connection-adapters/abstract/connection-pool.js";
 import { PoolConfig } from "../../lib/connection-adapters/pool-config.js";

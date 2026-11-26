@@ -1,7 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { TestCase } from "@blazetrails/activesupport/test-case";
 import { Isolation } from "@blazetrails/activesupport/testing/isolation";
-import { Dir, File, include } from "@blazetrails/ruby-compat";
+import { Dir } from "@blazetrails/ruby-compat/dir";
+import { File } from "@blazetrails/ruby-compat/file";
+import { include } from "@blazetrails/ruby-compat/include";
 import type { Generation } from "../support/isolation/abstract-unit.js";
 import "../support/isolation/abstract-unit.js";
 
@@ -26,8 +28,8 @@ describe("Trails::Command::DevcontainerTest", { timeout: 120_000 }, () => {
   it.skip("generates devcontainer for default app with solid gems", async () => {
     await t.buildApp();
 
-    await import("@blazetrails/solid-cable" as string);
-    await import("@blazetrails/solid-queue" as string);
+    await import("@blazetrails/solid-cable");
+    await import("@blazetrails/solid-queue");
 
     const output = await t.trails("devcontainer");
 

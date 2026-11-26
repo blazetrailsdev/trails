@@ -1,8 +1,8 @@
-import { include, type Included } from "@blazetrails/ruby-compat";
+import { include, type Included } from "@blazetrails/ruby-compat/include";
 import { Initializable, type Collection } from "../../lib/initializable.js";
 import { Base as JobBase } from "@blazetrails/activejob";
 import { constantize, TopLevel } from "@blazetrails/activesupport";
-import { constSet } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
 import { Base } from "@blazetrails/activerecord";
 import { Autoloaders } from "../../lib/autoloaders.js";
 import { afterEach, beforeEach, describe, it, expect, onTestFinished, vi } from "vitest";
@@ -27,14 +27,12 @@ import {
   Reloader,
   resetLoadHooks,
 } from "@blazetrails/activesupport";
-import {
-  Dir,
-  FileUtils,
-  Monitor,
-  Thread,
-  ThreadPoolExecutor,
-  TimerTask,
-} from "@blazetrails/ruby-compat";
+import { TimerTask } from "@blazetrails/ruby-compat/concurrent/timer-task";
+import { Dir } from "@blazetrails/ruby-compat/dir";
+import { FileUtils } from "@blazetrails/ruby-compat/file-utils";
+import { Monitor } from "@blazetrails/ruby-compat/monitor";
+import { Thread } from "@blazetrails/ruby-compat/thread";
+import { ThreadPoolExecutor } from "@blazetrails/ruby-compat/thread-pool-executor";
 import { Loader } from "@blazetrails/zeitwerk";
 import { ActionController } from "@blazetrails/actionpack";
 import { Trails } from "../../lib/trails.js";

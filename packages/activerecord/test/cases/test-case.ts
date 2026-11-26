@@ -16,24 +16,20 @@ import {
   assertIncludes,
   assertNotIncludes,
 } from "@blazetrails/activesupport/testing/assertions";
+import { Fiber } from "@blazetrails/ruby-compat/fiber";
 import {
   isModuleIncluded,
-  Fiber,
-  RuntimeError,
-  Thread,
   extend,
   include,
-  puts,
-  rbEqq,
-  rbEqual,
-  rbInspect,
   constSet,
-  rbObjRespondTo,
-  setEnv,
-  stderr,
-  stdout,
   type Extended,
-} from "@blazetrails/ruby-compat";
+} from "@blazetrails/ruby-compat/include";
+import { puts } from "@blazetrails/ruby-compat/io";
+import { rbInspect, rbObjRespondTo } from "@blazetrails/ruby-compat/object";
+import { setEnv, stderr, stdout } from "@blazetrails/ruby-compat/process-adapter";
+import { rbEqq, rbEqual } from "@blazetrails/ruby-compat/rb-equal";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
+import { Thread } from "@blazetrails/ruby-compat/thread";
 import {
   dbWarningsIgnore,
   defaultTimezone,

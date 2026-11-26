@@ -1,6 +1,7 @@
 import { Base } from "@blazetrails/activerecord";
 import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
-import { Dir, File } from "@blazetrails/ruby-compat";
+import { Dir } from "@blazetrails/ruby-compat/dir";
+import { File } from "@blazetrails/ruby-compat/file";
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { Application } from "../../lib/application.js";
 import { Generators } from "../../lib/generators.js";

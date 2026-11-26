@@ -1,4 +1,4 @@
-import { Dir } from "@blazetrails/ruby-compat";
+import { Dir } from "@blazetrails/ruby-compat/dir";
 import { quietly } from "@blazetrails/activesupport/testing/stream";
 import { assertNoMatch } from "@blazetrails/activesupport/testing/assertions";
 import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";

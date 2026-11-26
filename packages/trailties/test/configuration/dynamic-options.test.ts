@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { NoMethodError } from "@blazetrails/ruby-compat";
+import { NoMethodError } from "@blazetrails/ruby-compat/no-method-error";
 import { Configuration } from "../../lib/trailtie/configuration.js";
 
 describe("DynamicOptionsTest", () => {

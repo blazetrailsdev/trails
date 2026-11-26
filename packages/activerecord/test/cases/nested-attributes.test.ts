@@ -1,5 +1,8 @@
 import { DescendantsTracker } from "@blazetrails/activesupport";
-import { hashAref, isEmpty, constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { hashAref } from "@blazetrails/ruby-compat/hash";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
+import { isEmpty } from "@blazetrails/ruby-compat/ruby-empty";
 import { describe, it, expect, beforeAll, vi } from "vitest";
 import { Base, RecordNotFound, REJECT_ALL_BLANK_PROC, TooManyRecords } from "../../lib/index.js";
 import { ArgumentError, UnknownAttributeError } from "@blazetrails/activemodel";

@@ -1,5 +1,6 @@
 import { DescendantsTracker } from "@blazetrails/activesupport";
-import { constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
 import { describe, it, expect, afterEach, beforeEach } from "vitest";
 import { fixtures } from "../support/use-fixtures.js";
 import { itIfSupports } from "../support/supports.js";

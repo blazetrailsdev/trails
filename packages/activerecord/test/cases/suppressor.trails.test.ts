@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Thread } from "@blazetrails/ruby-compat";
+import { Thread } from "@blazetrails/ruby-compat/thread";
 import * as Suppressor from "../../lib/suppressor.js";
 import { fixtures } from "../support/use-fixtures.js";
 import { Notification } from "../models/notification.js";

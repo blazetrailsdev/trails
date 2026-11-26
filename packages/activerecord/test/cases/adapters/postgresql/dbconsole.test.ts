@@ -1,5 +1,5 @@
 import { it, expect, vi, beforeEach, afterEach } from "vitest";
-import { env as ENV, setEnv } from "@blazetrails/ruby-compat";
+import { env as ENV, setEnv } from "@blazetrails/ruby-compat/process-adapter";
 import { describeIfPg } from "../../../support/describe-if-pg.js";
 import { PostgreSQLAdapter } from "../../../../lib/connection-adapters/postgresql-adapter.js";
 import { HashConfig } from "../../../../lib/database-configurations/hash-config.js";

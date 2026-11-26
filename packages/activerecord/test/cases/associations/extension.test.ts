@@ -1,7 +1,9 @@
 import { DescendantsTracker } from "@blazetrails/activesupport";
 import type { CollectionAssociation } from "../../../lib/associations/collection-association.js";
 import { describe, it, expect } from "vitest";
-import { Marshal, constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { Marshal } from "@blazetrails/ruby-compat/marshal";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
 import { Base, CollectionProxy } from "../../../lib/index.js";
 import { HasMany } from "../../../lib/associations/builder/has-many.js";
 

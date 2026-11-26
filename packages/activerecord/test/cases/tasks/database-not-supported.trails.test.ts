@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { StandardError } from "@blazetrails/ruby-compat";
+import { StandardError } from "@blazetrails/ruby-compat/standard-error";
 import { DatabaseNotSupported } from "../../../lib/tasks/database-tasks.js";
 
 describe("DatabaseNotSupported", () => {

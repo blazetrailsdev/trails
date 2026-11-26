@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { DevServer } from "../../lib/server/dev-server.js";
 import { getEnv } from "@blazetrails/activesupport";
-import { setEnv } from "@blazetrails/ruby-compat";
+import { setEnv } from "@blazetrails/ruby-compat/process-adapter";
 import { Server, ServerCommand } from "../../lib/commands/server.js";
 
 describe("ServerCommand", () => {

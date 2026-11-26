@@ -13,7 +13,7 @@ import { adapterType } from "../support/test-adapter.js";
 import { Time as RubyTime } from "@blazetrails/date";
 import { fixtures } from "../support/use-fixtures.js";
 import "../support/canonical-model-index.js";
-import { StringIO } from "@blazetrails/ruby-compat";
+import { StringIO } from "@blazetrails/ruby-compat/string-io";
 import { adapterSupports, itIfSupports } from "../support/supports.js";
 import { inMemoryDb } from "../support/adapter-helper.js";
 import { Base } from "../../lib/base.js";

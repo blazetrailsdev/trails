@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { buildViews } from "@blazetrails/trails-tsc";
-import { Dir, File, FileUtils } from "@blazetrails/ruby-compat";
+import { Dir } from "@blazetrails/ruby-compat/dir";
+import { File } from "@blazetrails/ruby-compat/file";
+import { FileUtils } from "@blazetrails/ruby-compat/file-utils";
 import { useInMemoryDatabaseUrl } from "./support/in-memory-database-url.js";
 import { Trailtie } from "../lib/trailtie.js";
 import { Application } from "../lib/application.js";

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { rbObjRespondTo } from "@blazetrails/ruby-compat/object";
 import { CommandRecorder } from "../../../lib/migration/command-recorder.js";
 import { IrreversibleMigration } from "../../../lib/migration.js";
 import { Table } from "../../../lib/connection-adapters/abstract/schema-definitions.js";

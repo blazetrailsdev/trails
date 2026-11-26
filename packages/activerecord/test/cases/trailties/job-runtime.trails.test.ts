@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { include } from "@blazetrails/ruby-compat";
+import { include } from "@blazetrails/ruby-compat/include";
 import { JobRuntime } from "../../../lib/trailties/job-runtime.js";
 
 describe("JobRuntime#instrument", () => {

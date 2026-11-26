@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { capture } from "@blazetrails/activesupport/testing/stream";
-import { SystemExit, getProcessAdapter } from "@blazetrails/ruby-compat";
+import { SystemExit, getProcessAdapter } from "@blazetrails/ruby-compat/process-adapter";
 import { invoke } from "../../lib/command.js";
 import { VERSION } from "../../lib/gem-version.js";
 

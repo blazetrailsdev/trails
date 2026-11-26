@@ -2,7 +2,9 @@ import { describe, expect, test } from "vitest";
 import { TestCase } from "@blazetrails/activesupport/test-case";
 import { Isolation } from "@blazetrails/activesupport/testing/isolation";
 import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
-import { Process, env as ENV, include, setEnv } from "@blazetrails/ruby-compat";
+import { include } from "@blazetrails/ruby-compat/include";
+import { Process } from "@blazetrails/ruby-compat/process";
+import { env as ENV, setEnv } from "@blazetrails/ruby-compat/process-adapter";
 import type { Generation } from "../support/isolation/abstract-unit.js";
 import "../support/isolation/abstract-unit.js";
 

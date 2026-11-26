@@ -1,5 +1,5 @@
-import { Pathname } from "@blazetrails/ruby-compat";
-import { include, type Included } from "@blazetrails/ruby-compat";
+import { Pathname } from "@blazetrails/ruby-compat/pathname";
+import { include, type Included } from "@blazetrails/ruby-compat/include";
 import { Initializable, type Collection } from "../../lib/initializable.js";
 import { Autoloaders } from "../../lib/autoloaders.js";
 import {

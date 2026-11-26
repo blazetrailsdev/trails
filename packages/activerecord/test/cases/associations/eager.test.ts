@@ -1,4 +1,6 @@
-import { constSet, sortBy, TopLevel } from "@blazetrails/ruby-compat";
+import { sortBy } from "@blazetrails/ruby-compat/enumerable";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { Base, AssociationNotFoundError, EagerLoadPolymorphicError } from "../../../lib/index.js";
 import { Notifications } from "@blazetrails/activesupport";

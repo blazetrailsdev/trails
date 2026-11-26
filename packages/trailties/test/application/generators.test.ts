@@ -1,14 +1,14 @@
-import { Pathname } from "@blazetrails/ruby-compat";
+import { Pathname } from "@blazetrails/ruby-compat/pathname";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
-  Dir,
-  File,
-  FileUtils,
-  SecureRandom,
   childProcessAdapterConfig,
   registerChildProcessAdapter,
-  stdout,
-} from "@blazetrails/ruby-compat";
+} from "@blazetrails/ruby-compat/child-process-adapter";
+import { Dir } from "@blazetrails/ruby-compat/dir";
+import { File } from "@blazetrails/ruby-compat/file";
+import { FileUtils } from "@blazetrails/ruby-compat/file-utils";
+import { stdout } from "@blazetrails/ruby-compat/process-adapter";
+import { SecureRandom } from "@blazetrails/ruby-compat/secure-random";
 import { assertNoMatch, assertNothingRaised } from "@blazetrails/activesupport/testing/assertions";
 import { capture } from "@blazetrails/activesupport/testing/stream";
 import { Configuration } from "../../lib/application/configuration.js";

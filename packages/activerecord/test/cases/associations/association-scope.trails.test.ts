@@ -1,5 +1,6 @@
 import { DescendantsTracker } from "@blazetrails/activesupport";
-import { constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
 import type { AssociationProxy } from "../../../lib/associations/collection-proxy.js";
 import { describe, it, expect } from "vitest";
 import { Base } from "../../../lib/index.js";

@@ -11,7 +11,7 @@ import { Task } from "../models/task.js";
 import { Topic } from "../models/topic.js";
 import { Base } from "../../lib/index.js";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { Rational } from "@blazetrails/ruby-compat";
+import { Rational } from "@blazetrails/ruby-compat/rational";
 import { setDefaultTimezone } from "../../lib/active-record.js";
 
 afterEach(() => {

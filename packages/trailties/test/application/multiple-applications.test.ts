@@ -1,9 +1,9 @@
-import { Pathname } from "@blazetrails/ruby-compat";
+import { Pathname } from "@blazetrails/ruby-compat/pathname";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { TestCase } from "@blazetrails/activesupport/test-case";
 import { Isolation } from "@blazetrails/activesupport/testing/isolation";
 import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
-import { include, rbObjClone } from "@blazetrails/ruby-compat";
+import { include, rbObjClone } from "@blazetrails/ruby-compat/include";
 import { Application } from "../../lib/application.js";
 import { Configuration } from "../../lib/application/configuration.js";
 import { Trails } from "../../lib/trails.js";

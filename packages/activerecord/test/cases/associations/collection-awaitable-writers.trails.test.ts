@@ -1,4 +1,5 @@
-import { constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
 import { describe, it, expect, beforeAll } from "vitest";
 import { CollectionAssociation } from "../../../lib/associations/collection-association.js";
 import { RecordNotFound } from "../../../lib/index.js";

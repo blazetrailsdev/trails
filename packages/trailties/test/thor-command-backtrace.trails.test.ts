@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ArgumentError } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
 import { Thor } from "@blazetrails/thor";
 
 interface Cli {

@@ -3,13 +3,13 @@ import {
   registerChildProcessAdapter,
   childProcessAdapterConfig,
   type ChildProcessAdapter,
-} from "@blazetrails/ruby-compat";
+} from "@blazetrails/ruby-compat/child-process-adapter";
 import {
   registerFsAdapter,
   fsAdapterConfig,
   type FsAdapter,
   type PathAdapter,
-} from "@blazetrails/ruby-compat";
+} from "@blazetrails/ruby-compat/fs-adapter";
 import {
   registerPackageManagerAdapter,
   packageManagerAdapterConfig,

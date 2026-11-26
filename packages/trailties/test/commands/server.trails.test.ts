@@ -1,10 +1,10 @@
-import { Pathname } from "@blazetrails/ruby-compat";
+import { Pathname } from "@blazetrails/ruby-compat/pathname";
 import { BroadcastLogger, Logger } from "@blazetrails/activesupport";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { env, setEnv } from "@blazetrails/ruby-compat";
+import { env, setEnv } from "@blazetrails/ruby-compat/process-adapter";
 import { MockRequest, type RackEnv } from "@blazetrails/rack";
 import { Handler } from "@blazetrails/rackup";
 import { Builder } from "@blazetrails/rack";

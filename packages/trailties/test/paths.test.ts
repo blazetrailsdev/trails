@@ -1,13 +1,13 @@
-import { Pathname } from "@blazetrails/ruby-compat";
+import { Pathname } from "@blazetrails/ruby-compat/pathname";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
+import { File } from "@blazetrails/ruby-compat/file";
 import {
-  File,
   fsAdapterConfig,
-  RuntimeError,
   registerFsAdapter,
   type FsAdapter,
   type PathAdapter,
-} from "@blazetrails/ruby-compat";
+} from "@blazetrails/ruby-compat/fs-adapter";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
 import { assertRaises } from "@blazetrails/activesupport/testing/assertions";
 import { Root } from "../lib/paths.js";
 

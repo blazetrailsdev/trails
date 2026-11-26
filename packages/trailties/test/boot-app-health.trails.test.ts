@@ -1,5 +1,5 @@
 import type { RackResponse } from "@blazetrails/rack";
-import { rbFSend } from "@blazetrails/ruby-compat";
+import { rbFSend } from "@blazetrails/ruby-compat/object";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import "../lib/index.js";
 import { Application } from "../lib/application.js";

@@ -10,14 +10,10 @@ import {
   assertRaise,
   assertRaises,
 } from "@blazetrails/activesupport/testing/assertions";
-import {
-  include,
-  constSet,
-  regexpEscape,
-  TopLevel,
-  rbObjClone,
-  rbModRemoveConst,
-} from "@blazetrails/ruby-compat";
+import { include, constSet, rbObjClone } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
+import { regexpEscape } from "@blazetrails/ruby-compat/regexp";
+import { rbModRemoveConst } from "@blazetrails/ruby-compat/variable";
 import { Nodes } from "@blazetrails/arel";
 import { classify, underscore } from "@blazetrails/activesupport";
 import { Base } from "../../lib/index.js";

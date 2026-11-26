@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { puts, stdout } from "@blazetrails/ruby-compat";
+import { puts } from "@blazetrails/ruby-compat/io";
+import { stdout } from "@blazetrails/ruby-compat/process-adapter";
 import { Migration, Migrator } from "../../lib/index.js";
 import { MigrationContext } from "../../lib/migration.js";
 import type { SchemaMigration } from "../../lib/schema-migration.js";

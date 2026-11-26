@@ -1,6 +1,8 @@
 import { Time as RubyTime } from "@blazetrails/date";
 import { describe, it, expect } from "vitest";
-import { Rational, constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
+import { Rational } from "@blazetrails/ruby-compat/rational";
 import { CachedDeveloper, Developer } from "../models/developer.js";
 import { Client, Firm } from "../models/company.js";
 import { Owner } from "../models/owner.js";

@@ -7,7 +7,9 @@ import { Club } from "../../../models/club.js";
 import { Membership, CurrentMembership } from "../../../models/membership.js";
 import { Category } from "../../../models/category.js";
 import { Categorization } from "../../../models/categorization.js";
-import { regexpEscape, constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
+import { regexpEscape } from "@blazetrails/ruby-compat/regexp";
 
 constSet(TopLevel, "Member", Member);
 constSet(TopLevel, "Club", Club);

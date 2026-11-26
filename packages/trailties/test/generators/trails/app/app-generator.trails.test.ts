@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { include } from "@blazetrails/ruby-compat";
+import { include } from "@blazetrails/ruby-compat/include";
 import { ActionMethods } from "../../../../lib/generators/trails/app/app-generator.js";
 
 describe("prototype-chain method_missing", () => {

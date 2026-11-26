@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { NotImplementedError, kernelCatch } from "@blazetrails/ruby-compat";
+import { kernelCatch } from "@blazetrails/ruby-compat/kernel-catch";
+import { NotImplementedError } from "@blazetrails/ruby-compat/not-implemented-error";
 import { HasOneAssociation } from "../../../lib/associations/has-one-association.js";
 import { HasManyAssociation } from "../../../lib/associations/has-many-association.js";
 import { HasManyThroughAssociation } from "../../../lib/associations/has-many-through-association.js";

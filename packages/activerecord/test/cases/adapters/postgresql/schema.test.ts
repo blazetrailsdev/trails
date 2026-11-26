@@ -1,6 +1,9 @@
 import { DescendantsTracker } from "@blazetrails/activesupport";
 import { Time as RubyTime } from "@blazetrails/date";
-import { StringIO, constSet, TopLevel, rbModRemoveConst } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
+import { StringIO } from "@blazetrails/ruby-compat/string-io";
+import { rbModRemoveConst } from "@blazetrails/ruby-compat/variable";
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from "vitest";
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { itIfSupports } from "../../../support/supports.js";

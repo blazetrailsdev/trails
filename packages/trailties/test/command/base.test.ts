@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { capture } from "@blazetrails/activesupport/testing/stream";
-import { rbArgv, rbEqual, rbSetClassPathString } from "@blazetrails/ruby-compat";
+import { rbSetClassPathString } from "@blazetrails/ruby-compat/object";
+import { rbArgv } from "@blazetrails/ruby-compat/process-adapter";
+import { rbEqual } from "@blazetrails/ruby-compat/rb-equal";
 import type { ThorClass } from "@blazetrails/thor";
 import { Base } from "../../lib/command/base.js";
 import { invoke } from "../../lib/command.js";

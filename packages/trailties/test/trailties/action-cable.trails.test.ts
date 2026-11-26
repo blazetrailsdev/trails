@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getPath } from "@blazetrails/ruby-compat";
+import { getPath } from "@blazetrails/ruby-compat/fs-adapter";
 import { Engine } from "@blazetrails/actioncable/engine";
 
 describe("ActionCable::Engine", () => {

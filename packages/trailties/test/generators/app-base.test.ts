@@ -4,11 +4,10 @@ import * as path from "node:path";
 import { describe, it, expect, vi } from "vitest";
 import {
   childProcessAdapterConfig,
-  env,
   registerChildProcessAdapter,
-  setEnv,
   type ChildProcessAdapter,
-} from "@blazetrails/ruby-compat";
+} from "@blazetrails/ruby-compat/child-process-adapter";
+import { env, setEnv } from "@blazetrails/ruby-compat/process-adapter";
 import { AppBase, type AppBaseOptions } from "../../lib/generators/app-base.js";
 import { AppGenerator } from "../../lib/generators/trails/app/app-generator.js";
 

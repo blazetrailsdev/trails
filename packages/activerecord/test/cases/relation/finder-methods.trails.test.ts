@@ -10,7 +10,7 @@ import {
   raiseRecordNotFoundExceptionBang,
   _orderColumns,
 } from "../../../lib/relation/finder-methods.js";
-import { NoMethodError } from "@blazetrails/ruby-compat";
+import { NoMethodError } from "@blazetrails/ruby-compat/no-method-error";
 import { RecordNotFound } from "../../../lib/errors.js";
 
 describe("findWithIds — composite primary key", () => {

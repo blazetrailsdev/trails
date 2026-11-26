@@ -1,4 +1,4 @@
-import { StandardError } from "@blazetrails/ruby-compat";
+import { StandardError } from "@blazetrails/ruby-compat/standard-error";
 import { assertRaises } from "@blazetrails/activesupport/testing/assertions";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Migration } from "../../../../lib/index.js";

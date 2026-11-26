@@ -1,5 +1,5 @@
-import { Pathname } from "@blazetrails/ruby-compat";
-import { rbFSend } from "@blazetrails/ruby-compat";
+import { Pathname } from "@blazetrails/ruby-compat/pathname";
+import { rbFSend } from "@blazetrails/ruby-compat/object";
 import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
 import { Executor as ActionDispatchExecutor } from "@blazetrails/actionpack";
 import type { RackResponse } from "@blazetrails/rack";

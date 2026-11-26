@@ -1,4 +1,5 @@
-import { osAdapterConfig, registerOsAdapter, getFs } from "@blazetrails/ruby-compat";
+import { getFs } from "@blazetrails/ruby-compat/fs-adapter";
+import { osAdapterConfig, registerOsAdapter } from "@blazetrails/ruby-compat/os-adapter";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { DEFAULT_FORKS, resolveForkCount } from "../../support/ar-db-forks-default.js";
 import { workerForkCount } from "../../support/ar-db-slots.js";

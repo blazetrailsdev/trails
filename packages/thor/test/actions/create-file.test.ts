@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { Dir, File, FileUtils, rbFSystem } from "@blazetrails/ruby-compat";
+import { Dir, File, FileUtils } from "@blazetrails/ruby-compat";
+import { rbFSystem } from "@blazetrails/ruby-compat/kernel-system";
 import type { ActionsHost } from "../../lib/actions.js";
 import { MyCounter as MyCounterFixture } from "../fixtures/group.js";
 import { capture } from "../support/helper.js";
@@ -8,7 +9,7 @@ import { CreateFile } from "../../lib/actions/create-file.js";
 const { readline } = vi.hoisted(() => ({ readline: vi.fn() }));
 
 vi.mock("../../lib/line-editor.js", () => ({ readline }));
-vi.mock("@blazetrails/ruby-compat", async (importOriginal) => ({
+vi.mock("@blazetrails/ruby-compat/kernel-system", async (importOriginal) => ({
   ...(await importOriginal<object>()),
   rbFSystem: vi.fn(),
 }));

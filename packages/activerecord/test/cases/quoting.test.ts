@@ -24,7 +24,8 @@ const quotedTime = (value: Parameters<typeof quotedTimeFn>[0]): string =>
   quotedTimeFn.call(HOST, value);
 const quotedDate = (value: Parameters<typeof quotedDateFn>[0]): string =>
   quotedDateFn.call(HOST, value);
-import { rbFSend, TypeError } from "@blazetrails/ruby-compat";
+import { rbFSend } from "@blazetrails/ruby-compat/object";
+import { TypeError } from "@blazetrails/ruby-compat/type-error";
 import { NotImplementedError } from "../../lib/errors.js";
 import { setDefaultTimezone } from "../../lib/active-record.js";
 

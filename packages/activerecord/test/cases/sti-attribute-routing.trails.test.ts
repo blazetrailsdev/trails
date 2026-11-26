@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Hash, keys } from "@blazetrails/ruby-compat";
+import { Hash, keys } from "@blazetrails/ruby-compat/hash";
 import { Base } from "../../lib/base.js";
 import { adapterDouble, establishConnectionTo } from "../support/adapter-double.js";
 import { fixtures } from "../support/use-fixtures.js";

@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Base, ConnectionNotEstablished, SchemaReflection } from "@blazetrails/activerecord";
-import { env, getFs, getOsAsync, getPath, setEnv } from "@blazetrails/ruby-compat";
+import { getFs, getPath } from "@blazetrails/ruby-compat/fs-adapter";
+import { getOsAsync } from "@blazetrails/ruby-compat/os-adapter";
+import { env, setEnv } from "@blazetrails/ruby-compat/process-adapter";
 import { Application } from "../lib/application.js";
 import { Trails, _resetTrailsEnv } from "../lib/trails.js";
 

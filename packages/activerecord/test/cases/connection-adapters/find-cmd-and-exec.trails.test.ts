@@ -1,5 +1,10 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
-import { SystemExit, env, getProcessAdapter, setEnv } from "@blazetrails/ruby-compat";
+import {
+  SystemExit,
+  env,
+  getProcessAdapter,
+  setEnv,
+} from "@blazetrails/ruby-compat/process-adapter";
 import { AbstractAdapter } from "../../../lib/connection-adapters/abstract-adapter.js";
 
 describe("AbstractAdapter.findCmdAndExec", () => {

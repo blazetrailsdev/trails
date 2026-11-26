@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
-import { STDOUT } from "@blazetrails/ruby-compat";
+import { STDOUT } from "@blazetrails/ruby-compat/io";
 import { CodeStatistics } from "../lib/code-statistics.js";
 
 describe("CodeStatisticsTest", () => {

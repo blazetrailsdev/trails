@@ -1,4 +1,5 @@
-import { constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { Base } from "../../lib/index.js";
 import { FutureResult } from "../../lib/future-result.js";

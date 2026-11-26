@@ -1,7 +1,8 @@
 import pg from "pg";
 import { it, expect, describe, vi } from "vitest";
 import { fakePgConnection } from "../../support/fake-pg-connection.js";
-import { IO, rbClassNewInstance } from "@blazetrails/ruby-compat";
+import { rbClassNewInstance } from "@blazetrails/ruby-compat/include";
+import { IO } from "@blazetrails/ruby-compat/io";
 import { Connection } from "@blazetrails/pg";
 import { PG } from "@blazetrails/pg";
 import { cancelAnyRunningQuery } from "../../../lib/connection-adapters/postgresql/database-statements.js";

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { EtOrbi } from "@blazetrails/et-orbi";
-import { constGet } from "@blazetrails/ruby-compat";
+import { constGet } from "@blazetrails/ruby-compat/variable";
 import { Trails } from "../lib/trails.js";
 
 describe("Trails registered constant", () => {

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { ActionController } from "@blazetrails/actionpack";
-import { env, setEnv } from "@blazetrails/ruby-compat";
+import { env, setEnv } from "@blazetrails/ruby-compat/process-adapter";
 import { Application } from "../lib/application.js";
 import "../lib/all.js";
 import { Trails } from "../lib/trails.js";

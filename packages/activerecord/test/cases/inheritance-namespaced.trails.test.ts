@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { moduleParent, moduleParents } from "@blazetrails/activesupport";
-import { rbModName } from "@blazetrails/ruby-compat";
+import { rbModName } from "@blazetrails/ruby-compat/object";
 import { stiName, polymorphicName } from "../../lib/inheritance.js";
 import { fixtures } from "../support/use-fixtures.js";
 import { ClothingItem, ClothingItemUsed, ClothingItemSized } from "../models/clothing-item.js";

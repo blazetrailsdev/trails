@@ -1,14 +1,6 @@
 import "../constants.runner.generated.js";
-import {
-  File,
-  TopLevel,
-  exit,
-  argv,
-  include,
-  rbArgv,
-  rbFLoad,
-  stdin,
-} from "@blazetrails/ruby-compat";
+import { File, TopLevel, argv, include, rbArgv, rbFLoad, stdin } from "@blazetrails/ruby-compat";
+import { exit } from "@blazetrails/ruby-compat/process-adapter";
 import type { ThorClass } from "@blazetrails/thor";
 import type { ThorOptions } from "@blazetrails/thor/core-ext/hash-with-indifferent-access";
 import { isPresent } from "@blazetrails/activesupport";

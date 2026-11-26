@@ -1,5 +1,6 @@
 import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
-import { File, env as ENV, setEnv } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat/file";
+import { env as ENV, setEnv } from "@blazetrails/ruby-compat/process-adapter";
 import { trailsRoot } from "@blazetrails/activesupport";
 import { AbstractAdapter } from "../../../lib/connection-adapters/abstract-adapter.js";
 import { AbstractMysqlAdapter } from "../../../lib/connection-adapters/abstract-mysql-adapter.js";

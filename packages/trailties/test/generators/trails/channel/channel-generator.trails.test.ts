@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { Dir, File } from "@blazetrails/ruby-compat";
+import { Dir } from "@blazetrails/ruby-compat/dir";
+import { File } from "@blazetrails/ruby-compat/file";
 import { ChannelGenerator } from "../../../../lib/generators/trails/channel/channel-generator.js";
 
 describe("Trails::Generators::ChannelGenerator", () => {

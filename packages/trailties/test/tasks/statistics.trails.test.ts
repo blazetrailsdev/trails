@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Rake } from "@blazetrails/rake";
-import { File, STDERR, TopLevel, rbFLoad, stdout } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat/file";
+import { STDERR } from "@blazetrails/ruby-compat/io";
+import { rbFLoad } from "@blazetrails/ruby-compat/load";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
+import { stdout } from "@blazetrails/ruby-compat/process-adapter";
 import type {} from "../../lib/tasks/statistics.js";
 import { deprecator } from "../../lib/deprecator.js";
 

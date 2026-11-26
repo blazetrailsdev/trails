@@ -25,7 +25,10 @@ import {
   assertRaises,
   assertRespondTo,
 } from "@blazetrails/activesupport/testing/assertions";
-import { PP, SimpleDelegator, constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { SimpleDelegator } from "@blazetrails/ruby-compat/delegate";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
+import { PP } from "@blazetrails/ruby-compat/pp";
 import { fixtures } from "../support/use-fixtures.js";
 import { adapterType } from "../support/test-adapter.js";
 import { sql as arelSql } from "@blazetrails/arel";

@@ -27,14 +27,8 @@ import { MessageEncryptor } from "@blazetrails/activesupport/message-encryptor";
 import { Metadata } from "@blazetrails/activesupport/messages/metadata";
 import { Codec } from "@blazetrails/activesupport/messages/codec";
 import type { TestCase } from "@blazetrails/activesupport/test-case";
-import {
-  exit,
-  isSymbol,
-  rbFSend,
-  rbObjRespondTo,
-  STDERR,
-  symbolToS,
-} from "@blazetrails/ruby-compat";
+import { isSymbol, rbFSend, rbObjRespondTo, STDERR, symbolToS } from "@blazetrails/ruby-compat";
+import { exit } from "@blazetrails/ruby-compat/process-adapter";
 
 type HashDigestClass = typeof Digest.hashDigestClass;
 

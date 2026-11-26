@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { assertRaises } from "@blazetrails/activesupport/testing/assertions";
-import { puts, stdout } from "@blazetrails/ruby-compat";
+import { puts } from "@blazetrails/ruby-compat/io";
+import { stdout } from "@blazetrails/ruby-compat/process-adapter";
 import {
   Migration,
   Migrator,
