@@ -11,7 +11,7 @@ import {
   regexpEscape,
 } from "@blazetrails/ruby-compat";
 import type { Base, GeneratorConfig } from "./generators/base.js";
-import { noColorBang } from "./command/behavior.js";
+import { noColorBang, printList as behaviorPrintList } from "./command/behavior.js";
 import { CorrectableNameError } from "./command.js";
 import { Trails } from "./trails.js";
 import type {
@@ -276,12 +276,34 @@ export class Generators {
   }
 
   static hiddenNamespaces(): string[] {
-    return (_hiddenNamespaces ??= [
-      "trails",
-      "resource-route",
-      "action-mailbox:install",
-      "devcontainer",
-    ]);
+    if (_hiddenNamespaces === undefined) {
+      const orm = dasherize(underscore(`${Generators.options().trails.orm ?? ""}`));
+      const test = dasherize(underscore(`${Generators.options().trails.testFramework ?? ""}`));
+      const template = dasherize(underscore(`${Generators.options().trails.templateEngine ?? ""}`));
+
+      _hiddenNamespaces = [
+        "trails",
+        "resource-route",
+        `${orm}:migration`,
+        `${orm}:model`,
+        `${test}:controller`,
+        `${test}:helper`,
+        `${test}:integration`,
+        `${test}:system`,
+        `${test}:mailer`,
+        `${test}:model`,
+        `${test}:scaffold`,
+        `${test}:view`,
+        `${test}:job`,
+        `${template}:controller`,
+        `${template}:scaffold`,
+        `${template}:mailer`,
+        "action-text:install",
+        "action-mailbox:install",
+        "devcontainer",
+      ];
+    }
+    return _hiddenNamespaces;
   }
 
   static hideNamespaces(...namespaces: string[]): void {
@@ -383,10 +405,7 @@ export class Generators {
 
   private static printList(base: string, namespaces: string[]): void {
     namespaces = namespaces.filter((n) => !Generators.hiddenNamespaces().includes(n));
-    if (namespaces.length === 0) return;
-    STDOUT.puts(`${base.charAt(0).toUpperCase()}${base.slice(1)}:`);
-    for (const n of namespaces) STDOUT.puts(`  ${n}`);
-    STDOUT.puts();
+    behaviorPrintList(base, namespaces);
   }
 }
 

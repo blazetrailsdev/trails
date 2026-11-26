@@ -165,6 +165,12 @@ describe("GeneratorsTest", () => {
     expect(klass!.namespace()).toBe("fixjour");
   });
 
+  it("find by namespace in subfolder", async () => {
+    const klass = await Generators.findByNamespace("fixjour", "active_record");
+    expect(klass).toBeTruthy();
+    expect(klass!.namespace()).toEqual("active-record:fixjour");
+  });
+
   it("find by namespace with duplicated name", async () => {
     const klass = await Generators.findByNamespace("foobar");
     expect(klass).toBeTruthy();
@@ -230,6 +236,12 @@ describe("GeneratorsTest", () => {
     const output = await help();
     expect(output).toMatch(/Fixjour:/);
     expect(output).toMatch(/^ {2}fixjour$/m);
+  });
+
+  it("trails generators does not show active record hooks", async () => {
+    const output = await help();
+    expect(output).toMatch(/ActiveRecord:/);
+    expect(output).toMatch(/^ {2}active-record:fixjour$/m);
   });
 
   it("default banner should show generator namespace", async () => {

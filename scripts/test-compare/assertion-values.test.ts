@@ -64,6 +64,29 @@ describe("assertionValueMismatch", () => {
     ]);
   });
 
+  it("folds a kebab-case generator namespace onto the snake_case Rails spelling", () => {
+    expect(
+      assertionValueMismatch(
+        ["assert_equal"],
+        ["s:active_record:fixjour"],
+        ["toEqual"],
+        ["s:active-record:fixjour"],
+        false,
+      ),
+    ).toBeNull();
+    expect(
+      assertionValueMismatch(
+        ["assert_equal"],
+        ["s:active_record:fixjour"],
+        ["toEqual"],
+        ["s:test-unit:fixjour"],
+        false,
+      ),
+    ).toEqual([
+      { kind: "equal", rails: ["s:activeRecord:fixjour"], trails: ["s:testUnit:fixjour"] },
+    ]);
+  });
+
   it("folds a snake_case attribute-name literal onto its camelCase spelling", () => {
     expect(
       assertionValueMismatch(

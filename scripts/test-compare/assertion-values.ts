@@ -196,12 +196,25 @@ function foldDumpStatementToken(token: string): string {
  */
 const SNAKE_IDENTIFIER_RE = /\b[a-z][a-z0-9]*(?:_[a-z0-9]+)+\b/g;
 
+/**
+ * A name a user or file sees is kebab-case in trails (CLAUDE.md, "Casing is
+ * translated, never mirrored"): Rails' generator namespace `active_record:fixjour`
+ * (railties/test/generators_test.rb:114) is `active-record:fixjour`. A kebab run
+ * that heads a `:`-separated namespace folds onto
+ * the same camelCase spelling as its snake form.
+ */
+const KEBAB_NAMESPACE_RE = /(?<![\w-])[a-z][a-z0-9]*(?:-[a-z0-9]+)+(?=:[a-z])/g;
+
 function foldNameToken(token: string): string {
   if (!token.startsWith("s:")) return token;
   const text = token.slice(2);
-  return `s:${text.replace(SNAKE_IDENTIFIER_RE, (name) =>
-    name.replace(/_([a-z0-9])/g, (_, ch: string) => ch.toUpperCase()),
-  )}`;
+  return `s:${text
+    .replace(KEBAB_NAMESPACE_RE, (name) =>
+      name.replace(/-([a-z0-9])/g, (_, ch: string) => ch.toUpperCase()),
+    )
+    .replace(SNAKE_IDENTIFIER_RE, (name) =>
+      name.replace(/_([a-z0-9])/g, (_, ch: string) => ch.toUpperCase()),
+    )}`;
 }
 
 /**
