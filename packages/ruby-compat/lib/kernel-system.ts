@@ -23,24 +23,24 @@ import { RuntimeError } from "./runtime-error.js";
  * A host whose process adapter has no `signo` spawns no child, so it never
  * reaches the signal arm.
  *
- * @inventedArm throw — CONVERGEABLE rb-syserr-fail-str-raises-errno-for-every-spawn-code
  * @noRailsEquivalent PERMANENT — Ruby core `Kernel#system`
  * (`vendor/ruby/v3.3.11/process.c:4841`).
  */
 export async function rbFSystem(
   ...argv: (
     | string
+    | [program: string, argv0: string]
     | Record<string, string | null>
     | { out?: string | IO; err?: string | IO; exception?: boolean }
   )[]
 ): Promise<boolean | null> {
-  const [prog, env, args, opthash] = rbExecargNew(argv, true);
+  const [prog, env, args, opthash, argv0] = rbExecargNew(argv, true);
   const adapter = getChildProcess();
   if (adapter.system === undefined) {
     throw new NotImplementedError("system() function is unimplemented on this machine");
   }
 
-  const data = await adapter.system(prog, env, args, opthash);
+  const data = await adapter.system(prog, env, args, opthash, argv0);
   rbLastStatusSet(new Process.Status(data));
 
   if (data.pid != null && data.pid > 0) {
@@ -50,11 +50,7 @@ export async function rbFSystem(
 
     if (data.error !== undefined) {
       if (opthash.exception) {
-        const klass =
-          Errno[(data.error as { code?: string } | undefined)?.code as keyof typeof Errno];
-        throw klass !== undefined
-          ? new klass(prog)
-          : (data.error ?? new SystemCallError(`unknown error - ${prog}`));
+        rbSyserrFailStr(data.error, prog);
       } else {
         return null;
       }
@@ -70,13 +66,23 @@ export async function rbFSystem(
   }
 
   if (opthash.exception) {
-    const klass = Errno[(data.error as { code?: string } | undefined)?.code as keyof typeof Errno];
-    throw klass !== undefined
-      ? new klass(prog)
-      : (data.error ?? new SystemCallError(`unknown error - ${prog}`));
+    rbSyserrFailStr(data.error, prog);
   } else {
     return null;
   }
+}
+
+/**
+ * `rb_syserr_fail_str` (`vendor/ruby/v3.3.11/error.c:3573`): the `Errno` class
+ * `set_syserr` defined for the spawn error's errno, with `strerror` and the
+ * command as its message, or `SystemCallError`'s `Unknown error` for an errno
+ * with no class (`syserr_initialize`, `error.c:2786-2800`).
+ */
+function rbSyserrFailStr(e: unknown, mesg: string): never {
+  const { code, errno } = (e ?? {}) as { code?: string; errno?: number };
+  const klass = Errno[code as keyof typeof Errno];
+  if (klass !== undefined) throw new klass(mesg);
+  throw new SystemCallError(`Unknown error ${Math.abs(errno ?? 0)} - ${mesg}`);
 }
 
 /**

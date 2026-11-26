@@ -95,12 +95,12 @@
   },
   "ruby-compat": {
     "tarball": {
-      "value": 925431,
-      "reason": "Zlib::GzipFile ports gzfile_* framing over a sync zstream and adds NoFooter/CRCError/LengthError (trails#10772)"
+      "value": 927700,
+      "reason": "Zlib::GzipFile framing (trails#10772), and Errno classes for every spawn errno (rb_syserr_fail_str) with rb_check_argv and the one-pass JSON ignore"
     },
     "unpacked": {
-      "value": 4452377,
-      "reason": "Zlib::GzipFile ports gzfile_* framing over a sync zstream and adds NoFooter/CRCError/LengthError (trails#10772)"
+      "value": 4469500,
+      "reason": "Zlib::GzipFile framing (trails#10772), and Errno classes for every spawn errno (rb_syserr_fail_str) with rb_check_argv and the one-pass JSON ignore"
     },
     "entries": {
       "value": 621

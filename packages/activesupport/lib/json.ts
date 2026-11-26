@@ -58,9 +58,8 @@ export namespace ActiveSupportJSON {
 
   export const dump = encode;
 
-  /** @missingRailsArgs parse — CONVERGEABLE json-parse-skips-comments-in-one-pass-and-takes-options */
   export function decode(json: string | Uint8Array): unknown {
-    const data = RbJSON.parse(json);
+    const data = RbJSON.parse(json, { quirksMode: true });
 
     if (parseJsonTimes != null && parseJsonTimes !== false) {
       return convertDatesFrom(data);

@@ -457,6 +457,7 @@ describe.runIf(currentAdapter("PostgreSQLAdapter"))("PostgreSQLStructureDumpTest
       expect.objectContaining(expectedEnv),
       [...expectedArgs, filename, "my-app-db"],
       {},
+      null,
     );
   });
 
@@ -485,6 +486,7 @@ describe.runIf(currentAdapter("PostgreSQLAdapter"))("PostgreSQLStructureDumpTest
       expect.objectContaining(expectedEnv),
       [...expectedArgs, filename, "my-app-db"],
       {},
+      null,
     );
   });
 
@@ -498,6 +500,7 @@ describe.runIf(currentAdapter("PostgreSQLAdapter"))("PostgreSQLStructureDumpTest
       expect.anything(),
       [...expectedArgs, filename, "--noop", "my-app-db"],
       {},
+      null,
     );
   });
 
@@ -511,6 +514,7 @@ describe.runIf(currentAdapter("PostgreSQLAdapter"))("PostgreSQLStructureDumpTest
       expect.anything(),
       [...expectedArgs, filename, "my-app-db"],
       {},
+      null,
     );
   });
 
@@ -524,6 +528,7 @@ describe.runIf(currentAdapter("PostgreSQLAdapter"))("PostgreSQLStructureDumpTest
       expect.anything(),
       [...expectedArgs, filename, "--noop", "my-app-db"],
       {},
+      null,
     );
   });
 
@@ -544,6 +549,7 @@ describe.runIf(currentAdapter("PostgreSQLAdapter"))("PostgreSQLStructureDumpTest
       expect.anything(),
       [...expectedArgs, filename, "-T", "prefix_foo", "-T", "ignored_foo", "my-app-db"],
       {},
+      null,
     );
   });
 
@@ -562,6 +568,7 @@ describe.runIf(currentAdapter("PostgreSQLAdapter"))("PostgreSQLStructureDumpTest
       expect.anything(),
       [...expectedArgs, filename, "--schema=foo", "--schema=bar", "my-app-db"],
       {},
+      null,
     );
   });
 
@@ -582,6 +589,7 @@ describe.runIf(currentAdapter("PostgreSQLAdapter"))("PostgreSQLStructureDumpTest
       expect.anything(),
       [...expectedArgs, filename, "my-app-db"],
       {},
+      null,
     );
   });
 
@@ -595,6 +603,7 @@ describe.runIf(currentAdapter("PostgreSQLAdapter"))("PostgreSQLStructureDumpTest
       expect.anything(),
       [...expectedArgs, filename, "--schema=foo", "--schema=bar", "my-app-db"],
       {},
+      null,
     );
   });
 
@@ -615,6 +624,7 @@ describe.runIf(currentAdapter("PostgreSQLAdapter"))("PostgreSQLStructureDumpTest
       expect.anything(),
       [...expectedArgs, failing, "my-app-db"],
       {},
+      null,
     );
     expect(message).toMatch("failed to execute:");
   });
@@ -651,6 +661,7 @@ describe.runIf(currentAdapter("PostgreSQLAdapter"))("PostgreSQLStructureLoadTest
       expect.anything(),
       [...expectedArgs, "--file", filename, "my-app-db"],
       {},
+      null,
     );
   });
 
@@ -665,6 +676,7 @@ describe.runIf(currentAdapter("PostgreSQLAdapter"))("PostgreSQLStructureLoadTest
       expect.anything(),
       [...expectedArgs, "--noop", "--file", filename, "my-app-db"],
       {},
+      null,
     );
   });
 
@@ -695,6 +707,7 @@ describe.runIf(currentAdapter("PostgreSQLAdapter"))("PostgreSQLStructureLoadTest
       expect.objectContaining(expectedEnv),
       [...expectedArgs, "--noop", "--file", filename, "my-app-db"],
       {},
+      null,
     );
   });
 
@@ -725,6 +738,7 @@ describe.runIf(currentAdapter("PostgreSQLAdapter"))("PostgreSQLStructureLoadTest
       expect.objectContaining(expectedEnv),
       [...expectedArgs, "--noop", "--file", filename, "my-app-db"],
       {},
+      null,
     );
   });
 
@@ -739,6 +753,7 @@ describe.runIf(currentAdapter("PostgreSQLAdapter"))("PostgreSQLStructureLoadTest
       expect.anything(),
       [...expectedArgs, "--file", filename, "my-app-db"],
       {},
+      null,
     );
   });
 
@@ -753,6 +768,7 @@ describe.runIf(currentAdapter("PostgreSQLAdapter"))("PostgreSQLStructureLoadTest
       expect.anything(),
       [...expectedArgs, "--noop", "--file", filename, "my-app-db"],
       {},
+      null,
     );
   });
 
@@ -766,6 +782,7 @@ describe.runIf(currentAdapter("PostgreSQLAdapter"))("PostgreSQLStructureLoadTest
       expect.anything(),
       [...expectedArgs, "--file", filename, "my-app-db"],
       {},
+      null,
     );
   });
 });

@@ -64,6 +64,7 @@ export interface ChildProcessAdapter {
     env: Record<string, string | undefined>,
     args?: string[] | null,
     options?: { out?: string | IO; err?: string | IO },
+    argv0?: string | null,
   ): Promise<WaitStatus>;
   /**
    * Runs `command` through `/bin/sh -c`, or with no `args` the program `command`
@@ -217,9 +218,10 @@ function spawnChild(
   input?: string | Uint8Array,
   readErr?: ((chunk: string) => void) | { bytes: (chunk: Uint8Array) => void },
   cwd?: string,
+  argv0?: string,
 ): Promise<WaitStatus> {
   return new Promise((resolve) => {
-    const child = cp.spawn(file, args, { env, stdio, cwd });
+    const child = cp.spawn(file, args, { env, stdio, cwd, argv0 });
     child.stdin?.on("error", () => {});
     child.stdin?.end(input);
     if (typeof read === "function") {
@@ -282,7 +284,7 @@ function wrap(cp: NodeChildProcess): ChildProcessAdapter {
         error: result.error,
       };
     },
-    system(command, env, args, options) {
+    system(command, env, args, options, argv0) {
       const opened: File[] = [];
       const redirect = (target: string | IO | undefined, inherited: IO) => {
         let io: IO;
@@ -311,7 +313,18 @@ function wrap(cp: NodeChildProcess): ChildProcessAdapter {
       const status =
         args == null
           ? spawnChild(cp, "/bin/sh", ["-c", command], env, stdio, out.read, undefined, err.read)
-          : spawnChild(cp, command, args, env, stdio, out.read, undefined, err.read);
+          : spawnChild(
+              cp,
+              command,
+              args,
+              env,
+              stdio,
+              out.read,
+              undefined,
+              err.read,
+              undefined,
+              argv0 ?? undefined,
+            );
       return status.finally(() => {
         for (const file of opened) file.close();
       });

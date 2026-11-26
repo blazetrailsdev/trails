@@ -399,7 +399,7 @@ describe("Thor::Actions", () => {
         system = receiveSystem();
       });
       afterEach(() => {
-        expect(system).toHaveBeenCalledWith("ls", expect.anything(), [], {});
+        expect(system).toHaveBeenCalledWith("ls", expect.anything(), [], {}, null);
       });
 
       it("executes the command given", async () => {
@@ -452,6 +452,7 @@ describe("Thor::Actions", () => {
           expect.objectContaining({ BAR: "foo" }),
           null,
           {},
+          null,
         );
       });
     });
@@ -506,7 +507,7 @@ describe("Thor::Actions", () => {
       system = receiveSystem();
     });
     afterEach(() => {
-      expect(system).toHaveBeenCalledWith("/opt/jruby", expect.anything(), ["script.rb"], {});
+      expect(system).toHaveBeenCalledWith("/opt/jruby", expect.anything(), ["script.rb"], {}, null);
       vi.restoreAllMocks();
     });
 
@@ -534,13 +535,19 @@ describe("Thor::Actions", () => {
     it("executes the thor command", async () => {
       const system = receiveSystem();
       await action(counter(), "list", { verbose: true });
-      expect(system).toHaveBeenCalledWith("thor", expect.anything(), ["list"], {});
+      expect(system).toHaveBeenCalledWith("thor", expect.anything(), ["list"], {}, null);
     });
 
     it("converts extra arguments to command arguments", async () => {
       const system = receiveSystem();
       await action(counter(), "list", "foo", "bar");
-      expect(system).toHaveBeenCalledWith("thor", expect.anything(), ["list", "foo", "bar"], {});
+      expect(system).toHaveBeenCalledWith(
+        "thor",
+        expect.anything(),
+        ["list", "foo", "bar"],
+        {},
+        null,
+      );
     });
 
     it("converts options hash to switches", async () => {
@@ -551,6 +558,7 @@ describe("Thor::Actions", () => {
         expect.anything(),
         ["list", "foo", "bar", "--foo"],
         {},
+        null,
       );
 
       system.mockClear();
@@ -560,13 +568,14 @@ describe("Thor::Actions", () => {
         expect.anything(),
         ["list", "--foo", "1", "2", "3"],
         {},
+        null,
       );
     });
 
     it("logs status", async () => {
       const system = receiveSystem();
       expect(await action(counter(), "list")).toBe('         run  thor list from "."\n');
-      expect(system).toHaveBeenCalledWith("thor", expect.anything(), ["list"], {});
+      expect(system).toHaveBeenCalledWith("thor", expect.anything(), ["list"], {}, null);
     });
 
     it("does not log status if required", async () => {
@@ -577,6 +586,7 @@ describe("Thor::Actions", () => {
         expect.anything(),
         ["list", "--foo", "1", "2", "3"],
         {},
+        null,
       );
     });
 

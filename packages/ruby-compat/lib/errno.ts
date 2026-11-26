@@ -491,6 +491,186 @@ class ENETUNREACH extends SystemCallError {
 }
 
 /**
+ * `Errno::E2BIG`, defined by `set_syserr` (`vendor/ruby/v3.3.11/error.c:2700-2737`) as
+ * {@link ENOTTY} is: an errno `execve(2)` or `fork(2)` reports for a spawn.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `Errno::E2BIG`.
+ */
+class E2BIG extends SystemCallError {
+  static readonly Errno = 7;
+  readonly code = "E2BIG";
+
+  constructor(mesg?: string) {
+    super(mesg == null ? "Argument list too long" : `Argument list too long - ${mesg}`);
+    this.name = "Errno::E2BIG";
+    this.errno = E2BIG.Errno;
+  }
+}
+
+/**
+ * `Errno::EFAULT`, defined by `set_syserr` (`vendor/ruby/v3.3.11/error.c:2700-2737`) as
+ * {@link ENOTTY} is: an errno `execve(2)` or `fork(2)` reports for a spawn.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `Errno::EFAULT`.
+ */
+class EFAULT extends SystemCallError {
+  static readonly Errno = 14;
+  readonly code = "EFAULT";
+
+  constructor(mesg?: string) {
+    super(mesg == null ? "Bad address" : `Bad address - ${mesg}`);
+    this.name = "Errno::EFAULT";
+    this.errno = EFAULT.Errno;
+  }
+}
+
+/**
+ * `Errno::EIO`, defined by `set_syserr` (`vendor/ruby/v3.3.11/error.c:2700-2737`) as
+ * {@link ENOTTY} is: an errno `execve(2)` or `fork(2)` reports for a spawn.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `Errno::EIO`.
+ */
+class EIO extends SystemCallError {
+  static readonly Errno = 5;
+  readonly code = "EIO";
+
+  constructor(mesg?: string) {
+    super(mesg == null ? "Input/output error" : `Input/output error - ${mesg}`);
+    this.name = "Errno::EIO";
+    this.errno = EIO.Errno;
+  }
+}
+
+/**
+ * `Errno::ELIBBAD`, defined by `set_syserr` (`vendor/ruby/v3.3.11/error.c:2700-2737`) as
+ * {@link ENOTTY} is: an errno `execve(2)` or `fork(2)` reports for a spawn.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `Errno::ELIBBAD`.
+ */
+class ELIBBAD extends SystemCallError {
+  static readonly Errno = 80;
+  readonly code = "ELIBBAD";
+
+  constructor(mesg?: string) {
+    super(
+      mesg == null
+        ? "Accessing a corrupted shared library"
+        : `Accessing a corrupted shared library - ${mesg}`,
+    );
+    this.name = "Errno::ELIBBAD";
+    this.errno = ELIBBAD.Errno;
+  }
+}
+
+/**
+ * `Errno::ELOOP`, defined by `set_syserr` (`vendor/ruby/v3.3.11/error.c:2700-2737`) as
+ * {@link ENOTTY} is: an errno `execve(2)` or `fork(2)` reports for a spawn.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `Errno::ELOOP`.
+ */
+class ELOOP extends SystemCallError {
+  static readonly Errno = 40;
+  readonly code = "ELOOP";
+
+  constructor(mesg?: string) {
+    super(
+      mesg == null
+        ? "Too many levels of symbolic links"
+        : `Too many levels of symbolic links - ${mesg}`,
+    );
+    this.name = "Errno::ELOOP";
+    this.errno = ELOOP.Errno;
+  }
+}
+
+/**
+ * `Errno::ENAMETOOLONG`, defined by `set_syserr` (`vendor/ruby/v3.3.11/error.c:2700-2737`) as
+ * {@link ENOTTY} is: an errno `execve(2)` or `fork(2)` reports for a spawn.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `Errno::ENAMETOOLONG`.
+ */
+class ENAMETOOLONG extends SystemCallError {
+  static readonly Errno = 36;
+  readonly code = "ENAMETOOLONG";
+
+  constructor(mesg?: string) {
+    super(mesg == null ? "File name too long" : `File name too long - ${mesg}`);
+    this.name = "Errno::ENAMETOOLONG";
+    this.errno = ENAMETOOLONG.Errno;
+  }
+}
+
+/**
+ * `Errno::ENFILE`, defined by `set_syserr` (`vendor/ruby/v3.3.11/error.c:2700-2737`) as
+ * {@link ENOTTY} is: an errno `execve(2)` or `fork(2)` reports for a spawn.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `Errno::ENFILE`.
+ */
+class ENFILE extends SystemCallError {
+  static readonly Errno = 23;
+  readonly code = "ENFILE";
+
+  constructor(mesg?: string) {
+    super(
+      mesg == null ? "Too many open files in system" : `Too many open files in system - ${mesg}`,
+    );
+    this.name = "Errno::ENFILE";
+    this.errno = ENFILE.Errno;
+  }
+}
+
+/**
+ * `Errno::ENOEXEC`, defined by `set_syserr` (`vendor/ruby/v3.3.11/error.c:2700-2737`) as
+ * {@link ENOTTY} is: an errno `execve(2)` or `fork(2)` reports for a spawn.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `Errno::ENOEXEC`.
+ */
+class ENOEXEC extends SystemCallError {
+  static readonly Errno = 8;
+  readonly code = "ENOEXEC";
+
+  constructor(mesg?: string) {
+    super(mesg == null ? "Exec format error" : `Exec format error - ${mesg}`);
+    this.name = "Errno::ENOEXEC";
+    this.errno = ENOEXEC.Errno;
+  }
+}
+
+/**
+ * `Errno::ENOMEM`, defined by `set_syserr` (`vendor/ruby/v3.3.11/error.c:2700-2737`) as
+ * {@link ENOTTY} is: an errno `execve(2)` or `fork(2)` reports for a spawn.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `Errno::ENOMEM`.
+ */
+class ENOMEM extends SystemCallError {
+  static readonly Errno = 12;
+  readonly code = "ENOMEM";
+
+  constructor(mesg?: string) {
+    super(mesg == null ? "Cannot allocate memory" : `Cannot allocate memory - ${mesg}`);
+    this.name = "Errno::ENOMEM";
+    this.errno = ENOMEM.Errno;
+  }
+}
+
+/**
+ * `Errno::ETXTBSY`, defined by `set_syserr` (`vendor/ruby/v3.3.11/error.c:2700-2737`) as
+ * {@link ENOTTY} is: an errno `execve(2)` or `fork(2)` reports for a spawn.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `Errno::ETXTBSY`.
+ */
+class ETXTBSY extends SystemCallError {
+  static readonly Errno = 26;
+  readonly code = "ETXTBSY";
+
+  constructor(mesg?: string) {
+    super(mesg == null ? "Text file busy" : `Text file busy - ${mesg}`);
+    this.name = "Errno::ETXTBSY";
+    this.errno = ETXTBSY.Errno;
+  }
+}
+
+/**
  * Ruby's core `Errno` module (`vendor/ruby/v3.3.11/error.c:2666-2694`), holding the
  * `SystemCallError` subclass for each errno a raise site in ruby-compat names.
  *
@@ -498,6 +678,7 @@ class ENETUNREACH extends SystemCallError {
  * without defining.
  */
 export const Errno = {
+  E2BIG,
   EACCES,
   EAGAIN,
   ECHILD,
@@ -505,13 +686,21 @@ export const Errno = {
   ECONNREFUSED,
   ECONNRESET,
   EEXIST,
+  EFAULT,
   EHOSTUNREACH,
   EINTR,
   EINVAL,
+  EIO,
   EISDIR,
+  ELIBBAD,
+  ELOOP,
   EMFILE,
+  ENAMETOOLONG,
   ENETUNREACH,
+  ENFILE,
   ENOENT,
+  ENOEXEC,
+  ENOMEM,
   ENOTDIR,
   ENOTTY,
   EPERM,
@@ -519,4 +708,5 @@ export const Errno = {
   ESPIPE,
   ESRCH,
   ETIMEDOUT,
+  ETXTBSY,
 };
