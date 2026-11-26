@@ -219,34 +219,30 @@ export class FormatBuilder extends Visitor {
     return new Format(super.accept(node) as FormatPart[]);
   }
 
-  protected override terminal(node: Node): FormatPart[] {
+  override terminal(node: Node): FormatPart[] {
     return [typeof node.left === "string" ? node.left : ""];
   }
 
-  protected override binary(node: Node): FormatPart[] {
+  override binary(node: Node): FormatPart[] {
     return [
       ...(this.visit((node as Node & { left: Node }).left) as FormatPart[]),
       ...(this.visit((node as Node & { right: Node }).right) as FormatPart[]),
     ];
   }
 
-  protected override visitGROUP(n: Node): FormatPart[] {
+  override visitGROUP(n: Node): FormatPart[] {
     return [new Format(this.unary(n) as FormatPart[])];
   }
 
-  protected override visitSTAR(n: Node): FormatPart[] {
+  override visitSTAR(n: Node): FormatPart[] {
     const inner = (n as Node & { left: Node }).left;
     return [Format.requiredPath(inner.toSym())];
   }
 
-  protected override visitSYMBOL(n: Node): FormatPart[] {
+  override visitSYMBOL(n: Node): FormatPart[] {
     const symbol = n.toSym();
     if (symbol === "controller") return [Format.requiredPath(symbol)];
     return [Format.requiredSegment(symbol)];
-  }
-
-  protected override visitOR(_n: Node): FormatPart[] {
-    throw new Error("FormatBuilder does not support OR (alternation) nodes");
   }
 }
 

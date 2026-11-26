@@ -95,11 +95,6 @@ describe("ActionDispatch::Journey::Visitors::FormatBuilder", () => {
     expect(format.evaluate({})).toBe("/posts");
     expect(format.evaluate({ format: "json" })).toBe("/posts.json");
   });
-
-  it("throws on OR (alternation) nodes — Rails routes don't use OR for path-building", () => {
-    const tree = new Parser().parse("a|b")!;
-    expect(() => new FormatBuilder().accept(tree)).toThrow(/OR/);
-  });
 });
 
 describe("ActionDispatch::Journey::Format", () => {
