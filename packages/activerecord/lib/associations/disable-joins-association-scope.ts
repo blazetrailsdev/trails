@@ -1,6 +1,6 @@
 import { any } from "@blazetrails/activesupport";
 import type { Table, Nodes } from "@blazetrails/arel";
-import { union } from "@blazetrails/ruby-compat";
+import { union } from "@blazetrails/ruby-compat/array";
 import { AssociationScope, type AssociationScopeable } from "./association-scope.js";
 import { DisableJoinsAssociationRelation } from "../disable-joins-association-relation.js";
 import { DeferredPluck } from "../relation/predicate-builder/deferred-distinct-pk-in.js";

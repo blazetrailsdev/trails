@@ -2,7 +2,9 @@ import "../../constants.mysql2-database-statements.generated.js";
 import { Result } from "../../result.js";
 import { combineMultiStatements, type MaxAllowedPacketHost } from "../mysql/database-statements.js";
 import { lastInsertedId as abstractLastInsertedId } from "../abstract/database-statements.js";
-import { anybits, rbCallSuper, rbObjIvarGet, rbObjIvarSet } from "@blazetrails/ruby-compat";
+import { anybits } from "@blazetrails/ruby-compat/numeric";
+import { rbCallSuper } from "@blazetrails/ruby-compat/include";
+import { rbObjIvarGet, rbObjIvarSet } from "@blazetrails/ruby-compat/object";
 import type { StatementPool } from "../statement-pool.js";
 import {
   Mysql2,

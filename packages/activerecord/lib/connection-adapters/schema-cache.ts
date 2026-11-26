@@ -1,20 +1,15 @@
-import {
-  Encoding,
-  File,
-  FileUtils,
-  Marshal,
-  Zlib,
-  block,
-  fetch,
-  forceEncoding,
-  isEmpty,
-  isModuleIncluded,
-  rbCallSuper,
-  rbObjRespondTo,
-  sort,
-  toH,
-  synchronize,
-} from "@blazetrails/ruby-compat";
+import { Encoding } from "@blazetrails/ruby-compat/encoding";
+import { File } from "@blazetrails/ruby-compat/file";
+import { FileUtils } from "@blazetrails/ruby-compat/file-utils";
+import { Marshal } from "@blazetrails/ruby-compat/marshal";
+import { Zlib } from "@blazetrails/ruby-compat/zlib";
+import { block, fetch } from "@blazetrails/ruby-compat/hash";
+import { forceEncoding } from "@blazetrails/ruby-compat/string/force-encoding";
+import { isEmpty } from "@blazetrails/ruby-compat/ruby-empty";
+import { isModuleIncluded, rbCallSuper } from "@blazetrails/ruby-compat/include";
+import { rbObjRespondTo } from "@blazetrails/ruby-compat/object";
+import { sort, toH } from "@blazetrails/ruby-compat/array";
+import { synchronize } from "@blazetrails/ruby-compat/monitor";
 import { atomicWrite, indexBy } from "@blazetrails/activesupport";
 import { YAML } from "@blazetrails/ruby-compat/yaml";
 import type { Column } from "./column.js";

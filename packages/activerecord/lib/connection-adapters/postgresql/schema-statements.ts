@@ -12,19 +12,12 @@ import {
   symbolizeKeys,
   wrap,
 } from "@blazetrails/activesupport";
-import {
-  block,
-  fetch,
-  OpenSSL,
-  rbInspect,
-  rbObjAsString,
-  rtest,
-  stringDelete,
-  toS,
-  valuesAt,
-  coreHashMergeKwd,
-  eachWithObject,
-} from "@blazetrails/ruby-compat";
+import { block, fetch, valuesAt } from "@blazetrails/ruby-compat/hash";
+import { OpenSSL } from "@blazetrails/ruby-compat/openssl";
+import { rbInspect, rbObjAsString, rtest, toS } from "@blazetrails/ruby-compat/object";
+import { stringDelete } from "@blazetrails/ruby-compat/string/delete";
+import { coreHashMergeKwd } from "@blazetrails/ruby-compat/keyword-splat";
+import { eachWithObject } from "@blazetrails/ruby-compat/enumerable";
 import { SchemaStatements as AbstractSchemaStatements } from "../abstract/schema-statements.js";
 import type { CommentOrChanges } from "../abstract/schema-statements.js";
 import {

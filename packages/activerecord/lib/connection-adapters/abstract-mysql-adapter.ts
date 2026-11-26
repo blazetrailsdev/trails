@@ -12,18 +12,15 @@ import {
   explain as mysqlExplain,
 } from "./mysql/database-statements.js";
 import type { ExplainOption } from "./abstract/database-statements.js";
-import {
-  sortByBang,
-  fetch,
-  first,
-  isEmpty,
-  rbInspect,
-  rbObjAsString as toS,
-  RuntimeError,
-  groupBy,
-} from "@blazetrails/ruby-compat";
+import { sortByBang, first } from "@blazetrails/ruby-compat/array";
+import { fetch } from "@blazetrails/ruby-compat/hash";
+import { isEmpty } from "@blazetrails/ruby-compat/ruby-empty";
+import { rbInspect, rbObjAsString as toS } from "@blazetrails/ruby-compat/object";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
+import { groupBy } from "@blazetrails/ruby-compat/enumerable";
 import { Result } from "../result.js";
-import { Concurrent, rtest } from "@blazetrails/ruby-compat";
+import { Concurrent } from "@blazetrails/ruby-compat/concurrent/map";
+import { rtest } from "@blazetrails/ruby-compat/object";
 import { transactionIsolationLevels } from "./abstract/database-statements.js";
 import type { InsertBuilder } from "../insert-all.js";
 import { AbstractAdapter, Version } from "./abstract-adapter.js";

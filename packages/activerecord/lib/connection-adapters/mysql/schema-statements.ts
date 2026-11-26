@@ -1,7 +1,11 @@
 import "../../constants.mysql-schema-statements.generated.js";
 import type { SqlTypeMetadata } from "../sql-type-metadata.js";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { hashDelete, rbRegMatchP, toI, toH, toS } from "@blazetrails/ruby-compat";
+import { hashDelete } from "@blazetrails/ruby-compat/hash";
+import { rbRegMatchP } from "@blazetrails/ruby-compat/regexp";
+import { toI } from "@blazetrails/ruby-compat/numeric";
+import { toH } from "@blazetrails/ruby-compat/array";
+import { toS } from "@blazetrails/ruby-compat/object";
 import { StatementInvalid } from "../../errors.js";
 import { isPresent, presence } from "@blazetrails/activesupport";
 import { Version } from "../abstract-adapter.js";

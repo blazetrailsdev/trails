@@ -4,19 +4,17 @@ import type {
   DatabaseConfig,
   DatabaseConfigOptions,
 } from "../database-configurations/database-config.js";
+import { block, fetch } from "@blazetrails/ruby-compat/hash";
+import { excSetupMessage } from "@blazetrails/ruby-compat/exception";
 import {
-  block,
-  excSetupMessage,
-  fetch,
   rbCFalseClass,
   rbCInteger,
   rbCTrueClass,
   rbObjRespondTo,
-  setEnv,
-  filterMap,
-  toA,
-  type Enumerable,
-} from "@blazetrails/ruby-compat";
+} from "@blazetrails/ruby-compat/object";
+import { setEnv } from "@blazetrails/ruby-compat/process-adapter";
+import { filterMap, type Enumerable } from "@blazetrails/ruby-compat/enumerable";
+import { toA } from "@blazetrails/ruby-compat/array";
 import { ValueType, ArgumentError, BinaryData, TimeType } from "@blazetrails/activemodel";
 import {
   classAttribute,
@@ -27,14 +25,12 @@ import {
   tryCall,
 } from "@blazetrails/activesupport";
 import { Nodes, Visitors, type ArelNode } from "@blazetrails/arel";
-import {
-  eachWithObject,
-  hashDelete,
-  IO,
-  rbRegMatchP,
-  rtest,
-  RuntimeError,
-} from "@blazetrails/ruby-compat";
+import { eachWithObject } from "@blazetrails/ruby-compat/enumerable";
+import { hashDelete } from "@blazetrails/ruby-compat/hash";
+import { IO } from "@blazetrails/ruby-compat/io";
+import { rbRegMatchP } from "@blazetrails/ruby-compat/regexp";
+import { rtest } from "@blazetrails/ruby-compat/object";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
 import { Result } from "../result.js";
 import * as Type from "../type.js";
 import { HashLookupTypeMap } from "../type/hash-lookup-type-map.js";

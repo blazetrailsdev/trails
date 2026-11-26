@@ -1,14 +1,11 @@
 import type { PermittedAttributes } from "@blazetrails/activemodel";
-import {
-  fetch,
-  include,
-  kernelThrow,
-  rbEqual,
-  rbFSend,
-  rbObjAsString,
-  toI,
-  eachSlice,
-} from "@blazetrails/ruby-compat";
+import { fetch } from "@blazetrails/ruby-compat/hash";
+import { include } from "@blazetrails/ruby-compat/include";
+import { kernelThrow } from "@blazetrails/ruby-compat/kernel-catch";
+import { rbEqual } from "@blazetrails/ruby-compat/rb-equal";
+import { rbFSend, rbObjAsString } from "@blazetrails/ruby-compat/object";
+import { toI } from "@blazetrails/ruby-compat/numeric";
+import { eachSlice } from "@blazetrails/ruby-compat/enumerable";
 import { Associations } from "../namespaces.js";
 import type { Base } from "../base.js";
 import type { AssociationDefinition } from "../associations.js";
