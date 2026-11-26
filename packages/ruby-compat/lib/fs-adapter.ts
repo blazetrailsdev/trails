@@ -459,7 +459,7 @@ function tryAutoRegisterNode(): boolean {
       isAbsolute: (p) => nodePath.isAbsolute(p),
       relative: (from, to) => nodePath.relative(from, to),
       pathToFileURL: (p) => nodeUrl.pathToFileURL(p),
-      fileURLToPath: (url) => nodeUrl.fileURLToPath(url),
+      fileURLToPath: (url) => (url.startsWith("file:") ? nodeUrl.fileURLToPath(url) : url),
       sep: nodePath.sep,
     };
     registry.set("node", { fs, path });
