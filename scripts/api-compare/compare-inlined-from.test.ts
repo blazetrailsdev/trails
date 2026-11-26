@@ -368,6 +368,15 @@ describe("inlinedFromTags on a constructor", () => {
     ).toBeUndefined();
   });
 
+  it("reads a namespace seat through a cast, whatever package the namespace comes from", () => {
+    const head = 'import { ActiveModel } from "@blazetrails/activerecord";';
+    expect(
+      inlinedFromTags(
+        ctorOf("if (isModuleIncluded(new.target, ActiveModel.Attributes as never)) {}", head),
+      )?.[0].guarded,
+    ).toBe(true);
+  });
+
   it("leaves an unguarded segment, or one guarded on another module, unmarked", () => {
     expect(inlinedFromTags(ctorOf(""))?.[0].guarded).toBeUndefined();
     expect(

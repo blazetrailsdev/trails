@@ -25,12 +25,18 @@ mixin_keys=$(
     sed -E 's/.*[[:space:]](::)?//' | tr '[:upper:]' '[:lower:]'
     { grep -rhoE '@inlinedFrom [A-Z][A-Za-z0-9]*' "$src" --include='*.ts' || true; } |
       sed -E 's/.*[[:space:]]//' | tr '[:upper:]' '[:lower:]'
+    # A tag citing another gem's module (`ActiveJob::BatchId` from solid_queue)
+    # needs that gem's manifest too: key it by the citation's source.
+    { grep -rhoE '@inlinedFrom [^ ]+ [a-z_]+/' "$src" --include='*.ts' || true; } |
+      sed -E 's/.*[[:space:]]//; s#/$##; s/_/-/g'
   } | sort -u | jq -R . | jq -sc .
 )
 LIB_PATHS_JSON=$(echo "$ALL_LIB_PATHS_JSON" | jq -c --arg pkg "$pkg" --argjson mixins "$mixin_keys" \
   'with_entries(select(.key == $pkg or (.key as $k | $mixins | index($k))))')
 LIB_ENTRY_FILES_JSON=$(pnpm --silent vendor:fetch --print-lib-entry-files | jq -c "$only")
-LIB_EXTRA_PATHS_JSON=$(pnpm --silent vendor:fetch --print-lib-extra-paths | jq -c "$only")
+LIB_EXTRA_PATHS_JSON=$(pnpm --silent vendor:fetch --print-lib-extra-paths |
+  jq -c --argjson keys "$(echo "$LIB_PATHS_JSON" | jq -c keys)" \
+    'with_entries(select(.key as $k | $keys | index($k)))')
 TEST_PATHS_JSON=$(pnpm --silent vendor:fetch --print-test-paths | jq -c "$only")
 LOCKFILE_PATH="$PWD/vendor/sources.lock.json"
 export LIB_PATHS_JSON LIB_ENTRY_FILES_JSON LIB_EXTRA_PATHS_JSON TEST_PATHS_JSON LOCKFILE_PATH

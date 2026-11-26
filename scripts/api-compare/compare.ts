@@ -6510,7 +6510,7 @@ export function main() {
         const bothLevels =
           seen.has(rubyLevelKey("class", rubyName)) && seen.has(rubyLevelKey("instance", rubyName));
         let neutralTaken = false;
-        const directMatch = tsCandidates.find((c) => {
+        const firstMatch = tsCandidates.find((c) => {
           if (!tsMethods.has(c)) return false;
           if (copyHookClaimed(rubyName, c, copyHookClaims)) return false;
           if (!bothLevels || level === undefined) return true;
@@ -6529,6 +6529,29 @@ export function main() {
           neutralClaims.add(c);
           return true;
         });
+        // A bodyless candidate must not shadow a later one that is a port: a
+        // Struct writer `attributes=` offers `setAttributes` first, and an
+        // `interface X extends Model` in the same file declares a bodyless
+        // `setAttributes` for another class entirely.
+        const isDeclOnly = (c: string) =>
+          declarationOnlyInFile(
+            expectedTs,
+            c,
+            tsBodylessOwnersByFileName,
+            tsBodiedOwnersByFileName,
+            notes,
+            tsAliasNamesByFileName,
+          );
+        const directMatch =
+          firstMatch !== undefined && !bothLevels && isDeclOnly(firstMatch)
+            ? (tsCandidates.find(
+                (c) =>
+                  c !== firstMatch &&
+                  tsMethods.has(c) &&
+                  !copyHookClaimed(rubyName, c, copyHookClaims) &&
+                  !isDeclOnly(c),
+              ) ?? firstMatch)
+            : firstMatch;
         // A candidate whose only declaration here is a bodyless signature is
         // not a port — see `declarationOnlyInFile`. The direct-match arm is
         // skipped so the mixin / reopening / misplaced arms below still get
@@ -6537,16 +6560,7 @@ export function main() {
         // credits as a move. Only a name nothing else accounts for lands in the
         // `declarationOnly` column, counted as a miss so the file's percentage
         // states what a Rails developer would find on opening it.
-        let declOnly =
-          directMatch !== undefined &&
-          declarationOnlyInFile(
-            expectedTs,
-            directMatch,
-            tsBodylessOwnersByFileName,
-            tsBodiedOwnersByFileName,
-            notes,
-            tsAliasNamesByFileName,
-          );
+        let declOnly = directMatch !== undefined && isDeclOnly(directMatch);
         // The bodyless name to report, which for the misplaced-cluster arm
         // below is not `directMatch` (that arm runs because the expected file
         // does not exist at all).
