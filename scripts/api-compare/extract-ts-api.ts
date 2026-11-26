@@ -5723,7 +5723,6 @@ export function extractClass(
       if (clause.token === ts.SyntaxKind.ExtendsKeyword) {
         let expr = clause.types[0] && unwrapTsExpression(clause.types[0].expression);
         if (!expr) continue;
-        // `Migration.get(7.2)` is Ruby's `Migration[7.2]`: credit the constant.
         if (
           ts.isCallExpression(expr) &&
           ts.isPropertyAccessExpression(expr.expression) &&

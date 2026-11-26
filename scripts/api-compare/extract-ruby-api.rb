@@ -788,8 +788,6 @@ class ApiExtractor
     return unless name
 
     delegated = delegate_class_target(node[2])
-    # `ActiveRecord::Migration[7.2]` is `Migration.[]`, which answers a
-    # subclass of the constant; the TS side spells it `Migration.get(7.2)`.
     super_node = node[2].is_a?(Array) && node[2][0] == :aref ? node[2][1] : node[2]
     superclass = qualified_const_name(delegated || super_node) if node[2]
 
@@ -2218,8 +2216,6 @@ class ApiExtractor
     extract_params(params)
   end
 
-  # `lambda { |channels, last_id| ... }` (or `proc`): Ripper spells it
-  # `method_add_block(fcall lambda, brace_block(block_var(params)))`.
   def lambda_block_params(list)
     call = list.find do |el|
       next false unless el.is_a?(Array) && el[0] == :method_add_block
