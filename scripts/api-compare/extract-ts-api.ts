@@ -1100,6 +1100,30 @@ export function extractFromProgram(
                   )
                   .flatMap((o) => harvestObjectLiteralMethods(o, checker, relPath))
               : harvestModuleInstanceMethods(decl.initializer, checker, relPath);
+          // A Ruby module nested in a plain-object module
+          // (`LibXML::Conversions::Document`, `ForkTracker::CoreExt`) is a
+          // capitalised member holding its own object literal.
+          if (objectLiteral) {
+            for (const prop of literal.properties) {
+              if (!ts.isPropertyAssignment(prop) || !ts.isIdentifier(prop.name)) continue;
+              if (!/^[A-Z]/.test(prop.name.text) || isConstantCaseName(prop.name.text)) continue;
+              const nested = unwrapAssertions(prop.initializer);
+              if (!ts.isObjectLiteralExpression(nested)) continue;
+              const nestedMethods = harvestObjectLiteralMethods(nested, checker, relPath);
+              const nestedKey = `${relPath}:${decl.name.text}.${prop.name.text}`;
+              if (nestedMethods.length === 0 || info.modules[nestedKey]) continue;
+              info.modules[nestedKey] = {
+                name: prop.name.text,
+                file: relPath,
+                includes: [],
+                extends: [],
+                instanceMethods: nestedMethods,
+                classMethods: [],
+                objectLiteral: true,
+              };
+              fileHasClassOrModule = true;
+            }
+          }
           if (methods.length === 0 && !isDefineModuleCall(unwrapAssertions(decl.initializer)))
             continue;
           const modKey = `${relPath}:${decl.name.text}`;

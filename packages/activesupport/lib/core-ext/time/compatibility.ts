@@ -2,9 +2,13 @@ import { rbClearMethodCache } from "@blazetrails/ruby-compat/method-cache";
 import { nowTimeZoneId, Time as RubyTime } from "@blazetrails/date";
 import { preserveTimezone as compatibilityPreserveTimezone } from "../date-and-time/compatibility.js";
 
+export function toTime(time: RubyTime): RubyTime {
+  return preserveTimezone(time) ? time : time.getlocal();
+}
+
 Object.assign(RubyTime.prototype, {
   toTime(this: RubyTime): RubyTime {
-    return preserveTimezone(this) ? this : this.getlocal();
+    return toTime(this);
   },
 });
 rbClearMethodCache();

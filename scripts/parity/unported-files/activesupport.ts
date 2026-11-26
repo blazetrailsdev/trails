@@ -10,6 +10,12 @@ const SOLID_STACK_ONLY =
 
 export const ACTIVESUPPORT_UNPORTED_FILES: UnportedFile[] = [
   {
+    pattern: "core_ext/thread/backtrace/location.rb",
+    package: "activesupport",
+    reason:
+      "PERMANENT: `ErrorHighlight.spot` reads the Ruby AST node behind a frame; V8 exposes no such node, so a frame is spotted through actionpack's `SourceMapLocation#spot` instead.",
+  },
+  {
     pattern: "i18n_railtie.rb",
     package: "activesupport",
     reason: "CONVERGEABLE activesupport-port-i18n-railtie",

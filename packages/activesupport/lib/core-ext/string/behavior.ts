@@ -1,3 +1,7 @@
 import { STRING_METHOD_TABLE } from "@blazetrails/ruby-compat/string/method-table";
 
-STRING_METHOD_TABLE.actsLikeString = () => true;
+export function isActsLikeString(_string: unknown): boolean {
+  return true;
+}
+
+STRING_METHOD_TABLE.actsLikeString = isActsLikeString;

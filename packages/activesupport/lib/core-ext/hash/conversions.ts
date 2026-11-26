@@ -5,7 +5,49 @@ import { isBlank, isPresent } from "../object/blank.js";
 import { isEmpty } from "@blazetrails/ruby-compat/ruby-empty";
 import { wrap } from "../array/wrap.js";
 import { isPlainObject } from "../../hash-utils.js";
+import { Hash } from "@blazetrails/ruby-compat/hash";
+import { rbModDefineMethod } from "@blazetrails/ruby-compat/object";
 import { rbInspect as inspect } from "@blazetrails/ruby-compat/object";
+
+type AnyObject = Record<string, unknown>;
+
+export function toXml(
+  self: AnyObject,
+  options: XmlMini.ToXmlOptions = {},
+  block?: (builder: XmlMini.XmlBuilder) => void,
+): string {
+  options = { ...options };
+  options.indent ??= 2;
+  options.root ??= "hash";
+  options.builder ??= new XmlMini.IndentedXmlStringBuilder("", options.indent);
+
+  const builder = options.builder;
+  const skipInstruct = options.skipInstruct;
+  delete options.skipInstruct;
+  if (!skipInstruct) builder.instructBang();
+
+  const root = XmlMini.renameKey(String(options.root), options);
+
+  builder.openTag(root);
+  for (const [key, value] of Object.entries(self)) {
+    XmlMini.toTag(key, value, options as XmlMini.ToTagOptions);
+  }
+  if (block) block(builder);
+  builder.closeTag(root);
+  return builder.target();
+}
+
+rbModDefineMethod(
+  Hash,
+  "toXml",
+  function (
+    this: AnyObject,
+    options?: XmlMini.ToXmlOptions,
+    block?: (builder: XmlMini.XmlBuilder) => void,
+  ) {
+    return toXml(this, options, block);
+  },
+);
 
 export function fromXml(
   xml: string | Uint8Array | StringIO | null | undefined,

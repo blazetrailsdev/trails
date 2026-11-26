@@ -445,7 +445,7 @@ export const RUBY_FILE_TS_OVERRIDES: Record<string, string> = {
   // already produces.
   "activesupport:core_ext/date_time/conversions.rb": "core-ext/date-time/conversions.ts",
   "activesupport:core_ext/time/compatibility.rb": "core-ext/time/compatibility.ts",
-  "activesupport:core_ext/date_time/compatibility.rb": "core-ext/time/compatibility.ts",
+  "activesupport:core_ext/date_time/compatibility.rb": "core-ext/date-time/compatibility.ts",
   // `date_time/acts_like.rb:6` is DateTime's FIRST reopening, so the whole
   // `DateTime` bucket — `preserve_timezone` and
   // `utc_to_local_returns_utc_offset_times`, which `DateAndTime::Compatibility`
@@ -850,6 +850,26 @@ const PG_LIBRARY_VERSION_REASON =
   '`PG.library_version` is `PQlibVersion()` and node-pg links no libpq (packages/pg/CLAUDE.md, "The pg port carries only what trails calls"). PERMANENT.';
 
 export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
+  {
+    reason:
+      'PERMANENT: the non-MRI `WeakSet` arm (`RUBY_ENGINE != "ruby"`, descendants_tracker.rb:27-53); trails ports the MRI arm, a `WeakSet < ObjectSpace::WeakMap`.',
+    names: ["initialize", "include?"],
+    rubyFiles: ["descendants_tracker.rb"],
+    packages: ["activesupport"],
+  },
+  {
+    reason:
+      "PERMANENT: `require_rexml` (xml_mini/rexml.rb:41-46) loads the rexml gem on first parse; trails' REXML port is a static ES import, so `defined?(REXML::Document)` always holds and there is nothing to load.",
+    names: ["require_rexml"],
+    rubyFiles: ["xml_mini/rexml.rb"],
+    packages: ["activesupport"],
+  },
+  {
+    reason: "CONVERGEABLE encrypted-configuration-invalid-content-error-message-override",
+    names: ["message"],
+    rubyFiles: ["encrypted_configuration.rb"],
+    packages: ["activesupport"],
+  },
   {
     reason: "not called by activerecord",
     names: ["query_info", "info"],

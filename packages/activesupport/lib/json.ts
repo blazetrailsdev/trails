@@ -1,7 +1,7 @@
 import { Date as RubyDate } from "@blazetrails/date";
 import { JSON as RbJSON } from "@blazetrails/ruby-compat/json";
 import { ArgumentError } from "./hash-utils.js";
-import { Encoding, type EncodeOptions } from "./json/encoding.js";
+import * as JsonEncoding from "./json/encoding.js";
 import { zone } from "./time-zone-config.js";
 import type { TimeZone } from "./values/time-zone.js";
 import { ActiveSupport } from "./namespaces.js";
@@ -52,11 +52,9 @@ function convertDatesFrom(data: unknown): unknown {
 }
 
 export namespace ActiveSupportJSON {
-  export function encode(value: unknown, options?: EncodeOptions): string {
-    return new Encoding.jsonEncoder(options).encode(value);
-  }
+  export import encode = JsonEncoding.encode;
 
-  export const dump = encode;
+  export import dump = JsonEncoding.dump;
 
   /** @missingRailsArgs parse — CONVERGEABLE json-parse-skips-comments-in-one-pass-and-takes-options */
   export function decode(json: string | Uint8Array): unknown {

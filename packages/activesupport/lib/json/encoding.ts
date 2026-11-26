@@ -100,6 +100,12 @@ export class JSONGemEncoder {
   }
 }
 
+export function encode(value: unknown, options?: EncodeOptions): string {
+  return new Encoding.jsonEncoder(options).encode(value);
+}
+
+export { encode as dump };
+
 let _useStandardJsonTimeFormat = true;
 let _escapeHtmlEntitiesInJson = true;
 let _jsonEncoder: typeof JSONGemEncoder = JSONGemEncoder;

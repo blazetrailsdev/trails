@@ -9,11 +9,10 @@ import {
   valuesAt,
 } from "@blazetrails/ruby-compat/hash";
 import { rbObjDup } from "@blazetrails/ruby-compat/include";
-import { rbFSend, rbModDefineMethod, rbObjRespondTo } from "@blazetrails/ruby-compat/object";
+import { rbFSend, rbObjRespondTo } from "@blazetrails/ruby-compat/object";
 import { isSymbol, symbolToS } from "@blazetrails/ruby-compat/symbol";
 import { isBlank } from "./core-ext/object/blank.js";
 import { isDuplicable } from "./core-ext/object/duplicable.js";
-import * as XmlMini from "./xml-mini.js";
 
 type AnyObject = Record<string, unknown>;
 
@@ -524,40 +523,4 @@ export function compactBlankBang<T extends AnyObject>(hash: T): T {
   return hash;
 }
 
-export function toXml(
-  self: AnyObject,
-  options: XmlMini.ToXmlOptions = {},
-  block?: (builder: XmlMini.XmlBuilder) => void,
-): string {
-  options = { ...options };
-  options.indent ??= 2;
-  options.root ??= "hash";
-  options.builder ??= new XmlMini.IndentedXmlStringBuilder("", options.indent);
-
-  const builder = options.builder;
-  const skipInstruct = options.skipInstruct;
-  delete options.skipInstruct;
-  if (!skipInstruct) builder.instructBang();
-
-  const root = XmlMini.renameKey(String(options.root), options);
-
-  builder.openTag(root);
-  for (const [key, value] of Object.entries(self)) {
-    XmlMini.toTag(key, value, options as XmlMini.ToTagOptions);
-  }
-  if (block) block(builder);
-  builder.closeTag(root);
-  return builder.target();
-}
-
-rbModDefineMethod(
-  Hash,
-  "toXml",
-  function (
-    this: AnyObject,
-    options?: XmlMini.ToXmlOptions,
-    block?: (builder: XmlMini.XmlBuilder) => void,
-  ) {
-    return toXml(this, options, block);
-  },
-);
+export { toXml } from "./core-ext/hash/conversions.js";

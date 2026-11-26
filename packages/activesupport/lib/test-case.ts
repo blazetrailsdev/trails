@@ -84,6 +84,10 @@ export class TestCase extends Minitest.Test {
     return activeSupportTestOrder()!;
   }
 
+  static get runOrder(): string {
+    return this.testOrder;
+  }
+
   static test(name: string, block?: (this: TestCase) => unknown): void {
     const testName = `test_${name.replace(/\s+/g, "_")}`;
     const defined = rbModMethodDefined(this, testName);

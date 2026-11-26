@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { coder } from "../../lib/cache/coder.js";
+import { coder } from "../../lib/cache/marshal-coder.js";
 
 describe("cache coder fidelity", () => {
   function roundtrip(value: unknown): unknown {

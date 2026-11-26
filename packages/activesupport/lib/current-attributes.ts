@@ -1,10 +1,11 @@
 import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
 import { hashAref } from "@blazetrails/ruby-compat/hash";
 import { methodMissingPrototype } from "@blazetrails/ruby-compat/method-missing-proxy";
-import { rbFSend, rbObjRespondTo } from "@blazetrails/ruby-compat/object";
+import { rbFSend, rbModMethodDefined, rbObjRespondTo } from "@blazetrails/ruby-compat/object";
 import { Callbacks } from "./callbacks.js";
 import { classAttribute } from "./class-attribute.js";
 import { CodeGenerator } from "./code-generator.js";
+import { Delegation } from "./delegation.js";
 import { with as with_ } from "./core-ext/object/with.js";
 import {
   include,
@@ -194,6 +195,17 @@ export class CurrentAttributes {
   /** @internal */
   private static respondToMissing(name: string, _includePrivate: boolean): boolean {
     return rbObjRespondTo(this.instance(), name);
+  }
+
+  /** @internal */
+  protected static methodAdded(name: string): void {
+    if (name === "initialize") return;
+
+    if (!rbModMethodDefined(this, name)) return;
+
+    if (name in this) return;
+
+    Delegation.generate(this, [name], { to: "instance", as: this, nilable: false });
   }
 
   static {

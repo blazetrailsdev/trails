@@ -1,6 +1,6 @@
 import { ActiveSupport } from "../namespaces.js";
 import type { CacheOptions, CacheStore } from "./index.js";
-import { coder } from "./coder.js";
+import { coder } from "./marshal-coder.js";
 import { Entry } from "./entry.js";
 import type { Duration } from "../duration.js";
 import { Store, inspectOptions, type StoreOptions } from "./store.js";

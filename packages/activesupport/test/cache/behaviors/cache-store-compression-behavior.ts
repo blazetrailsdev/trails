@@ -1,7 +1,7 @@
 import { rbEqual } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, expect, it } from "vitest";
 import { Entry } from "../../../lib/cache/entry.js";
-import { coder } from "../../../lib/cache/coder.js";
+import { coder } from "../../../lib/cache/marshal-coder.js";
 import "../../../lib/cache.js";
 import "../../../lib/cache.js";
 import { ActiveSupport } from "../../../lib/namespaces.js";
