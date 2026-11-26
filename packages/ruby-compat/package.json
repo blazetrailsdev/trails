@@ -132,6 +132,7 @@
     "./dist/runtime-error.js",
     "./dist/set.js",
     "./dist/socket.js",
+    "./dist/standard-error.js",
     "./dist/string-io.js",
     "./dist/string/case-mapping.js",
     "./dist/string/method-table.js",

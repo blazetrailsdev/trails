@@ -1,6 +1,6 @@
 {
   "app": "examples/serverless-lambda/config/environment.ts",
-  "total": 1893,
+  "total": 1888,
   "packages": {
     "activerecord": 346,
     "ruby-compat": 205,
@@ -22,14 +22,14 @@
     "html-sanitizer": 22,
     "zeitwerk": 22,
     "actionmailer": 21,
-    "sqlite3": 20,
     "@msgpack/msgpack": 16,
     "msgpack": 15,
     "libxml2-wasm": 14,
     "parse5": 14,
+    "sqlite3": 14,
     "nodemailer": 11,
+    "date": 10,
     "(entry)": 9,
-    "date": 9,
     "did-you-mean": 9,
     "globalid": 9,
     "net-smtp": 8,
@@ -44,5 +44,5 @@
   "rubyCompatTarget": 180,
   "rubyCompatTargetWithWholeBarrelImports": 180,
   "wholeBarrelImports": [],
-  "appTarget": 1868
+  "appTarget": 1863
 }

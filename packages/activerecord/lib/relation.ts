@@ -259,23 +259,6 @@ const ENUMERABLE_DELEGATES = {
 /** @perf 11x — PERMANENT */
 const _placeholderFields: object = Object.create(null);
 
-/** @perf 3% — CONVERGEABLE rb-obj-clone-fast-path-for-plain-data-fields */
-const _propertyIsEnumerable = Object.prototype.propertyIsEnumerable;
-/** @perf 3% — CONVERGEABLE rb-obj-clone-fast-path-for-plain-data-fields */
-const _lookupGetter = (Object.prototype as { __lookupGetter__(key: string): unknown })
-  .__lookupGetter__;
-/** @perf 3% — CONVERGEABLE rb-obj-clone-fast-path-for-plain-data-fields */
-const _lookupSetter = (Object.prototype as { __lookupSetter__(key: string): unknown })
-  .__lookupSetter__;
-
-/** @perf 11x — PERMANENT */
-function _isPlaceholderField(proto: object, key: string): boolean {
-  for (let p = proto; p !== _placeholderFields; p = Object.getPrototypeOf(p)) {
-    if (Object.hasOwn(p, key)) return false;
-  }
-  return true;
-}
-
 type ScopeRegistryLike = {
   currentScope(model: unknown, skipInheritedScope?: boolean): unknown;
   setCurrentScope(model: unknown, scope: unknown): void;
@@ -1742,45 +1725,8 @@ export class Relation<T extends Base, G extends boolean = false> {
     return this;
   }
 
-  /** @perf 3% — CONVERGEABLE rb-obj-clone-fast-path-for-plain-data-fields */
   clone(): Relation<T, G> {
-    if (Object.isFrozen(this) || Object.getOwnPropertySymbols(this).length > 0) {
-      return rbObjClone(this);
-    }
-    const proto = Object.getPrototypeOf(this);
-    const copy = Object.create(proto);
-    for (const key of Reflect.ownKeys(this) as string[]) {
-      if (
-        key.startsWith("_") &&
-        _isPlaceholderField(proto, key) &&
-        Object.hasOwn(_placeholderFields, key) &&
-        _propertyIsEnumerable.call(this, key) &&
-        _lookupGetter.call(this, key) === undefined &&
-        _lookupSetter.call(this, key) === undefined
-      ) {
-        copy[key] = Reflect.get(this, key);
-      } else {
-        const descriptor = Object.getOwnPropertyDescriptor(this, key)!;
-        Object.defineProperty(copy, key, descriptor);
-        if (
-          key.startsWith("_") &&
-          descriptor.writable === true &&
-          descriptor.enumerable === true &&
-          descriptor.configurable === true &&
-          !Object.hasOwn(_placeholderFields, key) &&
-          _isPlaceholderField(proto, key)
-        ) {
-          Object.defineProperty(_placeholderFields, key, {
-            value: undefined,
-            writable: true,
-            configurable: true,
-          });
-        }
-      }
-    }
-    const initializeClone = "initializeClone" in copy ? copy.initializeClone : copy.initializeCopy;
-    initializeClone.call(copy, this);
-    return copy;
+    return rbObjClone(this);
   }
 
   _execScope(...args: unknown[]): unknown {

@@ -4,7 +4,7 @@ import { rbFSend, rbInspect, rbObjRespondTo, rtest } from "./object.js";
 import { ArgumentError } from "./argument-error.js";
 import { rbEql, rbEqq } from "./rb-equal.js";
 import { rbHash } from "./rb-hash.js";
-import type { Enumerated } from "./enumerable.js";
+import { isAll, type Each, type Enumerated } from "./enumerable.js";
 import { StopIteration } from "./stop-iteration.js";
 import { FloatDomainError } from "./float-domain-error.js";
 import { num2long } from "./string/support.js";
@@ -124,22 +124,17 @@ export class Enumerator<T = unknown, E = unknown> {
   }
 
   /**
-   * `Enumerable#all?` (`vendor/ruby/v3.3.11/enum.c:1799` `enum_all`), which
-   * stops iterating at the first element the block rejects.
+   * `Enumerable#all?` (`vendor/ruby/v3.3.11/enum.c:1799` `enum_all`): a pattern
+   * tested with `===`, or each element's own truthiness with none. A block is a
+   * proc, which `===` calls.
    *
-   * @noRailsEquivalent CONVERGEABLE system-call-error-instanceof-reads-an-errno-table-and-all-takes-a-pattern
+   * @noRailsEquivalent PERMANENT
    */
-  isAll(block: (value: T) => unknown): boolean {
-    const stop = {};
-    try {
-      this.each((value: T) => {
-        if (!rtest(block(value))) throw stop;
-      });
-    } catch (error) {
-      if (error !== stop) throw error;
-      return false;
-    }
-    return true;
+  isAll(block: (value: T) => unknown): boolean;
+  /** @noRailsEquivalent PERMANENT */
+  isAll(pattern?: unknown): boolean;
+  isAll(...args: unknown[]): boolean {
+    return isAll(this as unknown as Each<T, unknown>, ...args) as boolean;
   }
 
   /**

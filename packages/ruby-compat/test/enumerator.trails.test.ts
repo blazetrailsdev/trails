@@ -4,7 +4,7 @@ import { eachSlice, eachWithIndex, eachWithObject } from "../lib/enumerable.js";
 import { block } from "../lib/hash.js";
 import { StopIteration } from "../lib/stop-iteration.js";
 import { FloatDomainError } from "../lib/float-domain-error.js";
-import { rbFSend } from "../lib/object.js";
+import { rbCNilClass, rbFSend } from "../lib/object.js";
 
 describe("Enumerator", () => {
   const source = {
@@ -37,6 +37,19 @@ describe("Enumerator", () => {
     expect(enumerator.isAll(() => 0)).toBe(true);
     expect(enumerator.isAll(() => "")).toBe(true);
     expect(enumerator.isAll(() => null)).toBe(false);
+  });
+
+  it("isAll tests a pattern with === and, with none, each element", () => {
+    const nils = {
+      each: (block: (value: unknown) => void) => {
+        for (const value of [null, null]) block(value);
+      },
+    };
+    expect(toEnum(nils, "each").isAll(rbCNilClass)).toBe(true);
+    expect(toEnum<string>(source, "eachPair", "y").isAll(rbCNilClass)).toBe(false);
+    expect(toEnum<string>(source, "eachPair", "y").isAll(/^y/)).toBe(true);
+    expect(toEnum(nils, "each").isAll()).toBe(false);
+    expect(toEnum<string>(source, "eachPair", "y").isAll()).toBe(true);
   });
 
   it("isAll propagates what the block raises", () => {

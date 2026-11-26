@@ -158,10 +158,7 @@ export class ScalarScanner {
     return kernelInteger(stringDelete(string, ",_"));
   }
 
-  /**
-   * @inventedArm Number — CONVERGEABLE kernel-integer-bignum-callers-narrow-with-number
-   * @noRailsEquivalent PERMANENT
-   */
+  /** @noRailsEquivalent PERMANENT */
   parseTime(string: string): unknown {
     const klass = this.classLoader.load("Time") as TimeClass;
 
@@ -186,7 +183,7 @@ export class ScalarScanner {
       .exec(md[3])!
       .slice(1)
       .filter((digit) => digit != null)
-      .map((digit) => Number(kernelInteger(digit, 10)));
+      .map((digit) => kernelInteger(digit, 10) as number);
     let offset = tz[0] * 3600;
 
     if (offset < 0) {

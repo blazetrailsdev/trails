@@ -9,6 +9,7 @@ import {
   Process,
   kernelFloat,
   kernelInteger,
+  toF,
   stringSplit,
 } from "@blazetrails/ruby-compat";
 import type { Tempfile } from "@blazetrails/ruby-compat";
@@ -144,15 +145,12 @@ export class VideoAnalyzer extends Analyzer {
     return (this._encodedHeight ??= kernelFloat(videoStream["height"]));
   }
 
-  /**
-   * @internal
-   * @inventedArm Number — CONVERGEABLE kernel-integer-bignum-callers-narrow-with-number
-   */
+  /** @internal */
   protected async displayHeightScale(): Promise<number | null> {
     const displayAspectRatio = await this.displayAspectRatio();
     if (displayAspectRatio == null) return null;
     return (this._displayHeightScale ??=
-      kernelFloat(displayAspectRatio[1]) / Number(displayAspectRatio[0]));
+      kernelFloat(displayAspectRatio[1]) / toF(displayAspectRatio[0]));
   }
 
   /** @internal */

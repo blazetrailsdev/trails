@@ -1,3 +1,4 @@
+let debugGlobal: unknown = false;
 let verboseGlobal: unknown = false;
 
 /**
@@ -24,4 +25,28 @@ export function verbose(): unknown {
  */
 export function setVerbose(value: unknown): void {
   verboseGlobal = value != null && value !== false ? true : value;
+}
+
+/**
+ * `$DEBUG` (`vendor/ruby/v3.3.11/ruby.c:2940-2943`, `debug_getter`; `ruby_debug`, set
+ * by `-d` / `--debug`).
+ * A trails process has no such flag, so it reads `false` until something sets it.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core, not Rails: `$DEBUG` is an
+ * interpreter global, and `Tempfile::Remover#call` guards its trace on it
+ * (`vendor/ruby/v3.3.11/lib/tempfile.rb:315`).
+ */
+export function debug(): unknown {
+  return debugGlobal;
+}
+
+/**
+ * `$DEBUG=` (`vendor/ruby/v3.3.11/ruby.c:2946-2949`, `debug_setter`), which
+ * stores the value as given.
+ *
+ * @noRailsEquivalent PERMANENT — the writer half of {@link debug}; a TS
+ * `set` accessor cannot be a module-level binding.
+ */
+export function setDebug(value: unknown): void {
+  debugGlobal = value;
 }

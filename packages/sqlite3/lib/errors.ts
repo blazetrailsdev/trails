@@ -1,26 +1,17 @@
-import { rbModName } from "@blazetrails/ruby-compat";
+import { StandardError } from "@blazetrails/ruby-compat";
 import { SQLite3 } from "./namespaces.js";
 import "./constants.js";
 import type { EngineErrors } from "./database.js";
 
-export class Exception extends Error {
+export class Exception extends StandardError {
   code: number | null = null;
 
   sql: string | null = null;
 
   sqlOffset = -1;
 
-  #message: string;
-
-  constructor(message?: string) {
-    super(message);
-    this.name = rbModName(new.target) ?? new.target.name;
-    this.#message = message ?? this.name;
-    delete (this as { message?: string }).message;
-  }
-
   override get message(): string {
-    return [this.#message, this.sqlError()].filter((s) => s != null).join(":\n");
+    return [super.message, this.sqlError()].filter((s) => s != null).join(":\n");
   }
 
   /** @internal */

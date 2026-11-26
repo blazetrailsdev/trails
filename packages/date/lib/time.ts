@@ -573,6 +573,8 @@ export class Time extends rbCTime {
   #subnano: Rational;
   /** @internal */
   #zoneObject: object | null = null;
+  /** `vtm.zone` when it is a String (`time_mload`, `vendor/ruby/v3.3.11/time.c:5585-5589`). @internal */
+  #vtmZone: string | null = null;
   /** @internal */
   #isdstMemo: boolean | null = null;
 
@@ -1644,6 +1646,7 @@ export class Time extends rbCTime {
 
   get zone(): string | object | null {
     if (this.#tzmodeUtc) return "UTC";
+    if (this.#vtmZone != null) return this.#vtmZone;
     if (this.#timeZoneId == null) return this.#zoneObject;
     if (!this.#localZone) return (this.#zoneObject ??= new Timezone(this.#timeZoneId));
     return zoneAbbreviation(this.#instant.toZonedDateTimeISO(this.#timeZoneId));
@@ -1794,6 +1797,7 @@ export class Time extends rbCTime {
     this.#utcOffsetMemo = time.#utcOffsetMemo;
     this.#subnano = time.#subnano;
     this.#zoneObject = time.#zoneObject;
+    this.#vtmZone = time.#vtmZone;
     this.#isdstMemo = time.#isdstMemo;
     return this;
   }
@@ -1887,6 +1891,7 @@ export class Time extends rbCTime {
     this.#timeZoneId = "UTC";
     this.#localZone = false;
     this.#zoneObject = null;
+    this.#vtmZone = null;
     this.#isdstMemo = null;
 
     this.#tzmodeUtc = true;
@@ -2030,7 +2035,6 @@ export class Time extends rbCTime {
    * `Time._load` (`time_load`, `vendor/ruby/v3.3.11/time.c:5600`) over `time_mload`
    * (`time.c:5448`), reading the ivars {@link Time#_dump} boxes onto the String.
    *
-   * @missingRailsCall time_set_zone — CONVERGEABLE time-mload-seats-string-zone
    * @noRailsEquivalent PERMANENT
    */
   static _load(str: string | typeof String.prototype): Time {
@@ -2134,7 +2138,9 @@ export class Time extends rbCTime {
       } catch {
         z = null;
       }
-      if (maybeTzobjP(z)) time = Time.#zoneLocaltime(z, time) ?? time;
+      zone = z ?? zone;
+      if (typeof zone === "string") time.#vtmZone = zone;
+      if (maybeTzobjP(zone)) time = Time.#zoneLocaltime(zone, time) ?? time;
     }
     for (const iv of Object.keys(ivars)) if (iv.startsWith("@")) rbObjIvarSet(time, iv, ivars[iv]);
     return time;

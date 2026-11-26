@@ -1,7 +1,7 @@
 {
   "sccs": [
     {
-      "size": 33,
+      "size": 34,
       "modules": [
         "array.js",
         "base64.js",
@@ -25,6 +25,7 @@
         "rb-equal.js",
         "rb-hash.js",
         "regexp.js",
+        "signal-exception.js",
         "string/byte-methods.js",
         "string/case-mapping.js",
         "string/convert.js",
@@ -322,6 +323,10 @@
     },
     "cryptoAdapterConfig": {
       "module": "crypto-adapter.js",
+      "scc": null
+    },
+    "debug": {
+      "module": "verbose.js",
       "scc": null
     },
     "DEFAULT_PARSER": {
@@ -742,7 +747,7 @@
     },
     "Interrupt": {
       "module": "signal-exception.js",
-      "scc": null
+      "scc": 0
     },
     "InvalidByteSequenceError": {
       "module": "invalid-byte-sequence-error.js",
@@ -2068,6 +2073,10 @@
       "module": "load.js",
       "scc": null
     },
+    "setDebug": {
+      "module": "verbose.js",
+      "scc": null
+    },
     "setEnv": {
       "module": "process-adapter.js",
       "scc": 0
@@ -2102,7 +2111,7 @@
     },
     "SignalException": {
       "module": "signal-exception.js",
-      "scc": null
+      "scc": 0
     },
     "signo2signm": {
       "module": "process-adapter.js",

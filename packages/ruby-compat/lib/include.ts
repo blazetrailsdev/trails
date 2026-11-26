@@ -1814,6 +1814,13 @@ export function rbObjClone<T>(obj: T): T {
   if (obj === null || (typeof obj !== "object" && typeof obj !== "function")) return obj;
   if (temporalTag(obj) !== null) return obj;
   const frozen = Object.isFrozen(obj);
+  if (!frozen && !isClassConstructor(obj)) {
+    const clone = _plainDataClone(obj);
+    if (clone !== null) {
+      initCopyHook(clone, "initializeClone", obj);
+      return clone as T;
+    }
+  }
   const descriptors = copiedDescriptors(obj, frozen);
   for (const registry of [extendedKeys, includedModulesKey]) {
     const table = descriptors[registry];
@@ -1974,6 +1981,46 @@ function rbObjAlloc(obj: object, proto: object | null): object {
     return Object.setPrototypeOf(new typedArray(obj as Uint8Array), proto);
   }
   return Object.create(proto);
+}
+
+/** @perf 3x — PERMANENT */
+const _lookupSetter = (Object.prototype as { __lookupSetter__(key: string): unknown })
+  .__lookupSetter__;
+
+/** @perf 3x — PERMANENT */
+function _plainDataClone(obj: object): object | null {
+  const keys = Reflect.ownKeys(obj);
+  const values: unknown[] = new Array(keys.length);
+  for (let i = 0; i < keys.length; i++) {
+    const key = keys[i];
+    if (typeof key === "symbol") return null;
+    const d = Object.getOwnPropertyDescriptor(obj, key)!;
+    if (!d.writable || !d.enumerable || !d.configurable || d.get || d.set) return null;
+    values[i] = d.value;
+  }
+  if (extendedOwners.has(obj)) return null;
+  const proto = Object.getPrototypeOf(obj) as object | null;
+  const alloc = rbObjAlloc(obj, proto) as Record<string, unknown>;
+  for (let i = 0; i < keys.length; i++) {
+    const key = keys[i] as string;
+    const define = (): void => {
+      Object.defineProperty(alloc, key, {
+        value: values[i],
+        writable: true,
+        enumerable: true,
+        configurable: true,
+      });
+    };
+    if (proto !== null && _lookupSetter.call(proto, key) !== undefined) define();
+    else {
+      try {
+        alloc[key] = values[i];
+      } catch {
+        define();
+      }
+    }
+  }
+  return alloc;
 }
 
 function copiedDescriptors(
