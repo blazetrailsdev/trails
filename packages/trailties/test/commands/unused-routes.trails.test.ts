@@ -1,6 +1,7 @@
 import { describe, it, expect, afterEach, onTestFinished, vi } from "vitest";
 import { ActionController, ActionView, type Journey } from "@blazetrails/actionpack";
 import { Base } from "@blazetrails/activerecord";
+import "@blazetrails/activerecord/tasks/database-tasks.js";
 import { capture } from "@blazetrails/activesupport/testing/stream";
 import {
   env,
