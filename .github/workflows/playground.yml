@@ -4,6 +4,8 @@ on:
   pull_request:
     paths:
       - "examples/browser-sqlite/**"
+      - "packages/trailties/lib/generators/**"
+      - "packages/trailties/lib/templates/**"
       - ".github/workflows/playground.yml"
 
 concurrency:
