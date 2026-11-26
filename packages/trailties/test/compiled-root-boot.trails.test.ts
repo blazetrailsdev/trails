@@ -41,6 +41,15 @@ Trails.application.routes().draw(function () {
 });
 `,
     );
+    write(
+      `${root}/config/environments/production.${ext}`,
+      `import { Trails } from "@blazetrails/trailties";
+
+Trails.application.configure(function () {
+  this.config.enableReloading = false;
+});
+`,
+    );
     write(`${root}/config/initializers/inflections.${ext}`, record);
     write(
       `${root}/app/controllers/pings-controller.${ext}`,
@@ -54,11 +63,32 @@ export class PingsController extends ActionController.Base {
 `,
     );
     write(
+      `${root}/app/jobs/ping-job.${ext}`,
+      `import { ActiveJob } from "@blazetrails/activejob";
+
+export class PingJob extends ActiveJob.Base {
+  async perform(word) {
+    return \`performed \${word}\`;
+  }
+}
+`,
+    );
+    write(
       `${root}/boot.mjs`,
-      `const { MockRequest } = await import("@blazetrails/rack");
+      `import { Dir, TopLevel } from "@blazetrails/ruby-compat";
+const scanned = [];
+for (const name of ["children", "childrenAsync", "glob", "globAsync"]) {
+  const original = Dir[name];
+  Dir[name] = function (path, ...rest) {
+    if (String(path).includes(\`\${import.meta.dirname}/app/\`)) scanned.push(String(path));
+    return original.call(this, path, ...rest);
+  };
+}
+const { MockRequest } = await import("@blazetrails/rack");
 const app = (await import("./config/environment.${ext}")).default;
 const response = await new MockRequest(app).get("/up");
-console.log(JSON.stringify({ stacks: globalThis.__stacks ?? [], status: response.status, body: response.body }));
+const performed = await new TopLevel.PingJob("ping").performNow();
+console.log(JSON.stringify({ stacks: globalThis.__stacks ?? [], scanned, status: response.status, body: response.body, performed }));
 `,
     );
     const env = { TRAILS_ENV: "production", SECRET_KEY_BASE: "compiled-root" };
@@ -81,9 +111,16 @@ console.log(JSON.stringify({ stacks: globalThis.__stacks ?? [], status: response
     const flags = ext === "js" ? ["--no-experimental-strip-types"] : [];
     const [stdout, stderr] = await Open3.capture3(env, node, ...flags, `${root}/boot.mjs`);
     expect(stderr).toBe("");
-    const { stacks, status, body } = JSON.parse(String(stdout).trim().split("\n").at(-1)!);
-    expect([status, body]).toEqual([200, "pong"]);
-    return { root, stacks: stacks as string[], cleanup: () => FileUtils.rmRf(base) };
+    const { stacks, scanned, status, body, performed } = JSON.parse(
+      String(stdout).trim().split("\n").at(-1)!,
+    );
+    expect([status, body, performed]).toEqual([200, "pong", "performed ping"]);
+    return {
+      root,
+      stacks: stacks as string[],
+      scanned: scanned as string[],
+      cleanup: () => FileUtils.rmRf(base),
+    };
   } catch (error) {
     FileUtils.rmRf(base);
     throw error;
@@ -92,8 +129,9 @@ console.log(JSON.stringify({ stacks: globalThis.__stacks ?? [], status: response
 
 describe("a compiled root boots from trails build's entry", () => {
   it("loads config files through .trails/compiled when config.js has no config.ts", async () => {
-    const { root, stacks, cleanup } = await bootFixture("js");
+    const { root, stacks, scanned, cleanup } = await bootFixture("js");
     try {
+      expect(scanned).toEqual([]);
       expect(File.read(`${root}/.trails/boot.generated.js`)).toContain('"config/routes.js"');
       expect(stacks.length).toBe(2);
       expect(stacks.every((stack) => stack.includes("/.trails/compiled/config/"))).toBe(true);
@@ -103,8 +141,9 @@ describe("a compiled root boots from trails build's entry", () => {
   }, 120_000);
 
   it("ignores a stale entry beside a source tree and boots through the autoloader", async () => {
-    const { stacks, cleanup } = await bootFixture("ts", { stale: true });
+    const { stacks, scanned, cleanup } = await bootFixture("ts", { stale: true });
     try {
+      expect(scanned).not.toEqual([]);
       expect(stacks.length).toBe(2);
       expect(stacks.some((stack) => stack.includes("/.trails/compiled/"))).toBe(false);
     } finally {
