@@ -36,6 +36,7 @@
     "@blazetrails/date": "workspace:*",
     "@blazetrails/globalid": "workspace:*",
     "@blazetrails/html-sanitizer": "workspace:*",
+    "@blazetrails/image-processing": "workspace:*",
     "@blazetrails/nokogiri": "workspace:*",
     "@blazetrails/rack": "workspace:*",
     "@blazetrails/rack-test": "workspace:*",

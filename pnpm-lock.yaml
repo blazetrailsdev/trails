@@ -395,6 +395,9 @@ importers:
       '@blazetrails/html-sanitizer':
         specifier: workspace:*
         version: link:../../packages/html-sanitizer
+      '@blazetrails/image-processing':
+        specifier: workspace:*
+        version: link:../../packages/image-processing
       '@blazetrails/nokogiri':
         specifier: workspace:*
         version: link:../../packages/nokogiri
