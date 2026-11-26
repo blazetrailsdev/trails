@@ -1,15 +1,9 @@
 import type { SqlTypeMetadata } from "./sql-type-metadata.js";
 import type { DatabaseConfig } from "../database-configurations/database-config.js";
-import {
-  LocalJumpError,
-  rbInspect,
-  rbModName,
-  rbObjId,
-  rbRegSUnion,
-  rbRegToS,
-  rtest,
-  sprintf,
-} from "@blazetrails/ruby-compat";
+import { sprintf } from "@blazetrails/ruby-compat/kernel-format";
+import { LocalJumpError } from "@blazetrails/ruby-compat/local-jump-error";
+import { rbInspect, rbModName, rbObjId, rtest } from "@blazetrails/ruby-compat/object";
+import { rbRegSUnion, rbRegToS } from "@blazetrails/ruby-compat/regexp";
 import type { ExplainOption } from "./abstract/database-statements.js";
 import type { SchemaDumper } from "./abstract/schema-dumper.js";
 import type { InsertBuilder } from "../insert-all.js";
@@ -37,28 +31,25 @@ import {
   NullLock,
   ThreadLoadInterlockAwareMonitor,
 } from "@blazetrails/activesupport";
+import { cmp } from "@blazetrails/ruby-compat/comparable";
+import { Concurrent } from "@blazetrails/ruby-compat/concurrent/map";
+import { rbEnsure } from "@blazetrails/ruby-compat/ensure";
+import { excSetupMessage } from "@blazetrails/ruby-compat/exception";
+import { Fiber } from "@blazetrails/ruby-compat/fiber";
+import { File } from "@blazetrails/ruby-compat/file";
+import { block, fetch } from "@blazetrails/ruby-compat/hash";
+import { toI } from "@blazetrails/ruby-compat/numeric";
 import {
-  Fiber,
-  File,
-  Process,
-  RbConfig,
-  abort,
-  block,
-  cmp,
-  Concurrent,
-  env,
-  excSetupMessage,
-  exec,
-  fetch,
-  isEmpty,
-  isMatch,
   isNil,
   rbDefineInspectCustom,
-  rbEnsure,
-  toI,
   rbObjAsString as toS,
-  Thread,
-} from "@blazetrails/ruby-compat";
+} from "@blazetrails/ruby-compat/object";
+import { Process } from "@blazetrails/ruby-compat/process";
+import { abort, env, exec } from "@blazetrails/ruby-compat/process-adapter";
+import { RbConfig } from "@blazetrails/ruby-compat/rb-config";
+import { isEmpty } from "@blazetrails/ruby-compat/ruby-empty";
+import { isMatch } from "@blazetrails/ruby-compat/string/sub";
+import { Thread } from "@blazetrails/ruby-compat/thread";
 import type { EventPayload } from "@blazetrails/activesupport";
 import { ACTIVE_RECORD_INSTRUMENTER } from "../future-result.js";
 

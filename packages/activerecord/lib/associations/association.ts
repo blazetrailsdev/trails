@@ -6,11 +6,9 @@ import { AssociationScope } from "./association-scope.js";
 import { DisableJoinsAssociationScope } from "./disable-joins-association-scope.js";
 import type { AssociationReflection, ThroughReflection } from "../reflection.js";
 import { kernelArray, safeConstantize, tryCall } from "@blazetrails/activesupport";
+import { rbEnsure } from "@blazetrails/ruby-compat/ensure";
+import { except, keys } from "@blazetrails/ruby-compat/hash";
 import {
-  except,
-  keys,
-  rbEnsure,
-  rbEqual,
   rbInspect,
   rbObjClass,
   rbDeclareIvar,
@@ -19,7 +17,8 @@ import {
   rbObjInstanceVariables,
   rbObjIvarGet,
   rbObjIvarSet,
-} from "@blazetrails/ruby-compat";
+} from "@blazetrails/ruby-compat/object";
+import { rbEqual } from "@blazetrails/ruby-compat/rb-equal";
 import { AssociationTypeMismatch, RecordNotFound } from "../errors.js";
 import { assertAssignedSynchronously, type PermittedAttributes } from "@blazetrails/activemodel";
 import { strictLoadingViolationBang } from "../core.js";

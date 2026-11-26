@@ -1,20 +1,11 @@
 import { extractBang } from "@blazetrails/activesupport/core-ext/hash/slice";
-import {
-  block,
-  fetch,
-  hashDelete,
-  OpenSSL,
-  partition,
-  slice,
-  rbInspect,
-  rtest,
-  RuntimeError,
-  toI,
-  hasKey,
-  toS,
-  coreHashMergeKwd,
-  eachWithObject,
-} from "@blazetrails/ruby-compat";
+import { partition, eachWithObject } from "@blazetrails/ruby-compat/enumerable";
+import { block, fetch, hashDelete, slice, hasKey } from "@blazetrails/ruby-compat/hash";
+import { coreHashMergeKwd } from "@blazetrails/ruby-compat/keyword-splat";
+import { toI } from "@blazetrails/ruby-compat/numeric";
+import { rbInspect, rtest, toS } from "@blazetrails/ruby-compat/object";
+import { OpenSSL } from "@blazetrails/ruby-compat/openssl";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
 import { NotImplementedError } from "../../errors.js";
 import { findJoinTableName, joinTableName } from "../../migration/join-table.js";
 import { CommandRecorder } from "../../migration/command-recorder.js";

@@ -1,15 +1,9 @@
-import {
-  block,
-  fetch,
-  include,
-  included,
-  isSymbol,
-  keywordSplat,
-  rbRegMatchP,
-  slice,
-  symbolToS,
-  rbClearMethodCache,
-} from "@blazetrails/ruby-compat";
+import { block, fetch, slice } from "@blazetrails/ruby-compat/hash";
+import { include, included } from "@blazetrails/ruby-compat/include";
+import { keywordSplat } from "@blazetrails/ruby-compat/keyword-splat";
+import { rbClearMethodCache } from "@blazetrails/ruby-compat/method-cache";
+import { rbRegMatchP } from "@blazetrails/ruby-compat/regexp";
+import { isSymbol, symbolToS } from "@blazetrails/ruby-compat/symbol";
 import type { SchemaQuoter } from "./assert-schema-adapter.js";
 import type { SchemaStatementsLike } from "./schema-statements-like.js";
 import type { Column } from "../column.js";

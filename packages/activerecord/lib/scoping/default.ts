@@ -1,6 +1,8 @@
 import { ArgumentError } from "@blazetrails/activemodel";
 import { any } from "@blazetrails/activesupport";
-import { rbObjIsKindOf, rbObjMethod, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { rbObjIsKindOf } from "@blazetrails/ruby-compat/include";
+import { rbObjMethod } from "@blazetrails/ruby-compat/method";
+import { rbObjRespondTo } from "@blazetrails/ruby-compat/object";
 import type { Base } from "../base.js";
 import { Relation } from "../relation.js";
 import { ScopeRegistry, isScopeAttributes as baseIsScopeAttributes } from "../scoping.js";

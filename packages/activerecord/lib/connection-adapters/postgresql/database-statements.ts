@@ -12,7 +12,11 @@ import {
   type ExplainOption,
 } from "../abstract/database-statements.js";
 import { ExplainPrettyPrinter } from "./explain-pretty-printer.js";
-import { aryJoin, b, eachWithIndex, fetch, rbRegMatchP } from "@blazetrails/ruby-compat";
+import { aryJoin } from "@blazetrails/ruby-compat/array";
+import { eachWithIndex } from "@blazetrails/ruby-compat/enumerable";
+import { fetch } from "@blazetrails/ruby-compat/hash";
+import { rbRegMatchP } from "@blazetrails/ruby-compat/regexp";
+import { b } from "@blazetrails/ruby-compat/string/b";
 import type { ConnectionPool, NullPool } from "../abstract/connection-pool.js";
 import type { StatementPool } from "../statement-pool.js";
 import { AbstractAdapter } from "../abstract-adapter.js";

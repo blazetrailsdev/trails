@@ -7,14 +7,8 @@ import {
   kernelArray,
   transformKeys,
 } from "@blazetrails/activesupport";
-import {
-  extend,
-  type Extended,
-  hashAref,
-  hashAset,
-  include,
-  rbCallSuper,
-} from "@blazetrails/ruby-compat";
+import { hashAref, hashAset } from "@blazetrails/ruby-compat/hash";
+import { extend, type Extended, include, rbCallSuper } from "@blazetrails/ruby-compat/include";
 import { prepend } from "@blazetrails/ruby-compat/include";
 import { Relation } from "../relation.js";
 import { Base } from "../base.js";

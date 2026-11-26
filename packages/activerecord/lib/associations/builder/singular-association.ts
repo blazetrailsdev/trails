@@ -1,4 +1,4 @@
-import type { Module } from "@blazetrails/ruby-compat";
+import type { Module } from "@blazetrails/ruby-compat/include";
 import { Association, type AssociationInstanceHost } from "./association.js";
 import { Builder } from "../../namespaces.js";
 

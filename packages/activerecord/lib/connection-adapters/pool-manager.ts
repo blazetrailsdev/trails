@@ -1,5 +1,5 @@
 import { ArgumentError } from "@blazetrails/activemodel";
-import { eachValue, hashDelete } from "@blazetrails/ruby-compat";
+import { eachValue, hashDelete } from "@blazetrails/ruby-compat/hash";
 import type { PoolConfig } from "./pool-config.js";
 
 export class PoolManager {

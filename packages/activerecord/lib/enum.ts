@@ -12,16 +12,15 @@ import {
   upcaseFirst,
 } from "@blazetrails/activesupport";
 import { ArgumentError, RuntimeError, ValueType, defaultValue } from "@blazetrails/activemodel";
+import { eachWithIndex } from "@blazetrails/ruby-compat/enumerable";
+import { Module, include } from "@blazetrails/ruby-compat/include";
 import {
-  Module,
-  include,
   rbInspect,
   rbModDefineMethod,
   toS,
   rbClassSuperclass,
   rbObjRespondTo,
-  eachWithIndex,
-} from "@blazetrails/ruby-compat";
+} from "@blazetrails/ruby-compat/object";
 import { isDangerousClassMethod, isMethodDefinedWithin } from "./attribute-methods.js";
 import { isReplayingOverColdSchema } from "./attributes.js";
 import { Relation } from "./relation.js";

@@ -1,12 +1,8 @@
-import {
-  kernelThrow,
-  rbEnsure,
-  rbEqual,
-  rbFSend,
-  rbModDefineMethod,
-  rbModMethodDefined,
-  rbCallSuper,
-} from "@blazetrails/ruby-compat";
+import { rbEnsure } from "@blazetrails/ruby-compat/ensure";
+import { rbCallSuper } from "@blazetrails/ruby-compat/include";
+import { kernelThrow } from "@blazetrails/ruby-compat/kernel-catch";
+import { rbFSend, rbModDefineMethod, rbModMethodDefined } from "@blazetrails/ruby-compat/object";
+import { rbEqual } from "@blazetrails/ruby-compat/rb-equal";
 import type { Base } from "./base.js";
 import type { AssociationReflection, ThroughReflection } from "./reflection.js";
 import type { Association } from "./associations/association.js";

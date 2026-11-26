@@ -1,13 +1,7 @@
-import {
-  Hash,
-  hashAref,
-  hashAset,
-  hashDelete,
-  NotImplementedError,
-  Process,
-  rtest,
-  size,
-} from "@blazetrails/ruby-compat";
+import { Hash, hashAref, hashAset, hashDelete, size } from "@blazetrails/ruby-compat/hash";
+import { NotImplementedError } from "@blazetrails/ruby-compat/not-implemented-error";
+import { rtest } from "@blazetrails/ruby-compat/object";
+import { Process } from "@blazetrails/ruby-compat/process";
 
 export class StatementPool<T = unknown> {
   static readonly DEFAULT_STATEMENT_LIMIT = 1000;

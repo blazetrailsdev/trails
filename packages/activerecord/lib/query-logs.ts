@@ -6,7 +6,8 @@ import {
   isPresent,
   threadMattrAccessor,
 } from "@blazetrails/activesupport";
-import { sortByBang, toS } from "@blazetrails/ruby-compat";
+import { sortByBang } from "@blazetrails/ruby-compat/array";
+import { toS } from "@blazetrails/ruby-compat/object";
 import { LegacyFormatter, SQLCommenter } from "./query-logs-formatter.js";
 import { LogSubscriber } from "./log-subscriber.js";
 import type { TagValue, QueryLogsFormatter } from "./query-logs-formatter.js";

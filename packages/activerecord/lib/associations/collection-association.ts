@@ -1,13 +1,9 @@
 import { ActiveSupport } from "@blazetrails/activesupport";
-import {
-  aryDelete,
-  kernelCatch,
-  rbEqual,
-  rbFSend,
-  rbObjRespondTo,
-  rbDeclareIvar,
-  Set,
-} from "@blazetrails/ruby-compat";
+import { aryDelete } from "@blazetrails/ruby-compat/array";
+import { kernelCatch } from "@blazetrails/ruby-compat/kernel-catch";
+import { rbFSend, rbObjRespondTo, rbDeclareIvar } from "@blazetrails/ruby-compat/object";
+import { rbEqual } from "@blazetrails/ruby-compat/rb-equal";
+import { Set } from "@blazetrails/ruby-compat/set";
 import type { Base } from "../base.js";
 import {
   compactBlank,

@@ -1,6 +1,7 @@
 import { ArgumentError, type ValueType } from "@blazetrails/activemodel";
 import * as Type from "../type.js";
-import { Concurrent, block as blockPass, fetch } from "@blazetrails/ruby-compat";
+import { Concurrent } from "@blazetrails/ruby-compat/concurrent/map";
+import { block as blockPass, fetch } from "@blazetrails/ruby-compat/hash";
 
 type Key = string | number;
 type Callable = (lookupKey: Key, ...args: unknown[]) => ValueType;

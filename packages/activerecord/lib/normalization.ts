@@ -1,6 +1,7 @@
 import { classAttribute, include, included, rbHash } from "@blazetrails/activesupport";
 import { SerializeCastValue, ValueType } from "@blazetrails/activemodel";
-import { DelegateClass, rbObjInspect } from "@blazetrails/ruby-compat";
+import { DelegateClass } from "@blazetrails/ruby-compat/delegate";
+import { rbObjInspect } from "@blazetrails/ruby-compat/object";
 
 export type NormalizesArgs = [
   ...names: string[],

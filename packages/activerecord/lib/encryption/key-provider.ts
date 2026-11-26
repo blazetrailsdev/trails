@@ -1,5 +1,7 @@
 import { kernelArray } from "@blazetrails/activesupport";
-import { groupBy, rtest, type Hash } from "@blazetrails/ruby-compat";
+import { groupBy } from "@blazetrails/ruby-compat/enumerable";
+import type { Hash } from "@blazetrails/ruby-compat/hash";
+import { rtest } from "@blazetrails/ruby-compat/object";
 import { Key } from "./key.js";
 import { Encryption } from "../namespaces.js";
 import type { Message } from "./message.js";

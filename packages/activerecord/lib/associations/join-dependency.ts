@@ -6,21 +6,12 @@ import {
   Notifications,
   type Extended,
 } from "@blazetrails/activesupport";
-import {
-  first,
-  Hash,
-  hasKey,
-  isEmpty,
-  partition,
-  rbInspect,
-  rtest,
-  symbolToS,
-  toS,
-  toSym,
-  eachWithObject,
-  eachWithIndex,
-  map,
-} from "@blazetrails/ruby-compat";
+import { first } from "@blazetrails/ruby-compat/array";
+import { partition, eachWithObject, eachWithIndex, map } from "@blazetrails/ruby-compat/enumerable";
+import { Hash, hasKey } from "@blazetrails/ruby-compat/hash";
+import { rbInspect, rtest, toS, toSym } from "@blazetrails/ruby-compat/object";
+import { isEmpty } from "@blazetrails/ruby-compat/ruby-empty";
+import { symbolToS } from "@blazetrails/ruby-compat/symbol";
 import type { Base } from "../base.js";
 import type { Result } from "../result.js";
 import type { AssociationSpec } from "../relation/query-methods.js";

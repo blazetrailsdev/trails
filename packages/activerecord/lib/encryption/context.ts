@@ -1,4 +1,4 @@
-import { rbDeclareIvar } from "@blazetrails/ruby-compat";
+import { rbDeclareIvar } from "@blazetrails/ruby-compat/object";
 import { MessageSerializer, type MessageSerializerLike } from "./message-serializer.js";
 import { Cipher } from "./cipher.js";
 import { Encryption } from "../namespaces.js";

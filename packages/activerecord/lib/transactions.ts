@@ -15,7 +15,8 @@ import {
   type Extended,
   type FilterListEntry,
 } from "@blazetrails/activesupport";
-import { rtest, rbCallSuper } from "@blazetrails/ruby-compat";
+import { rbCallSuper } from "@blazetrails/ruby-compat/include";
+import { rtest } from "@blazetrails/ruby-compat/object";
 import type { TouchArgs } from "./timestamp.js";
 import { Rollback } from "./errors.js";
 export { Rollback };

@@ -2,14 +2,9 @@ import type { Base } from "./base.js";
 import { addAggregateReflection, create } from "./reflection.js";
 import { assertValidKeys, camelize, constantize, isPlainObject } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
-import {
-  include,
-  isModuleIncluded,
-  NoMethodError,
-  rbCallSuper,
-  rbClearMethodCache,
-  rbObjDup,
-} from "@blazetrails/ruby-compat";
+import { include, isModuleIncluded, rbCallSuper, rbObjDup } from "@blazetrails/ruby-compat/include";
+import { rbClearMethodCache } from "@blazetrails/ruby-compat/method-cache";
+import { NoMethodError } from "@blazetrails/ruby-compat/no-method-error";
 
 export const Aggregations = {};
 

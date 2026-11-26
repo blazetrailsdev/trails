@@ -11,13 +11,9 @@ import {
   safeConstantize,
 } from "@blazetrails/activesupport";
 import { ArgumentError, type PermittedAttributes } from "@blazetrails/activemodel";
-import {
-  hashAref,
-  rbClassSuperclass,
-  rbModName,
-  rbObjRespondTo,
-  rbCallSuper,
-} from "@blazetrails/ruby-compat";
+import { hashAref } from "@blazetrails/ruby-compat/hash";
+import { rbCallSuper } from "@blazetrails/ruby-compat/include";
+import { rbClassSuperclass, rbModName, rbObjRespondTo } from "@blazetrails/ruby-compat/object";
 import { demodulize } from "@blazetrails/activesupport";
 import { applicationRecordClass, setApplicationRecordClass } from "./active-record.js";
 

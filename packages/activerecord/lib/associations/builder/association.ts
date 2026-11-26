@@ -1,11 +1,8 @@
 import type { MacroType, AssociationReflection } from "../../reflection.js";
 import { ArgumentError } from "@blazetrails/activemodel";
-import {
-  NotImplementedError,
-  rbObjIvarGet,
-  rbObjIvarSet,
-  type Module,
-} from "@blazetrails/ruby-compat";
+import type { Module } from "@blazetrails/ruby-compat/include";
+import { NotImplementedError } from "@blazetrails/ruby-compat/not-implemented-error";
+import { rbObjIvarGet, rbObjIvarSet } from "@blazetrails/ruby-compat/object";
 import { assertValidKeys, kernelArray } from "@blazetrails/activesupport";
 import { ConfigurationError } from "../../errors.js";
 import * as Reflection from "../../reflection.js";

@@ -1,5 +1,5 @@
 import { Executor } from "@blazetrails/activesupport";
-import { Concurrent } from "@blazetrails/ruby-compat";
+import { Concurrent } from "@blazetrails/ruby-compat/concurrent/map";
 import { ActiveRecordError } from "./errors.js";
 import type { Base } from "./base.js";
 
