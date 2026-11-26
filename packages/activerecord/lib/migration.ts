@@ -912,8 +912,10 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     if (!this.isReverting()) await this.executeBlock(block);
   }
 
+  /** @inventedArm loadPath — PERMANENT */
   async migrate(direction: "up" | "down"): Promise<void> {
     if (!rbObjRespondTo(this, direction)) return;
+    await ActiveRecord.Tasks.loadPath["active_record/tasks/database_tasks"]();
 
     switch (direction) {
       case "up":
@@ -1762,13 +1764,17 @@ export class Migrator {
     }
   }
 
+  /** @inventedArm loadPath — PERMANENT */
   async run(): Promise<string | number | undefined> {
+    await ActiveRecord.Tasks.loadPath["active_record/tasks/database_tasks"]();
     return (await this.isUseAdvisoryLock())
       ? this.withAdvisoryLock(() => this.runWithoutLock())
       : this.runWithoutLock();
   }
 
+  /** @inventedArm loadPath — PERMANENT */
   async migrate(): Promise<MigrationProxy[]> {
+    await ActiveRecord.Tasks.loadPath["active_record/tasks/database_tasks"]();
     return (await this.isUseAdvisoryLock())
       ? this.withAdvisoryLock(() => this.migrateWithoutLock())
       : this.migrateWithoutLock();
