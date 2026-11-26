@@ -1,0 +1,4 @@
+$ pnpm tsx scripts/vendor-recite.ts --check
+would recite CLAUDE.md
+1 file(s) carry a citation to recite
+[ELIFECYCLE] Command failed with exit code 1.
