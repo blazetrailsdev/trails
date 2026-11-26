@@ -35,6 +35,7 @@ export class XmlDocument extends XmlNode {
 
   private _doc: LibXmlDocument | null;
 
+  /** @missingRailsArgs xmlNewDoc — CONVERGEABLE nokogiri-xml-document-new-version-and-wrap */
   constructor(cDocument: number = Nokogiri.LibXml2!.xmlNewDoc()) {
     super(Nokogiri.LibXml2!.createNode(cDocument));
     this._doc = Nokogiri.LibXml2!.XmlDocument.getInstance(cDocument);
