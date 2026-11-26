@@ -905,10 +905,10 @@ a caller pass arguments Rails has no parameter for — and it is spelled
 ### Override signature on the static side
 
 A Ruby class method may also replace its parent's parameter types outright.
-`HTML5::DocumentFragment.parse(input, encoding_ = nil, positional_options_hash = nil, **options)`
-(`vendor/nokogiri/v1.18.3/lib/nokogiri/html5/document_fragment.rb:69-73`)
-overrides `XML::DocumentFragment.parse(tags, options_ = ParseOptions::DEFAULT_XML, &block)`
-(`vendor/nokogiri/v1.18.3/lib/nokogiri/xml/document_fragment.rb:35`). TypeScript
+`HTML5::DocumentFragment.parse(input, encoding_ = nil, positional_options_hash = nil, encoding: encoding_, **options)`
+(`vendor/nokogiri/v1.19.7/lib/nokogiri/html5/document_fragment.rb:69-73`)
+overrides `XML::DocumentFragment.parse(tags, options_ = ParseOptions::DEFAULT_XML, options: options_, &block)`
+(`vendor/nokogiri/v1.19.7/lib/nokogiri/xml/document_fragment.rb:35`). TypeScript
 checks the constructor side of `extends` and rejects it (TS2417), and the
 `_rest` shape above cannot help: the positions exist in both lists with
 unrelated types. An alias of the parent constructor typed without its statics
