@@ -107,7 +107,10 @@ console.log(JSON.stringify({ stacks: globalThis.__stacks ?? [], scanned, status:
     expect(buildErr).toBe("");
     expect(build.isSuccess()).toBe(true);
     if (stale) expect(File.isExist(`${root}/.trails/entry.generated.js`)).toBe(true);
-    if (recompiled) write(`${root}/config.${ext}`, "export {};\n");
+    if (recompiled) {
+      const old = new Date(Date.now() - 60_000);
+      await File.utimeAsync(old, old, `${root}/.trails/entry.generated.js`);
+    }
 
     const flags = ext === "js" ? ["--no-experimental-strip-types"] : [];
     const [stdout, stderr] = await Open3.capture3(env, node, ...flags, `${root}/boot.mjs`);
