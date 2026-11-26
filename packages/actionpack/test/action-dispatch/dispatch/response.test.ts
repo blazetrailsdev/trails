@@ -12,6 +12,8 @@ import {
   assertRaises,
 } from "@blazetrails/activesupport/testing/assertions";
 import { flatten } from "@blazetrails/ruby-compat/array";
+import { Enumerator } from "@blazetrails/ruby-compat/enumerator";
+import { block } from "@blazetrails/ruby-compat/hash";
 import {
   ContentLength,
   MockRequest,
@@ -293,6 +295,11 @@ describe("ResponseTest", () => {
       each(block: (chunk: string) => void) {
         eachCounter += 1;
         block("foo");
+      },
+      toAry(this: { each(block: (chunk: string) => void): void }) {
+        const a: string[] = [];
+        this.each((c) => a.push(c));
+        return a;
       },
     });
     response.setHeader("X-Foo", response.body);
@@ -675,5 +682,17 @@ describe("ResponseIntegrationTest", () => {
     assertEqual("text/plain", testCase.response.mediaType);
     assertEqual("utf-8", testCase.response.charset);
     assertEqual("012345678910", testCase.response.body);
+  });
+
+  it("response does not buffer enumerator body", async () => {
+    const body = new Enumerator(
+      block((enumerator: { yield(value: string): unknown }) => {
+        enumerator.yield("Hello World");
+      }),
+    );
+
+    const response = await Response.new(200, { "content-type": "text/plain" }, body);
+
+    assertEqual(body, response.body);
   });
 });

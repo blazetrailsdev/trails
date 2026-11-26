@@ -376,8 +376,21 @@ export class Session {
 
     this.requestCount += 1;
     this.request = new Request(session.lastRequest().env);
-    const stream = (this.request.controllerInstance as Metal | undefined)?.response?.stream;
+    const controllerResponse = (this.request.controllerInstance as Metal | undefined)?.response;
+    const stream = controllerResponse?.stream;
     if (stream instanceof Buffer && !(stream instanceof LiveBuffer)) await stream.awaitBody();
+    else if (
+      stream != null &&
+      !(stream instanceof Buffer) &&
+      !rbObjRespondTo(stream, "toPath") &&
+      rbObjRespondTo(stream, "each")
+    ) {
+      const parts: unknown[] = [];
+      await (stream as { each(block: (part: unknown) => unknown): unknown }).each((part) =>
+        parts.push(part),
+      );
+      await controllerResponse!.setBody(parts);
+    }
     const response = this._mockSession.lastResponse();
     this.response = await TestResponse.fromResponse(response);
     this.response.request = this.request;
