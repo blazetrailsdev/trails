@@ -1,6 +1,8 @@
 import { ArgumentError } from "./argument-error.js";
 import { Exception } from "./exception.js";
 import { NSIG, signo2signm, trapSignm } from "./process-adapter.js";
+import { checkArity, num2long, rbCheckStringType } from "./string/support.js";
+import { rbCheckToInteger, rbObjClassname } from "./object.js";
 
 /**
  * Ruby's core `SignalException` (`vendor/ruby/v3.3.11/error.c:3318`
@@ -25,13 +27,13 @@ export class SignalException extends Exception {
     let signo: number | undefined;
 
     if (argv.length > 0) {
-      if (typeof argv[0] === "number") {
-        sig = argv[0];
-        argnum = 2;
-      } else sig = argv[0];
+      sig = rbCheckToInteger(argv[0]);
+      if (sig != null) argnum = 2;
+      else sig = argv[0];
     }
+    checkArity(argv.length, 1, argnum);
     if (argnum === 2) {
-      signo = sig as number;
+      signo = num2long(sig);
       if (signo < 0 || signo > NSIG) {
         throw new ArgumentError(`invalid signal number (${signo})`);
       }
@@ -41,10 +43,12 @@ export class SignalException extends Exception {
         const signm = signo2signm(signo);
         sig = signm != null ? `SIG${signm}` : `SIG${signo}`;
       }
-    } else if (sig != null) {
-      const signm = String(sig);
+    } else {
+      const signm = rbCheckStringType(sig);
+      if (signm == null) throw new ArgumentError(`bad signal type ${rbObjClassname(sig)}`);
+      if (signm.startsWith("-")) throw new ArgumentError(`negative signal name: ${signm}`);
       signo = trapSignm(signm);
-      if (!signm.startsWith("SIG")) sig = `SIG${signm}`;
+      sig = signm.startsWith("SIG") ? signm : `SIG${signm}`;
     }
     super(...((sig == null ? [] : [sig]) as [string?]));
     this._signo = signo;
@@ -65,7 +69,8 @@ export class SignalException extends Exception {
  */
 export class Interrupt extends SignalException {
   /** `interrupt_init` (`vendor/ruby/v3.3.11/signal.c:397-405`): `SIGINT`, and the message given. */
-  constructor(mesg: unknown = null) {
-    super(2, mesg);
+  constructor(...argv: unknown[]) {
+    checkArity(argv.length, 0, 1);
+    super(2, argv.length > 0 ? argv[0] : null);
   }
 }

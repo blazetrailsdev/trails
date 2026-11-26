@@ -419,6 +419,21 @@ export const rbCDateTime = rbDefineClass("DateTime", rbCDate);
 export const rbCNilClass = rbDefineClass("NilClass");
 
 /**
+ * `rb_check_to_integer(val, "to_int")` (`vendor/ruby/v3.3.11/object.c:3219-3230`):
+ * an Integer, a Float's or another object's `to_int` when it answers one, else `nil`.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbCheckToInteger(val: unknown): number | bigint | null {
+  if (typeof val === "bigint") return val;
+  if (typeof val === "number") return Number.isInteger(val) ? val : Math.trunc(val);
+  const toInt = (val as { toInt?: unknown } | null)?.toInt;
+  if (typeof toInt !== "function") return null;
+  const v: unknown = toInt.call(val);
+  return typeof v === "number" || typeof v === "bigint" ? v : null;
+}
+
+/**
  * `rb_cTrueClass` (`vendor/ruby/v3.3.11/object.c:4498`).
  * @noRailsEquivalent PERMANENT
  */
