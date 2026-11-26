@@ -5726,8 +5726,15 @@ export function extractClass(
   if (node.heritageClauses) {
     for (const clause of node.heritageClauses) {
       if (clause.token === ts.SyntaxKind.ExtendsKeyword) {
-        const expr = clause.types[0] && unwrapTsExpression(clause.types[0].expression);
+        let expr = clause.types[0] && unwrapTsExpression(clause.types[0].expression);
         if (!expr) continue;
+        if (
+          ts.isCallExpression(expr) &&
+          ts.isPropertyAccessExpression(expr.expression) &&
+          expr.expression.name.text === "get"
+        ) {
+          expr = expr.expression.expression;
+        }
         superclass = ts.isIdentifier(expr)
           ? importedName(expr, node.getSourceFile())
           : expr.getText();
