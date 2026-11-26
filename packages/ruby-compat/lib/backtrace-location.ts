@@ -54,7 +54,9 @@ export class Location {
       this.path = `(${location.slice(0, location.lastIndexOf(", "))})`;
     } else {
       const file = path ? path[1] : location;
-      this.path = /^[a-z][a-z\d+.-]*:\/\//i.test(file) ? getPath().fileURLToPath!(file) : file;
+      const fileURLToPath = getPath().fileURLToPath;
+      this.path =
+        fileURLToPath && /^[a-z][a-z\d+.-]*:\/\//i.test(file) ? fileURLToPath(file) : file;
     }
 
     const position = /:(\d+):(\d+)\)?$/.exec(this._frame);
