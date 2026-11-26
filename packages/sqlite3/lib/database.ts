@@ -44,6 +44,7 @@ export interface Aggregator {
 export interface EngineErrors {
   errcode(error: unknown): number | null;
   errmsg(error: unknown): string;
+  /** @noRailsEquivalent PERMANENT */
   isDeadlock?(error: unknown): boolean;
 }
 
