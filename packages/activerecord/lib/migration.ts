@@ -1772,7 +1772,6 @@ export class Migrator {
       : this.runWithoutLock();
   }
 
-  /** @inventedArm loadPath — PERMANENT */
   async migrate(): Promise<MigrationProxy[]> {
     await ActiveRecord.Tasks.loadPath["active_record/tasks/database_tasks"]();
     return (await this.isUseAdvisoryLock())

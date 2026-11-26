@@ -27,7 +27,6 @@ async function defineClassMethod<A extends DatabaseAdapter>(
   await new this().define(info, block!);
 }
 
-/** @inventedArm loadPath — PERMANENT */
 async function define<A extends DatabaseAdapter>(
   this: Schema<A>,
   info: SchemaDefineInfo,
