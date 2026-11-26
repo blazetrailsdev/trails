@@ -13,6 +13,7 @@ import { constSet, isModuleIncluded } from "@blazetrails/ruby-compat/include";
 import { rbModRemoveConst } from "@blazetrails/ruby-compat/variable";
 import { ActionDispatch, Response, Session } from "@blazetrails/actionpack";
 import type { MiddlewareStack } from "@blazetrails/actionpack";
+import { map } from "@blazetrails/ruby-compat/enumerable";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -4187,9 +4188,9 @@ export class Foo extends ApplicationRecord {
     const application = await app("development");
 
     expect(
-      [...(application.config.middleware as unknown as MiddlewareStack)]
-        .map((m) => m.name)
-        .includes("ActiveSupport::Cache::Strategy::LocalCache"),
+      map(application.config.middleware as MiddlewareStack, (m) => m.name).includes(
+        "ActiveSupport::Cache::Strategy::LocalCache",
+      ),
     ).toBeFalsy();
   });
 
@@ -4225,7 +4226,9 @@ class CustomMiddlewareThree {
     return this;
   }
 }
+constSet(TopLevel, "CustomMiddlewareOne", CustomMiddlewareOne);
 constSet(TopLevel, "CustomMiddlewareTwo", CustomMiddlewareTwo);
+constSet(TopLevel, "CustomMiddlewareThree", CustomMiddlewareThree);
 
 Trails.application.config.middleware.use(CustomMiddlewareOne);
 Trails.application.config.middleware.use(CustomMiddlewareTwo);
@@ -4237,18 +4240,20 @@ Trails.application.config.middleware.delete(CustomMiddlewareThree);
 
     const application = await app("development");
 
-    const customMiddlewareOne = [...(application.config.middleware as unknown as MiddlewareStack)]
-      .map((m) => m.name)
-      .indexOf("1st custom middleware");
-    const customMiddlewareTwo = [...(application.config.middleware as unknown as MiddlewareStack)]
-      .map((m) => m.name)
-      .indexOf("CustomMiddlewareTwo");
+    const customMiddlewareOne = map(
+      application.config.middleware as MiddlewareStack,
+      (m) => m.name,
+    ).indexOf("1st custom middleware");
+    const customMiddlewareTwo = map(
+      application.config.middleware as MiddlewareStack,
+      (m) => m.name,
+    ).indexOf("CustomMiddlewareTwo");
     expect(customMiddlewareOne > customMiddlewareTwo).toBeTruthy();
 
     expect(
-      [...(application.config.middleware as unknown as MiddlewareStack)]
-        .map((m) => m.name)
-        .find((name) => name === "3rd custom middleware") ?? null,
+      map(application.config.middleware as MiddlewareStack, (m) => m.name).find(
+        (name) => name === "3rd custom middleware",
+      ) ?? null,
     ).toBeNull();
   });
 });
