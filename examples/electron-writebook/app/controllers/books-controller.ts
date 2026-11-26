@@ -37,7 +37,6 @@ export class BooksController extends ApplicationController {
 
   async show(): Promise<void> {
     this.leaves = await this.book.leaves.active().withLeafables().positioned().toArray();
-    for (const leaf of this.leaves) leaf.association("book").target = this.book;
 
     await this.respondTo((format: Record<string, (block?: () => unknown) => void>) => {
       format.html();
@@ -74,7 +73,7 @@ export class BooksController extends ApplicationController {
   }
 
   private async ensureIndexIsNotEmpty(): Promise<void> {
-    if (!this.isSignedIn() && !(await Book.published().isAny())) {
+    if (!this.isSignedIn() && (await Book.published().isNone())) {
       await this.requireAuthentication();
     }
   }
@@ -95,10 +94,18 @@ export class BooksController extends ApplicationController {
   }
 
   private async updateAccesses(book: Book): Promise<void> {
-    const ids = (key: string) =>
-      ((this.params.get(key) as string[] | undefined) ?? []).map((id) => Number(id));
-    const editors = [Current.user!.id as number, ...ids("editor_ids")];
-    const readers = [Current.user!.id as number, ...ids("reader_ids")];
+    const editors = [
+      Current.user!.id as number,
+      ...((this.params.get("editor_ids") as string[] | undefined)?.map(
+        (id) => parseInt(id, 10) || 0,
+      ) ?? []),
+    ];
+    const readers = [
+      Current.user!.id as number,
+      ...((this.params.get("reader_ids") as string[] | undefined)?.map(
+        (id) => parseInt(id, 10) || 0,
+      ) ?? []),
+    ];
 
     await book.updateAccess({ editors, readers });
   }

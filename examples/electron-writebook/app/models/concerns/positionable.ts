@@ -13,14 +13,14 @@ export interface PositionedWithin {
 
 interface Positioned extends Base, PositionedWithin {
   position_score: number;
-  _rebalanceRequired?: boolean;
+  rebalanceRequired?: boolean;
   withPositioningLock<T>(block: () => Promise<T>): Promise<T | undefined>;
   ordinalPosition(): Promise<number>;
   positionAtEnd(): Promise<void>;
   positionAtStart(): Promise<void>;
   beforeAndAfterFor(options: { offset: number; moving: Positioned[] }): Promise<[number, number]>;
   rememberToRebalancePositions(): void;
-  isRebalanceRequired(): boolean;
+  isRebalanceRequired(): boolean | undefined;
   rebalancePositions(): Promise<void>;
 }
 
@@ -177,11 +177,11 @@ export const Positionable = defineModule(
     },
 
     rememberToRebalancePositions(this: Positioned): void {
-      this._rebalanceRequired = true;
+      this.rebalanceRequired = true;
     },
 
-    isRebalanceRequired(this: Positioned): boolean {
-      return this._rebalanceRequired === true;
+    isRebalanceRequired(this: Positioned): boolean | undefined {
+      return this.rebalanceRequired;
     },
 
     async rebalancePositions(this: Positioned): Promise<void> {
@@ -194,7 +194,7 @@ export const Positionable = defineModule(
 
         await (await klass.leaseConnection()).execute(sql);
       });
-      this._rebalanceRequired = false;
+      this.rebalanceRequired = false;
     },
 
     async withPositioningLock<T>(
