@@ -3,7 +3,7 @@ import { File } from "@blazetrails/ruby-compat/file";
 import { FileUtils } from "@blazetrails/ruby-compat/file-utils";
 import { Marshal } from "@blazetrails/ruby-compat/marshal";
 import { Zlib } from "@blazetrails/ruby-compat/zlib";
-import { Hash, block, fetch } from "@blazetrails/ruby-compat/hash";
+import { Hash, block, fetch, transformValues } from "@blazetrails/ruby-compat/hash";
 import { forceEncoding } from "@blazetrails/ruby-compat/string/force-encoding";
 import { isEmpty } from "@blazetrails/ruby-compat/ruby-empty";
 import { isModuleIncluded, rbCallSuper, rbObjDup } from "@blazetrails/ruby-compat/include";
@@ -585,11 +585,8 @@ export class SchemaCache {
    */
   private deriveColumnsHashAndDeduplicateValues(): void {
     this._columns = this.deepDeduplicate(this._columns);
-    this._columnsHash = new Map(
-      [...this._columns].map(([table, columns]) => [
-        table,
-        Object.fromEntries(columns.map((column) => [column.name, column])),
-      ]),
+    this._columnsHash = transformValues(this._columns, (columns) =>
+      indexBy(columns, (column) => column.name),
     );
     this._primaryKeys = this.deepDeduplicate(this._primaryKeys);
     this._dataSources = this.deepDeduplicate(this._dataSources);
