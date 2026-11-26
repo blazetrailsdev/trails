@@ -32,16 +32,25 @@ export interface ZlibAdapter {
 /**
  * MRI's `struct zstream` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:562`), run
  * synchronously: `run` is `zstream_run` (`zlib.c:1190`) over `input` and `src`,
- * answering what the stream produced, and leaving in `input` what it did not
- * consume once the stream has ended.
+ * appending what the stream produced to `buf` and leaving in `input` what it
+ * did not consume once the stream has ended.
  *
  * @noRailsEquivalent PERMANENT
  */
 export interface ZStream {
+  buf: Uint8Array;
   input: Uint8Array;
   totalIn: number;
   readonly totalOut: number;
-  run(src: Uint8Array, flush: number): Uint8Array;
+  run(src: Uint8Array, flush: number): void;
+  /** `zstream_append_buffer` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:758`). */
+  appendBuffer(src: Uint8Array): void;
+  /** `zstream_append_input` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:875`). */
+  appendInput(src: Uint8Array): void;
+  /** `zstream_detach_buffer` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:789`). */
+  detachBuffer(): Uint8Array;
+  /** `zstream_shift_buffer` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:823`). */
+  shiftBuffer(len: number): Uint8Array;
   /**
    * `ZSTREAM_IS_FINISHED` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:587`). Node's
    * binding answers zlib's `Z_STREAM_END` only through input it leaves
@@ -202,19 +211,22 @@ function nodeZStream(stream: NodeZlibStream, inflate: boolean): ZStream {
     const kError = Object.getOwnPropertySymbols(stream).find((s) => s.description === "kError");
     return (kError && (stream as unknown as Record<symbol, unknown>)[kError]) ?? error;
   };
+  const concat = (a: Uint8Array, b: Uint8Array): Uint8Array => {
+    if (a.length === 0) return b;
+    const dst = new Uint8Array(a.length + b.length);
+    dst.set(a);
+    dst.set(b, a.length);
+    return dst;
+  };
   const z: ZStream & { totalIn: number; totalOut: number } = {
+    buf: new Uint8Array(),
     input: new Uint8Array(),
     totalIn: 0,
     totalOut: 0,
     run(src, flush) {
       const handle = stream._handle;
       if (handle === null) throw raised();
-      let input = src;
-      if (z.input.length > 0) {
-        input = new Uint8Array(z.input.length + src.length);
-        input.set(z.input);
-        input.set(src, z.input.length);
-      }
+      const input = concat(z.input, src);
       const chunks: Uint8Array[] = [];
       let inOff = 0;
       let availIn = input.length;
@@ -232,13 +244,25 @@ function nodeZStream(stream: NodeZlibStream, inflate: boolean): ZStream {
       if (inflate && z.input.length > 0) finished = true;
       if (!inflate && flush === Z_FINISH) finished = true;
       z.totalIn += inOff;
-      const dst = new Uint8Array(chunks.reduce((n, chunk) => n + chunk.length, 0));
-      let offset = 0;
       for (const chunk of chunks) {
-        dst.set(chunk, offset);
-        offset += chunk.length;
+        z.totalOut += chunk.length;
+        z.buf = concat(z.buf, chunk);
       }
-      z.totalOut += dst.length;
+    },
+    appendBuffer(src) {
+      z.buf = concat(z.buf, src);
+    },
+    appendInput(src) {
+      z.input = concat(z.input, src);
+    },
+    detachBuffer() {
+      const dst = z.buf;
+      z.buf = new Uint8Array();
+      return dst;
+    },
+    shiftBuffer(len) {
+      const dst = z.buf.subarray(0, len);
+      z.buf = z.buf.subarray(len);
       return dst;
     },
     isFinished(atEnd = false) {

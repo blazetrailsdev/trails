@@ -5,6 +5,7 @@ import type { Tempfile } from "./tempfile.js";
 import type { StringIO } from "./string-io.js";
 import { getZlib, type ZStream } from "./zlib-adapter.js";
 import { b } from "./string/b.js";
+import { binaryBytes, binaryString } from "./io.js";
 import { StandardError } from "./standard-error.js";
 import { ArgumentError } from "./argument-error.js";
 
@@ -38,34 +39,6 @@ const Z_BEST_COMPRESSION = 9;
 
 /** `GZFILE_READ_SIZE` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:2376`). */
 const GZFILE_READ_SIZE = 2048;
-
-/** `gzfile_get32` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:2597`). */
-function gzfileGet32(src: Uint8Array, offset = 0): number {
-  return (
-    (src[offset] | (src[offset + 1] << 8) | (src[offset + 2] << 16) | (src[offset + 3] << 24)) >>> 0
-  );
-}
-
-/** `gzfile_get16` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:2588`). */
-function gzfileGet16(src: Uint8Array): number {
-  return src[0] | (src[1] << 8);
-}
-
-/** `gzfile_set32` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:2608`). */
-function gzfileSet32(n: number, dst: Uint8Array, offset = 0): void {
-  dst[offset] = n & 0xff;
-  dst[offset + 1] = (n >>> 8) & 0xff;
-  dst[offset + 2] = (n >>> 16) & 0xff;
-  dst[offset + 3] = (n >>> 24) & 0xff;
-}
-
-function concatBytes(a: Uint8Array, b: Uint8Array): Uint8Array {
-  if (a.length === 0) return b;
-  const dst = new Uint8Array(a.length + b.length);
-  dst.set(a);
-  dst.set(b, a.length);
-  return dst;
-}
 
 /**
  * `Zlib::GzipFile` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:4838`). `gzfile_s_open`
@@ -110,9 +83,6 @@ class GzipFile<IO extends { close(): void } = File> {
 
   /** `gz->end`, the endfunc `gzfile_init` seats (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:2443`). */
   declare protected end: () => void;
-
-  /** `gz->z.buf` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:568`). */
-  protected buf: Uint8Array = new Uint8Array();
 
   constructor(
     protected io: IO,
@@ -248,16 +218,14 @@ class GzipReader extends GzipFile<File | StringIO<Uint8Array>> {
 
   /** `GZFILE_IS_FINISHED` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:2373`). */
   private isGzfileFinished(): boolean {
-    return this.z.isFinished() && this.buf.length === 0;
+    return this.z.isFinished() && this.z.buf.length === 0;
   }
 
   /** `gzfile_read_raw` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:2537`). */
   private gzfileReadRaw(): Uint8Array | null {
     const str = this.io.read(GZFILE_READ_SIZE);
     if (str == null) return null;
-    return typeof str === "string"
-      ? Uint8Array.from(str, (c: string) => c.charCodeAt(0) & 0xff)
-      : str;
+    return typeof str === "string" ? binaryBytes(str) : str;
   }
 
   /** `gzfile_read_raw_ensure` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:2551`). */
@@ -265,7 +233,7 @@ class GzipReader extends GzipFile<File | StringIO<Uint8Array>> {
     while (this.z.input.length < size) {
       const str = this.gzfileReadRaw();
       if (str == null) return false;
-      this.z.input = concatBytes(this.z.input, str);
+      this.z.appendInput(str);
     }
     return true;
   }
@@ -281,7 +249,7 @@ class GzipReader extends GzipFile<File | StringIO<Uint8Array>> {
         throw new GzError("unexpected end of file");
       }
       offset = this.z.input.length;
-      this.z.input = concatBytes(this.z.input, str);
+      this.z.appendInput(str);
     }
     return p;
   }
@@ -313,14 +281,18 @@ class GzipReader extends GzipFile<File | StringIO<Uint8Array>> {
     } else {
       this.level = Zlib.DEFAULT_COMPRESSION;
     }
-    this._mtime = gzfileGet32(head, 4);
+    this._mtime = new DataView(head.buffer, head.byteOffset, head.byteLength).getUint32(4, true);
     this.z.input = head.slice(10);
 
     if (flags & GZ_FLAG_EXTRA) {
       if (!this.gzfileReadRawEnsure(2)) {
         throw new GzError("unexpected end of file");
       }
-      const len = gzfileGet16(this.z.input);
+      const len = new DataView(
+        this.z.input.buffer,
+        this.z.input.byteOffset,
+        this.z.input.byteLength,
+      ).getUint16(0, true);
       if (!this.gzfileReadRawEnsure(2 + len)) {
         throw new GzError("unexpected end of file");
       }
@@ -344,7 +316,7 @@ class GzipReader extends GzipFile<File | StringIO<Uint8Array>> {
     }
 
     if (this.z.input.length > 0) {
-      this.buf = concatBytes(this.buf, this.z.run(new Uint8Array(), Zlib.SYNC_FLUSH));
+      this.z.run(new Uint8Array(), Zlib.SYNC_FLUSH);
     }
   }
 
@@ -354,8 +326,13 @@ class GzipReader extends GzipFile<File | StringIO<Uint8Array>> {
     if (!this.gzfileReadRawEnsure(8)) {
       throw new NoFooter("footer is not found");
     }
-    const crc = gzfileGet32(this.z.input);
-    const length = gzfileGet32(this.z.input, 4);
+    const footer = new DataView(
+      this.z.input.buffer,
+      this.z.input.byteOffset,
+      this.z.input.byteLength,
+    );
+    const crc = footer.getUint32(0, true);
+    const length = footer.getUint32(4, true);
     this.z.totalIn += 8;
     this.z.input = this.z.input.slice(8);
     if (this.crc !== crc) {
@@ -377,11 +354,11 @@ class GzipReader extends GzipFile<File | StringIO<Uint8Array>> {
         break;
       }
       if (str.length > 0) {
-        this.buf = concatBytes(this.buf, this.z.run(str, Zlib.SYNC_FLUSH));
+        this.z.run(str, Zlib.SYNC_FLUSH);
       }
-      if (this.buf.length > 0) break;
+      if (this.z.buf.length > 0) break;
     }
-    return this.buf.length;
+    return this.z.buf.length;
   }
 
   /** `gzfile_calc_crc` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:2846`). */
@@ -392,7 +369,7 @@ class GzipReader extends GzipFile<File | StringIO<Uint8Array>> {
   /** `gzfile_fill` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:2875`). */
   private gzfileFill(len: number): number {
     if (len === 0) return 0;
-    while (!this.z.isFinished() && this.buf.length < len) {
+    while (!this.z.isFinished() && this.z.buf.length < len) {
       this.gzfileReadMore();
     }
     if (this.isGzfileFinished()) {
@@ -401,7 +378,7 @@ class GzipReader extends GzipFile<File | StringIO<Uint8Array>> {
       }
       return -1;
     }
-    return len < this.buf.length ? len : this.buf.length;
+    return len < this.z.buf.length ? len : this.z.buf.length;
   }
 
   /** `gzfile_read` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:2894`). */
@@ -409,9 +386,9 @@ class GzipReader extends GzipFile<File | StringIO<Uint8Array>> {
     len = this.gzfileFill(len);
     if (len === 0) return "";
     if (len < 0) return null;
-    const dst = this.zstreamShiftBuffer(len);
+    const dst = this.z.shiftBuffer(len);
     this.gzfileCalcCrc(dst);
-    return bytesToString(dst);
+    return binaryString(dst);
   }
 
   /** `gzfile_read_all` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:2946`). */
@@ -425,23 +402,10 @@ class GzipReader extends GzipFile<File | StringIO<Uint8Array>> {
       }
       return "";
     }
-    const dst = this.zstreamShiftBuffer(this.buf.length);
+    const dst = this.z.detachBuffer();
     this.gzfileCalcCrc(dst);
-    return bytesToString(dst);
+    return binaryString(dst);
   }
-
-  /** `zstream_shift_buffer` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:823`). */
-  private zstreamShiftBuffer(len: number): Uint8Array {
-    const dst = this.buf.subarray(0, len);
-    this.buf = this.buf.subarray(len);
-    return dst;
-  }
-}
-
-function bytesToString(bytes: Uint8Array): string {
-  let str = "";
-  for (let i = 0; i < bytes.length; i++) str += String.fromCharCode(bytes[i]);
-  return str;
 }
 
 /**
@@ -513,7 +477,7 @@ class GzipWriter extends GzipFile<File | Tempfile | StringIO<Uint8Array>> {
   async flush(flush: number = Zlib.SYNC_FLUSH): Promise<this> {
     this.getGzfile();
     if (flush !== Zlib.NO_FLUSH) {
-      this.zstreamRun(new Uint8Array(), flush);
+      this.z.run(new Uint8Array(), flush);
     }
     this.gzfileWriteRaw();
     if (rbObjRespondTo(this.io, "flush")) {
@@ -530,17 +494,12 @@ class GzipWriter extends GzipFile<File | Tempfile | StringIO<Uint8Array>> {
       if (!this.headerFinished) {
         this.gzfileMakeHeader();
       }
-      this.zstreamRun(new Uint8Array(), Zlib.FINISH);
+      this.z.run(new Uint8Array(), Zlib.FINISH);
       this.gzfileMakeFooter();
       this.gzfileWriteRaw();
     } finally {
       this.zstreamEnsureEnd();
     }
-  }
-
-  /** `zstream_run` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:1190`), appending to `z.buf`. */
-  private zstreamRun(src: Uint8Array, flush: number): void {
-    this.buf = concatBytes(this.buf, this.z.run(src, flush));
   }
 
   /** `gzfile_make_header` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:2647`). */
@@ -559,19 +518,20 @@ class GzipWriter extends GzipFile<File | Tempfile | StringIO<Uint8Array>> {
     buf[1] = GZ_MAGIC2;
     buf[2] = GZ_METHOD_DEFLATE;
     buf[3] = 0;
-    gzfileSet32(this._mtime, buf, 4);
+    new DataView(buf.buffer).setUint32(4, this._mtime, true);
     buf[8] = extraflags;
     buf[9] = OS_CODE;
-    this.buf = concatBytes(this.buf, buf);
+    this.z.appendBuffer(buf);
     this.headerFinished = true;
   }
 
   /** `gzfile_make_footer` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:2691`). */
   private gzfileMakeFooter(): void {
     const buf = new Uint8Array(8);
-    gzfileSet32(this.crc, buf);
-    gzfileSet32(this.z.totalIn, buf, 4);
-    this.buf = concatBytes(this.buf, buf);
+    const footer = new DataView(buf.buffer);
+    footer.setUint32(0, this.crc, true);
+    footer.setUint32(4, this.z.totalIn >>> 0, true);
+    this.z.appendBuffer(buf);
     this.footerFinished = true;
   }
 
@@ -582,16 +542,15 @@ class GzipWriter extends GzipFile<File | Tempfile | StringIO<Uint8Array>> {
     }
     if (str.length > 0 || this.syncFlag) {
       this.crc = Zlib.crc32(str, this.crc);
-      this.zstreamRun(str, this.syncFlag ? Zlib.SYNC_FLUSH : Zlib.NO_FLUSH);
+      this.z.run(str, this.syncFlag ? Zlib.SYNC_FLUSH : Zlib.NO_FLUSH);
     }
     this.gzfileWriteRaw();
   }
 
   /** `gzfile_write_raw` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:2496`). */
   private gzfileWriteRaw(): void {
-    if (this.buf.length > 0) {
-      const str = this.buf;
-      this.buf = new Uint8Array();
+    if (this.z.buf.length > 0) {
+      const str = this.z.detachBuffer();
       this.io.write(str);
       if (this.syncFlag && rbObjRespondTo(this.io, "flush")) {
         this.io.flush();
@@ -632,7 +591,8 @@ class Inflate {
     const bytes =
       typeof string === "string" ? Uint8Array.from(string, (c) => c.charCodeAt(0)) : string;
     try {
-      return this.z.run(bytes, Zlib.SYNC_FLUSH);
+      this.z.run(bytes, Zlib.SYNC_FLUSH);
+      return this.z.detachBuffer();
     } catch (error) {
       throw new ZError((error as Error).message);
     }
