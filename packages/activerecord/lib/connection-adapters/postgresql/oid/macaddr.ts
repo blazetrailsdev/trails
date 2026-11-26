@@ -1,6 +1,7 @@
 import "../../../constants.postgresql-oid-macaddr.generated.js";
 import { ConnectionAdapters } from "../../../namespaces.js";
-import { casecmp, rbObjClass, rtest } from "@blazetrails/ruby-compat";
+import { casecmp } from "@blazetrails/ruby-compat/string/case-mapping";
+import { rbObjClass, rtest } from "@blazetrails/ruby-compat/object";
 import { StringType } from "@blazetrails/activemodel";
 
 export class Macaddr extends StringType {

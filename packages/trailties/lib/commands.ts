@@ -1,5 +1,5 @@
 import "@blazetrails/activesupport/node";
-import { SystemExit, rbArgv, setExitCode } from "@blazetrails/ruby-compat";
+import { SystemExit, rbArgv, setExitCode } from "@blazetrails/ruby-compat/process-adapter";
 import { invoke } from "./command.js";
 import "./constants.generated.js";
 

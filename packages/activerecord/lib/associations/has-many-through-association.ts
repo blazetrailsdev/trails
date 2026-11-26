@@ -4,17 +4,14 @@ import type { Base } from "../base.js";
 import type { AssociationReflection } from "../reflection.js";
 import type { AssociationDefinition } from "../associations.js";
 import { HasManyAssociation } from "./has-many-association.js";
-import {
-  aryDelete,
-  Hash,
-  include,
-  NotImplementedError,
-  rbEqual,
-  rbFSend,
-  rbDeclareIvar,
-} from "@blazetrails/ruby-compat";
+import { aryDelete } from "@blazetrails/ruby-compat/array";
+import { Hash } from "@blazetrails/ruby-compat/hash";
+import { include } from "@blazetrails/ruby-compat/include";
+import { NotImplementedError } from "@blazetrails/ruby-compat/not-implemented-error";
+import { rbEqual } from "@blazetrails/ruby-compat/rb-equal";
+import { rbFSend, rbDeclareIvar } from "@blazetrails/ruby-compat/object";
 import { exceptBang, isBlank, kernelArray as Array, wrap } from "@blazetrails/activesupport";
-import { eachWithObject } from "@blazetrails/ruby-compat";
+import { eachWithObject } from "@blazetrails/ruby-compat/enumerable";
 import { ThroughAssociation } from "./through-association.js";
 import { isThenable, type CollectionAssociation } from "./collection-association.js";
 import type { Association } from "./association.js";

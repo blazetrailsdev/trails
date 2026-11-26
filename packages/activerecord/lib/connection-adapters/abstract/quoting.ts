@@ -25,10 +25,10 @@ import {
   rbObjAsString,
   rbObjClassname,
   rbObjRespondTo,
-  Rational,
-  sprintf,
-  TypeError,
-} from "@blazetrails/ruby-compat";
+} from "@blazetrails/ruby-compat/object";
+import { Rational } from "@blazetrails/ruby-compat/rational";
+import { sprintf } from "@blazetrails/ruby-compat/kernel-format";
+import { TypeError } from "@blazetrails/ruby-compat/type-error";
 import type { TypeMap } from "../../type/type-map.js";
 import { NotImplementedError } from "../../errors.js";
 import { Value as TimeValue } from "../../type/time.js";

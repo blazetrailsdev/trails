@@ -2,7 +2,7 @@ import "../../../constants.postgresql-oid-interval.generated.js";
 import { ConnectionAdapters } from "../../../namespaces.js";
 import { ValueType } from "@blazetrails/activemodel";
 import { Duration } from "@blazetrails/activesupport";
-import { rbInspect } from "@blazetrails/ruby-compat";
+import { rbInspect } from "@blazetrails/ruby-compat/object";
 
 export class Interval extends ValueType<Duration> {
   override type(): string {

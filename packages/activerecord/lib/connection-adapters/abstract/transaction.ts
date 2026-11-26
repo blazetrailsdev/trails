@@ -13,7 +13,12 @@ import {
   type MonitorMixin,
   type NotificationHandle,
 } from "@blazetrails/activesupport";
-import { Hash, eachWithObject, rbObjId, Thread, throwDataP, uniq } from "@blazetrails/ruby-compat";
+import { Hash } from "@blazetrails/ruby-compat/hash";
+import { eachWithObject } from "@blazetrails/ruby-compat/enumerable";
+import { rbObjId } from "@blazetrails/ruby-compat/object";
+import { Thread } from "@blazetrails/ruby-compat/thread";
+import { throwDataP } from "@blazetrails/ruby-compat/kernel-catch";
+import { uniq } from "@blazetrails/ruby-compat/array";
 import { beforeCommittedOnAllRecords } from "../../active-record.js";
 
 /** @internal */

@@ -1,7 +1,9 @@
 import "../../constants.sqlite3-database-statements.generated.js";
 import * as Arel from "@blazetrails/arel";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { b, rbRegMatchP, StandardError } from "@blazetrails/ruby-compat";
+import { b } from "@blazetrails/ruby-compat/string/b";
+import { rbRegMatchP } from "@blazetrails/ruby-compat/regexp";
+import { StandardError } from "@blazetrails/ruby-compat/standard-error";
 import type {
   Database as SQLite3Database,
   Statement as SQLite3Statement,

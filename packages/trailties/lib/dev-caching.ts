@@ -1,4 +1,6 @@
-import { File, FileUtils, stdout } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat/file";
+import { FileUtils } from "@blazetrails/ruby-compat/file-utils";
+import { stdout } from "@blazetrails/ruby-compat/process-adapter";
 
 export class DevCaching {
   static readonly FILE = "tmp/caching-dev.txt";

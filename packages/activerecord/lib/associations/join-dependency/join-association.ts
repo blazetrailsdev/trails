@@ -10,7 +10,10 @@ import type {
 import { JoinPart } from "./join-part.js";
 import type { AliasTracker } from "../alias-tracker.js";
 import { extractBang } from "@blazetrails/activesupport";
-import { first, isEmpty, rbEqual, rtest, union } from "@blazetrails/ruby-compat";
+import { first, union } from "@blazetrails/ruby-compat/array";
+import { isEmpty } from "@blazetrails/ruby-compat/ruby-empty";
+import { rbEqual } from "@blazetrails/ruby-compat/rb-equal";
+import { rtest } from "@blazetrails/ruby-compat/object";
 
 type JoinType = typeof Nodes.InnerJoin | typeof Nodes.OuterJoin;
 type TableResolver = (

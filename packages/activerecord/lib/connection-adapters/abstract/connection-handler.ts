@@ -2,14 +2,11 @@ import type { ConnectionPool } from "./connection-pool.js";
 import { DatabaseConfig } from "../../database-configurations/database-config.js";
 import type { HashConfig } from "../../database-configurations/hash-config.js";
 import { ActiveRecord, ConnectionAdapters } from "../../namespaces.js";
-import {
-  Concurrent,
-  hashAset,
-  isSymbol,
-  toEnum,
-  toS,
-  type Enumerator,
-} from "@blazetrails/ruby-compat";
+import { Concurrent } from "@blazetrails/ruby-compat/concurrent/map";
+import { hashAset } from "@blazetrails/ruby-compat/hash";
+import { isSymbol } from "@blazetrails/ruby-compat/symbol";
+import { toEnum, type Enumerator } from "@blazetrails/ruby-compat/enumerator";
+import { toS } from "@blazetrails/ruby-compat/object";
 import { PoolConfig } from "../pool-config.js";
 import { PoolManager } from "../pool-manager.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../abstract-adapter.js";

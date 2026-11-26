@@ -1,4 +1,5 @@
-import { Enumerable, type Hash } from "@blazetrails/ruby-compat";
+import { Enumerable } from "@blazetrails/ruby-compat/enumerable";
+import type { Hash } from "@blazetrails/ruby-compat/hash";
 import { include } from "@blazetrails/activesupport";
 import type { Base } from "../../base.js";
 import type { Table, Nodes } from "@blazetrails/arel";

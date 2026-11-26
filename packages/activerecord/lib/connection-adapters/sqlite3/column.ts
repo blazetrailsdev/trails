@@ -3,7 +3,8 @@ import { ConnectionAdapters } from "../../namespaces.js";
 import { Column as BaseColumn } from "../column.js";
 import type { ColumnCoder } from "../column.js";
 import type { SqlTypeMetadata } from "../sql-type-metadata.js";
-import { rbHash, hashAref } from "@blazetrails/ruby-compat";
+import { rbHash } from "@blazetrails/ruby-compat/rb-hash";
+import { hashAref } from "@blazetrails/ruby-compat/hash";
 
 export class Column extends BaseColumn {
   private _autoIncrement: boolean;

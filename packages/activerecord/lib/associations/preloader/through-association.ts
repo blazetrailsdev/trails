@@ -3,15 +3,10 @@ import type { AssociationReflection, ThroughReflection } from "../../reflection.
 import { Association } from "./association.js";
 import { Associations } from "../../namespaces.js";
 import { any } from "@blazetrails/activesupport";
-import {
-  sortByBang,
-  Hash,
-  eachWithObject,
-  isEmpty,
-  reduce,
-  union,
-  uniq,
-} from "@blazetrails/ruby-compat";
+import { sortByBang, union, uniq } from "@blazetrails/ruby-compat/array";
+import { Hash } from "@blazetrails/ruby-compat/hash";
+import { eachWithObject, reduce } from "@blazetrails/ruby-compat/enumerable";
+import { isEmpty } from "@blazetrails/ruby-compat/ruby-empty";
 
 type AssociationLikeReflection = AssociationReflection | ThroughReflection;
 

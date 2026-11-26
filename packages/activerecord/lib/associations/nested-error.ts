@@ -1,6 +1,7 @@
 import { underscore } from "@blazetrails/activesupport";
 import { NestedError as ActiveModelNestedError } from "@blazetrails/activemodel";
-import { rtest, stringToSym, toS } from "@blazetrails/ruby-compat";
+import { rtest, toS } from "@blazetrails/ruby-compat/object";
+import { stringToSym } from "@blazetrails/ruby-compat/symbol";
 import { indexNestedAttributeErrors } from "../active-record.js";
 
 interface AssociationLike {

@@ -1,7 +1,14 @@
 #!/usr/bin/env node
 import "@blazetrails/activesupport/node";
 import { Handler } from "@blazetrails/rackup";
-import { SystemExit, exit, rbArgv, setExitCode, STDOUT, trap } from "@blazetrails/ruby-compat";
+import {
+  SystemExit,
+  exit,
+  rbArgv,
+  setExitCode,
+  trap,
+} from "@blazetrails/ruby-compat/process-adapter";
+import { STDOUT } from "@blazetrails/ruby-compat/io";
 import { AppLoader } from "./app-loader.js";
 import { HELP_MAPPINGS, invoke } from "./command.js";
 

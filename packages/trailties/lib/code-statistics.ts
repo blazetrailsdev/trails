@@ -1,5 +1,9 @@
 import { classAttribute } from "@blazetrails/activesupport";
-import { File, STDOUT, getFs, rbClassNewInstance, sprintf } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat/file";
+import { STDOUT } from "@blazetrails/ruby-compat/io";
+import { getFs } from "@blazetrails/ruby-compat/fs-adapter";
+import { rbClassNewInstance } from "@blazetrails/ruby-compat/include";
+import { sprintf } from "@blazetrails/ruby-compat/kernel-format";
 import { CodeStatisticsCalculator } from "./code-statistics-calculator.js";
 
 export type DirectoryPair = readonly [label: string, path: string];

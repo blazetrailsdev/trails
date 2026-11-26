@@ -1,23 +1,20 @@
+import { AtomicFixnum } from "@blazetrails/ruby-compat/concurrent/atomic-fixnum";
+import { aryDelete, aryDeleteIf } from "@blazetrails/ruby-compat/array";
+import { Fiber } from "@blazetrails/ruby-compat/fiber";
+import { isMonOwned, synchronize } from "@blazetrails/ruby-compat/monitor";
+import { KERNEL_METHODS, PROTOCOL_PROBES } from "@blazetrails/ruby-compat/method-missing-proxy";
+import { Mutex } from "@blazetrails/ruby-compat/mutex";
+import { count } from "@blazetrails/ruby-compat/enumerable";
 import {
-  AtomicFixnum,
-  aryDelete,
-  aryDeleteIf,
-  Fiber,
-  isMonOwned,
-  KERNEL_METHODS,
-  Mutex,
-  count,
-  PROTOCOL_PROBES,
   rbDefineInspectCustom,
   rbInspect,
   rbModName,
-  rbObjDup,
   rtest,
-  RuntimeError,
-  synchronize,
-  Thread,
-  ThreadPoolExecutor,
-} from "@blazetrails/ruby-compat";
+} from "@blazetrails/ruby-compat/object";
+import { rbObjDup } from "@blazetrails/ruby-compat/include";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
+import { Thread } from "@blazetrails/ruby-compat/thread";
+import { ThreadPoolExecutor } from "@blazetrails/ruby-compat/thread-pool-executor";
 import { include, prepend } from "@blazetrails/ruby-compat/include";
 import { ActiveSupport, IsolatedExecutionState } from "@blazetrails/activesupport";
 import { NoMethodError } from "@blazetrails/activemodel";

@@ -2,7 +2,7 @@ import type { PermittedAttributes } from "@blazetrails/activemodel";
 import type { Base } from "../base.js";
 import { Association } from "./association.js";
 import { exceptBang, kernelArray } from "@blazetrails/activesupport";
-import { NotImplementedError } from "@blazetrails/ruby-compat";
+import { NotImplementedError } from "@blazetrails/ruby-compat/not-implemented-error";
 import { RecordInvalid } from "../validations.js";
 import { awaitingAssignment } from "@blazetrails/activemodel";
 

@@ -12,20 +12,15 @@ import {
   setTrailsRoot,
   underscore,
 } from "@blazetrails/activesupport";
-import {
-  File,
-  block,
-  rbFLoad,
-  getFs,
-  loadIseqEval,
-  rbFRequireFile,
-  LOAD_PATH,
-  Pathname,
-  constGet,
-  RuntimeError,
-  setSourceMapsSupport,
-  symbolToS,
-} from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat/file";
+import { block } from "@blazetrails/ruby-compat/hash";
+import { rbFLoad, loadIseqEval, rbFRequireFile, LOAD_PATH } from "@blazetrails/ruby-compat/load";
+import { getFs } from "@blazetrails/ruby-compat/fs-adapter";
+import { Pathname } from "@blazetrails/ruby-compat/pathname";
+import { constGet } from "@blazetrails/ruby-compat/variable";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
+import { setSourceMapsSupport } from "@blazetrails/ruby-compat/process-adapter";
+import { symbolToS } from "@blazetrails/ruby-compat/symbol";
 import { Executor, Reloader } from "@blazetrails/activesupport";
 import { CachingKeyGenerator, KeyGenerator } from "@blazetrails/activesupport/key-generator";
 import type { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
