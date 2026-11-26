@@ -1,0 +1,6 @@
+[
+{"package":"nokogiri","rubyFile":"css/test_xpath_visitor.rb","path":"functions > handles contains() (extended-syntax)","kind":"changed","from":"v1.18.3","to":"v1.19.7"},
+{"package":"nokogiri","rubyFile":"css/test_xpath_visitor.rb","path":"pseudo-classes > :nth(an+b)","kind":"changed","from":"v1.18.3","to":"v1.19.7"},
+{"package":"nokogiri","rubyFile":"css/test_xpath_visitor.rb","path":"pseudo-classes > miscellaneous pseudo-classes are converted into xpath function calls","kind":"changed","from":"v1.18.3","to":"v1.19.7"},
+{"package":"nokogiri","rubyFile":"css/test_xpath_visitor.rb","path":"selectors > attribute > rhs with quotes","kind":"changed","from":"v1.18.3","to":"v1.19.7"}
+]
