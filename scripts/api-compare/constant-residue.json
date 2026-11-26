@@ -1336,13 +1336,10 @@
     }
   },
   "stimulus": {
-    "rows": 2,
-    "excluded": [],
+    "rows": 1,
+    "excluded": ["generators/stimulus/stimulus-generator.ts::StimulusGenerator"],
     "unwalked": [],
-    "residue": {
-      "engine.ts::Engine": "Stimulus::Engine",
-      "generators/stimulus/stimulus-generator.ts::StimulusGenerator": "StimulusGenerator"
-    }
+    "residue": { "engine.ts::Engine": "Stimulus::Engine" }
   },
   "thor": {
     "rows": 42,

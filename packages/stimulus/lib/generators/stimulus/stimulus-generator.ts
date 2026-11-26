@@ -1,4 +1,3 @@
-import "../../constants.stimulus-stimulus-generator.generated.js";
 import { File } from "@blazetrails/ruby-compat";
 import { underscore } from "@blazetrails/activesupport";
 import { NamedBase, type GeneratorOptions } from "@blazetrails/trailties/generators";
