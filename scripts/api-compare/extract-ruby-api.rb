@@ -788,7 +788,10 @@ class ApiExtractor
     return unless name
 
     delegated = delegate_class_target(node[2])
-    superclass = qualified_const_name(delegated || node[2]) if node[2]
+    # `ActiveRecord::Migration[7.2]` is `Migration.[]`, which answers a
+    # subclass of the constant; the TS side spells it `Migration.get(7.2)`.
+    super_node = node[2].is_a?(Array) && node[2][0] == :aref ? node[2][1] : node[2]
+    superclass = qualified_const_name(delegated || super_node) if node[2]
 
     @namespace_stack.push(name)
     @visibility_stack.push(:public)
@@ -2209,10 +2212,24 @@ class ApiExtractor
     list = positional_arg_list(args)
     return [] unless list.is_a?(Array)
     body = list.find { |el| el.is_a?(Array) && el[0] == :lambda }
-    return [] unless body
+    return extract_params(lambda_block_params(list)) unless body
     params = body[1]
     params = params[1] if params.is_a?(Array) && params[0] == :paren
     extract_params(params)
+  end
+
+  # `lambda { |channels, last_id| ... }` (or `proc`): Ripper spells it
+  # `method_add_block(fcall lambda, brace_block(block_var(params)))`.
+  def lambda_block_params(list)
+    call = list.find do |el|
+      next false unless el.is_a?(Array) && el[0] == :method_add_block
+      callee = el[1]
+      callee = callee[1] if callee.is_a?(Array) && callee[0] == :method_add_arg
+      callee.is_a?(Array) && %i[fcall vcall].include?(callee[0]) &&
+        %w[lambda proc].include?(callee.dig(1, 1))
+    end
+    block_var = call && call[2].is_a?(Array) ? call[2][1] : nil
+    block_var.is_a?(Array) && block_var[0] == :block_var ? block_var[1] : nil
   end
 
   def process_scope_from_arg_paren(args)

@@ -8,6 +8,19 @@ import {
 } from "../lib/thread-pool-executor.js";
 
 describe("ThreadPoolExecutor", () => {
+  it("starts tasks in post order when an idle worker and a new worker share the work", async () => {
+    const executor = new ThreadPoolExecutor({ minThreads: 1, maxThreads: 10, maxQueue: 0 });
+    const order: string[] = [];
+    executor.post(() => order.push("warm"));
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    executor.post(() => order.push("first"));
+    executor.post(() => order.push("second"));
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(order).toEqual(["warm", "first", "second"]);
+    executor.shutdown();
+  });
+
   it("runs at most maxThreads tasks, queues up to maxQueue, then runs on the caller", async () => {
     const executor = new ThreadPoolExecutor({
       minThreads: 0,

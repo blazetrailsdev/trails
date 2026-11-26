@@ -31,7 +31,7 @@
   ],
   "scripts": {
     "build": "tsc && pnpm build:templates",
-    "build:templates": "node -e \"for (const g of ['install', 'update']) require('fs').cpSync('lib/generators/solid-cable/' + g + '/templates', 'dist/generators/solid-cable/' + g + '/templates', { recursive: true })\" && trails-tsc-views build-templates dist/generators"
+    "build:templates": "node -e \"for (const g of ['install', 'update']) require('fs').cpSync('lib/generators/solid-cable/' + g + '/templates', 'dist/generators/solid-cable/' + g + '/templates', { recursive: true })\" && trails-tsc-views build-templates dist/generators dist/generators/solid-cable/update/templates/db/migrate/create-compact-channel.ts"
   },
   "dependencies": {
     "@blazetrails/actioncable": "workspace:*",
