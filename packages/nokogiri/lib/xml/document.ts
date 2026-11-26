@@ -141,7 +141,7 @@ export class XmlDocument extends XmlNode {
       }
     }
 
-    const document = nokoXmlDocumentWrap(XmlDocument, cDocument);
+    const document = nokoXmlDocumentWrap(this, cDocument);
     document._root = new XmlNode(document._doc!.root, document);
     document.url = url;
     document.errors = rbErrors;
