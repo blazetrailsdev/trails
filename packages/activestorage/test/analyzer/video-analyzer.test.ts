@@ -5,6 +5,7 @@ import "../support/database/setup.js";
 import { ActiveStorage } from "../../lib/active-storage.js";
 import {
   createFileBlob,
+  createPlaylistBlob,
   extractMetadataFrom,
   subscribeEventsFrom,
 } from "../support/test-helper.js";
@@ -83,6 +84,18 @@ describe("ActiveStorage::Analyzer::VideoAnalyzerTest", () => {
     expect(metadata.get("duration")).toEqual(5.229000);
     expect(metadata.get("audio")).toBeTruthy();
     expect(metadata.get("video")).toBeTruthy();
+  });
+
+  it("analyzing a playlist declared as a video", async () => {
+    const blob = await createPlaylistBlob({
+      referencing: "video.mp4",
+      filename: "video.m3u8",
+      contentType: "video/mp4",
+    });
+    const metadata = await extractMetadataFrom(blob);
+
+    expect(metadata.get("width")).toBeUndefined();
+    expect(metadata.get("duration")).toBeUndefined();
   });
 
   it("analyzing a video without a video stream", async () => {

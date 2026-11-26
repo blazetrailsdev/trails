@@ -249,6 +249,30 @@ export async function createFileBlob({
   });
 }
 
+export async function createPlaylistBlob({
+  referencing,
+  filename,
+  contentType,
+}: {
+  referencing: string;
+  filename: string;
+  contentType: string;
+}): Promise<Blob> {
+  const playlist = `#EXTM3U
+#EXT-X-TARGETDURATION:10
+#EXTINF:10,
+file://${File.realpath(fileFixture(referencing).toString())}
+#EXT-X-ENDLIST
+`;
+
+  return await createBlob({
+    data: playlist,
+    filename: filename,
+    contentType: contentType,
+    identify: false,
+  });
+}
+
 export async function createBlobBeforeDirectUpload({
   key = null,
   filename = "hello.txt",
