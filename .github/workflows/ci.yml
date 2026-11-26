@@ -456,73 +456,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - shard: activerecord
-            paths: packages/activerecord
-          - shard: rails-and-scripts
-            paths: packages/activemodel packages/actionpack packages/trailties scripts
-          - shard: rest-a
-            paths: >-
-              packages/actiontext packages/activejob packages/activerecord-cli
-              packages/builder packages/chronic packages/et-orbi packages/listen
-              packages/mysql2 packages/pg packages/rack packages/rack-proxy
-              packages/rack-session packages/rack-test packages/rake
-              packages/ruby-compat packages/solid-cache packages/sqlite3
-              packages/vitest-matchers packages/website
-          - shard: rest-b
-            paths: >-
-              packages/actioncable packages/actionmailbox packages/actionmailer
-              packages/actionview packages/bcrypt packages/date packages/did-you-mean
-              packages/fugit packages/i18n packages/image-processing
-              packages/libxml-ruby packages/mini-magick packages/raabro
-              packages/rack-cache packages/rack-cors packages/solid-queue
-              packages/turbo packages/tzinfo packages/vite-trails
-          - shard: rest
-            paths: >-
-              .
-              --ignore-pattern packages/activerecord/**
-              --ignore-pattern packages/activemodel/**
-              --ignore-pattern packages/actionpack/**
-              --ignore-pattern packages/trailties/**
-              --ignore-pattern scripts/**
-              --ignore-pattern packages/actiontext/**
-              --ignore-pattern packages/activejob/**
-              --ignore-pattern packages/activerecord-cli/**
-              --ignore-pattern packages/builder/**
-              --ignore-pattern packages/chronic/**
-              --ignore-pattern packages/et-orbi/**
-              --ignore-pattern packages/listen/**
-              --ignore-pattern packages/mysql2/**
-              --ignore-pattern packages/pg/**
-              --ignore-pattern packages/rack/**
-              --ignore-pattern packages/rack-proxy/**
-              --ignore-pattern packages/rack-session/**
-              --ignore-pattern packages/rack-test/**
-              --ignore-pattern packages/rake/**
-              --ignore-pattern packages/ruby-compat/**
-              --ignore-pattern packages/solid-cache/**
-              --ignore-pattern packages/sqlite3/**
-              --ignore-pattern packages/vitest-matchers/**
-              --ignore-pattern packages/website/**
-              --ignore-pattern packages/actioncable/**
-              --ignore-pattern packages/actionmailbox/**
-              --ignore-pattern packages/actionmailer/**
-              --ignore-pattern packages/actionview/**
-              --ignore-pattern packages/bcrypt/**
-              --ignore-pattern packages/date/**
-              --ignore-pattern packages/did-you-mean/**
-              --ignore-pattern packages/fugit/**
-              --ignore-pattern packages/i18n/**
-              --ignore-pattern packages/image-processing/**
-              --ignore-pattern packages/libxml-ruby/**
-              --ignore-pattern packages/mini-magick/**
-              --ignore-pattern packages/raabro/**
-              --ignore-pattern packages/rack-cache/**
-              --ignore-pattern packages/rack-cors/**
-              --ignore-pattern packages/solid-queue/**
-              --ignore-pattern packages/turbo/**
-              --ignore-pattern packages/tzinfo/**
-              --ignore-pattern packages/vite-trails/**
+        shard: [activerecord, rails-and-scripts, rest-a, rest-b, rest]
     env:
       LINT_FILES: ${{ needs.changes.outputs.lint_files }}
       ACTIVE: ${{ matrix.shard == 'rest' || needs.changes.outputs.lint_files == '__ALL__' }}
@@ -542,11 +476,12 @@ jobs:
       - name: ESLint
         if: env.ACTIVE == 'true'
         env:
-          SHARD_PATHS: ${{ matrix.paths }}
+          SHARD: ${{ matrix.shard }}
         run: |
           set -euo pipefail
           if [ "$LINT_FILES" = "__ALL__" ]; then
-            read -r -a shard_paths <<<"$SHARD_PATHS"
+            paths=$(scripts/ci/lint-shard-paths.sh "$SHARD")
+            mapfile -t shard_paths <<<"$paths"
             pnpm run lint:shard "${shard_paths[@]}"
           elif [ -z "$LINT_FILES" ]; then
             echo "No changed files to lint."

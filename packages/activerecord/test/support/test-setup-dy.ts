@@ -2,16 +2,23 @@ import { connect } from "./connection.js";
 import { getEnv } from "@blazetrails/activesupport";
 import { RuntimeError, getOs } from "@blazetrails/ruby-compat";
 import { Base } from "../../lib/base.js";
+import { ConnectionNotEstablished } from "../../lib/errors.js";
 import { DatabaseTasks } from "../../lib/tasks/database-tasks.js";
 import { SQLiteDatabaseTasks } from "../../lib/tasks/sqlite-database-tasks.js";
 
-const dyBoot = globalThis as typeof globalThis & { __arDyBooted?: boolean };
-if (dyBoot.__arDyBooted) {
+const dyBoot = globalThis as typeof globalThis & { __arDyBootDbConfig?: unknown };
+if (dyBoot.__arDyBootDbConfig !== undefined) {
   const { resetTestTables } = await import("./drop-all-tables.js");
+  let established = true;
   try {
     await Base.leaseConnection();
-  } catch {
+  } catch (error) {
+    if (!(error instanceof ConnectionNotEstablished)) throw error;
+    established = false;
+  }
+  if (!established || Base.connectionDbConfig() !== dyBoot.__arDyBootDbConfig) {
     await connect();
+    dyBoot.__arDyBootDbConfig = Base.connectionDbConfig();
   }
   await resetTestTables(await Base.leaseConnection());
   const { FixtureSet } = await import("../../lib/fixtures.js");
@@ -76,5 +83,5 @@ if (dyBoot.__arDyBooted) {
 
   const { captureWritingPoolBaseline } = await import("../cases/helper.js");
   captureWritingPoolBaseline();
-  dyBoot.__arDyBooted = true;
+  dyBoot.__arDyBootDbConfig = Base.connectionDbConfig();
 }
