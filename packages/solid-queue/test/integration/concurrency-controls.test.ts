@@ -159,7 +159,7 @@ describe("ConcurrencyControlsTest", { timeout: 30_000 }, () => {
       async () => {
         await ThrottledUpdateResultJob.performLater(result, { name: "A", pause: 1.5 });
         await ThrottledUpdateResultJob.performLater(result, { name: "B", pause: 1.5 });
-        await ThrottledUpdateResultJob.performLater(result, { name: "C", pause: 4 });
+        await ThrottledUpdateResultJob.performLater(result, { name: "C", pause: 8 });
       },
     );
 
