@@ -35,7 +35,7 @@ describe("Trails::Command::ServerTest", () => {
       new ServerCommand([], []) as unknown as { rackServerSuggestion(s: string): string }
     ).rackServerSuggestion(server);
 
-  const noEnv = { TRAILS_ENV: undefined, NODE_ENV: undefined };
+  const noEnv = { TRAILS_ENV: undefined, RACK_ENV: undefined };
 
   it("environment with server option", () => {
     const options = parseArguments(["-u", "thin", "-e", "production"]);
@@ -82,13 +82,13 @@ describe("Trails::Command::ServerTest", () => {
   });
 
   it("environment with trails env", () => {
-    withEnv({ NODE_ENV: undefined, TRAILS_ENV: "production" }, () =>
+    withEnv({ RACK_ENV: undefined, TRAILS_ENV: "production" }, () =>
       expect(parseArguments().environment).toBe("production"),
     );
   });
 
   it("environment with rack env", () => {
-    withEnv({ TRAILS_ENV: undefined, NODE_ENV: "production" }, () =>
+    withEnv({ TRAILS_ENV: undefined, RACK_ENV: "production" }, () =>
       expect(parseArguments().environment).toBe("production"),
     );
   });
@@ -132,8 +132,8 @@ describe("Trails::Command::ServerTest", () => {
       expect(parseArguments(["-e", "production"]).logStdout).toBe(false);
       expect(parseArguments(["-e", "development", "--no-log-to-stdout"]).logStdout).toBe(false);
       expect(parseArguments(["-e", "production", "--log-to-stdout"]).logStdout).toBe(true);
-      withEnv({ NODE_ENV: "development" }, () => expect(parseArguments([]).logStdout).toBe(true));
-      withEnv({ NODE_ENV: "production" }, () => expect(parseArguments([]).logStdout).toBe(false));
+      withEnv({ RACK_ENV: "development" }, () => expect(parseArguments([]).logStdout).toBe(true));
+      withEnv({ RACK_ENV: "production" }, () => expect(parseArguments([]).logStdout).toBe(false));
       withEnv({ TRAILS_ENV: "development" }, () => expect(parseArguments([]).logStdout).toBe(true));
       withEnv({ TRAILS_ENV: "production" }, () => expect(parseArguments([]).logStdout).toBe(false));
     });

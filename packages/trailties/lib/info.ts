@@ -79,6 +79,6 @@ export class Info {
 }
 
 Info.property("Trails version", VERSION.STRING);
-Info.property("Environment", () => env.TRAILS_ENV ?? env.NODE_ENV ?? "development");
+Info.property("Environment", () => env.TRAILS_ENV ?? env.RACK_ENV ?? "development");
 
 Trails.Info = Info;

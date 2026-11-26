@@ -148,18 +148,18 @@ describe("Trails::DBConsoleTest", () => {
       expect(new DBConsole().environment()).toBe("test");
 
       delete ENV.TRAILS_ENV;
-      delete ENV.NODE_ENV;
+      delete ENV.RACK_ENV;
 
       expect(new DBConsole().environment()).toBe("development");
 
-      ENV.NODE_ENV = "rack_env";
+      ENV.RACK_ENV = "rack_env";
       expect(new DBConsole().environment()).toBe("rack_env");
 
       ENV.TRAILS_ENV = "rails_env";
       expect(new DBConsole().environment()).toBe("rails_env");
     } finally {
       ENV.TRAILS_ENV = "test";
-      delete ENV.NODE_ENV;
+      delete ENV.RACK_ENV;
     }
   });
 

@@ -666,7 +666,7 @@ await Schema.define({ version: 20140423102712 }, async (t) => {
 
   it("db:setup loads schema and seeds database", async () => {
     await t.switchEnv("TRAILS_ENV", undefined, () =>
-      t.switchEnv("NODE_ENV", undefined, async () => {
+      t.switchEnv("RACK_ENV", undefined, async () => {
         await t.appFile(
           "db/schema.ts",
           schema("1", `await t.createTable("users", (t) => { t.string("name"); });`),

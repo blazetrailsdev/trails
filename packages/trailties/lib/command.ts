@@ -58,7 +58,7 @@ export function hiddenCommands(): (typeof Base)[] {
 }
 
 export function environment(): string {
-  return presence(env.TRAILS_ENV) ?? presence(env.NODE_ENV) ?? "development";
+  return presence(env.TRAILS_ENV) ?? presence(env.RACK_ENV) ?? "development";
 }
 
 export function root(): Pathname | undefined {

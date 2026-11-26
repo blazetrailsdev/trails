@@ -18,7 +18,7 @@ export function serverEnvironment(options: ServeOptions = {}): string {
   return (
     presence(options.environment) ||
     presence(getEnv("TRAILS_ENV")) ||
-    presence(getEnv("NODE_ENV")) ||
+    presence(getEnv("RACK_ENV")) ||
     "development"
   );
 }

@@ -166,11 +166,11 @@ async function establishMigrationConnection(
 
 describe("resolveEnv", () => {
   const origTrailsEnv = env.TRAILS_ENV;
-  const origNodeEnv = env.NODE_ENV;
+  const origRackEnv = env.RACK_ENV;
 
   afterEach(() => {
     setEnv("TRAILS_ENV", origTrailsEnv);
-    setEnv("NODE_ENV", origNodeEnv);
+    setEnv("RACK_ENV", origRackEnv);
   });
 
   it("prefers TRAILS_ENV", () => {
@@ -180,7 +180,7 @@ describe("resolveEnv", () => {
 
   it("defaults to development", () => {
     setEnv("TRAILS_ENV", undefined);
-    setEnv("NODE_ENV", undefined);
+    setEnv("RACK_ENV", undefined);
     expect(resolveEnv()).toBe("development");
   });
 });
@@ -506,10 +506,10 @@ describe("db subcommand CLI actions", { timeout: 30_000 }, () => {
   let logs: string[];
   let errs: string[];
   let origExitCode: typeof process.exitCode;
-  const origNodeEnv = env.NODE_ENV;
+  const origRackEnv = env.RACK_ENV;
 
   beforeEach(() => {
-    setEnv("NODE_ENV", undefined);
+    setEnv("RACK_ENV", undefined);
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-db-cli-"));
     originalCwd = process.cwd();
     fs.mkdirSync(path.join(tmpDir, "config"), { recursive: true });
@@ -536,7 +536,7 @@ describe("db subcommand CLI actions", { timeout: 30_000 }, () => {
   });
 
   afterEach(() => {
-    setEnv("NODE_ENV", origNodeEnv);
+    setEnv("RACK_ENV", origRackEnv);
     process.chdir(originalCwd);
     vi.restoreAllMocks();
     process.exitCode = origExitCode;
@@ -1830,7 +1830,7 @@ describe("db command multi-database parity", { timeout: 30_000 }, () => {
   let logs: string[];
   let stdout: string;
   let previousProcessAdapter: ReturnType<typeof getProcessAdapter>;
-  const origNodeEnv = env.NODE_ENV;
+  const origRackEnv = env.RACK_ENV;
   const primaryDb = () => path.join(tmpDir, "primary.sqlite3");
   const animalsDb = () => path.join(tmpDir, "animals.sqlite3");
 
@@ -1882,7 +1882,7 @@ fs.appendFileSync(${JSON.stringify(marker)}, "loaded\\n");`,
   }
 
   beforeEach(() => {
-    setEnv("NODE_ENV", undefined);
+    setEnv("RACK_ENV", undefined);
     setEnv("TRAILS_ENV", "development");
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-db-multi-"));
     originalCwd = process.cwd();
@@ -1909,7 +1909,7 @@ fs.appendFileSync(${JSON.stringify(marker)}, "loaded\\n");`,
 
   afterEach(async () => {
     registerProcessAdapter(previousProcessAdapter);
-    setEnv("NODE_ENV", origNodeEnv);
+    setEnv("RACK_ENV", origRackEnv);
     setEnv("TRAILS_ENV", undefined);
     setAppPath(undefined);
     setEnginePath(undefined);

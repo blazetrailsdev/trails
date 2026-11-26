@@ -79,15 +79,15 @@ describe("Trails", () => {
     }
   });
 
-  it("Trails.env falls back to NODE_ENV when TRAILS_ENV is unset", () => {
-    const nodeEnv = env.NODE_ENV;
+  it("Trails.env falls back to RACK_ENV when TRAILS_ENV is unset", () => {
+    const nodeEnv = env.RACK_ENV;
     setEnv("TRAILS_ENV", undefined);
-    setEnv("NODE_ENV", "production");
+    setEnv("RACK_ENV", "production");
     try {
       _resetTrailsEnv();
       expect(Trails.env.toString()).toBe("production");
     } finally {
-      setEnv("NODE_ENV", nodeEnv);
+      setEnv("RACK_ENV", nodeEnv);
       _resetTrailsEnv();
     }
   });

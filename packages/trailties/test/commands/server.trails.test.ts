@@ -26,7 +26,7 @@ describe("trails server environment (trails)", () => {
   let tmpDir: string;
   let origCwd: string;
   let savedTrailsEnv: string | undefined;
-  let savedNodeEnv: string | undefined;
+  let savedRackEnv: string | undefined;
   let runOptions: Array<Record<string, unknown>>;
   let runApps: Application[];
   let said: string[];
@@ -39,9 +39,9 @@ describe("trails server environment (trails)", () => {
     fs.writeFileSync(path.join(tmpDir, "config.ts"), "");
     process.chdir(tmpDir);
     savedTrailsEnv = env.TRAILS_ENV;
-    savedNodeEnv = env.NODE_ENV;
+    savedRackEnv = env.RACK_ENV;
     setEnv("TRAILS_ENV", undefined);
-    setEnv("NODE_ENV", undefined);
+    setEnv("RACK_ENV", undefined);
     _resetTrailsEnv();
     runOptions = [];
     runApps = [];
@@ -79,7 +79,7 @@ describe("trails server environment (trails)", () => {
     process.chdir(origCwd);
     fs.rmSync(tmpDir, { recursive: true, force: true });
     setEnv("TRAILS_ENV", savedTrailsEnv);
-    setEnv("NODE_ENV", savedNodeEnv);
+    setEnv("RACK_ENV", savedRackEnv);
     _resetTrailsEnv();
   });
 
