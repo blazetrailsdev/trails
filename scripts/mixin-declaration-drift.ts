@@ -66,15 +66,31 @@ function signatureOf(node: ts.SignatureDeclarationBase): string {
     : "";
   const params = node.parameters
     .filter((p) => !(ts.isIdentifier(p.name) && p.name.text === "this"))
-    .map((p) => {
+    .map((p, i, all) => {
       const dots = p.dotDotDotToken ? "..." : "";
       const optional = p.questionToken || p.initializer ? "?" : "";
-      const name = bindingNameText(p.name).replace(/^_+/, "");
+      const name = (
+        i === all.length - 1 ? kwargsNameText(p.name) : bindingNameText(p.name)
+      ).replace(/^_+/, "");
       const type = p.type ? typeText(p.type) : p.initializer ? WILDCARD : "";
       return `${dots}${name}${optional}: ${type}`;
     })
     .join(", ");
   return `${typeParams}(${params}): ${typeText(node.type) ?? ""}`;
+}
+
+/**
+ * A trailing Ruby kwargs pattern, `{ ifExists, ...options }`, compares as its
+ * `**options` rest, `options`: typescript-5 rejects an optional destructured
+ * parameter with no initializer in an interface (TS2339), so the declaration
+ * names it plainly, and its explicit keys are left to the type literal.
+ */
+function kwargsNameText(name: ts.BindingName): string {
+  if (ts.isObjectBindingPattern(name)) {
+    const rest = name.elements.find((e) => e.dotDotDotToken && ts.isIdentifier(e.name));
+    if (rest) return (rest.name as ts.Identifier).text;
+  }
+  return bindingNameText(name);
 }
 
 function bindingNameText(name: ts.BindingName): string {

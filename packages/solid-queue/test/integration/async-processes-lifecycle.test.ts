@@ -25,6 +25,7 @@ import {
   findProcessesRegisteredAs,
   runSupervisor,
   signalProcess,
+  stubExit,
   waitFor,
   waitForProcessTerminationWithTimeout,
   waitForRegisteredProcesses,
@@ -141,9 +142,11 @@ describe("AsyncProcessesLifecycleTest", () => {
   afterEach(async () => {
     if (pid.isExists) await pid.terminate();
     vi.restoreAllMocks();
+    stubExit();
   });
 
   afterAll(() => {
+    vi.restoreAllMocks();
     setPermanentConnectionCheckout(oldPermanentConnectionCheckout);
   });
 

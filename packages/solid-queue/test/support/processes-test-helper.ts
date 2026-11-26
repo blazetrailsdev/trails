@@ -95,6 +95,12 @@ async function waitpid2(pid: number): Promise<[number, Status]> {
   return waited!;
 }
 
+export function stubExit(): void {
+  vi.spyOn(getProcessAdapter(), "exit").mockImplementation((code) => {
+    throw new SystemExit(code ?? 0);
+  });
+}
+
 export function runSupervisor(options: { [key: string]: unknown } = {}, block?: () => void) {
   vi.spyOn(TopLevel.Trails!, "root").mockReturnValue(new Pathname(dummyRoot));
   const supervisors: Supervisor[] = [];
@@ -105,9 +111,7 @@ export function runSupervisor(options: { [key: string]: unknown } = {}, block?: 
     started.mockRestore();
     return this.start();
   });
-  vi.spyOn(getProcessAdapter(), "exit").mockImplementation((code) => {
-    throw new SystemExit(code ?? 0);
-  });
+  stubExit();
   let exited = false;
   block?.();
   const running = Supervisor.start({ skipRecurring: true, ...options });

@@ -23,7 +23,6 @@ export default {
   readme: "none",
   githubPages: false,
   excludeInternal: true,
-  skipErrorChecking: true,
   blockTags: [...OptionDefaults.blockTags, ...apiCompareTags],
   excludeTags: [...OptionDefaults.excludeTags, ...apiCompareTags],
   outputFileStrategy: "members",
@@ -33,6 +32,5 @@ export default {
   packageOptions: {
     entryPoints: ["lib/index.ts"],
     excludeInternal: true,
-    skipErrorChecking: true,
   },
 };

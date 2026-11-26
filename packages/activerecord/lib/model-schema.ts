@@ -632,8 +632,7 @@ export async function sequenceName(this: SchemaKlass): Promise<string | null> {
   } else {
     return (
       ownSchemaMemo(this, "_sequenceName") ??
-      (this._sequenceName = null) ??
-      baseClass.call(this).sequenceName
+      ((this._sequenceName = null), baseClass.call(this).sequenceName)
     );
   }
 }
