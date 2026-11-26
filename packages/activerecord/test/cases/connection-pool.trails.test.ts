@@ -191,6 +191,48 @@ it("withConnection overlapping on an empty lease checks out one connection", asy
   expect(pool.isActiveConnection()).toBeNull();
 });
 
+it("withConnection keeps the lease for a joiner that outlives the checkout's owner", async () => {
+  const pool = makePool(2);
+  const checkout = vi.spyOn(pool, "checkout");
+  let finishJoiner!: () => void;
+  let joiner!: Promise<DatabaseAdapter>;
+  const owner = pool.withConnection((conn) => {
+    joiner = pool.withConnection(async (joined) => {
+      await new Promise<void>((resolve) => (finishJoiner = resolve));
+      expect(pool.isActiveConnection()).toBe(joined);
+      return joined;
+    });
+    return conn;
+  });
+  const conn = await owner;
+  expect(pool.stat().busy).toBe(1);
+  finishJoiner();
+  expect(await joiner).toBe(conn);
+  expect(checkout).toHaveBeenCalledTimes(1);
+  expect(pool.isActiveConnection()).toBeNull();
+  expect(pool.stat().busy).toBe(0);
+});
+
+it("releaseConnection during a pending checkout keeps the lease's checkout", async () => {
+  const pool = makePool(2);
+  const pending = pool.withConnection((conn) => {
+    expect(pool.isActiveConnection()).toBe(conn);
+  });
+  expect(pool.releaseConnection()).toBe(false);
+  await pending;
+  expect(pool.isActiveConnection()).toBeNull();
+  expect(pool.stat().busy).toBe(0);
+});
+
+it("withConnection on a sticky lease retries after its checkout rejects", async () => {
+  const pool = makePool(2);
+  vi.spyOn(pool, "checkout").mockRejectedValueOnce(new Error("boom"));
+  const conn = await pool.leaseConnection().catch(() => null);
+  expect(conn).toBeNull();
+  await expect(pool.withConnection(() => undefined)).resolves.toBeUndefined();
+  expect(pool.stat().busy).toBe(0);
+});
+
 it("leaseConnection overlapping on an empty lease checks out one connection", async () => {
   const pool = makePool(2);
   const checkout = vi.spyOn(pool, "checkout");
