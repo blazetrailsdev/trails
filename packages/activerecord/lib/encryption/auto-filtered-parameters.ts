@@ -1,3 +1,4 @@
+import { rbModName } from "@blazetrails/ruby-compat/object";
 import { Encryption } from "../encryption.js";
 
 export interface AutoFilteredParametersApp {
@@ -69,7 +70,10 @@ export class AutoFilteredParameters {
   }
 
   private applyFilter(klass: any, attribute: string): void {
-    const filter = [klass.name ? `${klass.modelName.element}` : null, String(attribute)]
+    const filter = [
+      rbModName(klass) != null ? `${klass.modelName.element}` : null,
+      String(attribute),
+    ]
       .filter((part) => part != null)
       .join(".");
     if (!this.isExcludedFromFilterParameters(filter)) {

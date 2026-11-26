@@ -620,11 +620,9 @@ const otherSetupFiles = [
 
 const AR_SPLIT = process.env.AR_SPLIT;
 const AR_ISOLATED_CASES = [
-  "packages/activerecord/test/cases/canonical-model-seats.trails.test.ts",
-  "packages/activerecord/test/cases/cold-model-construction.trails.test.ts",
   "packages/activerecord/test/cases/connection-adapters/registration.test.ts",
+  // Asserts `active_support/message_pack` was never loaded: needs a fresh module graph.
   "packages/activerecord/test/cases/encryption/message-pack-message-serializer.trails.test.ts",
-  "packages/activerecord/test/cases/enum-cold-schema.trails.test.ts",
   "packages/activerecord/test/cases/support/drop-all-tables.trails.test.ts",
   "packages/activerecord/test/cases/support/template-stamp.trails.test.ts",
 ];
