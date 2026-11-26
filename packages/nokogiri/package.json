@@ -35,8 +35,8 @@
   "mirrors": [
     {
       "source": "nokogiri",
-      "ref": "v1.18.3",
-      "sha": "fd3ca2e22df67fd25fd5c25c466f6896b6547cb8"
+      "ref": "v1.19.7",
+      "sha": "cb8cd033a3c6c67109a745f7eb4a98b05e82adbe"
     }
   ],
   "publishConfig": {
