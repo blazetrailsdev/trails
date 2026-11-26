@@ -241,6 +241,7 @@ describe("ActionController::Streaming chunked response body", () => {
     const controller = new StreamGateController();
     await controller.dispatch("show", makeRequest(), await Response.new());
 
+    expect(controller.response.body).toBeDefined();
     const body = (controller.response.stream as StreamedBody).body!();
     fail(new Error("boom"));
     expect(await body).toMatch(/^<head><\/head>/);
