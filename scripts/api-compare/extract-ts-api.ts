@@ -3244,8 +3244,6 @@ function guardNames(guard: IncludedGuard, tag: InlinedFrom): boolean {
   if (guard.path.length > rubyPath.length) return false;
   const tail = rubyPath.slice(rubyPath.length - guard.path.length);
   if (tail.some((segment, i) => segment !== guard.path[i])) return false;
-  // A namespace seat (`ActiveJob.BatchId`) is written by whichever gem
-  // defines the constant, so the namespace's own package says nothing of it.
   if (guard.path.length > 1) return true;
   return guard.pkg === undefined || guard.pkg === tag.file.split("/")[0];
 }

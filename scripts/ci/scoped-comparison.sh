@@ -25,8 +25,6 @@ mixin_keys=$(
     sed -E 's/.*[[:space:]](::)?//' | tr '[:upper:]' '[:lower:]'
     { grep -rhoE '@inlinedFrom [A-Z][A-Za-z0-9]*' "$src" --include='*.ts' || true; } |
       sed -E 's/.*[[:space:]]//' | tr '[:upper:]' '[:lower:]'
-    # A tag citing another gem's module (`ActiveJob::BatchId` from solid_queue)
-    # needs that gem's manifest too: key it by the citation's source.
     { grep -rhoE '@inlinedFrom [^ ]+ [a-z_]+/' "$src" --include='*.ts' || true; } |
       sed -E 's/.*[[:space:]]//; s#/$##; s/_/-/g'
   } | sort -u | jq -R . | jq -sc .

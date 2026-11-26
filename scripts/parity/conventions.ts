@@ -493,9 +493,6 @@ export const RUBY_FILE_TS_OVERRIDES: Record<string, string> = {
   "trailties:generators/mailer/mailer_generator.rb": "generators/trails/mailer/mailer-generator.ts",
   "trailties:generators/test_unit/channel_generator.rb":
     "generators/test-unit/channel/channel-generator.ts",
-  // A migration template keeps Rails' snake_case basename: the update
-  // generator copies it under that name, and `MigrationFilenameRegexp`
-  // admits only `[_a-z0-9]` in a migration file's name.
   "solid-queue:generators/solid_queue/update/templates/db/add_batches_to_solid_queue.rb":
     "generators/solid-queue/update/templates/db/add_batches_to_solid_queue.ts",
 };

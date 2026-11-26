@@ -6529,10 +6529,6 @@ export function main() {
           neutralClaims.add(c);
           return true;
         });
-        // A bodyless candidate must not shadow a later one that is a port: a
-        // Struct writer `attributes=` offers `setAttributes` first, and an
-        // `interface X extends Model` in the same file declares a bodyless
-        // `setAttributes` for another class entirely.
         const isDeclOnly = (c: string) =>
           declarationOnlyInFile(
             expectedTs,
