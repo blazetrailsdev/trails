@@ -74,7 +74,7 @@ import { MessageEncryptor } from "@blazetrails/activesupport/message-encryptor";
 import { ActiveJob, Serializers } from "@blazetrails/activejob";
 import { Trailtie as ActiveJobTrailtie } from "../../lib/trailties/active-job.js";
 import { Configuration as TrailtieConfiguration } from "../../lib/trailtie/configuration.js";
-import { DatabaseTasks } from "@blazetrails/activerecord";
+import { DatabaseTasks } from "@blazetrails/activerecord/tasks/database-tasks.js";
 import { Annotation } from "../../lib/source-annotation-extractor.js";
 import { Trailtie as ActionMailerTrailtie } from "../../lib/trailties/action-mailer.js";
 import { TestCase } from "@blazetrails/activesupport/test-case";

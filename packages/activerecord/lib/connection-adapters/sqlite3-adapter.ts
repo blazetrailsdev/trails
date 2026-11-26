@@ -1393,3 +1393,18 @@ runLoadHooks("active_record_sqlite3adapter", SQLite3Adapter);
 
 ConnectionAdapters.SQLite3Adapter = SQLite3Adapter;
 SQLite3Adapter.SQLite3Integer = SQLite3Integer;
+
+declare module "../namespaces.js" {
+  interface ConnectionAdapterClasses {
+    SQLite3Adapter: typeof SQLite3Adapter;
+  }
+  interface SQLite3Namespace {
+    DatabaseStatements: typeof import("./sqlite3/database-statements.js");
+  }
+}
+
+declare module "./pool-config.js" {
+  interface SQLite3Config {
+    engine?: EngineOpenV2;
+  }
+}

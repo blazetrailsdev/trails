@@ -21,7 +21,8 @@ import {
   schemaFormat,
   setSchemaFormat,
 } from "@blazetrails/activerecord";
-import { Base, DatabaseTasks, MigrationProxy } from "@blazetrails/activerecord";
+import { Base, MigrationProxy } from "@blazetrails/activerecord";
+import { DatabaseTasks } from "@blazetrails/activerecord/tasks/database-tasks.js";
 import { Trails, _resetTrailsEnv } from "../../lib/trails.js";
 import { Application } from "../../lib/application.js";
 import { parse as yamlParse } from "@blazetrails/ruby-compat/psych-adapter";
@@ -772,13 +773,8 @@ export class CreatePosts extends Migration.Current {
   });
 
   it("checkProtectedEnvironmentsBang raises when stored env is protected", async () => {
-    const {
-      DatabaseTasks,
-      InternalMetadata,
-      ProtectedEnvironmentError,
-      DatabaseConfigurations,
-      HashConfig,
-    } = await import("@blazetrails/activerecord");
+    const { InternalMetadata, ProtectedEnvironmentError, DatabaseConfigurations, HashConfig } =
+      await import("@blazetrails/activerecord");
     const { SQLite3Adapter } =
       await import("@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js");
 
@@ -810,13 +806,8 @@ export class CreatePosts extends Migration.Current {
   });
 
   it("checkProtectedEnvironmentsBang raises EnvironmentMismatchError when stored != current", async () => {
-    const {
-      DatabaseTasks,
-      InternalMetadata,
-      EnvironmentMismatchError,
-      DatabaseConfigurations,
-      HashConfig,
-    } = await import("@blazetrails/activerecord");
+    const { InternalMetadata, EnvironmentMismatchError, DatabaseConfigurations, HashConfig } =
+      await import("@blazetrails/activerecord");
     const { SQLite3Adapter } =
       await import("@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js");
 
@@ -852,7 +843,7 @@ export class CreatePosts extends Migration.Current {
   });
 
   it("DISABLE_DATABASE_ENVIRONMENT_CHECK bypasses the check", async () => {
-    const { DatabaseTasks, InternalMetadata, DatabaseConfigurations, HashConfig } =
+    const { InternalMetadata, DatabaseConfigurations, HashConfig } =
       await import("@blazetrails/activerecord");
     const { SQLite3Adapter } =
       await import("@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js");
@@ -1023,11 +1014,7 @@ export class CreatePosts extends Migration.Current {
   });
 
   it("DatabaseTasks.truncateTables deletes user tables but keeps schema_migrations + ar_internal_metadata", async () => {
-    const {
-      DatabaseTasks,
-      InternalMetadata,
-      HashConfig: HC,
-    } = await import("@blazetrails/activerecord");
+    const { InternalMetadata, HashConfig: HC } = await import("@blazetrails/activerecord");
     const { SQLite3Adapter } =
       await import("@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js");
 

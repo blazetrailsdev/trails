@@ -1001,6 +1001,7 @@ jobs:
           scripts/package-files-field.test.ts
           scripts/package-publish-shape.test.ts
           scripts/package-size/side-effects.test.ts
+          scripts/package-size/optional-peers-dts.test.ts
           scripts/require-canonical-rebuild-directives.test.ts
           scripts/ruby-compat-leaf.test.ts
           scripts/ruby-compat-entry-modules.test.ts

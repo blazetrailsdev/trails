@@ -1,4 +1,4 @@
-import { DatabaseTasks } from "@blazetrails/activerecord";
+import { DatabaseTasks } from "@blazetrails/activerecord/tasks/database-tasks.js";
 import type { MigrationProxy } from "@blazetrails/activerecord";
 import { loadDatabaseConfig } from "./db-helpers.js";
 

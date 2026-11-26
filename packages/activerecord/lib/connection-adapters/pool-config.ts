@@ -115,7 +115,6 @@ export interface SQLite3Config extends TrailsAdapterOptions {
   database?: string;
   readonly?: boolean;
   flags?: number;
-  engine?: import("@blazetrails/sqlite3").EngineOpenV2;
   pragmas?: Record<string, string | number | boolean>;
   strict?: boolean;
   timeout?: number | string | false;

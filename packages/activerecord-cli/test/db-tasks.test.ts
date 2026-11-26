@@ -3,7 +3,8 @@ import { mkdtemp, mkdir, writeFile } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
 import { run } from "../lib/cli.js";
-import { Base, DatabaseTasks } from "@blazetrails/activerecord";
+import { Base } from "@blazetrails/activerecord";
+import { DatabaseTasks } from "@blazetrails/activerecord/tasks/database-tasks.js";
 
 const FAKE_CONFIG = `
 const config = {

@@ -1,5 +1,6 @@
 import { afterAll } from "vitest";
-import { Base, DatabaseTasks } from "@blazetrails/activerecord";
+import { Base } from "@blazetrails/activerecord";
+import { DatabaseTasks } from "@blazetrails/activerecord/tasks/database-tasks.js";
 import { setEnv } from "@blazetrails/ruby-compat";
 import "@blazetrails/actionmailer/test-case";
 import "@blazetrails/actionmailer/test-helper";

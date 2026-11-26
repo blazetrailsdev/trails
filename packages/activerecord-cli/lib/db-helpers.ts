@@ -2,7 +2,8 @@ import { generateManifest, MANIFEST_PATH } from "./generate-manifest.js";
 import { join, resolve } from "path";
 import { File } from "@blazetrails/ruby-compat";
 import { getEnv, presence } from "@blazetrails/activesupport";
-import { Base, DatabaseTasks, DatabaseConfigurations, Migrator } from "@blazetrails/activerecord";
+import { Base, DatabaseConfigurations, Migrator } from "@blazetrails/activerecord";
+import { DatabaseTasks } from "@blazetrails/activerecord/tasks/database-tasks.js";
 import { establishEnvironmentConnection, normalizeSqlitePaths } from "./environment.js";
 
 export async function loadDatabaseConfig(cwd: string): Promise<DatabaseConfigurations> {

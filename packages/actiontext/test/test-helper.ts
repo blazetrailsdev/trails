@@ -1,6 +1,7 @@
 import { afterAll } from "vitest";
 import { I18n, Logger, TopLevel, setTrailsRoot } from "@blazetrails/activesupport";
-import { ActiveRecord, Base, DatabaseTasks, Migration, Migrator } from "@blazetrails/activerecord";
+import { ActiveRecord, Base, Migration, Migrator } from "@blazetrails/activerecord";
+import { DatabaseTasks } from "@blazetrails/activerecord/tasks/database-tasks.js";
 import { Trails } from "@blazetrails/trailties";
 import { ActionController } from "@blazetrails/actionpack";
 import { Base as ActionMailerBase } from "@blazetrails/actionmailer";

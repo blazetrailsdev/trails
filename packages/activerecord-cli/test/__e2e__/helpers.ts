@@ -1,4 +1,5 @@
-import { Base, DatabaseTasks, Migrator } from "@blazetrails/activerecord";
+import { Base, Migrator } from "@blazetrails/activerecord";
+import { DatabaseTasks } from "@blazetrails/activerecord/tasks/database-tasks.js";
 import { mkdtemp, rm } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";

@@ -2,7 +2,7 @@ import { join, resolve } from "path";
 import { getEnv } from "@blazetrails/activesupport";
 import { setEnv } from "@blazetrails/ruby-compat";
 import { File } from "@blazetrails/ruby-compat";
-import { DatabaseTasks } from "@blazetrails/activerecord";
+import { DatabaseTasks } from "@blazetrails/activerecord/tasks/database-tasks.js";
 import { loadDatabaseConfig, tryLoadModels } from "./db-helpers.js";
 import { withEnvironmentConnection } from "./environment.js";
 

@@ -11,7 +11,8 @@ import {
 import { TestCase } from "@blazetrails/activesupport/test-case";
 import { GlobalID } from "@blazetrails/globalid";
 import { Configuration } from "@blazetrails/trailties/trailtie/configuration";
-import { ActiveRecord, Base, DatabaseTasks } from "@blazetrails/activerecord";
+import { ActiveRecord, Base } from "@blazetrails/activerecord";
+import { DatabaseTasks } from "@blazetrails/activerecord/tasks/database-tasks.js";
 import { Application } from "@blazetrails/trailties";
 import { Trailtie as ActiveSupportRailtie } from "@blazetrails/trailties/trailties/active-support";
 import { Trailtie as ActiveRecordRailtie } from "@blazetrails/trailties/trailties/active-record";

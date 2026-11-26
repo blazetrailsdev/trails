@@ -26,8 +26,6 @@ import type { Base } from "./base.js";
 import type { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
 import type { Column as MySQLColumn } from "./connection-adapters/mysql/column.js";
 import type { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
-import type { SQLite3Adapter } from "./connection-adapters/sqlite3-adapter.js";
-import type { Mysql2Adapter } from "./connection-adapters/mysql2-adapter.js";
 import type {
   InverseOfAssociationRecursiveError,
   HasManyThroughAssociationNotFoundError,
@@ -48,7 +46,6 @@ import type {
 import type { TypeMetadata as MySQLTypeMetadata } from "./connection-adapters/mysql/type-metadata.js";
 import type { Column as PostgreSQLColumn } from "./connection-adapters/postgresql/column.js";
 import type { TypeMetadata as PostgreSQLTypeMetadata } from "./connection-adapters/postgresql/type-metadata.js";
-import type { Array as OIDArray } from "./connection-adapters/postgresql/oid/array.js";
 import type { BitVarying as OIDBitVarying } from "./connection-adapters/postgresql/oid/bit-varying.js";
 import type { Bit as OIDBit } from "./connection-adapters/postgresql/oid/bit.js";
 import type { Bytea as OIDBytea } from "./connection-adapters/postgresql/oid/bytea.js";
@@ -73,7 +70,6 @@ import type { Uuid as OIDUuid } from "./connection-adapters/postgresql/oid/uuid.
 import type { Vector as OIDVector } from "./connection-adapters/postgresql/oid/vector.js";
 import type { Xml as OIDXml } from "./connection-adapters/postgresql/oid/xml.js";
 import type { Column as SQLite3Column } from "./connection-adapters/sqlite3/column.js";
-import type { PostgreSQLAdapter } from "./connection-adapters/postgresql-adapter.js";
 import type { load, register, resolve } from "./connection-adapters.js";
 import type * as ConnectionHandling from "./connection-handling.js";
 import type { DisableJoinsAssociationRelation } from "./disable-joins-association-relation.js";
@@ -476,61 +472,65 @@ Tasks.autoload("SQLiteDatabaseTasks", "active_record/tasks/sqlite_database_tasks
 ActiveRecord.Tasks = Tasks;
 ActiveRecord.Coders = { name: "ActiveRecord::Coders" } as typeof ActiveRecord.Coders;
 
+export interface ConnectionAdapterClasses {
+  name: string;
+}
+export interface SQLite3Namespace {
+  name: string;
+}
+export interface PostgreSQLOID {
+  name: string;
+}
+
 export const ConnectionAdapters = {
   name: "ActiveRecord::ConnectionAdapters",
   loadPath,
   adapters: new Map(),
-} as AutoloadModule & {
-  adapters: Map<string, [string, string]>;
-  ConnectionPool: typeof ConnectionPool;
-  MySQL: { name: string; Column: typeof MySQLColumn; TypeMetadata: typeof MySQLTypeMetadata };
-  PostgreSQL: {
-    name: string;
-    Column: typeof PostgreSQLColumn;
-    TypeMetadata: typeof PostgreSQLTypeMetadata;
-    OID: {
+} as AutoloadModule &
+  ConnectionAdapterClasses & {
+    adapters: Map<string, [string, string]>;
+    ConnectionPool: typeof ConnectionPool;
+    MySQL: { name: string; Column: typeof MySQLColumn; TypeMetadata: typeof MySQLTypeMetadata };
+    PostgreSQL: {
       name: string;
-      Array: typeof OIDArray;
-      BitVarying: typeof OIDBitVarying;
-      Bit: typeof OIDBit;
-      Bytea: typeof OIDBytea;
-      Cidr: typeof OIDCidr;
-      DateTime: typeof OIDDateTime;
-      Date: typeof OIDDate;
-      Decimal: typeof OIDDecimal;
-      Enum: typeof OIDEnum;
-      Hstore: typeof OIDHstore;
-      Inet: typeof OIDInet;
-      Interval: typeof OIDInterval;
-      Jsonb: typeof OIDJsonb;
-      LegacyPoint: typeof OIDLegacyPoint;
-      Macaddr: typeof OIDMacaddr;
-      Money: typeof OIDMoney;
-      Oid: typeof OIDOid;
-      Point: typeof OIDPoint;
-      SpecializedString: typeof OIDSpecializedString;
-      TimestampWithTimeZone: typeof OIDTimestampWithTimeZone;
-      Timestamp: typeof OIDTimestamp;
-      Uuid: typeof OIDUuid;
-      Vector: typeof OIDVector;
-      Xml: typeof OIDXml;
+      Column: typeof PostgreSQLColumn;
+      TypeMetadata: typeof PostgreSQLTypeMetadata;
+      OID: PostgreSQLOID & {
+        BitVarying: typeof OIDBitVarying;
+        Bit: typeof OIDBit;
+        Bytea: typeof OIDBytea;
+        Cidr: typeof OIDCidr;
+        DateTime: typeof OIDDateTime;
+        Date: typeof OIDDate;
+        Decimal: typeof OIDDecimal;
+        Enum: typeof OIDEnum;
+        Hstore: typeof OIDHstore;
+        Inet: typeof OIDInet;
+        Interval: typeof OIDInterval;
+        Jsonb: typeof OIDJsonb;
+        LegacyPoint: typeof OIDLegacyPoint;
+        Macaddr: typeof OIDMacaddr;
+        Money: typeof OIDMoney;
+        Oid: typeof OIDOid;
+        Point: typeof OIDPoint;
+        SpecializedString: typeof OIDSpecializedString;
+        TimestampWithTimeZone: typeof OIDTimestampWithTimeZone;
+        Timestamp: typeof OIDTimestamp;
+        Uuid: typeof OIDUuid;
+        Vector: typeof OIDVector;
+        Xml: typeof OIDXml;
+      };
     };
+    SQLite3: SQLite3Namespace & {
+      Column: typeof SQLite3Column;
+      Quoting: typeof import("./connection-adapters/sqlite3/quoting.js");
+      SchemaStatements: typeof import("./connection-adapters/sqlite3/schema-statements.js");
+    };
+    AbstractAdapter: typeof AbstractAdapter;
+    register: typeof register;
+    load: typeof load;
+    resolve: typeof resolve;
   };
-  SQLite3: {
-    name: string;
-    Column: typeof SQLite3Column;
-    DatabaseStatements: typeof import("./connection-adapters/sqlite3/database-statements.js");
-    Quoting: typeof import("./connection-adapters/sqlite3/quoting.js");
-    SchemaStatements: typeof import("./connection-adapters/sqlite3/schema-statements.js");
-  };
-  AbstractAdapter: typeof AbstractAdapter;
-  SQLite3Adapter: typeof SQLite3Adapter;
-  Mysql2Adapter: typeof Mysql2Adapter;
-  PostgreSQLAdapter: typeof PostgreSQLAdapter;
-  register: typeof register;
-  load: typeof load;
-  resolve: typeof resolve;
-};
 extend(ConnectionAdapters, Autoload);
 ConnectionAdapters.autoloadAt("active_record/connection_adapters/abstract/connection_pool", () => {
   ConnectionAdapters.autoload("ConnectionPool");

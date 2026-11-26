@@ -5,12 +5,12 @@ import { join } from "path";
 import { run } from "../lib/cli.js";
 import {
   Base,
-  DatabaseTasks,
   Migration,
   Migrator,
   MigrationContext,
   MigrationProxy,
 } from "@blazetrails/activerecord";
+import { DatabaseTasks } from "@blazetrails/activerecord/tasks/database-tasks.js";
 import { checkPendingMigrations } from "../lib/pending-migrations.js";
 
 const FAKE_CONFIG = `

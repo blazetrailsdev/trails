@@ -27,7 +27,8 @@ export default config;
 
 const CONFIG_DATABASE = configDatabase("sqlite3");
 
-const DB_GLUE = `import { Base, DatabaseTasks } from "@blazetrails/activerecord";
+const DB_GLUE = `import { Base } from "@blazetrails/activerecord";
+import { DatabaseTasks } from "@blazetrails/activerecord/tasks/database-tasks.js";
 import { loadDatabaseConfig } from "@blazetrails/activerecord-cli";
 import { models } from "./.trails/models/index.js";
 
