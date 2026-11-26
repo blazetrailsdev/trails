@@ -9,7 +9,8 @@
 
 import type { UnportedFile } from "./types.js";
 
-const NOT_CALLED = "not called by trails";
+const NOT_CALLED =
+  'not called by trails (RFC 0259 § "Scoping nokogiri and libxml-ruby"). PERMANENT.';
 
 const NOT_YET_PORTED = "No TS test file, under any name, ports a test of this Ruby file yet.";
 

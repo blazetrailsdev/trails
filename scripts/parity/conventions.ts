@@ -849,7 +849,8 @@ const PG_UNPORTED_REASON =
 const PG_LIBRARY_VERSION_REASON =
   '`PG.library_version` is `PQlibVersion()` and node-pg links no libpq (packages/pg/CLAUDE.md, "The pg port carries only what trails calls"). PERMANENT.';
 
-const NOKOGIRI_NOT_CALLED_REASON = "not called by trails";
+const NOKOGIRI_NOT_CALLED_REASON =
+  'not called by trails (RFC 0259 § "Scoping nokogiri and libxml-ruby"). PERMANENT.';
 
 export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
   {
