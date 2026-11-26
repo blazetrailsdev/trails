@@ -529,13 +529,6 @@ export class File extends IO {
   }
 
   /**
-   * `vendor/ruby/v3.3.11/file.c:1305` `rb_file_s_size` — the byte size of the named
-   * file, which is `File.stat(file_name).size`.
-   *
-   * @noRailsEquivalent PERMANENT — Ruby core `File.size`
-   * (`vendor/ruby/v3.3.11/file.c:1305`).
-   */
-  /**
    * `vendor/ruby/v3.3.11/file.c:2028` `rb_file_zero_p`, which answers `false`
    * rather than raising when the stat fails.
    *
@@ -549,6 +542,13 @@ export class File extends IO {
     }
   }
 
+  /**
+   * `vendor/ruby/v3.3.11/file.c:1305` `rb_file_s_size` — the byte size of the named
+   * file, which is `File.stat(file_name).size`.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `File.size`
+   * (`vendor/ruby/v3.3.11/file.c:1305`).
+   */
   static size(fileName: string): number {
     return File.stat(fileName).size;
   }
