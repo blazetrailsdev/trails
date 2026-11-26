@@ -1,10 +1,12 @@
 import * as libxml2 from "libxml2-wasm";
 import {
+  allocCStringArray,
   error,
+  free,
   xmlAddChild,
   xmlCtxtSetErrorHandler,
   xmlFreeParserCtxt,
-  xmlNewDoc,
+  xmlNewDoc as _xmlNewDoc,
   xmlNewParserCtxt,
   xmlReadString,
   XmlTreeCommonStruct,
@@ -19,6 +21,15 @@ import { Nokogiri, type LibXml2 } from "./namespaces.js";
 
 declare module "libxml2-wasm/lib/nodes.mjs" {
   export function createNode(nodePtr: number): XmlNode;
+}
+
+function xmlNewDoc(version: string): number {
+  const buf = allocCStringArray([version]);
+  try {
+    return (_xmlNewDoc as unknown as (version: number) => number)(buf + 8);
+  } finally {
+    free(buf);
+  }
 }
 
 Nokogiri.LibXml2 = {
