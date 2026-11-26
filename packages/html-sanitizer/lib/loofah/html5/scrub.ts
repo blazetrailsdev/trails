@@ -192,19 +192,16 @@ export const Scrub = {
 
   isCssPropertyUnsafe(node: CrassNode): boolean {
     return (node.children as CrassNode[]).some((child) => {
-      switch (child.node) {
-        case "url":
-        case "bad_url":
-        case "bad_string":
-          return true;
-        case "string":
-          return !CSS_PROPERTY_STRING_WITHOUT_EMBEDDED_QUOTES.test(child.raw);
-        case "function":
-          return !SafeList.ALLOWED_CSS_FUNCTIONS.has(
-            (child.name as string).replace(/[A-Z]/g, (c) => c.toLowerCase()),
-          );
-        default:
-          return false;
+      if (CSS_URLISH_NODES.includes(child.node)) {
+        return true;
+      } else if (child.node === "string") {
+        return !CSS_PROPERTY_STRING_WITHOUT_EMBEDDED_QUOTES.test(child.raw);
+      } else if (child.node === "function") {
+        return !SafeList.ALLOWED_CSS_FUNCTIONS.has(
+          (child.name as string).replace(/[A-Z]/g, (c) => c.toLowerCase()),
+        );
+      } else {
+        return false;
       }
     });
   },
@@ -234,6 +231,7 @@ export const Scrub = {
     attrNode.value = values.join(" ");
   },
 
+  /** @missingRailsCall isValidEncoding — PERMANENT */
   isAllowedUri(uriString: string): boolean {
     uriString = CGI.unescapeHTML(this.decodeNumericCharacterReferences(uriString));
     uriString = uriString.replace(CONTROL_CHARACTERS, "");
