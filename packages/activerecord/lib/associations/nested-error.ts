@@ -24,9 +24,13 @@ interface InnerErrorLike {
 export class NestedError extends ActiveModelNestedError {
   private readonly _association: AssociationLike;
 
+  /** @inventedArm create — PERMANENT */
   constructor(association: AssociationLike, innerError: InnerErrorLike) {
-    const attribute = NestedError.computeAttribute(association, innerError);
-    super(association.owner, innerError, { attribute });
+    const self: NestedError = Object.assign(Object.create(NestedError.prototype) as NestedError, {
+      _association: association,
+      innerError,
+    });
+    super(association.owner, innerError, { attribute: computeAttribute.call(self, innerError) });
     this._association = association;
   }
 
@@ -34,26 +38,20 @@ export class NestedError extends ActiveModelNestedError {
   get association(): AssociationLike {
     return this._association;
   }
+}
 
-  private static computeAttribute(
-    association: AssociationLike,
-    innerError: InnerErrorLike,
-  ): string {
-    const self: NestedError = Object.assign(Object.create(NestedError.prototype) as NestedError, {
-      _association: association,
-      innerError,
-    });
-    const associationName = underscore(association.reflection.name);
+/** @internal */
+function computeAttribute(this: NestedError, innerError: InnerErrorLike): string {
+  const associationName = underscore(this.association.reflection.name);
 
-    if (
-      association.isCollection() &&
-      rtest(indexErrorsSetting.call(self)) &&
-      index.call(self) != null
-    ) {
-      return stringToSym(`${associationName}[${index.call(self)}].${toS(innerError.attribute)}`);
-    } else {
-      return stringToSym(`${associationName}.${toS(innerError.attribute)}`);
-    }
+  if (
+    this.association.isCollection() &&
+    rtest(indexErrorsSetting.call(this)) &&
+    index.call(this) != null
+  ) {
+    return stringToSym(`${associationName}[${index.call(this)}].${toS(innerError.attribute)}`);
+  } else {
+    return stringToSym(`${associationName}.${toS(innerError.attribute)}`);
   }
 }
 

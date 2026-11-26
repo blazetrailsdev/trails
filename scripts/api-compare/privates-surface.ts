@@ -35,6 +35,7 @@ import {
   collectTaggedEntries,
   buildGlobalRubyCandidates,
   collectAllowedNames,
+  isPrivateOwnerCredited,
   indexRubyFiles,
   uncoveredTsFiles,
   type RubyOwner,
@@ -48,6 +49,8 @@ export interface PopulationName {
   name: string;
   population: PopulationKind;
   perf?: true;
+  /** Each declaring member's owner and static-ness, `${owner}\u0000${isStatic}`. */
+  owners?: string[];
 }
 
 export interface PrivateName extends PopulationName {
@@ -108,16 +111,31 @@ export function collectPrivatesPopulation(
   fileConstants: string[] = [],
 ): PopulationName[] {
   const out = new Map<string, PopulationName>();
-  const add = (name: string, population: PopulationKind | null, perf?: boolean): void => {
-    if (population === null || name === "constructor" || out.has(name)) return;
-    out.set(name, { name, population, ...(perf === true ? { perf: true as const } : {}) });
+  const add = (
+    name: string,
+    population: PopulationKind | null,
+    perf?: boolean,
+    owner?: string,
+  ): void => {
+    if (population === null || name === "constructor") return;
+    const prior = out.get(name);
+    if (prior !== undefined) {
+      if (owner !== undefined && prior.owners !== undefined) prior.owners.push(owner);
+      return;
+    }
+    out.set(name, {
+      name,
+      population,
+      ...(perf === true ? { perf: true as const } : {}),
+      ...(owner !== undefined ? { owners: [owner] } : {}),
+    });
   };
   for (const c of [...classes, ...modules]) {
     if (c.file !== file || c.synthesizedMixin === true) continue;
     if (c.isInterface === true && c.declaredAsNamespace !== true) continue;
     for (const m of [...c.instanceMethods, ...c.classMethods]) {
       if (m.declaredIn !== undefined) continue;
-      add(m.name, memberPopulation(m), m.perf);
+      add(m.name, memberPopulation(m), m.perf, `${c.name}\u0000${m.isStatic === true}`);
     }
   }
   for (const fn of fileFunctions ?? []) {
@@ -206,7 +224,8 @@ export function buildPrivatesReport(
         Object.keys(tsFileConstants[tsFile] ?? {}),
       );
       if (population.length === 0) continue;
-      const mirrored = (visibility: "private" | "public"): Set<string> =>
+      const keyed = new Set<string>();
+      const mirrored = (visibility: "private" | "public", ownerKeyed?: Set<string>): Set<string> =>
         rubyFile === null
           ? new Set<string>()
           : collectAllowedNames(
@@ -223,14 +242,22 @@ export function buildPrivatesReport(
               [],
               undefined,
               visibility,
+              ownerKeyed,
             );
-      const allowed = mirrored("private");
+      const allowed = mirrored("private", keyed);
       const publicOnly = mirrored("public");
       const elsewhere = (owner: RubyOwner): boolean =>
         owner.package !== pkg || owner.file !== rubyFile;
-      for (const p of population) {
+      for (const { owners, ...p } of population) {
         const candidates = matchNames(p.name);
-        const scored: PrivateKind = candidates.some((c) => allowed.has(c))
+        const isCredited = (c: string): boolean =>
+          owners === undefined
+            ? allowed.has(c)
+            : owners.some((o) => {
+                const [owner, isStatic] = o.split("\u0000");
+                return isPrivateOwnerCredited(keyed, allowed, owner, isStatic === "true", c);
+              });
+        const scored: PrivateKind = candidates.some(isCredited)
           ? "credited"
           : candidates.some((c) => publicOnly.has(c))
             ? "visibility"

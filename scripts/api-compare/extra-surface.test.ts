@@ -8,6 +8,7 @@ import {
   parseArgs,
   collectTsFileNames,
   countTsInternalNames,
+  collectAllowedNames,
   collectTaggedEntries,
   classifyReason,
   printClassificationBlock,
@@ -5365,6 +5366,53 @@ describe("countTsInternalNames — Rails-backed privates", () => {
       params: [],
     } as unknown as ClassInfo["instanceMethods"][number]);
     expect(countTsInternalNames("backend/memoize.ts", [c], [], undefined, [])).toBe(2);
+  });
+
+  it("counts an @internal member colliding with a private of another class in the same .rb", () => {
+    const entity = (fqn: string, instanceMethods: unknown[], classMethods: unknown[] = []) => ({
+      fqn,
+      info: { name: fqn, file: "i18n/backend/memoize.rb", instanceMethods, classMethods },
+    });
+    const keyed = new Set<string>();
+    const railsPrivate = collectAllowedNames(
+      [
+        entity("I18n::Backend::Memoize", [
+          { name: "lookup", visibility: "protected", file: "i18n/backend/memoize.rb" },
+        ]),
+        entity(
+          "I18n::Backend::Other",
+          [{ name: "invented", visibility: "private", file: "i18n/backend/memoize.rb" }],
+          [{ name: "lookup", visibility: "private", file: "i18n/backend/memoize.rb" }],
+        ),
+      ] as unknown as Parameters<typeof collectAllowedNames>[0],
+      "i18n",
+      {},
+      new Map(),
+      {},
+      {},
+      {},
+      {},
+      [],
+      "i18n/backend/memoize.rb",
+      [],
+      undefined,
+      "private",
+      keyed,
+    );
+    expect(railsPrivate).toEqual(new Set(["lookup", "_lookup", "invented", "_invented"]));
+    const count = (ownerKeyed?: Set<string>): number =>
+      countTsInternalNames(
+        "backend/memoize.ts",
+        [memoize()],
+        [],
+        undefined,
+        [],
+        railsPrivate,
+        [],
+        ownerKeyed,
+      );
+    expect(count()).toBe(0);
+    expect(count(keyed)).toBe(1);
   });
 });
 

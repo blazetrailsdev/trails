@@ -213,7 +213,7 @@ describe("Trails::Command::EncryptedTest", { timeout: 120_000 }, () => {
   it("edit command does not display save confirmation message if interrupted", async () => {
     expect(await t.runEditCommand()).toMatch(/file encrypted and saved/i);
 
-    const interruptCommandProcess = `sh -c 'kill -INT $PPID'`;
+    const interruptCommandProcess = `sh -c 'kill -INT $PPID; sleep 1'`;
     const output = await t.runEditCommand(undefined, { visual: interruptCommandProcess });
 
     expect(output).not.toMatch(/file encrypted and saved/i);

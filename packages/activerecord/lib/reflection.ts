@@ -366,8 +366,8 @@ export abstract class AbstractReflection {
   }
 
   /** @internal */
-  inverseName(): string | false | null {
-    return null;
+  actualSourceReflection(): AbstractReflection {
+    return this;
   }
 
   /** @internal */
@@ -665,7 +665,7 @@ export class AssociationReflection extends MacroReflection {
   private _inverseOfCache: AssociationReflection | ThroughReflection | null | undefined = undefined;
 
   /** @internal */
-  override inverseName(): string | false | null {
+  inverseName(): string | false | null {
     if (this._inverseNameCache !== undefined) return this._inverseNameCache;
     this._inverseNameCache = fetch<string | false | null>(
       this.options,
@@ -943,11 +943,6 @@ export class AssociationReflection extends MacroReflection {
     let className = this.nameString;
     if (this.isCollection()) className = singularize(className);
     return camelize(className);
-  }
-
-  /** @internal */
-  actualSourceReflection(): this {
-    return this;
   }
 
   /** @internal */
@@ -1304,7 +1299,7 @@ export class ThroughReflection extends AbstractReflection {
   private _inverseOfCache: AssociationReflection | ThroughReflection | null | undefined = undefined;
 
   /** @internal */
-  override inverseName(): string | false | null {
+  inverseName(): string | false | null {
     return this._delegate.inverseName();
   }
 
@@ -1421,7 +1416,7 @@ export class ThroughReflection extends AbstractReflection {
   }
 
   /** @internal */
-  actualSourceReflection(): AssociationReflection {
+  override actualSourceReflection(): AbstractReflection {
     return this.sourceReflection!.actualSourceReflection();
   }
 

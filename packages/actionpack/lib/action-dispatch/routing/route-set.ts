@@ -380,14 +380,13 @@ export class UrlHelper {
 
   /** @internal */
   protected readonly options: Record<string, unknown>;
-  /** @internal */
-  private readonly segmentKeys: string[];
+  readonly #segmentKeys: string[];
   /** @internal */
   protected readonly route: Route;
 
   constructor(route: Route, options: Record<string, unknown>, routeName: string) {
     this.options = options;
-    this.segmentKeys = [...new Set(route.segmentKeys)];
+    this.#segmentKeys = [...new Set(route.segmentKeys)];
     this.route = route;
     this.routeName = routeName;
   }
@@ -406,7 +405,7 @@ export class UrlHelper {
       innerOptions ?? {},
       args,
       options,
-      this.segmentKeys,
+      this.#segmentKeys,
     );
     return t._routes.urlFor(hash, this.routeName, urlStrategy, methodName);
   }

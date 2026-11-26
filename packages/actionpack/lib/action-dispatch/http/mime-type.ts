@@ -431,8 +431,6 @@ export class NullType {
   [predicate: `is${string}`]: (() => boolean) | undefined;
   static readonly instance = new NullType();
   readonly symbol: string | null = null;
-  /** @internal */
-  readonly string = "";
 
   private constructor() {}
 
