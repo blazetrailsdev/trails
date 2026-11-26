@@ -193,6 +193,18 @@ describe("Nokogiri::XML::Document Pathname", () => {
 });
 
 describe("Nokogiri::XML::Document < Node (trails)", () => {
+  it("parse of an empty-file Pathname takes the empty-document arm", async () => {
+    const path = new Pathname(Dir.tmpdir()).join(`nokogiri-empty-${Date.now()}.xml`);
+    await path.write("");
+    try {
+      expect(() => XmlDocument.parse(path, null, null, ParseOptions.STRICT)).toThrow(
+        "Empty document",
+      );
+    } finally {
+      await path.delete();
+    }
+  });
+
   it("inherits type and xml? from XML::Node", () => {
     const doc = new XmlDocument();
     expect(doc).toBeInstanceOf(XmlNode);
