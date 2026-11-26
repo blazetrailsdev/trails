@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { NameError } from "../../lib/core-ext/name-error.js";
 import { constantize } from "../../lib/inflector.js";
-import { TopLevel, constSet, constDefined, rbModRemoveConst } from "@blazetrails/ruby-compat";
+import { constSet, constDefined } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
+import { rbModRemoveConst } from "@blazetrails/ruby-compat/variable";
 import { assert, assertNot, assertRaise, assertNil } from "../../lib/testing/assertions.js";
 
 describe("NameErrorTest", () => {

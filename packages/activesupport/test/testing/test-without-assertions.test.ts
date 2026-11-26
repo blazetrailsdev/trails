@@ -1,6 +1,6 @@
 import { afterEach, expect, it, vi } from "vitest";
 
-import { iseqLocationSetup } from "@blazetrails/ruby-compat";
+import { iseqLocationSetup } from "@blazetrails/ruby-compat/method";
 import { TestCase } from "../../lib/test-case.js";
 
 class TestsWithoutAssertionsWarnTest extends TestCase {

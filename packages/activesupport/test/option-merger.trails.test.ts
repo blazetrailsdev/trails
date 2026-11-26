@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { rbObjRespondTo } from "@blazetrails/ruby-compat/object";
 import { OptionMerger } from "../lib/option-merger.js";
 
 describe("OptionMerger in the prototype chain", () => {

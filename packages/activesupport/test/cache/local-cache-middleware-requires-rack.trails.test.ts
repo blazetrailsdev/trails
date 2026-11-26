@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { TopLevel, constGet } from "@blazetrails/ruby-compat";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
+import { constGet } from "@blazetrails/ruby-compat/variable";
 import { Middleware } from "../../lib/cache/strategy/local-cache-middleware.js";
 
 describe("LocalCache::Middleware in a process that has not loaded rack", () => {

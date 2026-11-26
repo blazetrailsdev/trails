@@ -1,7 +1,8 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { MockInstance } from "vitest";
 
-import { TopLevel, include } from "@blazetrails/ruby-compat";
+import { include } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
 import { Executor } from "../../lib/executor.js";
 import { TestHelper as ExecutorTestHelper } from "../../lib/executor/test-helper.js";
 import { TestCase } from "../../lib/test-case.js";

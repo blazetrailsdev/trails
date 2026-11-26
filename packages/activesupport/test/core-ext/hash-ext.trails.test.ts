@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Hash } from "@blazetrails/ruby-compat";
+import { Hash } from "@blazetrails/ruby-compat/hash";
 import { sliceBang } from "../../lib/core-ext/hash/slice.js";
 import { HashWithIndifferentAccess } from "../../lib/hash-with-indifferent-access.js";
 import { deepTransformKeys, deepStringifyKeysBang } from "../../lib/hash-utils.js";

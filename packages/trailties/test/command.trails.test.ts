@@ -132,7 +132,10 @@ describe("Trails::Command.root", () => {
 
 describe("Trails::Command.lookup", () => {
   it("finds a command an application defines under lib/commands on the load path", async () => {
-    const { Dir, File, FileUtils, LOAD_PATH } = await import("@blazetrails/ruby-compat");
+    const { Dir } = await import("@blazetrails/ruby-compat/dir");
+    const { File } = await import("@blazetrails/ruby-compat/file");
+    const { FileUtils } = await import("@blazetrails/ruby-compat/file-utils");
+    const { LOAD_PATH } = await import("@blazetrails/ruby-compat/load");
     const lib = File.join(Dir.mktmpdir("lookup"), "lib");
     await FileUtils.mkdirPAsync(File.join(lib, "commands"));
     const base = File.expandPath(
@@ -160,8 +163,11 @@ export class FooCommand extends Base {
   }, 30_000);
 
   it("re-raises a module-not-found raised while loading the command", async () => {
-    const { Dir, File, FileUtils, LOAD_PATH, LoadError, registerCompiledFiles } =
-      await import("@blazetrails/ruby-compat");
+    const { Dir } = await import("@blazetrails/ruby-compat/dir");
+    const { File } = await import("@blazetrails/ruby-compat/file");
+    const { FileUtils } = await import("@blazetrails/ruby-compat/file-utils");
+    const { LOAD_PATH, registerCompiledFiles } = await import("@blazetrails/ruby-compat/load");
+    const { LoadError } = await import("@blazetrails/ruby-compat/load-error");
     const lib = File.join(Dir.mktmpdir("lookup"), "lib");
     await FileUtils.mkdirPAsync(File.join(lib, "commands"));
     const file = File.join(lib, "commands", "bar.ts");

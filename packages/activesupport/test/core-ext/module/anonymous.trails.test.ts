@@ -1,11 +1,7 @@
 import { describe, expect, it } from "vitest";
-import {
-  constGet,
-  constSet,
-  TopLevel,
-  constDefined,
-  rbModRemoveConst,
-} from "@blazetrails/ruby-compat";
+import { constSet, constDefined } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
+import { constGet, rbModRemoveConst } from "@blazetrails/ruby-compat/variable";
 import { isAnonymous } from "../../../lib/module-ext.js";
 
 describe("Module#anonymous? for a JS class (anonymous.rb:27-29)", () => {

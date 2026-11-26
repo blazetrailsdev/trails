@@ -1,4 +1,4 @@
-import { Process } from "@blazetrails/ruby-compat";
+import { Process } from "@blazetrails/ruby-compat/process";
 import { describe, expect, it } from "vitest";
 import { ForkTracker } from "../lib/fork-tracker.js";
 

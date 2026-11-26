@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { rbEql, rbEqual, rbHash } from "@blazetrails/ruby-compat";
+import { rbEql, rbEqual } from "@blazetrails/ruby-compat/rb-equal";
+import { rbHash } from "@blazetrails/ruby-compat/rb-hash";
 import { SafeBuffer } from "../lib/core-ext/string/output-safety.js";
 
 describe("SafeBuffer as a String", () => {

@@ -1,6 +1,6 @@
 import { describe } from "vitest";
 
-import { getCrypto } from "@blazetrails/ruby-compat";
+import { getCrypto } from "@blazetrails/ruby-compat/crypto-adapter";
 import { MessageEncryptor } from "../../lib/message-encryptor.js";
 import { InvalidSignature } from "../../lib/message-verifier.js";
 import { messageMetadataTests } from "../../lib/messages/message-metadata-tests.js";

@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { Date as RubyDate, DateTime, Time, resetLocalTimeZoneId } from "@blazetrails/date";
-import { Rational } from "@blazetrails/ruby-compat";
+import { Rational } from "@blazetrails/ruby-compat/rational";
 import { actsLike } from "../../lib/core-ext/object/acts-like.js";
 import {
   advance,

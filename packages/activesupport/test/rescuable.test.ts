@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { block, include, rbObjRespondTo, TopLevel, constSet } from "@blazetrails/ruby-compat";
+import { block } from "@blazetrails/ruby-compat/hash";
+import { include, constSet } from "@blazetrails/ruby-compat/include";
+import { rbObjRespondTo, TopLevel } from "@blazetrails/ruby-compat/object";
 
 import { Rescuable } from "../lib/rescuable.js";
 

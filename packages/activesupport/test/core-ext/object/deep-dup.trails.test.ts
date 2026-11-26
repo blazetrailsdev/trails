@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Time } from "@blazetrails/date";
-import { rbDefineAllocFunc, rbObjDup } from "@blazetrails/ruby-compat";
+import { rbDefineAllocFunc, rbObjDup } from "@blazetrails/ruby-compat/include";
 import { deepDup } from "../../../lib/hash-utils.js";
 import { TimeWithZone } from "../../../lib/time-with-zone.js";
 import { TimeZone } from "../../../lib/values/time-zone.js";

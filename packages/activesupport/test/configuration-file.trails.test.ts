@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { rbModName, rbObjClassname } from "@blazetrails/ruby-compat";
+import { rbModName, rbObjClassname } from "@blazetrails/ruby-compat/object";
 import { ConfigurationFile, FormatError } from "../lib/configuration-file.js";
 
 describe("ConfigurationFile class paths", () => {

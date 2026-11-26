@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { defineModule, rbObjSingletonClass } from "@blazetrails/ruby-compat";
+import { defineModule } from "@blazetrails/ruby-compat/include";
+import { rbObjSingletonClass } from "@blazetrails/ruby-compat/object";
 import { classAttribute } from "../../../lib/class-attribute.js";
 import { assertNotRespondTo, assertPredicate } from "../../../lib/testing/assertions.js";
 

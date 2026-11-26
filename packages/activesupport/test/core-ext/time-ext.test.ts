@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Date as RubyDate, DateTime as RubyDateTime, Time as RubyTime } from "@blazetrails/date";
-import { Range, Rational } from "@blazetrails/ruby-compat";
+import { Range } from "@blazetrails/ruby-compat/range";
+import { Rational } from "@blazetrails/ruby-compat/rational";
 import {
   assertNothingRaised,
   assertPredicate,

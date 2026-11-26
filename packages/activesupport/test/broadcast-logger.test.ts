@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { Logger } from "../lib/logger.js";
 import { BroadcastLogger } from "../lib/broadcast-logger.js";
-import { rbInspect as inspect, rbObjDup } from "@blazetrails/ruby-compat";
+import { rbObjDup } from "@blazetrails/ruby-compat/include";
+import { rbInspect as inspect } from "@blazetrails/ruby-compat/object";
 import {
   assertChanges,
   assertEmpty,

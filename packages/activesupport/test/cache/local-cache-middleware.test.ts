@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { RuntimeError, UncaughtThrowError, constGet, kernelThrow } from "@blazetrails/ruby-compat";
+import { UncaughtThrowError, kernelThrow } from "@blazetrails/ruby-compat/kernel-catch";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
+import { constGet } from "@blazetrails/ruby-compat/variable";
 import { LocalCacheRegistry } from "../../lib/cache/strategy/local-cache.js";
 import { Middleware } from "../../lib/cache/strategy/local-cache-middleware.js";
 

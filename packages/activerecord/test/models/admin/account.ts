@@ -1,6 +1,6 @@
 import { DescendantsTracker } from "@blazetrails/activesupport";
 import { Admin } from "../admin.js";
-import { constSet } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
 import { Base } from "../../../lib/base.js";
 import type { AssociationProxy } from "../../../lib/associations/collection-proxy.js";
 import type { AdminUser } from "./user.js";

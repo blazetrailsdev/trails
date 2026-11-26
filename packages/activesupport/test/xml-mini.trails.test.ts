@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { LoadError } from "@blazetrails/ruby-compat";
+import { LoadError } from "@blazetrails/ruby-compat/load-error";
 import {
   _parseBinary,
   _parseFile,

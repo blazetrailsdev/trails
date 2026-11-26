@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { classModule, extend, include } from "@blazetrails/ruby-compat";
+import { classModule } from "@blazetrails/ruby-compat/class-module";
+import { extend, include } from "@blazetrails/ruby-compat/include";
 
 import { mattrAccessor, mattrWriter } from "../../../lib/module-ext.js";
 

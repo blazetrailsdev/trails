@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { getFs, getOsAsync, getPath } from "@blazetrails/ruby-compat";
+import { getFs, getPath } from "@blazetrails/ruby-compat/fs-adapter";
+import { getOsAsync } from "@blazetrails/ruby-compat/os-adapter";
 import { EncryptedConfiguration, InvalidContentError } from "../lib/encrypted-configuration.js";
 
 describe("EncryptedConfiguration::InvalidContentError", () => {

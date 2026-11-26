@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { NameError, StandardError, Thread, rbEqual, stderr } from "@blazetrails/ruby-compat";
+import { NameError } from "@blazetrails/ruby-compat/name-error";
+import { stderr } from "@blazetrails/ruby-compat/process-adapter";
+import { rbEqual } from "@blazetrails/ruby-compat/rb-equal";
+import { StandardError } from "@blazetrails/ruby-compat/standard-error";
+import { Thread } from "@blazetrails/ruby-compat/thread";
 import { include, constSet } from "@blazetrails/ruby-compat/include";
 import {
   Deprecation,

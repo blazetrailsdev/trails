@@ -1,6 +1,6 @@
 import { DescendantsTracker } from "@blazetrails/activesupport";
 import { Publisher } from "../publisher.js";
-import { constSet } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
 import { Base } from "../../../lib/base.js";
 
 export class PublisherMagazine extends Base {

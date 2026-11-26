@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { OpenSSL } from "@blazetrails/ruby-compat";
+import { OpenSSL } from "@blazetrails/ruby-compat/openssl";
 import { ArgumentError } from "../../../lib/hash-utils.js";
 import {
   DNS_NAMESPACE,

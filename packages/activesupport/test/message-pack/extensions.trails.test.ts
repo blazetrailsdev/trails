@@ -1,11 +1,8 @@
 import { describe, expect, it } from "vitest";
-import {
-  EOFError,
-  NameError,
-  ZeroDivisionError,
-  complex,
-  rational,
-} from "@blazetrails/ruby-compat";
+import { complex } from "@blazetrails/ruby-compat/complex";
+import { EOFError } from "@blazetrails/ruby-compat/eof-error";
+import { NameError } from "@blazetrails/ruby-compat/name-error";
+import { ZeroDivisionError, rational } from "@blazetrails/ruby-compat/rational";
 
 import { Extensions, MissingClassError } from "../../lib/message-pack/extensions.js";
 import { Factory } from "@blazetrails/msgpack";

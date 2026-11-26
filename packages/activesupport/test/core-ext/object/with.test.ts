@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { NoMethodError } from "@blazetrails/ruby-compat";
+import { NoMethodError } from "@blazetrails/ruby-compat/no-method-error";
 import { with as with_ } from "../../../lib/core-ext/object/with.js";
 import { assertNotRespondTo } from "../../../lib/testing/assertions.js";
 

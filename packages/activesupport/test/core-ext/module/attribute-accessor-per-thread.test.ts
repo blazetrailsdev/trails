@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { NameError, Thread } from "@blazetrails/ruby-compat";
+import { NameError } from "@blazetrails/ruby-compat/name-error";
+import { Thread } from "@blazetrails/ruby-compat/thread";
 import {
   threadCattrReader,
   threadCattrWriter,

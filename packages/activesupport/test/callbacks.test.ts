@@ -1,4 +1,6 @@
-import { include, kernelThrow, rbObjSingletonClass } from "@blazetrails/ruby-compat";
+import { include } from "@blazetrails/ruby-compat/include";
+import { kernelThrow } from "@blazetrails/ruby-compat/kernel-catch";
+import { rbObjSingletonClass } from "@blazetrails/ruby-compat/object";
 import type { Extended, Included } from "@blazetrails/ruby-compat/include";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Callbacks } from "../lib/callbacks.js";

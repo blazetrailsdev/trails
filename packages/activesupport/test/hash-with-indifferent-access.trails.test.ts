@@ -7,7 +7,8 @@
  */
 import { describe, it, expect } from "vitest";
 import { HashWithIndifferentAccess } from "../lib/hash-with-indifferent-access.js";
-import { Enumerator, Hash } from "@blazetrails/ruby-compat";
+import { Enumerator } from "@blazetrails/ruby-compat/enumerator";
+import { Hash } from "@blazetrails/ruby-compat/hash";
 
 describe("HashWithIndifferentAccess", () => {
   it("dig with array", () => {

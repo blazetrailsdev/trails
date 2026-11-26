@@ -1,5 +1,5 @@
 import { parentPort, workerData } from "node:worker_threads";
-import { getCryptoAsync } from "@blazetrails/ruby-compat";
+import { getCryptoAsync } from "@blazetrails/ruby-compat/crypto-adapter";
 import { FileStore } from "../../lib/cache/file-store.js";
 
 await getCryptoAsync();

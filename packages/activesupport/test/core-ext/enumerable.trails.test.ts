@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { rbFSend, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { rbFSend, rbObjRespondTo } from "@blazetrails/ruby-compat/object";
 import { tryCall } from "../../lib/try.js";
 import "../../lib/core-ext/enumerable.js";
 

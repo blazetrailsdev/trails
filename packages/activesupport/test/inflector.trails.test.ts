@@ -4,7 +4,9 @@ import { NotImplementedError } from "@blazetrails/ruby-compat/not-implemented-er
 import { StopIteration } from "@blazetrails/ruby-compat/stop-iteration";
 import { constantize, safeConstantize } from "../lib/inflector.js";
 import { Inflections } from "../lib/inflector/inflections.js";
-import { constSet, TopLevel, constDefined, rbModRemoveConst } from "@blazetrails/ruby-compat";
+import { constSet, constDefined } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
+import { rbModRemoveConst } from "@blazetrails/ruby-compat/variable";
 
 declare module "@blazetrails/ruby-compat" {
   interface ConstantTable {

@@ -1,5 +1,7 @@
 import { describe, it, beforeEach, afterEach, expect } from "vitest";
-import { Concurrent, Mutex, Thread } from "@blazetrails/ruby-compat";
+import { Concurrent } from "@blazetrails/ruby-compat/concurrent/map";
+import { Mutex } from "@blazetrails/ruby-compat/mutex";
+import { Thread } from "@blazetrails/ruby-compat/thread";
 import {
   assert,
   Assertion,

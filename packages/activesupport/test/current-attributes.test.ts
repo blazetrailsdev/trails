@@ -1,4 +1,5 @@
-import { Thread, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { rbObjRespondTo } from "@blazetrails/ruby-compat/object";
+import { Thread } from "@blazetrails/ruby-compat/thread";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 
 import { CurrentAttributes } from "../lib/current-attributes.js";

@@ -16,7 +16,10 @@ import { StringType } from "@blazetrails/activemodel";
 import { Base } from "../../lib/base.js";
 import * as Type from "../../lib/type.js";
 import type { Relation } from "../../lib/relation.js";
-import { Range, RuntimeError, constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
+import { Range } from "@blazetrails/ruby-compat/range";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Developer extends Base {

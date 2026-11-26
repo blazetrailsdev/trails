@@ -4,7 +4,7 @@ import { DateTime, Time as RubyTime } from "@blazetrails/date";
 import * as DateTimeExt from "../../lib/core-ext/date-time/calculations.js";
 
 import { hours } from "../../lib/duration.js";
-import { TypeError as RubyTypeError } from "@blazetrails/ruby-compat";
+import { TypeError as RubyTypeError } from "@blazetrails/ruby-compat/type-error";
 import { Range } from "@blazetrails/ruby-compat/range";
 import { instantFromDate } from "../../lib/testing/temporal-helpers.js";
 import { TimeWithZone } from "../../lib/time-with-zone.js";

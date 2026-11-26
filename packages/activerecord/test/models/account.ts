@@ -1,5 +1,6 @@
 import { DescendantsTracker } from "@blazetrails/activesupport";
-import { constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
 import type { Reply } from "./reply.js";
 import type { ScopeOn } from "../../lib/scoping/named.js";
 import type { Relation } from "../../lib/relation.js";

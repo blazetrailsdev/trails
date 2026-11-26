@@ -1,7 +1,7 @@
 import { readFile } from "fs/promises";
 import { API, ModuleKind } from "typescript/unstable/sync";
 import * as ts from "typescript/unstable/ast";
-import { extend } from "@blazetrails/ruby-compat";
+import { extend } from "@blazetrails/ruby-compat/include";
 import { describe, expect, it } from "vitest";
 import * as Autoload from "../../lib/dependencies/autoload.js";
 

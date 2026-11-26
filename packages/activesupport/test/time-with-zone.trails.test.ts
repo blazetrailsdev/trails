@@ -5,7 +5,8 @@ import { Timezone } from "@blazetrails/tzinfo";
 import { DateTime, Time } from "@blazetrails/date";
 import { DATE_FORMATS } from "../lib/core-ext/time/conversions.js";
 import { Range } from "@blazetrails/ruby-compat/range";
-import { rbEqual, rbObjClass, rbObjClassname } from "@blazetrails/ruby-compat";
+import { rbObjClass, rbObjClassname } from "@blazetrails/ruby-compat/object";
+import { rbEqual } from "@blazetrails/ruby-compat/rb-equal";
 
 describe("TimeWithZone sub-millisecond precision", () => {
   const eastern = TimeZone.find("Eastern Time (US & Canada)")!;

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { Thread } from "@blazetrails/ruby-compat";
+import { Thread } from "@blazetrails/ruby-compat/thread";
 import { setZone, setZoneDefault, useZone, zone, zoneDefault } from "../lib/time-zone-config.js";
 import { TimeZone } from "../lib/values/time-zone.js";
 

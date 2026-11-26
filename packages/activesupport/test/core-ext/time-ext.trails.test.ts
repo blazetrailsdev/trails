@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { Time as RubyTime } from "@blazetrails/date";
 import { advance } from "../../lib/time-ext.js";
 import "../../lib/core-ext/time/calculations.js";
-import { rbFSend } from "@blazetrails/ruby-compat";
+import { rbFSend } from "@blazetrails/ruby-compat/object";
 import "../../lib/core-ext/time/conversions.js";
 import "../../lib/core-ext/date/conversions.js";
 import { TimeWithZone } from "../../lib/time-with-zone.js";

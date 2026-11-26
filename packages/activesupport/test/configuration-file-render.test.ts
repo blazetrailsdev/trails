@@ -2,7 +2,8 @@ import { describe, it, expect, afterEach } from "vitest";
 import { writeFileSync, mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { rbFBinding, TopLevel } from "@blazetrails/ruby-compat";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
+import { rbFBinding } from "@blazetrails/ruby-compat/variable";
 import { ConfigurationFile } from "../lib/configuration-file.js";
 
 describe("ConfigurationFile render", () => {

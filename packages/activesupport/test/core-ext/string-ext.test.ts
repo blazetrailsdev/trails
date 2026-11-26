@@ -46,7 +46,11 @@ import {
   UnderscoresToDashes,
 } from "../../lib/inflector-test-cases.js";
 import { SafeBuffer, htmlSafe, isHtmlSafe } from "../../lib/core-ext/string/output-safety.js";
-import { NoMethodError, Range, Rational, rbFSend, resetConstants } from "@blazetrails/ruby-compat";
+import { NoMethodError } from "@blazetrails/ruby-compat/no-method-error";
+import { rbFSend } from "@blazetrails/ruby-compat/object";
+import { Range } from "@blazetrails/ruby-compat/range";
+import { Rational } from "@blazetrails/ruby-compat/rational";
+import { resetConstants } from "@blazetrails/ruby-compat/variable";
 import { endsWith, startsWith } from "../../lib/core-ext/string/starts-ends-with.js";
 import { htmlEscape, htmlEscapeOnce, xmlNameEscape } from "../../lib/core-ext/tse/util.js";
 import {

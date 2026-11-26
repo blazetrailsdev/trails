@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { pack } from "@blazetrails/ruby-compat";
+import { pack } from "@blazetrails/ruby-compat/array";
 import { Coder } from "../../lib/cache/coder.js";
 import { coder } from "../../lib/cache/marshal-coder.js";
 import { Entry } from "../../lib/cache/entry.js";

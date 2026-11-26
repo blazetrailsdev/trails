@@ -1,10 +1,7 @@
-import {
-  block,
-  defineModule,
-  include,
-  kernelThrow,
-  rbObjSingletonClass,
-} from "@blazetrails/ruby-compat";
+import { block } from "@blazetrails/ruby-compat/hash";
+import { defineModule, include } from "@blazetrails/ruby-compat/include";
+import { kernelThrow } from "@blazetrails/ruby-compat/kernel-catch";
+import { rbObjSingletonClass } from "@blazetrails/ruby-compat/object";
 import type { Extended, Included } from "@blazetrails/ruby-compat/include";
 import { classAttribute } from "../lib/class-attribute.js";
 import { describe, it, expect } from "vitest";

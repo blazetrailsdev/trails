@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Thread } from "@blazetrails/ruby-compat";
+import { Thread } from "@blazetrails/ruby-compat/thread";
 import { threadMattrAccessor } from "../../../lib/core-ext/module/attribute-accessors-per-thread.js";
 
 describe("thread_mattr_accessor on a namespace object", () => {

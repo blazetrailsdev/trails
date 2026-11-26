@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { rbFSend, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { rbFSend, rbObjRespondTo } from "@blazetrails/ruby-compat/object";
 import { isBlank, mbChars, presence } from "../../../lib/index.js";
 
 describe("Object#blank? respond_to?(:empty?) probe", () => {

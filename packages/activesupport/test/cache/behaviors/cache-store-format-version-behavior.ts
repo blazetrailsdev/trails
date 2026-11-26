@@ -1,11 +1,9 @@
 import { expect, it } from "vitest";
-import {
-  constSet,
-  rbModRemoveConst,
-  rbStrStartWith,
-  TopLevel,
-  uniq,
-} from "@blazetrails/ruby-compat";
+import { uniq } from "@blazetrails/ruby-compat/array";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
+import { rbStrStartWith } from "@blazetrails/ruby-compat/string/sub";
+import { rbModRemoveConst } from "@blazetrails/ruby-compat/variable";
 import { Entry } from "../../../lib/cache/entry.js";
 import "../../../lib/cache.js";
 import { ActiveSupport } from "../../../lib/namespaces.js";

@@ -17,17 +17,14 @@ import {
   maximum,
 } from "../../lib/core-ext/enumerable.js";
 import { compactBlank as hashCompactBlank, compactBlankBang } from "../../lib/hash-utils.js";
-import {
-  Complex,
-  Enumerator,
-  Hash,
-  TypeError,
-  complex,
-  rational,
-  rbEqual,
-  rbObjClassname,
-  each,
-} from "@blazetrails/ruby-compat";
+import { each } from "@blazetrails/ruby-compat/array";
+import { Complex, complex } from "@blazetrails/ruby-compat/complex";
+import { Enumerator } from "@blazetrails/ruby-compat/enumerator";
+import { Hash } from "@blazetrails/ruby-compat/hash";
+import { rbObjClassname } from "@blazetrails/ruby-compat/object";
+import { rational } from "@blazetrails/ruby-compat/rational";
+import { rbEqual } from "@blazetrails/ruby-compat/rb-equal";
+import { TypeError } from "@blazetrails/ruby-compat/type-error";
 import { Range } from "@blazetrails/ruby-compat/range";
 import { first } from "@blazetrails/ruby-compat/enumerable";
 import { assertEqual, assertRaise, assertRaises } from "../../lib/testing/assertions.js";

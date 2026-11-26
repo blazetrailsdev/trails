@@ -2,7 +2,8 @@ import { AbstractAdapter } from "../../lib/connection-adapters/abstract-adapter.
 import { Column } from "../../lib/connection-adapters/column.js";
 import type { SqlTypeMetadata } from "../../lib/connection-adapters/sql-type-metadata.js";
 import { SchemaStatements } from "../../lib/connection-adapters/abstract/schema-statements.js";
-import { TopLevel, constSet } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
 
 export interface MergeColumnOptions {
   default?: string | null;

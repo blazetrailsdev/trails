@@ -1,4 +1,7 @@
-import { Dir, File, FileUtils, getOsAsync } from "@blazetrails/ruby-compat";
+import { Dir } from "@blazetrails/ruby-compat/dir";
+import { File } from "@blazetrails/ruby-compat/file";
+import { FileUtils } from "@blazetrails/ruby-compat/file-utils";
+import { getOsAsync } from "@blazetrails/ruby-compat/os-adapter";
 import { RUN_TOKEN_ENV, STALE_DB_AGE_MS } from "./run-token.js";
 import { activeLane } from "./connection.js";
 

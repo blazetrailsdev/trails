@@ -1,4 +1,5 @@
-import { Hash, Thread } from "@blazetrails/ruby-compat";
+import { Hash } from "@blazetrails/ruby-compat/hash";
+import { Thread } from "@blazetrails/ruby-compat/thread";
 import { describe, it, expect, afterEach, beforeEach } from "vitest";
 import {
   backend,

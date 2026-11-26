@@ -1,5 +1,5 @@
 import { beforeEach, describe, it, expect } from "vitest";
-import { extend, include } from "@blazetrails/ruby-compat";
+import { extend, include } from "@blazetrails/ruby-compat/include";
 import { includedModules, prepend } from "@blazetrails/ruby-compat/include";
 import { Concern, MultipleIncludedBlocks, MultiplePrependBlocks } from "../lib/concern.js";
 import {

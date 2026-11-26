@@ -1,6 +1,7 @@
 import { connect } from "./connection.js";
 import { getEnv } from "@blazetrails/activesupport";
-import { RuntimeError, getOs } from "@blazetrails/ruby-compat";
+import { getOs } from "@blazetrails/ruby-compat/os-adapter";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
 import { Base } from "../../lib/base.js";
 import { ConnectionNotEstablished } from "../../lib/errors.js";
 import { DatabaseTasks } from "../../lib/tasks/database-tasks.js";

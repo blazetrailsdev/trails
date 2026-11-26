@@ -1,5 +1,6 @@
 import { beforeEach, describe, it, expect } from "vitest";
-import { Gem, RbConfig } from "@blazetrails/ruby-compat";
+import { Gem } from "@blazetrails/ruby-compat/gem";
+import { RbConfig } from "@blazetrails/ruby-compat/rb-config";
 import { assertEmpty } from "../lib/testing/assertions.js";
 
 import { BacktraceCleaner } from "../lib/backtrace-cleaner.js";

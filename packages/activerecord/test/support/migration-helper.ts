@@ -1,5 +1,5 @@
 import { delegate } from "@blazetrails/activesupport";
-import { included } from "@blazetrails/ruby-compat";
+import { included } from "@blazetrails/ruby-compat/include";
 import type { BigDecimal } from "@blazetrails/activesupport";
 import { Base } from "../../lib/base.js";
 import { Migration } from "../../lib/migration.js";

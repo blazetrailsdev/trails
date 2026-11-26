@@ -4,7 +4,9 @@ import { Redis, ReplyError, type ChainableCommander } from "ioredis";
 import PipelineModule from "ioredis/built/Pipeline.js";
 
 const Pipeline = PipelineModule as unknown as { prototype: ChainableCommander };
-import { ArgumentError, SecureRandom, regexpEscape } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { regexpEscape } from "@blazetrails/ruby-compat/regexp";
+import { SecureRandom } from "@blazetrails/ruby-compat/secure-random";
 import { Duration } from "../../../lib/duration.js";
 import { getEnv } from "../../../lib/environment.js";
 import { lookupStore as cacheLookupStore } from "../../../lib/cache.js";

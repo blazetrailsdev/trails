@@ -1,6 +1,6 @@
 import pg from "pg";
 import mysql from "mysql2/promise";
-import { RuntimeError } from "@blazetrails/ruby-compat";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
 import { WORKER_DB_ENV, ensureWorkerClone } from "./sqlite-template.js";
 import { slotPoolSize, workerForkCount } from "./ar-db-slots.js";
 import { SLOT_ENV, mysqlSettings, ownsSlotDatabase, postgresSettings } from "./config.js";

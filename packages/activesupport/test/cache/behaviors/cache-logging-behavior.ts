@@ -1,5 +1,6 @@
 import { beforeEach, expect, it } from "vitest";
-import { StringIO, regexpEscape } from "@blazetrails/ruby-compat";
+import { regexpEscape } from "@blazetrails/ruby-compat/regexp";
+import { StringIO } from "@blazetrails/ruby-compat/string-io";
 import { Logger } from "../../../lib/logger.js";
 import { Store, type StoreOptions } from "../../../lib/cache/store.js";
 import { with as with_ } from "../../../lib/core-ext/object/with.js";

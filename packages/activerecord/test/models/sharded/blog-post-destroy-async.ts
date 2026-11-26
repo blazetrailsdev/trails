@@ -1,5 +1,5 @@
 import { DescendantsTracker } from "@blazetrails/activesupport";
-import { constSet } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
 import { Sharded } from "./namespace.js";
 import "../../../lib/destroy-association-async-job.js";
 import { Base } from "../../../lib/base.js";

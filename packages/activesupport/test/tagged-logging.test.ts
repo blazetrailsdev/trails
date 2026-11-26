@@ -2,7 +2,8 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { Logger } from "../lib/logger.js";
 import { BroadcastLogger } from "../lib/broadcast-logger.js";
 import { TagStack, TaggedLogging } from "../lib/tagged-logging.js";
-import { Thread, extend } from "@blazetrails/ruby-compat";
+import { extend } from "@blazetrails/ruby-compat/include";
+import { Thread } from "@blazetrails/ruby-compat/thread";
 import { assertRespondTo, assertNotNil, assertNil } from "../lib/testing/assertions.js";
 
 function makeBuffer() {

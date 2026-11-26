@@ -1,17 +1,14 @@
 import { afterEach, beforeEach, describe, it, expect } from "vitest";
-import {
-  ArgumentError,
-  cmp,
-  IndexError,
-  NameError,
-  NoMethodError,
-  Range,
-  rbEql,
-  rbEqual,
-  rbObjMethod,
-  rbStrSend,
-  TypeError,
-} from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { cmp } from "@blazetrails/ruby-compat/comparable";
+import { IndexError } from "@blazetrails/ruby-compat/index-error";
+import { rbObjMethod } from "@blazetrails/ruby-compat/method";
+import { NameError } from "@blazetrails/ruby-compat/name-error";
+import { NoMethodError } from "@blazetrails/ruby-compat/no-method-error";
+import { Range } from "@blazetrails/ruby-compat/range";
+import { rbEql, rbEqual } from "@blazetrails/ruby-compat/rb-equal";
+import { rbStrSend } from "@blazetrails/ruby-compat/string/method-table";
+import { TypeError } from "@blazetrails/ruby-compat/type-error";
 import { Multibyte } from "../lib/multibyte.js";
 import { Chars } from "../lib/multibyte/chars.js";
 import { mbChars as stringMbChars } from "../lib/core-ext/string/multibyte.js";

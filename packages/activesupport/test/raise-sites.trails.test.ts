@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { ArgumentError } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
 import { Rescuable } from "../lib/rescuable.js";
 import { Fanout } from "../lib/notifications/fanout.js";
 import { numberToHuman } from "../lib/number-helper.js";

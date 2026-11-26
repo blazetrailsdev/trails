@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { isEmpty } from "@blazetrails/ruby-compat";
+import { isEmpty } from "@blazetrails/ruby-compat/ruby-empty";
 
 import { benchmark as benchmarkFn, type BenchmarkOptions } from "../lib/benchmarkable.js";
 import { Logger } from "../lib/logger.js";

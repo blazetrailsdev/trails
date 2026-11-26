@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Hash } from "@blazetrails/ruby-compat";
+import { Hash } from "@blazetrails/ruby-compat/hash";
 import { toXml } from "../lib/core-ext/array/conversions.js";
 import {
   deepMerge,
@@ -29,7 +29,7 @@ import {
   compactBlank,
   HashWithIndifferentAccess,
 } from "../lib/index.js";
-import { except } from "@blazetrails/ruby-compat";
+import { except } from "@blazetrails/ruby-compat/hash";
 import { extractBang } from "../lib/core-ext/hash/slice.js";
 
 describe("deepMerge", () => {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { ArgumentError } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
 import { EnvironmentInquirer, DEFAULT_ENVIRONMENTS } from "../lib/environment-inquirer.js";
 
 describe("EnvironmentInquirer", () => {

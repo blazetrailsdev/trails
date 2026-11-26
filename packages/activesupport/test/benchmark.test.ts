@@ -1,5 +1,5 @@
 import { describe, it } from "vitest";
-import { Range } from "@blazetrails/ruby-compat";
+import { Range } from "@blazetrails/ruby-compat/range";
 import { Benchmark } from "../lib/benchmark.js";
 import { assertIncludes } from "../lib/testing/assertions.js";
 

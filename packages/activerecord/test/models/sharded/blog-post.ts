@@ -1,7 +1,7 @@
 import { DescendantsTracker } from "@blazetrails/activesupport";
-import { constSet } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
 import { Sharded } from "./namespace.js";
-import { rbModName } from "@blazetrails/ruby-compat";
+import { rbModName } from "@blazetrails/ruby-compat/object";
 import type { AssociationProxy } from "../../../lib/associations/collection-proxy.js";
 import { Base } from "../../../lib/base.js";
 import { queryConstraints } from "../../../lib/persistence.js";

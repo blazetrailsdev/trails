@@ -1,16 +1,11 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import {
-  rbObjRespondTo,
-  ArgumentError,
-  NoMethodError,
-  rbObjMethod,
-  TopLevel,
-  constGet,
-  constSet,
-  constDefined,
-  rbModRemoveConst,
-} from "@blazetrails/ruby-compat";
-import { rbCBasicObject as BasicObject } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { constSet, constDefined } from "@blazetrails/ruby-compat/include";
+import { rbObjMethod } from "@blazetrails/ruby-compat/method";
+import { NoMethodError } from "@blazetrails/ruby-compat/no-method-error";
+import { rbObjRespondTo, TopLevel } from "@blazetrails/ruby-compat/object";
+import { constGet, rbModRemoveConst } from "@blazetrails/ruby-compat/variable";
+import { rbCBasicObject as BasicObject } from "@blazetrails/ruby-compat/object";
 import { delegate, delegateMissingTo } from "../../lib/module-ext.js";
 import { DelegationError } from "../../lib/delegation.js";
 import { callerLocations } from "../../lib/deprecation.js";

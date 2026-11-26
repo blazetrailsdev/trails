@@ -1,5 +1,9 @@
 import { afterEach, beforeEach, describe, it } from "vitest";
-import { getFs, getOsAsync, getPath, Hash, KeyError, setEnv } from "@blazetrails/ruby-compat";
+import { getFs, getPath } from "@blazetrails/ruby-compat/fs-adapter";
+import { Hash } from "@blazetrails/ruby-compat/hash";
+import { KeyError } from "@blazetrails/ruby-compat/key-error";
+import { getOsAsync } from "@blazetrails/ruby-compat/os-adapter";
+import { setEnv } from "@blazetrails/ruby-compat/process-adapter";
 import { Psych } from "@blazetrails/ruby-compat/psych";
 import {
   EncryptedConfiguration,

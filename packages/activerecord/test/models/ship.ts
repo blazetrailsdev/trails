@@ -1,5 +1,8 @@
 import { DescendantsTracker } from "@blazetrails/activesupport";
-import { isEmpty, kernelThrow, constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { kernelThrow } from "@blazetrails/ruby-compat/kernel-catch";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
+import { isEmpty } from "@blazetrails/ruby-compat/ruby-empty";
 import type { AssociationProxy } from "../../lib/associations/collection-proxy.js";
 import type { Time as RubyTime } from "@blazetrails/date";
 import type { Developer } from "./developer.js";

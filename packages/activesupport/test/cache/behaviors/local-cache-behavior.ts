@@ -1,6 +1,7 @@
 import { beforeEach, expect, it as vitestIt } from "vitest";
 import { Time } from "@blazetrails/date";
-import { NotImplementedError, rbModName } from "@blazetrails/ruby-compat";
+import { NotImplementedError } from "@blazetrails/ruby-compat/not-implemented-error";
+import { rbModName } from "@blazetrails/ruby-compat/object";
 import type { Store, StoreOptions } from "../../../lib/cache/store.js";
 import type { LocalStore } from "../../../lib/cache/strategy/local-cache.js";
 import type { Middleware } from "../../../lib/cache/strategy/local-cache-middleware.js";

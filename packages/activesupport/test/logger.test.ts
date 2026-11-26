@@ -1,7 +1,12 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { Logger, SimpleFormatter } from "../lib/logger.js";
 import { IsolatedExecutionState } from "../lib/isolated-execution-state.js";
-import { File, Fiber, FrozenError, Tempfile, Thread, rbObjClone } from "@blazetrails/ruby-compat";
+import { Fiber } from "@blazetrails/ruby-compat/fiber";
+import { File } from "@blazetrails/ruby-compat/file";
+import { FrozenError } from "@blazetrails/ruby-compat/frozen-error";
+import { rbObjClone } from "@blazetrails/ruby-compat/include";
+import { Tempfile } from "@blazetrails/ruby-compat/tempfile";
+import { Thread } from "@blazetrails/ruby-compat/thread";
 import { BroadcastLogger } from "../lib/broadcast-logger.js";
 
 function makeBuffer() {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Hash } from "@blazetrails/ruby-compat";
+import { Hash } from "@blazetrails/ruby-compat/hash";
 import { reverseMerge, reverseMergeBang, transformKeys } from "../lib/hash-utils.js";
 
 describe("transformKeys on a plain object", () => {

@@ -4,7 +4,8 @@ import { DateTime, Date as RubyDate, Time } from "@blazetrails/date";
 import { TimeZone } from "../lib/values/time-zone.js";
 import type { TimeWithZone } from "../lib/time-with-zone.js";
 import { setZone, zone } from "../lib/time-zone-config.js";
-import { Rational, RuntimeError } from "@blazetrails/ruby-compat";
+import { Rational } from "@blazetrails/ruby-compat/rational";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
 import { Duration } from "../lib/duration.js";
 import { toFs } from "../lib/core-ext/time/conversions.js";
 import {

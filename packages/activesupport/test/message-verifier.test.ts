@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { assertNot, assertRaises, assertNil } from "../lib/testing/assertions.js";
 
-import { getCrypto } from "@blazetrails/ruby-compat";
+import { getCrypto } from "@blazetrails/ruby-compat/crypto-adapter";
 import { ActiveSupportJSON } from "../lib/json.js";
 import { Encoding } from "../lib/json/encoding.js";
 import { base58 } from "../lib/core-ext/securerandom.js";

@@ -1,14 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
 import { Time as RubyTime } from "@blazetrails/date";
 import { Duration, Scalar, days } from "../../lib/duration.js";
+import { cmp } from "@blazetrails/ruby-compat/comparable";
 import {
-  cmp,
-  rbEqual,
   rbInspect as inspect,
   rbObjRespondTo,
   rbCInteger,
   rbCNumeric,
-} from "@blazetrails/ruby-compat";
+} from "@blazetrails/ruby-compat/object";
+import { rbEqual } from "@blazetrails/ruby-compat/rb-equal";
 import {
   assertNothingRaised,
   assertRaise,

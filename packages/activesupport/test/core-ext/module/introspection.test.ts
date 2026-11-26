@@ -1,11 +1,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
-import {
-  TopLevel,
-  constGet,
-  constSet,
-  constDefined,
-  rbModRemoveConst,
-} from "@blazetrails/ruby-compat";
+import { constSet, constDefined } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
+import { constGet, rbModRemoveConst } from "@blazetrails/ruby-compat/variable";
 import { moduleParent, moduleParentName, moduleParents } from "../../../lib/module-ext.js";
 import { assertNil } from "../../../lib/testing/assertions.js";
 

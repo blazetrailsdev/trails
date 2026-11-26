@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { ArgumentError, File, Pathname } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { File } from "@blazetrails/ruby-compat/file";
+import { Pathname } from "@blazetrails/ruby-compat/pathname";
 import { TestCase } from "../../lib/test-case.js";
 import { assertRaises } from "../../lib/testing/assertions.js";
 

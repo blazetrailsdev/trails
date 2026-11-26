@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Pathname } from "@blazetrails/ruby-compat";
+import { Pathname } from "@blazetrails/ruby-compat/pathname";
 import { existence } from "../../../lib/core-ext/pathname/existence.js";
 
 describe("PathnameExistenceTest", () => {

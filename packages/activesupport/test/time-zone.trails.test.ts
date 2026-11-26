@@ -4,7 +4,7 @@ import { TimeZone } from "../lib/values/time-zone.js";
 import { AmbiguousTime, PeriodNotFound } from "@blazetrails/tzinfo";
 import { ArgumentError } from "../lib/hash-utils.js";
 import { Time } from "@blazetrails/date";
-import { Rational } from "@blazetrails/ruby-compat";
+import { Rational } from "@blazetrails/ruby-compat/rational";
 
 describe("TimeZoneTest", () => {
   it("clear resets the memos", () => {

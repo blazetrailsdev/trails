@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { Rational } from "@blazetrails/ruby-compat";
+import { Rational } from "@blazetrails/ruby-compat/rational";
 import { Time as RubyTime } from "@blazetrails/date";
 import * as DateExt from "../../lib/core-ext/date/calculations.js";
 import { setZone } from "../../lib/time-zone-config.js";
