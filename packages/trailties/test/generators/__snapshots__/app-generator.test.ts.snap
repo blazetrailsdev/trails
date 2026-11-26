@@ -1,18 +1,18 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`AppGenerator > snapshots emitted TypeScript sources > application-controller.ts 1`] = `
+exports[`AppGeneratorTest > snapshots emitted TypeScript sources > application-controller.ts 1`] = `
 "import { ActionController } from "@blazetrails/actionpack";
 
 export class ApplicationController extends ActionController.Base {}
 "
 `;
 
-exports[`AppGenerator > snapshots emitted TypeScript sources > application-helper.ts 1`] = `
+exports[`AppGeneratorTest > snapshots emitted TypeScript sources > application-helper.ts 1`] = `
 "export const ApplicationHelper = {};
 "
 `;
 
-exports[`AppGenerator > snapshots emitted TypeScript sources > application-job.ts 1`] = `
+exports[`AppGeneratorTest > snapshots emitted TypeScript sources > application-job.ts 1`] = `
 "import { ActiveJob } from "@blazetrails/activejob";
 
 export class ApplicationJob extends ActiveJob.Base {
@@ -24,7 +24,7 @@ export class ApplicationJob extends ActiveJob.Base {
 "
 `;
 
-exports[`AppGenerator > snapshots emitted TypeScript sources > application-mailer.ts 1`] = `
+exports[`AppGeneratorTest > snapshots emitted TypeScript sources > application-mailer.ts 1`] = `
 "export class ApplicationMailer {
   defaultFrom = "from@example.com";
 
@@ -33,7 +33,7 @@ exports[`AppGenerator > snapshots emitted TypeScript sources > application-maile
 "
 `;
 
-exports[`AppGenerator > snapshots emitted TypeScript sources > application-record.ts 1`] = `
+exports[`AppGeneratorTest > snapshots emitted TypeScript sources > application-record.ts 1`] = `
 "import { Base } from "@blazetrails/activerecord";
 
 export class ApplicationRecord extends Base {
@@ -44,7 +44,7 @@ export class ApplicationRecord extends Base {
 "
 `;
 
-exports[`AppGenerator > snapshots emitted TypeScript sources > config.ts 1`] = `
+exports[`AppGeneratorTest > snapshots emitted TypeScript sources > config.ts 1`] = `
 "// This file is used by Rack-based servers to start the application.
 import { Trails } from "@blazetrails/trailties";
 
@@ -56,7 +56,7 @@ await Trails.application.loadServer();
 "
 `;
 
-exports[`AppGenerator > snapshots emitted TypeScript sources > config/application.ts 1`] = `
+exports[`AppGeneratorTest > snapshots emitted TypeScript sources > config/application.ts 1`] = `
 "import "./boot.ts";
 
 import { Bundler, constSet, TopLevel } from "@blazetrails/ruby-compat";
@@ -101,7 +101,7 @@ declare module "@blazetrails/trailties" {
 "
 `;
 
-exports[`AppGenerator > snapshots emitted TypeScript sources > config/cable.ts 1`] = `
+exports[`AppGeneratorTest > snapshots emitted TypeScript sources > config/cable.ts 1`] = `
 "export default {
   development: {
     adapter: "async",
@@ -118,7 +118,7 @@ exports[`AppGenerator > snapshots emitted TypeScript sources > config/cable.ts 1
 "
 `;
 
-exports[`AppGenerator > snapshots emitted TypeScript sources > config/routes.ts 1`] = `
+exports[`AppGeneratorTest > snapshots emitted TypeScript sources > config/routes.ts 1`] = `
 "import { Trails } from "@blazetrails/trailties";
 
 Trails.application.routes().draw(function () {
@@ -140,7 +140,7 @@ Trails.application.routes().draw(function () {
 "
 `;
 
-exports[`AppGenerator > snapshots emitted TypeScript sources > config/storage.ts 1`] = `
+exports[`AppGeneratorTest > snapshots emitted TypeScript sources > config/storage.ts 1`] = `
 "export default {
   test: {
     service: "Disk",
@@ -178,7 +178,7 @@ exports[`AppGenerator > snapshots emitted TypeScript sources > config/storage.ts
 "
 `;
 
-exports[`AppGenerator > snapshots emitted TypeScript sources > environments/development.ts 1`] = `
+exports[`AppGeneratorTest > snapshots emitted TypeScript sources > environments/development.ts 1`] = `
 "import { days } from "@blazetrails/activesupport";
 import { getFs } from "@blazetrails/ruby-compat";
 import { Trails } from "@blazetrails/trailties";
@@ -258,7 +258,7 @@ Trails.application.configure(function () {
 "
 `;
 
-exports[`AppGenerator > snapshots emitted TypeScript sources > environments/production.ts 1`] = `
+exports[`AppGeneratorTest > snapshots emitted TypeScript sources > environments/production.ts 1`] = `
 "import { TaggedLogging } from "@blazetrails/activesupport";
 import { env, STDOUT } from "@blazetrails/ruby-compat";
 import { Trails } from "@blazetrails/trailties";
@@ -353,7 +353,7 @@ Trails.application.configure(function () {
 "
 `;
 
-exports[`AppGenerator > snapshots emitted TypeScript sources > environments/test.ts 1`] = `
+exports[`AppGeneratorTest > snapshots emitted TypeScript sources > environments/test.ts 1`] = `
 "// The test environment is used exclusively to run your application's
 // test suite. You never need to work with it otherwise. Remember that
 // your test database is "scratch space" for the test suite and is wiped
@@ -414,7 +414,7 @@ Trails.application.configure(function () {
 "
 `;
 
-exports[`AppGenerator > snapshots emitted TypeScript sources > global-setup.ts 1`] = `
+exports[`AppGeneratorTest > snapshots emitted TypeScript sources > global-setup.ts 1`] = `
 "import { Base } from "@blazetrails/activerecord";
 import { buildViews } from "@blazetrails/trails-tsc";
 import { env, setEnv } from "@blazetrails/ruby-compat";
@@ -432,7 +432,7 @@ export async function teardown(): Promise<void> {
 "
 `;
 
-exports[`AppGenerator > snapshots emitted TypeScript sources > test-helper.ts 1`] = `
+exports[`AppGeneratorTest > snapshots emitted TypeScript sources > test-helper.ts 1`] = `
 "import { TestCase } from "@blazetrails/activesupport/test-case";
 import { env, setEnv } from "@blazetrails/ruby-compat";
 
@@ -447,7 +447,7 @@ TestCase.fixtures(":all");
 "
 `;
 
-exports[`AppGenerator > snapshots emitted TypeScript sources > vite.config.ts 1`] = `
+exports[`AppGeneratorTest > snapshots emitted TypeScript sources > vite.config.ts 1`] = `
 "/// <reference types="vitest/config" />
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
