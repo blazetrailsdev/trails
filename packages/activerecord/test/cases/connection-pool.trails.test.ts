@@ -201,6 +201,16 @@ it("leaseConnection joining a pending withConnection checkout keeps the lease", 
   expect(pool.stat().busy).toBe(1);
 });
 
+it("withConnectionSync during a pending withConnection checkout uses its own connection", async () => {
+  const pool = makePool(2);
+  const pending = pool.withConnection((conn) => conn);
+  const synced = pool.withConnectionSync((conn) => conn);
+  const owned = await pending;
+  expect(synced).not.toBe(owned);
+  expect(pool.isActiveConnection()).toBeNull();
+  expect(pool.stat().busy).toBe(0);
+});
+
 it("withConnection keeps the lease for a joiner that outlives the checkout's owner", async () => {
   const pool = makePool(2);
   const checkout = vi.spyOn(pool, "checkout");

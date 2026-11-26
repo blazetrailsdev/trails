@@ -759,9 +759,24 @@ export class ConnectionPool implements ReapablePool {
     let result: T;
     const release = !lease.connection;
     try {
-      /** @inventedArm throw — CONVERGEABLE with-connection-sync-is-a-lease-no-claude-md-section-ratifies */
+      /** @inventedArm if — CONVERGEABLE with-connection-sync-is-a-lease-no-claude-md-section-ratifies */
       if (lease.connection instanceof Promise) {
-        throw new RuntimeError("withConnectionSync reached a lease whose checkout is pending");
+        const conn = this.acquireConnectionSync(this.checkoutTimeout);
+        let value: T;
+        try {
+          value = fn(conn);
+        } catch (error) {
+          if (preventPermanentCheckout && !stickyWas) lease.sticky = stickyWas;
+          this.checkin(conn);
+          throw error;
+        }
+        const restore = () => {
+          if (preventPermanentCheckout && !stickyWas) lease.sticky = stickyWas;
+          this.checkin(conn);
+        };
+        if (value instanceof Promise) return value.finally(restore) as T;
+        restore();
+        return value;
       } else if (lease.connection) {
         result = fn(lease.connection);
       } else {
