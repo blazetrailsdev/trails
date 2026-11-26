@@ -143,7 +143,7 @@ type InsertHost = ActionsHost & { insertIntoFile: typeof insertIntoFile };
 
 export async function chmod(
   this: ActionsHost,
-  path: string,
+  path: string | { toPath(): string },
   mode: number,
   config: Record<string, unknown> = {},
 ): Promise<void> {
@@ -217,7 +217,7 @@ export function injectIntoModule(
 
 export async function gsubFileBang(
   this: ActionsHost,
-  path: string,
+  path: string | { toPath(): string },
   flag: RegExp | string,
   ...args: unknown[]
 ): Promise<void> {
@@ -242,7 +242,7 @@ export async function gsubFileBang(
 
 export async function gsubFile(
   this: ActionsHost,
-  path: string,
+  path: string | { toPath(): string },
   flag: RegExp | string,
   ...args: unknown[]
 ): Promise<void> {
@@ -267,7 +267,7 @@ export async function gsubFile(
 
 export function uncommentLines(
   this: GsubHost,
-  path: string,
+  path: string | { toPath(): string },
   flag: RegExp | string,
   ...args: unknown[]
 ): Promise<void> {
@@ -278,7 +278,7 @@ export function uncommentLines(
 
 export function commentLines(
   this: GsubHost,
-  path: string,
+  path: string | { toPath(): string },
   flag: RegExp | string,
   ...args: unknown[]
 ): Promise<void> {
@@ -289,7 +289,7 @@ export function commentLines(
 
 export async function removeFile(
   this: ActionsHost,
-  path: string,
+  path: string | { toPath(): string },
   config: Record<string, unknown> = {},
 ): Promise<void> {
   if (this.behavior !== "invoke") return;

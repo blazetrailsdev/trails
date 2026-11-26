@@ -47,6 +47,11 @@ describe("MiniMagick::Tool", () => {
   });
 
   describe(".new", () => {
+    it("accepts options", () => {
+      expect(() => Tool.new("compare", { errors: false })).not.toThrow();
+      expect(() => MiniMagick.compare({ errors: false })).not.toThrow();
+    });
+
     it("accepts a block, and immediately executes the command", async () => {
       const output = await Tool.new(
         "identify",

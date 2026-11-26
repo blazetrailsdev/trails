@@ -157,6 +157,54 @@ describe("ActionMailbox::Ingresses::Mailgun::InboundEmailsControllerTest", () =>
     t.assertResponse(":unauthorized");
   });
 
+  it("receiving an inbound email from Mailgun with a timestamp slightly ahead of local time", async () => {
+    await assertDifference(
+      () => InboundEmail.count(),
+      +1,
+      null,
+      async () => {
+        travelTo("2018-10-09 15:14:00 EDT");
+        await t.post(trailsMailgunInboundEmailsUrl(), {
+          params: {
+            timestamp: 1539112500,
+            token: TOKEN,
+            signature: SIGNATURE,
+            "body-mime": await t.fileFixture("../files/welcome.eml").read(),
+          },
+        });
+      },
+    );
+
+    t.assertResponse(":no_content");
+  });
+
+  it("rejecting an inbound email from Mailgun with a timestamp from the future", async () => {
+    const originalTimestamp = "1539112500";
+    const originalToken = TOKEN;
+    const futureTimestamp = originalTimestamp + originalToken[0];
+    const shortenedToken = originalToken.slice(1);
+
+    expect(futureTimestamp + shortenedToken).toBe(originalTimestamp + originalToken);
+
+    await assertNoDifference(
+      () => InboundEmail.count(),
+      null,
+      async () => {
+        travelTo("2018-10-09 15:26:00 EDT");
+        await t.post(trailsMailgunInboundEmailsUrl(), {
+          params: {
+            timestamp: futureTimestamp,
+            token: shortenedToken,
+            signature: SIGNATURE,
+            "body-mime": await t.fileFixture("../files/welcome.eml").read(),
+          },
+        });
+      },
+    );
+
+    t.assertResponse(":unauthorized");
+  });
+
   it("rejecting a forged inbound email from Mailgun", async () => {
     await assertNoDifference(
       () => InboundEmail.count(),

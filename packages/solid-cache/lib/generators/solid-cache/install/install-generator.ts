@@ -1,5 +1,6 @@
+import "../../../constants.solid-cache-install-install-generator.generated.js";
 import { Base as ActiveRecordBase } from "@blazetrails/activerecord";
-import { File, RuntimeError, rbInspect } from "@blazetrails/ruby-compat";
+import { File, Pathname, RuntimeError, rbInspect } from "@blazetrails/ruby-compat";
 import type * as ThorActions from "@blazetrails/thor/actions";
 import { Trails } from "@blazetrails/trailties";
 import type {} from "@blazetrails/trailties/trailties/active-record";
@@ -16,6 +17,7 @@ export class InstallGenerator extends Base {
 
   declare copyFile: OmitThisParameter<typeof ThorActions.Actions.copyFile>;
 
+  /** @missingRailsArgs template — CONVERGEABLE solid-cache-install-generator-writes-cache-yml */
   async copyFiles(): Promise<void> {
     await this.template("config/cache.ts");
 
@@ -28,7 +30,7 @@ export class InstallGenerator extends Base {
 
   async configureCacheStoreAdapter(): Promise<void> {
     await this.gsubFile(
-      File.join(this.destinationRoot, "config/environments/production.ts"),
+      new Pathname(this.destinationRoot).join("config/environments/production.ts"),
       /(\/\/ )?this\.config\.cacheStore = (".*")/,
       'this.config.cacheStore = ":solid_cache_store"',
     );
