@@ -249,9 +249,12 @@ export class Path {
     return out;
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm filter — PERMANENT
+   */
   private filesIn(path: string): string[] {
-    let files = Dir.glob(this.glob!, { base: path });
+    let files = Dir.glob(this.glob!, { base: path }).filter((file) => !file.endsWith(".d.ts"));
     if (this._exclude) files = files.filter((f) => !this._exclude!.includes(f));
     return files.map((file) => File.join(path, file)).sort();
   }
