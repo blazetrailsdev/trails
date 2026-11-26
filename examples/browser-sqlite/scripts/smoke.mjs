@@ -19,6 +19,9 @@ if (dist) {
 }
 const shots = process.env.SCREENSHOTS;
 const engine = process.env.BROWSER ?? "chromium";
+if (!["chromium", "firefox", "webkit"].includes(engine)) {
+  throw new Error(`BROWSER must be chromium, firefox or webkit, not ${engine}`);
+}
 const browser = await playwright[engine].launch();
 console.log("browser:", engine);
 const colorScheme = process.env.COLOR_SCHEME === "dark" ? "dark" : "light";

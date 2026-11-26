@@ -32,7 +32,7 @@ function load(): Promise<HighlighterCore> {
       import("shiki/langs/json.mjs"),
       tse,
     ],
-    engine: createJavaScriptRegexEngine(),
+    engine: createJavaScriptRegexEngine({ forgiving: true }),
   }));
 }
 
