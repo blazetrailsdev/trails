@@ -27,7 +27,7 @@ describe("SolidQueue::InstallGeneratorTest", () => {
     root = fs.mkdtempSync(path.join(packageDir, "../trailties/tmp-solid-queue-"));
     await new AppGenerator(
       ["my-app"],
-      { database: "sqlite", skipSolid: true },
+      { database: "sqlite", skipSolid: true, skipInstall: true },
       { destinationRoot: root },
     ).invokeAll();
     app = path.join(root, "my-app");
