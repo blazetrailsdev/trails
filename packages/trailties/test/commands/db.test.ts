@@ -83,6 +83,7 @@ async function runTask(task: string, taskVars: Record<string, string> = {}): Pro
     (k) => [k, seats[k]] as const,
   );
   for (const [k, v] of Object.entries(vars)) setEnv(k, v);
+  if ("TRAILS_ENV" in taskVars) _resetTrailsEnv();
   try {
     Base.configurations(
       (await new Configuration(new Pathname(process.cwd())).databaseConfiguration()) as Parameters<
@@ -116,6 +117,7 @@ async function runTask(task: string, taskVars: Record<string, string> = {}): Pro
     });
   } finally {
     for (const [k, v] of Object.entries(was)) setEnv(k, v);
+    _resetTrailsEnv();
     for (const [k, v] of seatsWas) seats[k] = v;
     Trails.application = null;
     Application.appClass = null;
@@ -164,6 +166,10 @@ async function establishMigrationConnection(
     await Base.connectionHandler.removeConnectionPool("ActiveRecord::Base");
   });
 }
+
+beforeEach(() => {
+  _resetTrailsEnv();
+});
 
 describe("resolveEnv", () => {
   const origTrailsEnv = env.TRAILS_ENV;

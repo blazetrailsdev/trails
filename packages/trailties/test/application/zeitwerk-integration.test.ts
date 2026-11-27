@@ -4,9 +4,14 @@ import { TestCase } from "@blazetrails/activesupport/test-case";
 import { Isolation } from "@blazetrails/activesupport/testing/isolation";
 import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
 import { capture } from "@blazetrails/activesupport/testing/stream";
-import { File } from "@blazetrails/ruby-compat/file";
-import { include } from "@blazetrails/ruby-compat/include";
-import { constDefined, constGet, constSet, TopLevel } from "@blazetrails/ruby-compat";
+import {
+  constDefined,
+  constGet,
+  constSet,
+  File,
+  include,
+  TopLevel,
+} from "@blazetrails/ruby-compat";
 import { Loader } from "@blazetrails/zeitwerk";
 import { Application } from "../../lib/application.js";
 import { Trails } from "../../lib/trails.js";
@@ -200,8 +205,8 @@ export class RESTfulController extends ApplicationController {}`,
 
     await boot();
 
-    const basename = "restful-controller";
-    const abspath = `${Trails.root()}/app/controllers/${basename}.ts`;
+    const basename = "restful_controller";
+    const abspath = `${Trails.root()}/app/controllers/restful-controller.ts`;
     const camelized = "RESTfulController";
 
     Trails.autoloaders.each((autoloader) => {
@@ -267,7 +272,7 @@ export class User {}
 
     await t.appFile(
       "config/initializers/namespaces.ts",
-      `import { Dependencies, DescendantsTracker } from "@blazetrails/activesupport";
+      `import { Dependencies } from "@blazetrails/activesupport";
 import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { Trails } from "@blazetrails/trailties";
 
@@ -301,11 +306,11 @@ await main.pushDir(\`\${Trails.root()}/extras\`, { namespace: ZeitwerkIntegratio
 
     globals.configAutoloadOncePathsIsFrozen = false;
     globals.globalAutoloadOncePathsIsFrozen = false;
-    await t.addToConfig(`this.initializer("test_autoload_once_paths_is_frozen", { after: "bootstrap_hook" }, async () => {
+    await t.addToConfig(`Application.initializer("test_autoload_once_paths_is_frozen", { after: "bootstrap_hook" }, async () => {
       const { Dependencies } = await import("@blazetrails/activesupport");
       const { constGet, TopLevel } = await import("@blazetrails/ruby-compat");
       const globals = TopLevel as unknown as Record<string, unknown>;
-      globals.configAutoloadOncePathsIsFrozen = Object.isFrozen(this.config.autoloadOncePaths);
+      globals.configAutoloadOncePathsIsFrozen = Object.isFrozen(Application.config.autoloadOncePaths);
       globals.globalAutoloadOncePathsIsFrozen = Object.isFrozen(Dependencies.autoloadOncePaths);
       constGet(TopLevel, "X");
     });`);

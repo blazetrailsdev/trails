@@ -889,10 +889,10 @@ export default defineConfig({
             "./packages/stimulus/test/support/build-templates.ts",
           ],
           setupFiles: [
-            "./packages/trailties/test/abstract-unit.ts",
             ...(ISOLATION_DIST
               ? otherSetupFiles.map((file) => isolationDistPath(path.resolve(__dirname, file)))
               : otherSetupFiles),
+            "./packages/trailties/test/abstract-unit.ts",
           ],
         },
       },
