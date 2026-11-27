@@ -126,6 +126,27 @@ describe("assertionValueMismatch", () => {
     ).toBeNull();
   });
 
+  it("folds a Symbol argument in a rendered call onto its string spelling", () => {
+    expect(
+      assertionValueMismatch(
+        ["assert_not_includes"],
+        ["s:create_table(:users)"],
+        ["not:toContain"],
+        ['s:createTable("users")'],
+        false,
+      ),
+    ).toBeNull();
+    expect(
+      assertionValueMismatch(
+        ["assert_not_includes"],
+        ["s:create_table(:users)"],
+        ["not:toContain"],
+        ['s:createTable("posts")'],
+        false,
+      ),
+    ).not.toBeNull();
+  });
+
   it("folds a snake_case name embedded in a sentence onto its camelCase spelling", () => {
     expect(
       assertionValueMismatch(
