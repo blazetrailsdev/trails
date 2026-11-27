@@ -36,10 +36,11 @@ export class XmlDocument extends XmlNode {
 
   private _doc: LibXmlDocument | null;
 
-  constructor(version: string | null = null, ..._rest: unknown[]) {
+  constructor(...rest: unknown[]) {
     let cDocument = _wrappedCDocument;
     _wrappedCDocument = null;
     if (cDocument === null) {
+      let version = (rest[0] ?? null) as string | null;
       if (version == null) version = "1.0";
       cDocument = Nokogiri.LibXml2!.xmlNewDoc(version);
     }
@@ -205,14 +206,19 @@ include(XmlDocument, Searchable);
 XML.Document = XmlDocument;
 
 /** @internal */
+/** @noRailsEquivalent PERMANENT */
 let _wrappedCDocument: number | null = null;
 
 /** @internal */
 function nokoXmlDocumentWrap(
   klass: typeof XmlDocument,
   cDocument: number,
-  ...args: [version?: string | null, ...rest: unknown[]]
+  ...args: unknown[]
 ): XmlDocument {
   _wrappedCDocument = cDocument;
-  return new klass(...args);
+  try {
+    return new klass(...args);
+  } finally {
+    _wrappedCDocument = null;
+  }
 }

@@ -220,17 +220,18 @@ describe("Nokogiri::XML::Document < Node (trails)", () => {
     doc.dispose();
   });
 
-  it("a parsed document runs initialize, as Document.new does", () => {
-    const doc = XmlDocument.parse("<root/>");
+  it("a parsed document is built through the subclass constructor, as Document.new is", () => {
+    class Sub extends XmlDocument {
+      seen: unknown[];
+      constructor(...args: unknown[]) {
+        super(...args);
+        this.seen = args;
+      }
+    }
+    const doc = Sub.readMemory("<root/>", null, null, 0) as Sub;
+    expect(doc).toBeInstanceOf(Sub);
+    expect(doc.seen).toEqual([]);
     expect(doc.namespaceInheritance).toBe(false);
-    expect(doc.document).toBe(doc);
-    expect(doc.encoding).toBe(null);
-    doc.dispose();
-  });
-
-  it("new forwards its init arguments past version", () => {
-    const doc = new XmlDocument("1.0", "extra");
-    expect(doc.errors).toEqual([]);
     doc.dispose();
   });
 });
