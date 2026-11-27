@@ -26,6 +26,25 @@ const browser = await playwright[engine].launch();
 console.log("browser:", engine);
 const colorScheme = process.env.COLOR_SCHEME === "dark" ? "dark" : "light";
 const context = await browser.newContext({ viewport: { width: 1600, height: 900 }, colorScheme });
+if (process.env.REGEXP_MODIFIERS === "off") {
+  await context.addInitScript(() => {
+    const Native = RegExp;
+    const reject = (pattern) => {
+      const source = pattern instanceof Native ? pattern.source : String(pattern);
+      if (/\(\?[ims]*(?:-[ims]+)?:/.test(source.replaceAll("(?:", ""))) {
+        throw new SyntaxError("Invalid regular expression: unrecognized character after (?");
+      }
+    };
+    globalThis.RegExp = new Proxy(Native, {
+      construct: (target, args, newTarget) => (
+        reject(args[0]),
+        Reflect.construct(target, args, newTarget)
+      ),
+      apply: (target, self, args) => (reject(args[0]), Reflect.apply(target, self, args)),
+    });
+  });
+  console.log("regexp modifier groups: rejected, as Safari before 26 does");
+}
 const page = await context.newPage();
 page.on("pageerror", (e) => console.log("[pageerror]", e.message));
 const mailerRequests = [];

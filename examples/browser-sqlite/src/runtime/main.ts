@@ -104,8 +104,6 @@ const files = await new Promise<HostMessage>((resolve) => {
   post({ type: "runtime:waiting" });
 });
 
-// A rejected top-level await is not reported as an error event in Safari, so
-// a failed import would leave the status at "Loading…" with nothing logged.
 function load<T>(promise: Promise<T>): Promise<T> {
   return promise.catch((e: unknown) => {
     console.error("Boot failed:", e);

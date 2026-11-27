@@ -1,16 +1,3 @@
-// Regex modifier groups, `(?i-ms:…)`, are ES2025. ruby-compat's `rbRegToS`
-// writes them (Ruby's `Regexp#to_s`), and ActiveRecord's READ_QUERY and the
-// router build patterns from it, so Safari before 26 throws SyntaxError while
-// trails loads. Where the engine lacks them, RegExp is wrapped so a string
-// pattern's modifier groups are rewritten into plain `(?:…)` groups first.
-//
-// The rewrite writes the flags a group turns on into its source: under `i` a
-// cased letter becomes a class of both cases (a letter range gains its
-// other-case range), and under `s` a `.` outside a class becomes `[^]`. What a
-// group turns off, `m`, and a backreference's case-insensitive match cannot be
-// written into a source, and take the enclosing pattern's flags. trails'
-// groups turn `i` on inside case-sensitive patterns, which this reproduces.
-
 const ESCAPE =
   /^\\(?:[pPk][{<][^}>]*[}>]|u\{[0-9a-fA-F]+\}|u[0-9a-fA-F]{4}|x[0-9a-fA-F]{2}|c[A-Za-z]|.)/su;
 const GROUP_OPEN = /^\((?:\?(?:<[A-Za-z_$][\w$]*>|<?[=!:]|[ims]*-?[ims]*:))?/;
@@ -24,7 +11,6 @@ function otherCase(c: string): string | null {
   return c === u ? l : u;
 }
 
-/** Index just past the `)` closing the group opened at `start`. */
 function groupEnd(source: string, start: number): number {
   let depth = 0;
   let inClass = false;
@@ -39,7 +25,7 @@ function groupEnd(source: string, start: number): number {
   return source.length;
 }
 
-export function inlineFlags(source: string, on: string): string {
+function inlineFlags(source: string, on: string): string {
   const fold = on.includes("i");
   const dotAll = on.includes("s");
   let out = "";
@@ -87,8 +73,7 @@ export function inlineFlags(source: string, on: string): string {
   return out;
 }
 
-/** Rewrites every modifier group in `source`, innermost first. */
-export function rewriteModifiers(source: string): string {
+function rewriteModifiers(source: string): string {
   let out = "";
   let inClass = false;
   for (let i = 0; i < source.length; i++) {
@@ -117,13 +102,29 @@ export function rewriteModifiers(source: string): string {
   return out;
 }
 
-export function installRegExpModifiers(): void {
+function hasModifiers(): boolean {
   try {
     new RegExp("(?i-ms:a)");
-    return;
+    return true;
   } catch {
-    // fall through: the engine has no modifier groups
+    return false;
   }
+}
+
+/**
+ * Regex modifier groups, `(?i-ms:…)`, are ES2025. ruby-compat's `rbRegToS`
+ * (Ruby's `Regexp#to_s`) writes them, and ActiveRecord's `READ_QUERY` and the
+ * router build patterns from it, so on Safari before 26 trails throws
+ * `SyntaxError` while it loads. On such an engine this wraps `RegExp` so a
+ * string pattern's modifier groups are rewritten into plain `(?:…)` groups
+ * first, with the flags a group turns on written into its source: under `i` a
+ * cased letter becomes a class of both cases, and under `s` a `.` outside a
+ * class becomes `[^]`. What a group turns off, `m`, and a backreference's
+ * case-insensitive match take the enclosing pattern's flags; trails' groups
+ * turn `i` on inside case-sensitive patterns, which this reproduces.
+ */
+export function installRegExpModifiers(): void {
+  if (hasModifiers()) return;
   const Native = RegExp;
   const fix = (pattern: unknown) =>
     typeof pattern === "string" && pattern.includes("(?") ? rewriteModifiers(pattern) : pattern;
