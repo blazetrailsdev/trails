@@ -18,8 +18,8 @@ scaffold's functional tests, ported from Rails' templates, pass. The
 
 It is pre-release. Alpha builds are published to npm under the `alpha`
 dist-tag. Generate an app with the `trails` command from
-`@blazetrails/trailties`; its `package.json` depends on
-`@blazetrails/trails@~0.1.0-alpha0.1`:
+`@blazetrails/trailties`; its `package.json` depends on the matching `~`
+version of `@blazetrails/trails`:
 
 ```sh
 pnpm --package=@blazetrails/trailties@alpha --allow-build=esbuild dlx trails new blog --skip-install
