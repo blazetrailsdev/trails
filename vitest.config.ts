@@ -878,7 +878,7 @@ export default defineConfig({
           exclude: process.env.TRAILTIES_EXCLUDE
             ? [...SHARED_EXCLUDE, ...process.env.TRAILTIES_EXCLUDE.split(",")]
             : SHARED_EXCLUDE,
-          globalSetup: ["./packages/trailties/test/support/global-setup.ts"],
+          globalSetup: ["./scripts/ci/trailties-global-setup.mjs"],
           setupFiles: ISOLATION_DIST
             ? otherSetupFiles.map((file) => isolationDistPath(path.resolve(__dirname, file)))
             : otherSetupFiles,
