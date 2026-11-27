@@ -29,15 +29,21 @@ export class XmlDocument extends XmlNode {
   }
 
   errors: SyntaxError[] = [];
+  private _decorators: unknown = null;
+  namespaceInheritance = false;
   url: string | null = null;
   encoding: string | null = null;
   private _root: XmlNode | null = null;
 
   private _doc: LibXmlDocument | null;
 
-  constructor(version: string | null = null) {
-    if (version == null) version = "1.0";
-    const cDocument = Nokogiri.LibXml2!.xmlNewDoc(version);
+  constructor(version: string | null = null, ..._args: unknown[]) {
+    let cDocument = _wrappedCDocument;
+    _wrappedCDocument = null;
+    if (cDocument === null) {
+      if (version == null) version = "1.0";
+      cDocument = Nokogiri.LibXml2!.xmlNewDoc(version);
+    }
     super(Nokogiri.LibXml2!.createNode(cDocument));
     this._doc = Nokogiri.LibXml2!.XmlDocument.getInstance(cDocument);
     this.document = this;
@@ -200,16 +206,19 @@ include(XmlDocument, Searchable);
 XML.Document = XmlDocument;
 
 /** @internal */
-function nokoXmlDocumentWrap(klass: typeof XmlDocument, cDocument: number): XmlDocument {
-  const rbDocument: XmlDocument = Object.create(klass.prototype);
-  Object.assign(rbDocument, {
-    _node: Nokogiri.LibXml2!.createNode(cDocument),
-    _doc: Nokogiri.LibXml2!.XmlDocument.getInstance(cDocument),
-    _root: null,
-    document: rbDocument,
-    errors: [],
-    url: null,
-    encoding: null,
-  });
-  return rbDocument;
+/** @noRailsEquivalent PERMANENT */
+let _wrappedCDocument: number | null = null;
+
+/** @internal */
+function nokoXmlDocumentWrap(
+  klass: typeof XmlDocument,
+  cDocument: number,
+  ...args: [version?: string | null, ...args: unknown[]]
+): XmlDocument {
+  _wrappedCDocument = cDocument;
+  try {
+    return new klass(...args);
+  } finally {
+    _wrappedCDocument = null;
+  }
 }
