@@ -29,6 +29,7 @@ export class XmlDocument extends XmlNode {
   }
 
   errors: SyntaxError[] = [];
+  private _decorators: unknown = null;
   namespaceInheritance = false;
   url: string | null = null;
   encoding: string | null = null;
