@@ -37,11 +37,10 @@ export class XmlDocument extends XmlNode {
 
   private _doc: LibXmlDocument | null;
 
-  constructor(...rest: unknown[]) {
+  constructor(version: string | null = null, ..._args: unknown[]) {
     let cDocument = _wrappedCDocument;
     _wrappedCDocument = null;
     if (cDocument === null) {
-      let version = (rest[0] ?? null) as string | null;
       if (version == null) version = "1.0";
       cDocument = Nokogiri.LibXml2!.xmlNewDoc(version);
     }
