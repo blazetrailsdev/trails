@@ -1,6 +1,6 @@
 {
   "name": "@blazetrails/pg",
-  "version": "0.1.0-alpha0.1",
+  "version": "0.1.0-alpha0.2",
   "description": "The PostgreSQL client, mirroring Ruby's pg gem",
   "license": "MIT",
   "repository": {

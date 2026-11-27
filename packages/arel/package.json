@@ -1,6 +1,6 @@
 {
   "name": "@blazetrails/arel",
-  "version": "0.1.0-alpha0.1",
+  "version": "0.1.0-alpha0.2",
   "description": "SQL AST builder and query generation, mirroring Ruby's Arel",
   "license": "MIT",
   "repository": {

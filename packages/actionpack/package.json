@@ -1,6 +1,6 @@
 {
   "name": "@blazetrails/actionpack",
-  "version": "0.1.0-alpha0.1",
+  "version": "0.1.0-alpha0.2",
   "description": "ActionController and ActionDispatch — mirroring Rails ActionPack",
   "license": "MIT",
   "repository": {
