@@ -45,6 +45,13 @@ describe("a ReadableStream response body", () => {
     expect(response.body).toBe("hi café");
   });
 
+  it("is stored as the response stream unchanged", async () => {
+    const res = await Response.new();
+    const readable = new ReadableStream<Uint8Array>();
+    await res.setBody(readable);
+    expect(res.stream).toBe(readable);
+  });
+
   it("is cancelled by the rack body's close while a read is parked", async () => {
     let cancelled = false;
     const res = await Response.new();

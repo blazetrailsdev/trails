@@ -431,6 +431,14 @@ async function processControllerResponse(
     await this.wrapExecution(() => this.controller.dispatch(action, this.request, this.response));
     const stream = this.controller.response.stream;
     if (stream instanceof Buffer && !(stream instanceof LiveBuffer)) await stream.awaitBody();
+    /** @inventedArm if — PERMANENT */ else if (
+      stream instanceof ReadableStream &&
+      !stream.locked
+    ) {
+      const parts: unknown[] = [];
+      for await (const part of stream as ReadableStream<unknown>) parts.push(part);
+      await this.controller.response.setBody(parts);
+    }
   } finally {
     rbObjIvarSet(this, "@request", this.controller.request);
     rbObjIvarSet(this, "@response", this.controller.response);

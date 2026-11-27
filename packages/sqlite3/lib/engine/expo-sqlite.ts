@@ -25,6 +25,7 @@ interface ExpoStatement {
 interface ExpoDatabase {
   prepareAsync(sql: string): Promise<ExpoStatement>;
   closeAsync(): Promise<void>;
+  interruptSync(): void;
 }
 /** @internal */
 interface ExpoModule {
@@ -166,10 +167,11 @@ export const engine: EngineOpenV2 = Object.assign((file: string, mode: number) =
     throw new RuntimeError("SQLITE_OPEN_SHAREDCACHE is not supported by the expo-sqlite driver");
   }
   let raw: Promise<ExpoDatabase> | null = null;
+  let opened: ExpoDatabase | null = null;
   let closed = false;
   let changes = 0;
   let handler: BusyHandler | null = null;
-  const opening = () => (raw ??= open(file));
+  const opening = () => (raw ??= open(file).then((d) => (opened = d)));
   const setChanges = (n: number) => {
     changes = n;
   };
@@ -192,6 +194,7 @@ export const engine: EngineOpenV2 = Object.assign((file: string, mode: number) =
       throw new RuntimeError("load_extension is not supported by the expo-sqlite driver");
     },
     enableLoadExtension: () => {},
+    interrupt: () => opened?.interruptSync(),
     async libversion() {
       const st = await (await opening()).prepareAsync("select sqlite_version()");
       try {

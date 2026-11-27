@@ -121,11 +121,6 @@ export class Buffer<Buf extends { push(obj: unknown): unknown } = Array<unknown>
   protected _strBody: string | null = null;
   /** @internal */
   protected _pendingBody: { each: Promise<unknown>; buf: () => string } | null = null;
-  /**
-   * @internal
-   * @noRailsEquivalent PERMANENT
-   */
-  protected _reader: ReadableStreamDefaultReader<unknown> | null = null;
 
   constructor(response: Response | null, buf: Buf) {
     this._response = response;
@@ -211,26 +206,12 @@ export class Buffer<Buf extends { push(obj: unknown): unknown } = Array<unknown>
   async *[Symbol.asyncIterator](): AsyncIterableIterator<unknown> {
     if (this._strBody !== null) {
       yield this._strBody;
-    } else if (this._buf instanceof ReadableStream) {
-      const reader = (this._reader = (this._buf as ReadableStream<unknown>).getReader());
-      try {
-        for (;;) {
-          const { done, value } = await reader.read();
-          if (done) return;
-          yield value;
-        }
-      } finally {
-        await reader.cancel();
-      }
     } else {
       yield* _eachChunks((block) => this.eachChunk(block));
     }
   }
 
-  abort(): unknown {
-    if (this._buf instanceof ReadableStream)
-      return (this._reader ?? (this._buf as ReadableStream<unknown>)).cancel();
-  }
+  abort(): void {}
 
   close(): void {
     this._response!.commitBang();
@@ -243,21 +224,6 @@ export class Buffer<Buf extends { push(obj: unknown): unknown } = Array<unknown>
 
   /** @internal */
   protected eachChunk(block?: (chunk: unknown) => unknown): unknown {
-    if (this._buf instanceof ReadableStream) {
-      if (!block) return toEnum(this, "each");
-      const reader = (this._reader = (this._buf as ReadableStream<unknown>).getReader());
-      return (async () => {
-        try {
-          for (;;) {
-            const { done, value } = await reader.read();
-            if (done) return;
-            await block(value);
-          }
-        } finally {
-          await reader.cancel();
-        }
-      })();
-    }
     return rbFSend(this._buf, "each", block);
   }
 }
@@ -265,6 +231,11 @@ export class Buffer<Buf extends { push(obj: unknown): unknown } = Array<unknown>
 export class RackBody {
   /** @internal */
   private _response: Response;
+  /**
+   * @internal
+   * @noRailsEquivalent PERMANENT
+   */
+  private _reader: ReadableStreamDefaultReader<unknown> | null = null;
 
   constructor(response: Response) {
     this._response = response;
@@ -276,6 +247,8 @@ export class RackBody {
   }
 
   close(): unknown {
+    /** @inventedArm if — PERMANENT */
+    if (this._reader) return this._reader.cancel().then(() => this._response.abort());
     return this._response.abort();
   }
 
@@ -318,7 +291,18 @@ export class RackBody {
   async *[Symbol.asyncIterator](): AsyncIterableIterator<string | Uint8Array> {
     const stream = this._response.stream as Partial<AsyncIterable<unknown>>;
     this._response.sendingBang();
-    if (typeof stream[Symbol.asyncIterator] === "function") {
+    if (stream instanceof ReadableStream) {
+      const reader = (this._reader = stream.getReader());
+      try {
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          yield value as string | Uint8Array;
+        }
+      } finally {
+        await reader.cancel();
+      }
+    } else if (typeof stream[Symbol.asyncIterator] === "function") {
       for await (const chunk of stream as AsyncIterable<unknown>)
         yield chunk as string | Uint8Array;
     } else {
@@ -498,7 +482,7 @@ export class Response {
       this.stream = await this.buildBuffer(this, [body]);
     } else if (rbObjRespondTo(body, "toPath")) {
       this.stream = body as { toPath(): string };
-    } else if (rbObjRespondTo(body, "toAry") || body instanceof ReadableStream) {
+    } else if (rbObjRespondTo(body, "toAry")) {
       this.stream = await this.buildBuffer(this, body);
     } else {
       this.stream = body as Response["stream"];

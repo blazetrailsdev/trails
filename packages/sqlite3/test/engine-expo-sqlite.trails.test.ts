@@ -8,6 +8,7 @@ const native = (message: string) =>
   Object.assign(new Error(message), { code: "ERR_INTERNAL_SQLITE_ERROR" });
 
 const busy = { left: 0 };
+const interrupts = { count: 0 };
 
 vi.mock("expo-sqlite", () => ({
   openDatabaseAsync: async () => {
@@ -49,6 +50,7 @@ vi.mock("expo-sqlite", () => ({
         };
       },
       closeAsync: async () => raw.close(),
+      interruptSync: () => interrupts.count++,
     };
   },
 }));
@@ -67,6 +69,12 @@ describe("SQLite3::Database over the expo-sqlite engine", () => {
 
   afterAll(async () => {
     await db.close();
+  });
+
+  it("interrupt reaches the opened database's sqlite3_interrupt", async () => {
+    await db.execute("select 1");
+    expect(db.interrupt()).toBe(db);
+    expect(interrupts.count).toBe(1);
   });
 
   it("closed db behavior", async () => {
