@@ -223,7 +223,7 @@ describe("Nokogiri::XML::Document < Node (trails)", () => {
   it("a parsed document is built through the subclass constructor, as Document.new is", () => {
     class Sub extends XmlDocument {
       seen: unknown[];
-      constructor(...args: unknown[]) {
+      constructor(...args: [version?: string | null, ...args: unknown[]]) {
         super(...args);
         this.seen = args;
       }

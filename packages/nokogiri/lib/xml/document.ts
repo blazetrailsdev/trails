@@ -213,7 +213,7 @@ let _wrappedCDocument: number | null = null;
 function nokoXmlDocumentWrap(
   klass: typeof XmlDocument,
   cDocument: number,
-  ...args: unknown[]
+  ...args: [version?: string | null, ...args: unknown[]]
 ): XmlDocument {
   _wrappedCDocument = cDocument;
   try {
