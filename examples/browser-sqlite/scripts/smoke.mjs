@@ -26,6 +26,36 @@ const browser = await playwright[engine].launch();
 console.log("browser:", engine);
 const colorScheme = process.env.COLOR_SCHEME === "dark" ? "dark" : "light";
 const context = await browser.newContext({ viewport: { width: 1600, height: 900 }, colorScheme });
+if (process.env.REGEXP_MODIFIERS === "off") {
+  await context.addInitScript(() => {
+    const Native = RegExp;
+    const hasModifierGroup = (source) => {
+      let inClass = false;
+      for (let i = 0; i < source.length; i++) {
+        const c = source[i];
+        if (c === "\\") i++;
+        else if (inClass) inClass = c !== "]";
+        else if (c === "[") inClass = true;
+        else if (c === "(" && /^\(\?(?!:)[ims]*(?:-[ims]+)?:/.test(source.slice(i))) return true;
+      }
+      return false;
+    };
+    const reject = (pattern) => {
+      const source = pattern instanceof Native ? pattern.source : String(pattern);
+      if (hasModifierGroup(source)) {
+        throw new SyntaxError("Invalid regular expression: unrecognized character after (?");
+      }
+    };
+    globalThis.RegExp = new Proxy(Native, {
+      construct: (target, args, newTarget) => (
+        reject(args[0]),
+        Reflect.construct(target, args, newTarget)
+      ),
+      apply: (target, self, args) => (reject(args[0]), Reflect.apply(target, self, args)),
+    });
+  });
+  console.log("regexp modifier groups: rejected, as Safari before 26 does");
+}
 const page = await context.newPage();
 page.on("pageerror", (e) => console.log("[pageerror]", e.message));
 const mailerRequests = [];

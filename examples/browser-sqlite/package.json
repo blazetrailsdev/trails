@@ -37,6 +37,7 @@
     "yaml": "^2.8.3"
   },
   "devDependencies": {
+    "@types/node": "25.3.5",
     "@types/path-browserify": "^1.0.3",
     "@types/sql.js": "^1.4.9",
     "playwright": "1.60.0",

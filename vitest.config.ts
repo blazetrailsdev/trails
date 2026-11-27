@@ -782,6 +782,7 @@ export default defineConfig({
           globals: true,
           include: [
             "packages/*/test/**/*.test.ts",
+            "examples/*/test/**/*.test.ts",
             "scripts/guides-typecheck/*.test.ts",
             "scripts/api-compare/*.test.ts",
             "scripts/fixtures-compare/*.test.ts",

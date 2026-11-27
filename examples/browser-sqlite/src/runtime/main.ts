@@ -1,8 +1,10 @@
 import { Temporal } from "@js-temporal/polyfill";
 import { Buffer } from "buffer";
+import { installRegExpModifiers } from "./regexp-modifiers.ts";
 
 if (!("Temporal" in globalThis)) Object.assign(globalThis, { Temporal });
 if (!("Buffer" in globalThis)) Object.assign(globalThis, { Buffer });
+installRegExpModifiers();
 
 const query = new URLSearchParams(location.search);
 const session = query.get("session") ?? "0";
@@ -102,12 +104,21 @@ const files = await new Promise<HostMessage>((resolve) => {
   post({ type: "runtime:waiting" });
 });
 
+function load<T>(promise: Promise<T>): Promise<T> {
+  return promise.catch((e: unknown) => {
+    console.error("Boot failed:", e);
+    status("Boot failed");
+    post({ type: "boot-failed", text: e instanceof Error ? `${e.name}: ${e.message}` : String(e) });
+    throw e;
+  });
+}
+
 status("Loading SQLite (sql.js)…");
-const sqlite = await import("./expo-sqlite-sqljs.ts");
+const sqlite = await load(import("./expo-sqlite-sqljs.ts"));
 sqlite.seedDatabase("browser.db", files.db);
 (globalThis as { __expoSqlite?: unknown }).__expoSqlite = sqlite;
 
-const { VirtualFs } = await import("./vfs.ts");
+const { VirtualFs } = await load(import("./vfs.ts"));
 const vfs = new VirtualFs(files.files);
 const logOffsets = new Map<string, number>();
 vfs.onWrite = (path) => {
@@ -121,7 +132,7 @@ vfs.onWrite = (path) => {
   const added = text.slice(from).replace(/\n$/, "");
   if (added) post({ type: "console", level: "log", text: added });
 };
-const { FRAMEWORK_ROOT, SEAT_FRAMEWORK_DIR } = await import("./package-names.ts");
+const { FRAMEWORK_ROOT, SEAT_FRAMEWORK_DIR } = await load(import("./package-names.ts"));
 Object.assign(globalThis, {
   [SEAT_FRAMEWORK_DIR]: (dirname: string) => {
     const pkg = dirname.slice(FRAMEWORK_ROOT.length + 1).split("/")[0];
@@ -130,17 +141,18 @@ Object.assign(globalThis, {
     return dirname;
   },
 });
-const { installHost } = await import("./host.ts");
+const { installHost } = await load(import("./host.ts"));
 installHost(vfs, moduleBase, (level, text) => post({ type: "console", level, text }));
-(await import("./crypto.ts")).installCrypto();
+(await load(import("./crypto.ts"))).installCrypto();
 
 status("Loading trails…");
-const { PACKAGES, consoleLine, packageShim, syntaxErrors, transpile } =
-  await import("./modules.ts");
-await import("@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js");
-const { installTemplateCompiler } = await import("./template-compiler.ts");
+const { PACKAGES, consoleLine, packageShim, syntaxErrors, transpile } = await load(
+  import("./modules.ts"),
+);
+await load(import("@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js"));
+const { installTemplateCompiler } = await load(import("./template-compiler.ts"));
 installTemplateCompiler();
-const { DebugView } = await import("@blazetrails/actionpack");
+const { DebugView } = await load(import("@blazetrails/actionpack"));
 const rescues = import.meta.glob(
   "../../../../packages/actionpack/lib/action-dispatch/middleware/templates/**/*.tse",
   { query: "?raw", import: "default", eager: true },
@@ -158,10 +170,10 @@ for (const [p, source] of Object.entries(info)) {
   const relative = p.slice(p.indexOf("/templates/"));
   vfs.write(`${FRAMEWORK_ROOT}/trailties/dist${relative}`, source as string, false);
 }
-const { rackEnv, rackResult } = await import("./rack-bridge.ts");
-const { generate, generatorModule } = await import("./generate.ts");
+const { rackEnv, rackResult } = await load(import("./rack-bridge.ts"));
+const { generate, generatorModule } = await load(import("./generate.ts"));
 
-const { CookieJar } = await import("./cookie-jar.ts");
+const { CookieJar } = await load(import("./cookie-jar.ts"));
 const cookies = new CookieJar(files.cookies ?? {});
 
 let serialize: Promise<unknown> = Promise.resolve();

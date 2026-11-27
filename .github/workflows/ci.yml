@@ -1215,6 +1215,7 @@ jobs:
           pnpm exec tsc --build tsconfig.json
           pnpm --filter @blazetrails/example-browser-sqlite exec playwright install chromium
           pnpm --filter @blazetrails/example-browser-sqlite smoke
+          REGEXP_MODIFIERS=off pnpm --filter @blazetrails/example-browser-sqlite smoke
 
   trailties-tests:
     name: Trailties Tests
