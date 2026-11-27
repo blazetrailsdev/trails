@@ -2511,8 +2511,8 @@ describe("ApplicationTests::ConfigurationTest", { concurrent: true, timeout: 120
   }
 
   async function copyApp(): Promise<void> {
-    await FileUtils.cpRAsync(await t.appPath(), await newApp());
     const path = await newApp();
+    await FileUtils.cpRAsync(await t.appPath(), path);
     onTestFinished(async () => {
       await FileUtils.rmRfAsync(path);
     });
@@ -2635,19 +2635,15 @@ describe("ApplicationTests::ConfigurationTest", { concurrent: true, timeout: 120
     expect(Trails.application!.root()).toEqual(new Pathname(await newApp()));
   });
 
-  it("the application root is Dir.pwd if there is no config.ru", async () => {
+  it.sequential("the application root is Dir.pwd if there is no config.ru", async () => {
     await File.deleteAsync(`${await t.appPath()}/config.ts`);
 
     await t.useFrameworks([]);
 
-    const pwd = Dir.pwd();
-    Dir.chdir(await t.appPath());
-    try {
+    await Dir.chdir(await t.appPath(), async () => {
       await app("development");
       expect(Trails.application!.root()).toEqual(new Pathname(await t.appPath()));
-    } finally {
-      Dir.chdir(pwd);
-    }
+    });
   });
 
   it("Rails.root should be a Pathname", async () => {
