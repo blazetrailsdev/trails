@@ -74,8 +74,7 @@ async function reachableFrom(
 }
 
 describe("production boot", () => {
-  // BLOCKED: production-boot-reaches-generators-and-command
-  it.skip("reaches neither playwright nor vite", async () => {
+  it("reaches neither playwright nor vite", async () => {
     const trailties = getPath().join(packagesRoot, "trailties/lib");
     const { files, bare, chain } = await reachableFrom([
       getPath().join(trailties, "index.ts"),

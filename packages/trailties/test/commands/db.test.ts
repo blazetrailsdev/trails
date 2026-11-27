@@ -1917,7 +1917,7 @@ fs.appendFileSync(${JSON.stringify(marker)}, "loaded\\n");`,
   afterEach(async () => {
     registerProcessAdapter(previousProcessAdapter);
     setEnv("RACK_ENV", origRackEnv);
-    setEnv("TRAILS_ENV", origTrailsEnv);
+    setEnv("TRAILS_ENV", undefined);
     setAppPath(undefined);
     setEnginePath(undefined);
     process.chdir(originalCwd);
