@@ -42,6 +42,8 @@ export class XmlDocument extends XmlNode {
   url: string | null = null;
   encoding: string | null = null;
 
+  private _root: XmlNode | null = null;
+
   private _doc: LibXmlDocument | null;
 
   constructor(version: string | null = null, ..._args: unknown[]) {
@@ -189,7 +191,10 @@ export class XmlDocument extends XmlNode {
     if (this._doc === null) return null;
     const root = Nokogiri.LibXml2!.xmlDocGetRootElement(this.pointerId);
     if (!root) return null;
-    return new XmlNode(Nokogiri.LibXml2!.createNode(root), this);
+    if (this._root?.pointerId !== root) {
+      this._root = new XmlNode(Nokogiri.LibXml2!.createNode(root), this);
+    }
+    return this._root;
   }
 
   createElement(name: string, ...contentsOrAttrs: (string | Record<string, unknown>)[]): XmlNode {
@@ -292,6 +297,7 @@ export class XmlDocument extends XmlNode {
   dispose(): void {
     this._doc?.dispose();
     this._doc = null;
+    this._root = null;
   }
 
   [Symbol.dispose](): void {
