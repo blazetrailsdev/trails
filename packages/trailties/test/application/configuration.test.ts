@@ -2513,7 +2513,9 @@ describe("ApplicationTests::ConfigurationTest", { concurrent: true, timeout: 120
   async function copyApp(): Promise<void> {
     await FileUtils.cpRAsync(await t.appPath(), await newApp());
     const path = await newApp();
-    onTestFinished(() => FileUtils.rmRfAsync(path));
+    onTestFinished(async () => {
+      await FileUtils.rmRfAsync(path);
+    });
   }
 
   async function makeBasicApp(block?: (app: typeof Application) => unknown): Promise<void> {
