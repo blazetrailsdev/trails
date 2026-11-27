@@ -3342,10 +3342,14 @@ jobs:
           PASSED: ${{ !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') }}
         run: |
           cutoff=$(date -u -d '30 days ago' +%s)
-          gh api --paginate "repos/$GITHUB_REPOSITORY/git/matching-refs/ci-queue/" --jq '.[].ref' > refs.txt
+          prefix="ci-queue/$GITHUB_RUN_ID/"
+          [ "$GITHUB_EVENT_NAME" = "schedule" ] && prefix="ci-queue/"
+          gh api --paginate "repos/$GITHUB_REPOSITORY/git/matching-refs/$prefix" --jq '.[].ref' > refs.txt
           cut -d/ -f3 refs.txt | sort -u | while read -r run; do
             if [ "$run" = "$GITHUB_RUN_ID" ]; then
               [ "$PASSED" = "true" ] || continue
+            elif [ "$GITHUB_EVENT_NAME" != "schedule" ]; then
+              continue
             else
               created=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run" --jq .created_at 2>/dev/null) &&
                 [ "$(date -u -d "$created" +%s)" -gt "$cutoff" ] && continue
