@@ -37,7 +37,4 @@ jobs:
         if: github.event_name == 'push'
         run: |
           case "$GITHUB_REF_NAME" in *-alpha*) tag=alpha ;; *) tag=latest ;; esac
-          echo '//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}' >> ~/.npmrc
           pnpm -r publish --no-git-checks --provenance --tag "$tag"
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
