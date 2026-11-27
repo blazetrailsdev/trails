@@ -35,7 +35,7 @@ new public package cannot be created by the workflow. Before the first tag
 that includes it, an owner of the `blazetrails` npm org:
 
 1. Publishes it once from their machine, logged in interactively
-   (`npm login --auth-type=web`), from a build of the release commit:
+   (`npm login --auth-type=web`), from a build of the last release tag:
 
    ```sh
    pnpm --filter @blazetrails/<pkg> publish --access public --tag alpha --otp=<code>
