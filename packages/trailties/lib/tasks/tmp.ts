@@ -1,5 +1,6 @@
 import { DSL, main } from "@blazetrails/rake";
-import { Dir, block } from "@blazetrails/ruby-compat";
+import { Dir } from "@blazetrails/ruby-compat/dir";
+import { block } from "@blazetrails/ruby-compat/hash";
 
 await DSL.namespace("tmp", async () => {
   DSL.desc(

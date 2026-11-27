@@ -1,4 +1,4 @@
-import { File } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat/file";
 import { APP_PATH, ENGINE_ROOT, setAppPath } from "../app-path.js";
 
 if (APP_PATH == null) {

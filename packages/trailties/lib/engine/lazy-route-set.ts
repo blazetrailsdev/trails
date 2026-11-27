@@ -1,16 +1,10 @@
 import { RouteSet, type DrawCallback } from "@blazetrails/actionpack";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { TopLevel } from "@blazetrails/activesupport";
-import {
-  KERNEL_METHODS,
-  NoMethodError,
-  PROTOCOL_PROBES,
-  prepend,
-  rbCallSuper,
-  rbFSend,
-  rbInspect,
-  rbObjRespondTo,
-} from "@blazetrails/ruby-compat";
+import { prepend, rbCallSuper } from "@blazetrails/ruby-compat/include";
+import { KERNEL_METHODS, PROTOCOL_PROBES } from "@blazetrails/ruby-compat/method-missing-proxy";
+import { NoMethodError } from "@blazetrails/ruby-compat/no-method-error";
+import { rbFSend, rbInspect, rbObjRespondTo } from "@blazetrails/ruby-compat/object";
 
 type MethodMissingModule = {
   methodMissing(this: object, name: string, ...args: unknown[]): unknown;

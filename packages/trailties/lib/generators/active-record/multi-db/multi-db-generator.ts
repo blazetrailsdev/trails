@@ -1,5 +1,5 @@
 import "../../../constants.active-record-multi-db-multi-db-generator.generated.js";
-import { File } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat/file";
 import { Base } from "../../base.js";
 
 const __dir__ = import.meta.dirname;

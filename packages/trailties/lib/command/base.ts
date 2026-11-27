@@ -1,16 +1,11 @@
 import { classAttribute, underscore } from "@blazetrails/activesupport";
-import {
-  File,
-  kebabCase,
-  include,
-  rbFBinding,
-  rbModName,
-  rbObjAsString as toS,
-  rbObjMethod,
-  TSE,
-  type Included,
-  rbClearMethodCache,
-} from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat/file";
+import { include, type Included } from "@blazetrails/ruby-compat/include";
+import { rbObjMethod } from "@blazetrails/ruby-compat/method";
+import { rbClearMethodCache } from "@blazetrails/ruby-compat/method-cache";
+import { kebabCase, rbModName, rbObjAsString as toS } from "@blazetrails/ruby-compat/object";
+import { TSE } from "@blazetrails/ruby-compat/tse";
+import { rbFBinding } from "@blazetrails/ruby-compat/variable";
 import { Thor, type ThorClass } from "@blazetrails/thor";
 import type { Basic } from "@blazetrails/thor/shell/basic";
 import type { Command as ThorCommand } from "@blazetrails/thor/command";

@@ -1,4 +1,5 @@
-import { STDERR, STDOUT, env } from "@blazetrails/ruby-compat";
+import { STDERR, STDOUT } from "@blazetrails/ruby-compat/io";
+import { env } from "@blazetrails/ruby-compat/process-adapter";
 import type { UserConsoleLog } from "vitest";
 import type { Reporter, TestCase, TestModule, Vitest } from "vitest/node";
 import { TestUnitReporter, type Result } from "./reporter.js";

@@ -1,15 +1,10 @@
 import "./constants.trailtie.generated.js";
 import { moduleParents, underscore } from "@blazetrails/activesupport";
 import { DSL } from "@blazetrails/rake";
-import {
-  NoMethodError,
-  RuntimeError,
-  extend,
-  include,
-  rbFSend,
-  rbObjRespondTo,
-  type Included,
-} from "@blazetrails/ruby-compat";
+import { extend, include, type Included } from "@blazetrails/ruby-compat/include";
+import { NoMethodError } from "@blazetrails/ruby-compat/no-method-error";
+import { rbFSend, rbObjRespondTo } from "@blazetrails/ruby-compat/object";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
 import { PROTOCOL_PROBES } from "@blazetrails/ruby-compat/method-missing-proxy";
 import { Initializable, type Collection, type InitializableClass } from "./initializable.js";
 import { Configuration } from "./trailtie/configuration.js";

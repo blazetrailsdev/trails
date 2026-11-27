@@ -10,20 +10,13 @@ import {
   upcaseFirst,
 } from "@blazetrails/activesupport";
 import { DSL } from "@blazetrails/rake";
-import {
-  except,
-  Process,
-  block,
-  rbFLoad,
-  rbFRequireFile,
-  File,
-  rbObjRespondTo,
-  STDERR,
-  STDOUT,
-  rbModGt,
-  rbModName,
-  resolveTsThenJs,
-} from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat/file";
+import { except, block } from "@blazetrails/ruby-compat/hash";
+import { rbModGt } from "@blazetrails/ruby-compat/include";
+import { STDERR, STDOUT } from "@blazetrails/ruby-compat/io";
+import { rbFLoad, rbFRequireFile, resolveTsThenJs } from "@blazetrails/ruby-compat/load";
+import { rbObjRespondTo, rbModName } from "@blazetrails/ruby-compat/object";
+import { Process } from "@blazetrails/ruby-compat/process";
 import { prepend } from "@blazetrails/ruby-compat/include";
 import { Callbacks, type ActionController } from "@blazetrails/actionpack";
 import * as ActiveRecord from "@blazetrails/activerecord";

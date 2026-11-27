@@ -1,5 +1,5 @@
 import "../constants.bundle-helper.generated.js";
-import { File } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat/file";
 import { rbFSystem } from "@blazetrails/ruby-compat/kernel-system";
 import { getPackageManager } from "../package-manager.js";
 

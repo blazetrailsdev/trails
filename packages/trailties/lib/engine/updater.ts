@@ -1,4 +1,4 @@
-import { rbFSend } from "@blazetrails/ruby-compat";
+import { rbFSend } from "@blazetrails/ruby-compat/object";
 import { PluginGenerator } from "../generators/trails/plugin/plugin-generator.js";
 import { ENGINE_ROOT } from "../app-path.js";
 

@@ -1,7 +1,9 @@
 import { TimeZone, getEnv } from "@blazetrails/activesupport";
 import { Time } from "@blazetrails/date";
 import { DSL } from "@blazetrails/rake";
-import { STDOUT, block, rbStrToF } from "@blazetrails/ruby-compat";
+import { block } from "@blazetrails/ruby-compat/hash";
+import { STDOUT } from "@blazetrails/ruby-compat/io";
+import { rbStrToF } from "@blazetrails/ruby-compat/string/convert";
 import { InvalidCountryCode } from "@blazetrails/tzinfo";
 import type { Task, TaskArguments } from "@blazetrails/rake";
 

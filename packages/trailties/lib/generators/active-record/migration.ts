@@ -1,7 +1,7 @@
 import "../../constants.active-record-migration.generated.js";
 import { Base, Migration as ActiveRecordMigration } from "@blazetrails/activerecord";
 import { TopLevel } from "@blazetrails/activesupport";
-import { include } from "@blazetrails/ruby-compat";
+import { include } from "@blazetrails/ruby-compat/include";
 import * as Generators from "../migration.js";
 
 interface MigrationHost {

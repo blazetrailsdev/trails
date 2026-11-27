@@ -7,15 +7,12 @@ import {
   ConnectionAdapters,
 } from "@blazetrails/activerecord";
 import { isPresent } from "@blazetrails/activesupport";
-import {
-  LoadError,
-  NotImplementedError,
-  abort,
-  getPath,
-  include,
-  rbInspect,
-  type Included,
-} from "@blazetrails/ruby-compat";
+import { getPath } from "@blazetrails/ruby-compat/fs-adapter";
+import { include, type Included } from "@blazetrails/ruby-compat/include";
+import { LoadError } from "@blazetrails/ruby-compat/load-error";
+import { NotImplementedError } from "@blazetrails/ruby-compat/not-implemented-error";
+import { rbInspect } from "@blazetrails/ruby-compat/object";
+import { abort } from "@blazetrails/ruby-compat/process-adapter";
 import type { ThorClass } from "@blazetrails/thor";
 import type { ThorOptions } from "@blazetrails/thor/core-ext/hash-with-indifferent-access";
 import { environment } from "../command.js";

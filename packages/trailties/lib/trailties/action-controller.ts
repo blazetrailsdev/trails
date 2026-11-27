@@ -11,7 +11,9 @@ import {
 } from "@blazetrails/activesupport";
 import { ActionController, AbstractController } from "@blazetrails/actionpack";
 import type { TestCase } from "@blazetrails/actionpack/testing";
-import { except, rbFSend, rbModName, rbObjRespondTo, RuntimeError } from "@blazetrails/ruby-compat";
+import { except } from "@blazetrails/ruby-compat/hash";
+import { rbFSend, rbModName, rbObjRespondTo } from "@blazetrails/ruby-compat/object";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
 import { QueryLogs } from "@blazetrails/activerecord";
 import { Trailtie as BaseTrailtie } from "../trailtie.js";
 

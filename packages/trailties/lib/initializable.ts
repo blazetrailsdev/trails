@@ -1,4 +1,6 @@
-import { ArgumentError, extend, included, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { extend, included } from "@blazetrails/ruby-compat/include";
+import { rbObjRespondTo } from "@blazetrails/ruby-compat/object";
 import type { Application } from "./application.js";
 
 export type InitializerGroup = string;

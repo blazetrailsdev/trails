@@ -1,4 +1,7 @@
-import { Interrupt, Shellwords, defineModule, env, onSignal } from "@blazetrails/ruby-compat";
+import { defineModule } from "@blazetrails/ruby-compat/include";
+import { env, onSignal } from "@blazetrails/ruby-compat/process-adapter";
+import { Shellwords } from "@blazetrails/ruby-compat/shellwords";
+import { Interrupt } from "@blazetrails/ruby-compat/signal-exception";
 import { rbFSystem } from "@blazetrails/ruby-compat/kernel-system";
 
 interface EditorHost {

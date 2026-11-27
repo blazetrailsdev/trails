@@ -1,5 +1,5 @@
 import "../../../constants.test-unit-plugin-plugin-generator.generated.js";
-import { File } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat/file";
 import { Base } from "../../test-unit.js";
 
 const __dir__ = import.meta.dirname;

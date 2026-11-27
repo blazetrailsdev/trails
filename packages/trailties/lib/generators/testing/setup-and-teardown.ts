@@ -1,5 +1,5 @@
 import "../../constants.testing-setup-and-teardown.generated.js";
-import { rbCallSuper } from "@blazetrails/ruby-compat";
+import { rbCallSuper } from "@blazetrails/ruby-compat/include";
 import { ensureCurrentPath, isDestinationRootIsSet } from "./behavior.js";
 
 export function setup(this: ThisParameterType<typeof ensureCurrentPath>): unknown {

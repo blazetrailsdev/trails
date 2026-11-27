@@ -1,6 +1,7 @@
 import "../constants.resource-helpers.generated.js";
 import { NameError, camelize, constantize, underscore } from "@blazetrails/activesupport";
-import { include, included, rbModAttrReader } from "@blazetrails/ruby-compat";
+import { include, included } from "@blazetrails/ruby-compat/include";
+import { rbModAttrReader } from "@blazetrails/ruby-compat/object";
 import { ActiveModel } from "./active-model.js";
 import { ModelHelpers } from "./model-helpers.js";
 import type { Base } from "./base.js";

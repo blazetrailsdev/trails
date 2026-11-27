@@ -31,7 +31,9 @@ import {
   Sendfile,
   TempfileReaper,
 } from "@blazetrails/rack";
-import { LoadError, rbFArray, rbRequireLoaded as require } from "@blazetrails/ruby-compat";
+import { rbFArray } from "@blazetrails/ruby-compat/array";
+import { rbRequireLoaded as require } from "@blazetrails/ruby-compat/load";
+import { LoadError } from "@blazetrails/ruby-compat/load-error";
 import { DatabaseSelector, ShardSelector } from "@blazetrails/activerecord";
 import { Logger } from "../rack/logger.js";
 import { SilenceRequest } from "../rack/silence-request.js";

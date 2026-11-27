@@ -1,5 +1,6 @@
 import { RouteSet, type MiddlewareStack } from "@blazetrails/actionpack";
-import { Pathname, TopLevel } from "@blazetrails/ruby-compat";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
+import { Pathname } from "@blazetrails/ruby-compat/pathname";
 import { Configuration as RailtieConfiguration } from "../trailtie/configuration.js";
 import { Root } from "../paths.js";
 import { Generators, MiddlewareStackProxy } from "../configuration.js";

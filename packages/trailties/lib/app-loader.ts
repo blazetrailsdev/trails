@@ -1,4 +1,8 @@
-import { Dir, File, Gem, Pathname, rbArgv } from "@blazetrails/ruby-compat";
+import { Dir } from "@blazetrails/ruby-compat/dir";
+import { File } from "@blazetrails/ruby-compat/file";
+import { Gem } from "@blazetrails/ruby-compat/gem";
+import { Pathname } from "@blazetrails/ruby-compat/pathname";
+import { rbArgv } from "@blazetrails/ruby-compat/process-adapter";
 import { exec } from "@blazetrails/ruby-compat/process-adapter";
 
 /** @internal */
