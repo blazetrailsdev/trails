@@ -878,19 +878,13 @@ export default defineConfig({
           exclude: process.env.TRAILTIES_EXCLUDE
             ? [...SHARED_EXCLUDE, ...process.env.TRAILTIES_EXCLUDE.split(",")]
             : SHARED_EXCLUDE,
-          globalSetup: [
-            "./packages/trailties/test/support/build-templates.ts",
-            "./packages/trailties/test/support/isolation/global-setup.ts",
-            "./packages/solid-cable/test/support/build-templates.ts",
-            "./packages/solid-queue/test/support/build-templates.ts",
-            "./packages/solid-cache/test/support/build-templates.ts",
-            "./packages/actionmailbox/test/support/build-templates.ts",
-            "./packages/actiontext/test/support/build-templates.ts",
-            "./packages/stimulus/test/support/build-templates.ts",
+          globalSetup: ["./scripts/ci/trailties-global-setup.mjs"],
+          setupFiles: [
+            "./packages/trailties/test/abstract-unit.ts",
+            ...(ISOLATION_DIST
+              ? otherSetupFiles.map((file) => isolationDistPath(path.resolve(__dirname, file)))
+              : otherSetupFiles),
           ],
-          setupFiles: ISOLATION_DIST
-            ? otherSetupFiles.map((file) => isolationDistPath(path.resolve(__dirname, file)))
-            : otherSetupFiles,
         },
       },
       {

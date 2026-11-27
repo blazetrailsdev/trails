@@ -1,3 +1,4 @@
+import "../test-env.js";
 import { Pathname } from "@blazetrails/ruby-compat";
 import { afterAll } from "vitest";
 import { Base as ActiveJobBase } from "@blazetrails/activejob";
