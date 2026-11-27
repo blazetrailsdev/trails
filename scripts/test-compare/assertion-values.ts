@@ -211,7 +211,7 @@ const KEBAB_NAMESPACE_RE = /(?<![\w-])[a-z][a-z0-9]*(?:-[a-z0-9]+)+(?=:[a-z])/g;
  * (CLAUDE.md, "A Ruby Symbol is a JS string"): the migration log line is
  * `createTable("users")`. Folds the Symbol onto that spelling on both sides.
  */
-const SYMBOL_ARGUMENT_RE = /\(:([a-z_][a-zA-Z0-9_]*)/g;
+const SYMBOL_ARGUMENT_RE = /(?<=[(,]\s*):([a-z_][a-zA-Z0-9_]*)/g;
 
 function foldNameToken(token: string): string {
   if (!token.startsWith("s:")) return token;
@@ -223,7 +223,7 @@ function foldNameToken(token: string): string {
     .replace(SNAKE_IDENTIFIER_RE, (name) =>
       name.replace(/_([a-z0-9])/g, (_, ch: string) => ch.toUpperCase()),
     )
-    .replace(SYMBOL_ARGUMENT_RE, '("$1"')}`;
+    .replace(SYMBOL_ARGUMENT_RE, '"$1"')}`;
 }
 
 /**

@@ -145,6 +145,15 @@ describe("assertionValueMismatch", () => {
         false,
       ),
     ).not.toBeNull();
+    expect(
+      assertionValueMismatch(
+        ["assert_includes"],
+        ["s:add_index(:users, :name)"],
+        ["toContain"],
+        ['s:addIndex("users", "name")'],
+        false,
+      ),
+    ).toBeNull();
   });
 
   it("folds a snake_case name embedded in a sentence onto its camelCase spelling", () => {

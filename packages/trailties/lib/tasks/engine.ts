@@ -5,7 +5,7 @@ import { block } from "@blazetrails/ruby-compat/hash";
 import { rbFLoad } from "@blazetrails/ruby-compat/load";
 import { TopLevel } from "@blazetrails/ruby-compat/object";
 import { Pathname } from "@blazetrails/ruby-compat/pathname";
-import { ENGINE_ROOT, setEngineRoot } from "../app-path.js";
+import { setEngineRoot } from "../app-path.js";
 import { Updater } from "../engine/updater.js";
 import { Engine } from "../engine.js";
 
@@ -33,7 +33,7 @@ DSL.task(
     });
     DSL.task({ environment: "app:environment" });
 
-    if (ENGINE_ROOT == null) {
+    if (TopLevel.ENGINE_ROOT == null) {
       setEngineRoot(await findEnginePath(new Pathname(TopLevel.APP_RAKEFILE!)));
     }
   }),
