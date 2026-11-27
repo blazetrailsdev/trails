@@ -12,6 +12,8 @@ import {
 import { constSet, isModuleIncluded } from "@blazetrails/ruby-compat/include";
 import { rbModRemoveConst } from "@blazetrails/ruby-compat/variable";
 import { ActionDispatch, Response, Session } from "@blazetrails/actionpack";
+import type { MiddlewareStack } from "@blazetrails/actionpack";
+import { map } from "@blazetrails/ruby-compat/enumerable";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -4177,6 +4179,83 @@ export class Foo extends ApplicationRecord {
       expect(ActiveRecord.ActiveRecord.ConnectionAdapters.PostgreSQLAdapter.decodeDates).toBe(true);
     },
   );
+
+  it("LocalCache middleware can be removed via app config", async () => {
+    await t.addToConfig(
+      "this.config.middleware.delete(TopLevel.ActiveSupport.Cache.Strategy.LocalCache);",
+    );
+
+    const application = await app("development");
+
+    expect(
+      map(application.config.middleware as MiddlewareStack, (m) => m.name).includes(
+        "ActiveSupport::Cache::Strategy::LocalCache",
+      ),
+    ).toBeFalsy();
+  });
+
+  it("custom middleware with overridden names can be added, moved, or deleted", async () => {
+    await t.appFile(
+      "config/initializers/add-custom-middleware.ts",
+      `import { Trails } from "@blazetrails/trailties";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
+
+class CustomMiddlewareOne {
+  static get name() {
+    return "1st custom middleware";
+  }
+  constructor(_app: unknown, ..._args: unknown[]) {}
+  new(_app: unknown) {
+    return this;
+  }
+}
+
+class CustomMiddlewareTwo {
+  constructor(_app: unknown, ..._args: unknown[]) {}
+  new(_app: unknown) {
+    return this;
+  }
+}
+
+class CustomMiddlewareThree {
+  static get name() {
+    return "3rd custom middleware";
+  }
+  constructor(_app: unknown, ..._args: unknown[]) {}
+  new(_app: unknown) {
+    return this;
+  }
+}
+constSet(TopLevel, "CustomMiddlewareOne", CustomMiddlewareOne);
+constSet(TopLevel, "CustomMiddlewareTwo", CustomMiddlewareTwo);
+constSet(TopLevel, "CustomMiddlewareThree", CustomMiddlewareThree);
+
+Trails.application.config.middleware.use(CustomMiddlewareOne);
+Trails.application.config.middleware.use(CustomMiddlewareTwo);
+Trails.application.config.middleware.use(CustomMiddlewareThree);
+Trails.application.config.middleware.moveAfter(CustomMiddlewareTwo, CustomMiddlewareOne);
+Trails.application.config.middleware.delete(CustomMiddlewareThree);
+`,
+    );
+
+    const application = await app("development");
+
+    const customMiddlewareOne = map(
+      application.config.middleware as MiddlewareStack,
+      (m) => m.name,
+    ).indexOf("1st custom middleware");
+    const customMiddlewareTwo = map(
+      application.config.middleware as MiddlewareStack,
+      (m) => m.name,
+    ).indexOf("CustomMiddlewareTwo");
+    expect(customMiddlewareOne > customMiddlewareTwo).toBeTruthy();
+
+    expect(
+      map(application.config.middleware as MiddlewareStack, (m) => m.name).find(
+        (name) => name === "3rd custom middleware",
+      ) ?? null,
+    ).toBeNull();
+  });
 });
 
 const I18N_HANDLER = `import { I18n } from "@blazetrails/activesupport";

@@ -1,6 +1,6 @@
 import { deleteAt } from "@blazetrails/ruby-compat/array";
 import { rbBlockGivenP } from "@blazetrails/ruby-compat/hash";
-import { rbInspect, rbProcCall } from "@blazetrails/ruby-compat/object";
+import { rbInspect, rbModName, rbProcCall } from "@blazetrails/ruby-compat/object";
 import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
 import { Notifications } from "@blazetrails/activesupport";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
@@ -18,6 +18,21 @@ export type MiddlewareFactory =
   | (new (app: any, ...args: any[]) => unknown)
   | { name: string; "new"(app: unknown, ...args: unknown[]): unknown };
 
+/** @noRailsEquivalent PERMANENT */
+function _klassName(klass: object): string | null {
+  if (typeof klass === "function") {
+    for (
+      let k: object | null = klass;
+      k && k !== Function.prototype;
+      k = Object.getPrototypeOf(k)
+    ) {
+      const getter = Object.getOwnPropertyDescriptor(k, "name")?.get;
+      if (getter) return getter.call(klass) as string | null;
+    }
+  }
+  return rbModName(klass);
+}
+
 export class Middleware {
   constructor(
     readonly klass: MiddlewareFactory,
@@ -25,8 +40,8 @@ export class Middleware {
     readonly block?: MiddlewareBlock,
   ) {}
 
-  get name(): string {
-    return this.klass.name;
+  get name(): string | null {
+    return _klassName(this.klass);
   }
 
   equals(middleware: unknown): boolean | undefined {
@@ -153,10 +168,10 @@ export class MiddlewareStack implements Iterable<Middleware> {
     this.middlewares.splice(index + 1, 1);
   }
 
-  delete(target: MiddlewareClass): Middleware[] | null {
+  delete(target: MiddlewareClass | MiddlewareFactory): Middleware[] | null {
     let rejected = false;
     for (let i = this.entries.length - 1; i >= 0; i--) {
-      if (this.entries[i].name === target.name) {
+      if (this.entries[i].name === _klassName(target)) {
         this.entries.splice(i, 1);
         rejected = true;
       }
@@ -164,7 +179,7 @@ export class MiddlewareStack implements Iterable<Middleware> {
     return rejected ? this.entries : null;
   }
 
-  deleteBang(target: MiddlewareClass): Middleware[] {
+  deleteBang(target: MiddlewareClass | MiddlewareFactory): Middleware[] {
     const rejected = this.delete(target);
     if (rejected === null) {
       throw new RuntimeError(`No such middleware to remove: ${rbInspect(target)}`);
@@ -246,6 +261,6 @@ export class MiddlewareStack implements Iterable<Middleware> {
 
   /** @internal */
   indexOf(klass: MiddlewareFactory): number {
-    return this.entries.findIndex((m) => m.name === klass.name);
+    return this.entries.findIndex((m) => m.name === _klassName(klass));
   }
 }
