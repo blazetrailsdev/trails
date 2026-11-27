@@ -1,3 +1,3 @@
-import { env as ENV } from "@blazetrails/ruby-compat/process-adapter";
+import { env as ENV, setEnv } from "@blazetrails/ruby-compat/process-adapter";
 
-ENV["TRAILS_ENV"] ??= "test";
+if (ENV["TRAILS_ENV"] == null) setEnv("TRAILS_ENV", "test");
