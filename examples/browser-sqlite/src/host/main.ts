@@ -201,7 +201,7 @@ function renderGutter(): void {
 
 function renderProblems(): void {
   const list = $("problems");
-  const mine = [...problems, ...typeWarnings].filter((p) => p.path === current);
+  const mine = allProblems().filter((p) => p.path === current);
   list.hidden = mine.length === 0;
   list.replaceChildren(
     ...mine.map((p) => {

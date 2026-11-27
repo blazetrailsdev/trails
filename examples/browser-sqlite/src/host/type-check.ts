@@ -8,17 +8,52 @@ export type TypeProblem = {
   severity: "warning";
 };
 
-const OPTIONS: ts.CompilerOptions = {
-  target: ts.ScriptTarget.ES2022,
-  module: ts.ModuleKind.ESNext,
-  moduleResolution: ts.ModuleResolutionKind.Bundler,
-  strict: true,
-  allowImportingTsExtensions: true,
-  noEmit: true,
-  skipLibCheck: true,
-  types: [],
-  lib: ["lib.es2023.d.ts", "lib.dom.d.ts", "lib.dom.iterable.d.ts"],
-};
+const TSCONFIG = "/tsconfig.json";
+
+let config: ts.ParsedCommandLine = ts.parseJsonConfigFileContent({}, configHost({}), "/");
+
+function glob(spec: string): RegExp {
+  const body = spec
+    .replace(/^\.?\//, "")
+    .replace(/[.+^${}()|[\]\\]/g, "\\$&")
+    .replace(/\*\*\//g, "(.*/)?")
+    .replace(/\*/g, "[^/]*")
+    .replace(/\?/g, "[^/]");
+  return new RegExp(`^/${body}(/.*)?$`);
+}
+
+function configHost(files: Record<string, string>): ts.ParseConfigHost {
+  return {
+    useCaseSensitiveFileNames: true,
+    fileExists: (path) => path in files,
+    readFile: (path) => files[path],
+    readDirectory: (_root, extensions, excludes, includes) => {
+      const included = (includes ?? ["**/*"]).map(glob);
+      const excluded = (excludes ?? []).map(glob);
+      return Object.keys(files).filter(
+        (path) =>
+          extensions.some((ext) => path.endsWith(ext)) &&
+          !path.endsWith(".d.ts") &&
+          included.some((re) => re.test(path)) &&
+          !excluded.some((re) => re.test(path)),
+      );
+    },
+  };
+}
+
+/**
+ * The app's `tsconfig.json`, read as `tsc -p` reads it, with what the
+ * playground cannot honour pinned: no emit, no `@types` packages, and the
+ * framework's declarations taken as checked.
+ */
+function readConfig(files: Record<string, string>): ts.ParsedCommandLine {
+  const text = files[TSCONFIG];
+  const json =
+    text === undefined ? {} : (ts.parseConfigFileTextToJson(TSCONFIG, text).config ?? {});
+  const parsed = ts.parseJsonConfigFileContent(json, configHost(files), "/", undefined, TSCONFIG);
+  parsed.options = { ...parsed.options, noEmit: true, skipLibCheck: true, types: [] };
+  return parsed;
+}
 
 const IMPORT_META = "/lib/import-meta.d.ts";
 const IMPORT_META_TEXT =
@@ -36,15 +71,15 @@ function read(path: string): string | undefined {
 function languageService(): ts.LanguageService {
   service ??= ts.createLanguageService(
     {
-      getCompilationSettings: () => OPTIONS,
-      getScriptFileNames: () => [...Object.keys(app), IMPORT_META],
+      getCompilationSettings: () => config.options,
+      getScriptFileNames: () => [...config.fileNames, IMPORT_META],
       getScriptVersion: (path) => String(versions.get(path) ?? 0),
       getScriptSnapshot: (path) => {
         const text = read(path);
         return text === undefined ? undefined : ts.ScriptSnapshot.fromString(text);
       },
       getCurrentDirectory: () => "/",
-      getDefaultLibFileName: () => "/lib/lib.d.ts",
+      getDefaultLibFileName: (options) => `/lib/${ts.getDefaultLibFileName(options)}`,
       fileExists: (path) => read(path) !== undefined,
       readFile: read,
       directoryExists: (dir) => {
@@ -74,16 +109,18 @@ export function typeProblems(
     if (app[path] !== text) versions.set(path, (versions.get(path) ?? 0) + 1);
   }
   app = next;
+  config = readConfig(files);
   const ls = languageService();
-  return Object.keys(app).flatMap((path) =>
+  return config.fileNames.flatMap((path) =>
     ls.getSyntacticDiagnostics(path).length
       ? []
-      : ls.getSemanticDiagnostics(path).map((d) => {
-          const at = d.file?.getLineAndCharacterOfPosition(d.start ?? 0);
+      : ls.getSemanticDiagnostics(path).flatMap((d) => {
+          if (d.file?.fileName !== path) return [];
+          const at = d.file.getLineAndCharacterOfPosition(d.start ?? 0);
           return {
             path,
-            line: (at?.line ?? 0) + 1,
-            column: (at?.character ?? 0) + 1,
+            line: at.line + 1,
+            column: at.character + 1,
             message: ts.flattenDiagnosticMessageText(d.messageText, " "),
             severity: "warning" as const,
           };
