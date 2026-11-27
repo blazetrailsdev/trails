@@ -4,7 +4,7 @@ import { Isolation } from "@blazetrails/activesupport/testing/isolation";
 import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
 import { Methods } from "@blazetrails/rack-test";
 import { include } from "@blazetrails/ruby-compat/include";
-import { constGet, RuntimeError, TopLevel } from "@blazetrails/ruby-compat";
+import { constGet, NameError, RuntimeError, TopLevel } from "@blazetrails/ruby-compat";
 import { Base, Migration, Schema } from "@blazetrails/activerecord";
 import { Application } from "../../lib/application.js";
 import { Trails } from "../../lib/trails.js";
@@ -523,6 +523,152 @@ Trails.application!.routes().draw(function () {
 
     await t.get("/omg/show");
     expect(t.lastResponse().body).toBe("Query cache is enabled.");
+  });
+  // PERMANENT-SKIP: packages/trailties/CLAUDE.md, "The application loader is Zeitwerk"
+  it.skip("constants without a matching file raise NameError", async () => {
+    await t.appFile(
+      "app/models/post.ts",
+      `import { constGet } from "@blazetrails/ruby-compat";
+export class Post {
+  static {
+    constGet(this, "NON_EXISTING_CONSTANT");
+  }
+}`,
+    );
+
+    await t.app("development");
+
+    let e = (() => {
+      try {
+        constGet(LoadingTest, "User");
+      } catch (error) {
+        return error as NameError;
+      }
+      throw new Error("expected NameError");
+    })();
+    expect(e).toBeInstanceOf(NameError);
+    expect(e.message).toContain(`uninitialized constant ${LoadingTest.name}::User`);
+
+    e = (() => {
+      try {
+        constGet(TopLevel, "Post");
+      } catch (error) {
+        return error as NameError;
+      }
+      throw new Error("expected NameError");
+    })();
+    expect(e).toBeInstanceOf(NameError);
+    expect(e.message).toContain("uninitialized constant Post::NON_EXISTING_CONSTANT");
+  });
+
+  // PERMANENT-SKIP: packages/trailties/CLAUDE.md, "The application loader is Zeitwerk"
+  it.skip("descendants loaded after framework initialization are cleaned on each request if reloading is enabled", async () => {
+    await t.addToConfig(`this.config.enableReloading = true;
+    this.config.reloadClassesOnlyOnChange = false;`);
+
+    await t.appFile(
+      "app/models/post.ts",
+      `import { ApplicationRecord } from "./application-record.js";
+export class Post extends ApplicationRecord {}`,
+    );
+
+    await t.appFile(
+      "config/routes.ts",
+      `import { Trails } from "@blazetrails/trailties";
+import { Base } from "@blazetrails/activerecord";
+import { constGet, TopLevel } from "@blazetrails/ruby-compat";
+const names = () => JSON.stringify([...new Set(Base.descendants.map((k) => k.name))].sort());
+Trails.application!.routes().draw(function () {
+  this.get("/load", {
+    to: async () => {
+      await (constGet(TopLevel, "Post") as typeof Base).all().toArray();
+      return [200, {}, [names()]];
+    },
+  });
+  this.get("/unload", { to: async () => [200, {}, [names()]] });
+});`,
+    );
+
+    await t.bootTrails();
+    await setupArBang();
+
+    const initial = [
+      "ActiveStorage::Record",
+      "ActiveStorage::Blob",
+      "ActiveStorage::Attachment",
+      "ApplicationRecord",
+    ].sort();
+
+    expect([...new Set(Base.descendants.map((k) => k.name))].sort()).toEqual(initial);
+    await t.get("/load");
+    expect(t.lastResponse().status).toBe(200);
+    expect(
+      (JSON.parse(t.lastResponse().body) as string[]).filter((n) => !initial.includes(n)),
+    ).toEqual(["Post"]);
+    await t.get("/unload");
+    expect(t.lastResponse().status).toBe(200);
+    expect(
+      (JSON.parse(t.lastResponse().body) as string[]).filter((n) => !initial.includes(n)),
+    ).toEqual([]);
+  });
+
+  it("columns migrations also trigger reloading", async () => {
+    await t.addToConfig(`this.config.enableReloading = true;
+    this.config.activeRecord.timestampedMigrations = false;`);
+
+    await t.appFile(
+      "config/routes.ts",
+      `import { Trails } from "@blazetrails/trailties";
+import { constGet, TopLevel } from "@blazetrails/ruby-compat";
+type PostClass = new () => { title: string; body: string };
+Trails.application!.routes().draw(function () {
+  this.get("/title", {
+    to: async () => [200, { "Content-Type": "text/plain" }, [new (constGet(TopLevel, "Post") as PostClass)().title]],
+  });
+  this.get("/body", {
+    to: async () => [200, { "Content-Type": "text/plain" }, [new (constGet(TopLevel, "Post") as PostClass)().body]],
+  });
+});`,
+    );
+
+    await t.appFile(
+      "app/models/post.ts",
+      `import { Base } from "@blazetrails/activerecord";
+export class Post extends Base {}`,
+    );
+
+    await t.appFile(
+      "db/migrate/1_create_posts.ts",
+      `import { Migration } from "@blazetrails/activerecord";
+export class CreatePosts extends Migration.Current {
+  async change() {
+    await this.createTable("posts", (t) => {
+      t.string("title", { default: "TITLE" });
+    });
+  }
+}`,
+    );
+
+    await t.trails("db:migrate");
+    await t.bootTrails();
+
+    await t.get("/title");
+    expect(t.lastResponse().body).toBe("TITLE");
+
+    await t.appFile(
+      "db/migrate/2_add_body_to_posts.ts",
+      `import { Migration } from "@blazetrails/activerecord";
+export class AddBodyToPosts extends Migration.Current {
+  async change() {
+    await this.addColumn("posts", "body", "text", { default: "BODY" });
+  }
+}`,
+    );
+
+    await t.trails("db:migrate");
+
+    await t.get("/body");
+    expect(t.lastResponse().body).toBe("BODY");
   });
 });
 
