@@ -12,6 +12,13 @@ describe("Nokogiri::XML::Document", () => {
     doc = null;
   });
 
+  it("default namespace inheritance", () => {
+    doc = new XmlDocument();
+    expect(doc.namespaceInheritance).toBe(false);
+    doc.namespaceInheritance = true;
+    expect(doc.namespaceInheritance).toBe(true);
+  });
+
   it("parse returns document with root", () => {
     doc = XmlDocument.parse("<root><child/></root>");
     expect(doc.errors).toHaveLength(0);
@@ -210,6 +217,20 @@ describe("Nokogiri::XML::Document < Node (trails)", () => {
     expect(doc).toBeInstanceOf(XmlNode);
     expect(doc.type).toBe(XmlNode.DOCUMENT_NODE);
     expect(doc.isXml()).toBe(true);
+    doc.dispose();
+  });
+
+  it("a parsed document runs initialize, as Document.new does", () => {
+    const doc = XmlDocument.parse("<root/>");
+    expect(doc.namespaceInheritance).toBe(false);
+    expect(doc.document).toBe(doc);
+    expect(doc.encoding).toBe(null);
+    doc.dispose();
+  });
+
+  it("new forwards its init arguments past version", () => {
+    const doc = new XmlDocument("1.0", "extra");
+    expect(doc.errors).toEqual([]);
     doc.dispose();
   });
 });
