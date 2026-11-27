@@ -72,7 +72,7 @@
   <header class="hero">
     <h1>Convention over configuration.<br />Now with types.</h1>
     <p class="lede">trails is Rails in TypeScript: the same names and conventions, plus a compiler that catches what your agents get wrong.</p>
-    <span class="pill">trails &mdash; pre-release &middot; measured at {data.measuredAt}</span>
+    <span class="pill">trails {data.version} &middot; measured at {data.measuredAt}</span>
     <div class="stage" id="caught">
       <div class="pane">
         <div class="split">

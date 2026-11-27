@@ -92,7 +92,11 @@ function withError(
 
 export async function load() {
   const parity = await loadParity();
+  const { version } = JSON.parse(
+    await fs.readFile(path.join(REPO_ROOT, "packages/trails/package.json"), "utf8"),
+  ) as { version: string };
   return {
+    version,
     measuredAt: shortSha(parity.measuredAt),
     buildRef: parity.buildRef,
     coverage: Object.fromEntries(parity.packages.map((p) => [p.name, percent(p.api)])),
