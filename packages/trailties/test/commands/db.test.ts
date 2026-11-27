@@ -1886,7 +1886,6 @@ fs.appendFileSync(${JSON.stringify(marker)}, "loaded\\n");`,
   }
 
   beforeEach(() => {
-    setEnv("TRAILS_ENV", undefined);
     setEnv("RACK_ENV", undefined);
     setEnv("TRAILS_ENV", "development");
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-db-multi-"));
@@ -1914,9 +1913,8 @@ fs.appendFileSync(${JSON.stringify(marker)}, "loaded\\n");`,
 
   afterEach(async () => {
     registerProcessAdapter(previousProcessAdapter);
-    setEnv("TRAILS_ENV", origTrailsEnv);
     setEnv("RACK_ENV", origRackEnv);
-    setEnv("TRAILS_ENV", undefined);
+    setEnv("TRAILS_ENV", origTrailsEnv);
     setAppPath(undefined);
     setEnginePath(undefined);
     process.chdir(originalCwd);
