@@ -97,9 +97,9 @@ describe("Runner", () => {
 
   it("reads -n in each spelling", () => {
     expect(internals.nameFilter(["-n", "/a.b/"])).toEqual(/a.b/);
-    expect(internals.nameFilter(["--name", "a.b"])).toEqual(/a\.b/);
-    expect(internals.nameFilter(["-nfoo"])).toEqual(/foo/);
-    expect(internals.nameFilter(["--name=foo"])).toEqual(/foo/);
+    expect(internals.nameFilter(["--name", "a.b"])).toEqual(/(?:^| )a\.b$/);
+    expect(internals.nameFilter(["-nfoo"])).toEqual(/(?:^| )foo$/);
+    expect(internals.nameFilter(["--name=foo"])).toEqual(/(?:^| )foo$/);
     expect(internals.nameFilter(["test/a.test.ts"])).toBeNull();
   });
 

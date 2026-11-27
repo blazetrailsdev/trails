@@ -6,6 +6,7 @@ import {
   isPresent,
   Logger,
   onLoad,
+  Reloader,
   TopLevel,
   upcaseFirst,
 } from "@blazetrails/activesupport";
@@ -378,6 +379,17 @@ export class Trailtie extends BaseTrailtie {
       if (Trails.env.isTest()) return;
       if (activeRecord === undefined) return;
       await warmSchemaCache(activeRecord.connectionHandler.connectionPoolList("all"));
+    });
+
+    this.initializer("active_record.set_reloader_hooks", () => {
+      onLoad("active_record", (base: typeof Base) => {
+        Reloader.beforeClassUnload(async () => {
+          if (base.isConnected()) {
+            base.clearCacheBang();
+            await base.connectionHandler.clearReloadableConnectionsBang("all");
+          }
+        });
+      });
     });
 
     this.initializer("active_record.set_executor_hooks", () => {

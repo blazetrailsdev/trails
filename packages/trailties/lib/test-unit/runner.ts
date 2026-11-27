@@ -277,7 +277,9 @@ export class Runner {
     const inline = argv.map((arg) => /^(?:-n|--name=)(.+)$/.exec(arg)).find((match) => match);
     const name = index === -1 ? inline?.[1] : argv[index + 1];
     if (name == null) return null;
-    return new RegExp(this.isRegexpFilter(name) ? name.slice(1, -1) : regexpEscape(name));
+    return new RegExp(
+      this.isRegexpFilter(name) ? name.slice(1, -1) : `(?:^| )${regexpEscape(name)}$`,
+    );
   }
 }
 
