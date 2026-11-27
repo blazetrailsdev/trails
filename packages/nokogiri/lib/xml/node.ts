@@ -30,6 +30,7 @@ export interface XmlNode {
   css(...args: unknown[]): NodeSet;
   atCss(...args: unknown[]): XmlNode | undefined;
   at(...args: unknown[]): XmlNode | undefined;
+  search(...args: unknown[]): NodeSet;
   xpath(...args: unknown[]): NodeSet;
   atXpath(...args: unknown[]): XmlNode | undefined;
 }
@@ -181,7 +182,7 @@ export class XmlNode {
     if (selector === null) return new NodeSet(this.document, parents as Node[]);
 
     const root = parents.at(-1)!;
-    const searchResults = root.css(selector);
+    const searchResults = root.search(selector);
 
     return new NodeSet(
       this.document,

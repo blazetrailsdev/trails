@@ -1,10 +1,14 @@
-import { ArgumentError, methodMissingPrototype, rbInspect } from "@blazetrails/ruby-compat";
+import {
+  ArgumentError,
+  methodMissingPrototype,
+  rbInspect,
+  stringSplit,
+} from "@blazetrails/ruby-compat";
 
 import { XML } from "../namespaces.js";
 
 import { XmlDocument } from "./document.js";
 import { XmlNode } from "./node.js";
-import { NodeSet } from "./node-set.js";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- a block takes whatever its caller yields.
 type Block = (...args: any[]) => unknown;
@@ -167,7 +171,9 @@ export class NodeBuilder {
     const block = typeof args.at(-1) === "function" ? (args.pop() as Block) : undefined;
     const last = args.at(-1);
     const opts = (
-      last !== null && typeof last === "object" && !(last instanceof NodeSet) ? args.pop() : {}
+      last !== null && typeof last === "object" && Object.getPrototypeOf(last) === Object.prototype
+        ? args.pop()
+        : {}
     ) as Record<string, unknown>;
     let match: RegExpMatchArray | null;
     if ((match = String(method).match(/^(.*)!$/))) {
@@ -178,13 +184,13 @@ export class NodeBuilder {
     } else {
       this.node.set(
         "class",
-        [...splitWords(this.node.get("class") ?? ""), String(method)].join(" "),
+        [...stringSplit(this.node.get("class") ?? "", /\s/), String(method)].join(" "),
       );
       if (args[0] != null && args[0] !== false) this.node.content = args[0];
     }
 
     for (const [k, v] of Object.entries(opts)) {
-      this.node.set(String(k), [...splitWords(this.node.get(String(k)) ?? ""), v].join(" "));
+      this.node.set(String(k), [...stringSplit(this.node.get(String(k)) ?? "", /\s/), v].join(" "));
     }
 
     if (block) {
@@ -209,13 +215,5 @@ export interface NodeBuilder {
 
 methodMissingPrototype(NodeBuilder, { delegate: () => null });
 Builder.NodeBuilder = NodeBuilder;
-
-/**
- * @internal
- * @noRailsEquivalent PERMANENT
- */
-function splitWords(string: string): string[] {
-  return string === "" ? [] : string.split(/\s/);
-}
 
 XML.Builder = Builder;
