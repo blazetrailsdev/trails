@@ -116,13 +116,8 @@ let typeWarnings: Problem[] = [];
 let checker: Worker | null = null;
 let checkTimer: ReturnType<typeof setTimeout> | undefined;
 
-/** The warnings first, so a line with an error and a warning shows the error. */
 const allProblems = (): Problem[] => [...typeWarnings, ...problems];
 
-/**
- * Type-checks the app's files in a worker, which loads the framework's
- * declarations only once it starts: after the app's first paint.
- */
 function checkTypes(): void {
   if (!checker) {
     checker = new Worker(new URL("./type-check.worker.ts", import.meta.url), { type: "module" });

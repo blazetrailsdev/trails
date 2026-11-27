@@ -71,7 +71,6 @@ function trailsPackageUrls(): Plugin {
 
 const DECLARATIONS = "\0trails-declarations";
 
-/** The `.d.ts` files the editor's type checker reads, built into a chunk of their own. */
 function trailsDeclarations(): Plugin {
   return {
     name: "trails-declarations",

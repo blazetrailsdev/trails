@@ -8,7 +8,6 @@ export type TypeProblem = {
   severity: "warning";
 };
 
-/** The app's own `tsconfig.json`, as the templates write it, plus the libs a browser app sees. */
 const OPTIONS: ts.CompilerOptions = {
   target: ts.ScriptTarget.ES2022,
   module: ts.ModuleKind.ESNext,
@@ -21,7 +20,6 @@ const OPTIONS: ts.CompilerOptions = {
   lib: ["lib.es2023.d.ts", "lib.dom.d.ts", "lib.dom.iterable.d.ts"],
 };
 
-/** What the runtime answers on `import.meta`, as Node does for a module on disk. */
 const IMPORT_META = "/lib/import-meta.d.ts";
 const IMPORT_META_TEXT =
   "interface ImportMeta { readonly dirname: string; readonly filename: string }";
