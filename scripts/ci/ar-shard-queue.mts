@@ -1,18 +1,20 @@
-// Runs one leg of a sharded AR adapter lane from a work queue every leg of
-// the lane shares, so a fast runner takes more files than a slow one
-// (hosted runners vary about ±25% between jobs, trails#10272).
-//
-//   node scripts/ci/ar-shard-queue.mts <shard>/<total> <vitest run args>...
-//
-// Every leg globs the same files, weighs them by ar-shard-durations.json
-// (VITEST_SHARD_DURATIONS) and cuts the same batches, longest first and each
-// a fraction of what is left (guided self-scheduling), so the last batches
-// are small. A leg claims batch i by creating the ref
-// refs/ci-queue/<run>-<attempt>/<job>/<i>: ref creation is atomic, so exactly
-// one leg gets each batch, and the `ci` job deletes the run's refs. One
-// vitest instance runs every batch a leg claims, so globalSetup and the
-// transform cache are paid once. Without a token that may write refs (a fork
-// PR), batch i goes to leg (i mod total) + 1.
+/**
+ * Runs one leg of a sharded AR adapter lane from a work queue every leg of
+ * the lane shares, so a fast runner takes more files than a slow one
+ * (hosted runners vary about ±25% between jobs, trails#10272).
+ *
+ *   node scripts/ci/ar-shard-queue.mts <shard>/<total> <vitest run args>...
+ *
+ * Every leg globs the same files, weighs them by ar-shard-durations.json
+ * (VITEST_SHARD_DURATIONS) and cuts the same batches, longest first and each
+ * a fraction of what is left (guided self-scheduling), so the last batches
+ * are small. A leg claims batch i by creating the ref
+ * refs/ci-queue/<run>-<attempt>/<job>/<i>: ref creation is atomic, so exactly
+ * one leg gets each batch, and the `ci` job deletes the run's refs. One
+ * vitest instance runs every batch a leg claims, so globalSetup and the
+ * transform cache are paid once. Without a token that may write refs (a fork
+ * PR), batch i goes to leg (i mod total) + 1.
+ */
 import { createVitest, parseCLI, type TestSpecification } from "vitest/node";
 import { loadDurations, specKey, weigher } from "./duration-sequencer.ts";
 
@@ -75,7 +77,6 @@ function batches(specs: TestSpecification[], weigh: (spec: TestSpecification) =>
 }
 
 const { filter, options } = parseCLI(["vitest", "run", ...vitestArgs]);
-// What `startVitest` sets before it creates the instance (prepareVitest).
 process.env.TEST = "true";
 process.env.VITEST = "true";
 process.env.NODE_ENV ??= "test";
