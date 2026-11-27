@@ -11,7 +11,9 @@
  * are small. A leg claims batch i by creating the ref
  * refs/ci-queue/<run>/<job>/claim/<i> (ref creation is atomic, so exactly one
  * leg gets each batch) and records itself in .../owner/<leg>/<i>. A re-run
- * leg (attempt > 1) runs the batches it owned, plus any nobody claimed. One
+ * leg (attempt > 1) runs the batches it owned, the ones claimed with no owner
+ * recorded, and any nobody claimed. About six batches a lane keep a run near
+ * 45 calls on GITHUB_TOKEN's 1000-an-hour repository budget. One
  * vitest instance runs every batch a leg claims, so globalSetup and the
  * transform cache are paid once. Without a token that may write refs (a fork
  * PR), batch i goes to leg (i mod total) + 1. The `ci` job deletes a run's
@@ -50,7 +52,10 @@ async function request(method: string, path: string, body?: unknown): Promise<Re
     const status = response instanceof Response ? response.status : 0;
     const limited =
       response instanceof Response &&
-      (status === 429 || (status === 403 && response.headers.get("x-ratelimit-remaining") === "0"));
+      (status === 429 ||
+        (status === 403 &&
+          (response.headers.has("retry-after") ||
+            response.headers.get("x-ratelimit-remaining") === "0")));
     if (response instanceof Response && !limited && status < 500) return response;
     if (attempt === 5) throw new Error(`${method} ${path} failed with ${status}`);
     const retryAfter = response instanceof Response ? response.headers.get("retry-after") : null;
@@ -86,10 +91,20 @@ async function claim(i: number): Promise<boolean> {
   return true;
 }
 
-async function owned(): Promise<Set<number>> {
-  const response = await request("GET", `matching-refs/${queue}/owner/${index}/`);
-  const refs = (await response.json()) as { ref: string }[];
-  return new Set(refs.map(({ ref }) => Number(ref.slice(ref.lastIndexOf("/") + 1))));
+async function refsUnder(prefix: string): Promise<string[]> {
+  const response = await request("GET", `matching-refs/${queue}/${prefix}?per_page=100`);
+  if (!response.ok) throw new Error(`listing ${queue}/${prefix} failed with ${response.status}`);
+  return ((await response.json()) as { ref: string }[]).map(({ ref }) =>
+    ref.slice(`refs/${queue}/${prefix}`.length),
+  );
+}
+
+async function rerunBatches(): Promise<Set<number>> {
+  const owners = (await refsUnder("owner/")).map((rest) => rest.split("/").map(Number));
+  const ownedByAnyone = new Set(owners.map(([, i]) => i));
+  const mine = owners.filter(([leg]) => leg === index).map(([, i]) => i);
+  const orphans = (await refsUnder("claim/")).map(Number).filter((i) => !ownedByAnyone.has(i));
+  return new Set([...mine, ...orphans]);
 }
 
 function batches(specs: TestSpecification[], weigh: (spec: TestSpecification) => number) {
@@ -97,7 +112,7 @@ function batches(specs: TestSpecification[], weigh: (spec: TestSpecification) =>
     .map((spec) => ({ spec, weight: weigh(spec), key: `${spec.project.name} ${spec.moduleId}` }))
     .sort((a, b) => b.weight - a.weight || (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
   const total = weighed.reduce((sum, { weight }) => sum + weight, 0);
-  const floor = total / (count * 25);
+  const floor = total / (count * 3);
   const out: TestSpecification[][] = [];
   let remaining = total;
   let batch: TestSpecification[] = [];
@@ -105,7 +120,7 @@ function batches(specs: TestSpecification[], weigh: (spec: TestSpecification) =>
   for (const { spec, weight } of weighed) {
     batch.push(spec);
     load += weight;
-    if (load >= Math.max(remaining / (2 * count), floor)) {
+    if (load >= Math.max(remaining / count, floor)) {
       out.push(batch);
       remaining -= load;
       batch = [];
@@ -129,9 +144,10 @@ const specs = await vitest.globTestSpecifications(filter);
 const table = (await loadDurations()) ?? {};
 const queued = batches(specs, weigher(vitest.config.root, table));
 console.log(`${specs.length} files in ${queued.length} batches; leg ${index}/${count}`);
+const keepAlive = setInterval(() => {}, 60_000);
 let ran = 0;
 let failed = false;
-const rerun = shared && Number(GITHUB_RUN_ATTEMPT ?? 1) > 1 ? await owned() : null;
+const rerun = shared && Number(GITHUB_RUN_ATTEMPT ?? 1) > 1 ? await rerunBatches() : null;
 for (let i = 0; i < queued.length; i++) {
   if (rerun ? !rerun.has(i) && !(await claim(i)) : !(await claim(i))) continue;
   ran += queued[i].length;
@@ -142,5 +158,6 @@ for (let i = 0; i < queued.length; i++) {
   if (unhandledErrors.length || testModules.some((module) => !module.ok())) failed = true;
 }
 console.log(`leg ${index}/${count} ran ${ran} of ${specs.length} files`);
+clearInterval(keepAlive);
 await vitest.close();
 process.exit(failed ? 1 : (process.exitCode ?? 0));
