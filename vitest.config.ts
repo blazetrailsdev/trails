@@ -879,9 +879,12 @@ export default defineConfig({
             ? [...SHARED_EXCLUDE, ...process.env.TRAILTIES_EXCLUDE.split(",")]
             : SHARED_EXCLUDE,
           globalSetup: ["./scripts/ci/trailties-global-setup.mjs"],
-          setupFiles: ISOLATION_DIST
-            ? otherSetupFiles.map((file) => isolationDistPath(path.resolve(__dirname, file)))
-            : otherSetupFiles,
+          setupFiles: [
+            "./packages/trailties/test/abstract-unit.ts",
+            ...(ISOLATION_DIST
+              ? otherSetupFiles.map((file) => isolationDistPath(path.resolve(__dirname, file)))
+              : otherSetupFiles),
+          ],
         },
       },
       {
