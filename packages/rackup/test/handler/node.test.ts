@@ -805,6 +805,38 @@ describe("Rack::Handler::Node", () => {
           "Connection: close\r\n\r\nok",
       );
     });
+
+    it("closes the body and frees the worker when the client left before the response", async () => {
+      const left: (() => void)[] = [];
+      let closed = 0;
+      await serving(
+        async (env) => {
+          if (env.PATH_INFO !== "/gone") return [200, { "content-type": "text/plain" }, ["ok"]];
+          await new Promise<void>((resolve) => left.push(resolve));
+          const body = {
+            async *[Symbol.asyncIterator]() {
+              yield "late";
+            },
+            close() {
+              closed += 1;
+            },
+          };
+          return [200, { "content-length": "4" }, body];
+        },
+        async (url) => {
+          for (let i = 0; i < 6; i++) {
+            const socket = await rawSocket(url, "/gone");
+            await vi.waitFor(() => expect(left.length).toBe(i + 1));
+            socket.destroy();
+            await new Promise((resolve) => setTimeout(resolve, 20));
+            left[i]();
+          }
+          await vi.waitFor(() => expect(closed).toBe(6));
+          const { text } = await rawGet(url, "/after");
+          expect(text).toMatch(/\r\n\r\nok$/);
+        },
+      );
+    });
   });
 
   describe("upgrade requests", () => {

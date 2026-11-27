@@ -231,6 +231,7 @@ export class Node {
           const onDrain = (): void => wake?.();
           res.on("close", onClose);
           res.on("drain", onDrain);
+          if (res.destroyed) onClose();
           try {
             for await (const chunk of body) {
               if (hijacked) return;
