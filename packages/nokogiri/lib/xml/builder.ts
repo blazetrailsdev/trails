@@ -175,7 +175,7 @@ export class NodeBuilder {
   }
 
   set(k: string, v: unknown): void {
-    this.node.set(String(k), String(v));
+    this.node.set(k, v);
   }
 
   get(k: string): string | null {
@@ -195,7 +195,7 @@ export class NodeBuilder {
       this.node.set("id", match[1]);
       if (args[0] != null && args[0] !== false) this.node.content = args[0];
     } else if ((match = String(method).match(/^(.*)=/))) {
-      this.node.set(match[1], String(args[0]));
+      this.node.set(match[1], args[0]);
     } else {
       this.node.set(
         "class",

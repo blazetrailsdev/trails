@@ -304,8 +304,9 @@ export class XmlNode {
     return this;
   }
 
-  set(name: string, value: string): void {
-    if (this._node instanceof Nokogiri.LibXml2!.XmlElement) this._node.setAttr(name, value);
+  set(name: unknown, value: unknown): void {
+    if (this._node instanceof Nokogiri.LibXml2!.XmlElement)
+      this._node.setAttr(String(name), String(value));
   }
 
   values(): string[] {
