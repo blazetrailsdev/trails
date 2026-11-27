@@ -4,7 +4,6 @@ const moduleRoot = `${base}rt/`;
 const runtimePage = `${base}runtime.html`;
 const ANSWER_TIMEOUT = 120_000;
 
-/** `{ version, files }`, written in by the build; absent under `vite dev`. */
 const PRECACHE = self.__PRECACHE__;
 const CACHE_PREFIX = "trails-playground-";
 const cacheName = PRECACHE ? `${CACHE_PREFIX}${PRECACHE.version}` : null;
@@ -22,10 +21,6 @@ self.addEventListener("activate", (event) =>
   ),
 );
 
-/**
- * Fills the cache in the background once the editor has booted, rather than
- * in `install`: the editor waits on `ready`, and 27MB would hold it there.
- */
 self.addEventListener("message", (event) => {
   if (event.data?.type === "sw:precache" && cacheName) event.waitUntil(precache());
 });
@@ -39,11 +34,6 @@ async function precache() {
   }
 }
 
-/**
- * The playground's own files: a hashed asset never changes, so the cache
- * answers it; a page or other unhashed file asks the network first and falls
- * back to the cache offline.
- */
 async function offline(request, url) {
   const cache = await caches.open(cacheName);
   const file = url.pathname.slice(base.length);

@@ -98,11 +98,6 @@ function importMetaPaths(): Plugin {
   };
 }
 
-/**
- * Stamps the built `sw.js` with every file the build wrote and a hash of their
- * bytes, so the worker can cache the whole playground for offline use and a
- * new build changes the worker's bytes, which is what makes a browser update it.
- */
 function offlinePrecache(): Plugin {
   let outDir = "";
   return {
