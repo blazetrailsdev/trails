@@ -1453,6 +1453,22 @@ jobs:
         run: scripts/ci/ar-non-isolated-cases.sh ${{ matrix.shard }}/${{ strategy.job-total }}
         env:
           VITEST_SHARD_DURATIONS: sqlite3
+      - if: ${{ matrix.shard == 1 && needs.changes.outputs.ar_scope == '' }}
+        run: pnpm vitest run packages/sqlite3/
+      # CLI E2E is not sharded — run it once, on shard 1 only.
+      - if: ${{ matrix.shard == 1 && needs.changes.outputs.ar_scope == '' }}
+        run: pnpm vitest run packages/activerecord-cli
+      - if: ${{ matrix.shard == 1 && (needs.changes.outputs.ar_scope == '' || contains(needs.changes.outputs.ar_scope, 'packages/activerecord-cli')) }}
+        run: pnpm --filter @blazetrails/example-twitter-clone test
+
+      # `ARCONN=sqlite3_mem` is the only lane where `in_memory_db?` is true, so
+      # without it every `skipIf(inMemoryDb())` guard is dead code (RFC 0029).
+      #
+      # A second full pass over the AR suite, so not on every PR or push: it runs on
+      # its own nightly cron (no other job does), on the Monday sweep, on
+      # `workflow_dispatch`, on a PR labelled `run-sqlite-mem`, and on a PR whose
+      # diff adds or removes an `inMemoryDb` line (scripts/ci/pr-lanes.sh). It is in the `ci`
+      # aggregator's `needs:`, so whenever it does run a failure blocks the merge.
       - if: needs.changes.outputs.ar_scope == ''
         run: node scripts/ci/ar-shard-queue.mts ${{ matrix.shard }}/${{ strategy.job-total }} packages/activerecord/ packages/solid-queue/ packages/solid-cable/ packages/solid-cache/ packages/activestorage/ packages/actionmailbox/ packages/actiontext/ packages/turbo/ --project '!system'
         env:
@@ -1463,22 +1479,6 @@ jobs:
         env:
           AR_SCOPE: ${{ needs.changes.outputs.ar_scope }}
         run: pnpm vitest run $AR_SCOPE --project '!system'
-      - if: ${{ matrix.shard == 1 && needs.changes.outputs.ar_scope == '' }}
-        run: pnpm vitest run packages/sqlite3/
-      # CLI E2E is not sharded — run it once, on shard 1 only.
-      - if: ${{ matrix.shard == 1 && needs.changes.outputs.ar_scope == '' }}
-        run: pnpm vitest run packages/activerecord-cli
-      - if: ${{ matrix.shard == 1 && (needs.changes.outputs.ar_scope == '' || contains(needs.changes.outputs.ar_scope, 'packages/activerecord-cli')) }}
-        run: pnpm --filter @blazetrails/example-twitter-clone test
-
-  # `ARCONN=sqlite3_mem` is the only lane where `in_memory_db?` is true, so
-  # without it every `skipIf(inMemoryDb())` guard is dead code (RFC 0029).
-  #
-  # A second full pass over the AR suite, so not on every PR or push: it runs on
-  # its own nightly cron (no other job does), on the Monday sweep, on
-  # `workflow_dispatch`, on a PR labelled `run-sqlite-mem`, and on a PR whose
-  # diff adds or removes an `inMemoryDb` line (scripts/ci/pr-lanes.sh). It is in the `ci`
-  # aggregator's `needs:`, so whenever it does run a failure blocks the merge.
   sqlite-mem-tests:
     name: "Active Record SQLite :memory: Tests"
     needs: changes
@@ -1817,20 +1817,6 @@ jobs:
           PGHOST: localhost
           PGPORT: "5432"
           PGUSER: rails
-      - if: needs.changes.outputs.ar_scope == ''
-        run: node scripts/ci/ar-shard-queue.mts ${{ matrix.shard }}/${{ strategy.job-total }} packages/activerecord/ packages/solid-queue/ packages/solid-cable/ packages/solid-cache/ packages/activestorage/ packages/actionmailbox/ packages/actiontext/ packages/turbo/ --project '!system'
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-          AR_SPLIT: ${{ (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && 'all' || 'rest' }}
-          VITEST_SHARD_DURATIONS: postgresql
-          ARCONN: postgresql
-          PGHOST: localhost
-          PGPORT: "5432"
-          # PGDATABASE is deliberately unset: the database comes from
-          # ARTest.expand_config (test/support/config.rb:28-34), not libpq's env.
-          PGUSER: rails
-          # AR_DB_FORKS deliberately unset: vitest.config.ts derives both the
-          # worker count and the slot-DB pool from the runner's vCPU count.
       - if: (needs.changes.outputs.ar_scope == '' || contains(needs.changes.outputs.ar_scope, 'packages/pg')) && matrix.shard == strategy.job-total
         run: pnpm vitest run packages/pg
         env:
@@ -1847,14 +1833,28 @@ jobs:
         env:
           PG_TEST_URL: postgres://rails@localhost:5432/activerecord_unittest
 
-  # Action Cable's Redis subscription adapter against a real server
-  # (actioncable/test/subscription_adapter/redis_test.rb). Gated like
-  # actioncable-postgres-tests; vitest.config.ts excludes the file wherever
-  # REDIS_URL is unset, so a missing service fails here rather than skipping.
-  # Active Storage's cloud services against local emulators, with no cloud
-  # credentials (RFC 0215-activestorage-cloud-services, decision 3). A service
-  # container takes no arguments and both emulators need them, so they start
-  # with docker run. SQLite-backed; gated as sqlite-tests' activestorage step is.
+      # Action Cable's Redis subscription adapter against a real server
+      # (actioncable/test/subscription_adapter/redis_test.rb). Gated like
+      # actioncable-postgres-tests; vitest.config.ts excludes the file wherever
+      # REDIS_URL is unset, so a missing service fails here rather than skipping.
+      # Active Storage's cloud services against local emulators, with no cloud
+      # credentials (RFC 0215-activestorage-cloud-services, decision 3). A service
+      # container takes no arguments and both emulators need them, so they start
+      # with docker run. SQLite-backed; gated as sqlite-tests' activestorage step is.
+      - if: needs.changes.outputs.ar_scope == ''
+        run: node scripts/ci/ar-shard-queue.mts ${{ matrix.shard }}/${{ strategy.job-total }} packages/activerecord/ packages/solid-queue/ packages/solid-cable/ packages/solid-cache/ packages/activestorage/ packages/actionmailbox/ packages/actiontext/ packages/turbo/ --project '!system'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          AR_SPLIT: ${{ (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && 'all' || 'rest' }}
+          VITEST_SHARD_DURATIONS: postgresql
+          ARCONN: postgresql
+          PGHOST: localhost
+          PGPORT: "5432"
+          # PGDATABASE is deliberately unset: the database comes from
+          # ARTest.expand_config (test/support/config.rb:28-34), not libpq's env.
+          PGUSER: rails
+          # AR_DB_FORKS deliberately unset: vitest.config.ts derives both the
+          # worker count and the slot-DB pool from the runner's vCPU count.
   activestorage-cloud-tests:
     name: Active Storage Cloud Tests
     needs: changes
@@ -2203,17 +2203,6 @@ jobs:
           ARCONN: mysql2
           MYSQL_HOST: localhost
           MYSQL_PORT: "3306"
-      - if: needs.changes.outputs.ar_scope == ''
-        run: node scripts/ci/ar-shard-queue.mts ${{ matrix.shard }}/${{ strategy.job-total }} packages/activerecord/ packages/solid-queue/ packages/solid-cable/ packages/solid-cache/ packages/activestorage/ packages/actionmailbox/ packages/actiontext/ packages/turbo/ --project '!system'
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-          AR_SPLIT: ${{ (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && 'all' || 'rest' }}
-          VITEST_SHARD_DURATIONS: mysql2
-          ARCONN: mysql2
-          MYSQL_HOST: localhost
-          MYSQL_PORT: "3306"
-          # AR_DB_FORKS deliberately unset: vitest.config.ts derives both the
-          # worker count and the slot-DB pool from the runner's vCPU count.
       - if: (needs.changes.outputs.ar_scope == '' || contains(needs.changes.outputs.ar_scope, 'packages/mysql2')) && matrix.shard == strategy.job-total
         run: pnpm vitest run packages/mysql2
         env:
@@ -2226,13 +2215,24 @@ jobs:
         env:
           MYSQL_TEST_URL: mysql://rails@localhost:3306/activerecord_unittest
 
-  # A second full pass over the AR suite, so off the per-PR/per-merge critical
-  # path entirely: it runs on the Monday sweep, on `workflow_dispatch`, and on a
-  # PR labelled `run-mysql-prepared` — never on a push to `main`, never on an
-  # unlabelled PR. It is in the `ci` aggregator's `needs:`, so whenever it does
-  # run a failure blocks the merge; when it legitimately doesn't run the
-  # aggregator treats the skip as "not required here". Unsharded (hence the
-  # wider timeout): off the critical path, one runner is the cheaper trade.
+      # A second full pass over the AR suite, so off the per-PR/per-merge critical
+      # path entirely: it runs on the Monday sweep, on `workflow_dispatch`, and on a
+      # PR labelled `run-mysql-prepared` — never on a push to `main`, never on an
+      # unlabelled PR. It is in the `ci` aggregator's `needs:`, so whenever it does
+      # run a failure blocks the merge; when it legitimately doesn't run the
+      # aggregator treats the skip as "not required here". Unsharded (hence the
+      # wider timeout): off the critical path, one runner is the cheaper trade.
+      - if: needs.changes.outputs.ar_scope == ''
+        run: node scripts/ci/ar-shard-queue.mts ${{ matrix.shard }}/${{ strategy.job-total }} packages/activerecord/ packages/solid-queue/ packages/solid-cable/ packages/solid-cache/ packages/activestorage/ packages/actionmailbox/ packages/actiontext/ packages/turbo/ --project '!system'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          AR_SPLIT: ${{ (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && 'all' || 'rest' }}
+          VITEST_SHARD_DURATIONS: mysql2
+          ARCONN: mysql2
+          MYSQL_HOST: localhost
+          MYSQL_PORT: "3306"
+          # AR_DB_FORKS deliberately unset: vitest.config.ts derives both the
+          # worker count and the slot-DB pool from the runner's vCPU count.
   maria-prepared-tests:
     name: Active Record MariaDB Tests (prepared statements)
     needs: changes
