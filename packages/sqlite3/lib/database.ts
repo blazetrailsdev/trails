@@ -620,6 +620,7 @@ export class Database<E extends EngineDatabase = EngineDatabase> {
   interrupt(): this {
     if (this.isClosed()) throw new Exception("cannot use a closed database");
 
+    /** @inventedArm if — PERMANENT */
     if (!this._engine.interrupt) {
       throw new NotImplementedError("interrupt() function is unimplemented on this machine");
     }
