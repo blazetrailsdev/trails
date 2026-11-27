@@ -1,4 +1,7 @@
+import { createHash } from "node:crypto";
+import { readdir, readFile, writeFile } from "node:fs/promises";
 import { builtinModules } from "node:module";
+import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { defineConfig, type Plugin } from "vite";
 import { declarationFiles } from "./scripts/declarations.ts";
@@ -95,8 +98,42 @@ function importMetaPaths(): Plugin {
   };
 }
 
+/**
+ * Stamps the built `sw.js` with every file the build wrote and a hash of their
+ * bytes, so the worker can cache the whole playground for offline use and a
+ * new build changes the worker's bytes, which is what makes a browser update it.
+ */
+function offlinePrecache(): Plugin {
+  let outDir = "";
+  return {
+    name: "offline-precache",
+    apply: "build",
+    configResolved(config) {
+      outDir = config.build.outDir;
+    },
+    async writeBundle() {
+      const files = (await readdir(outDir, { recursive: true, withFileTypes: true }))
+        .filter((entry) => entry.isFile())
+        .map((entry) => relative(outDir, join(entry.parentPath, entry.name)).split("\\").join("/"))
+        .filter((file) => file !== "sw.js")
+        .sort();
+      const hash = createHash("sha256");
+      for (const file of files) hash.update(file).update(await readFile(join(outDir, file)));
+      const sw = join(outDir, "sw.js");
+      const precache = JSON.stringify({ version: hash.digest("hex").slice(0, 16), files });
+      await writeFile(sw, (await readFile(sw, "utf8")).replace("self.__PRECACHE__", precache));
+    },
+  };
+}
+
 export default defineConfig({
-  plugins: [nodeBuiltinStubs(), trailsPackageUrls(), trailsDeclarations(), importMetaPaths()],
+  plugins: [
+    nodeBuiltinStubs(),
+    trailsPackageUrls(),
+    trailsDeclarations(),
+    importMetaPaths(),
+    offlinePrecache(),
+  ],
   worker: { format: "es", plugins: () => [trailsDeclarations()] },
   resolve: {
     alias: [

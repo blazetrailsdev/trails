@@ -249,6 +249,8 @@ export default defineConfig(
       globals: {
         self: "readonly",
         Response: "readonly",
+        caches: "readonly",
+        fetch: "readonly",
         MessageChannel: "readonly",
         document: "readonly",
         localStorage: "readonly",

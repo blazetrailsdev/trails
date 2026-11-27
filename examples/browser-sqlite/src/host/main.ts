@@ -907,6 +907,7 @@ async function start(): Promise<void> {
       return;
     }
   }
+  navigator.serviceWorker.controller?.postMessage({ type: "sw:precache" });
   owner = await holdExample();
   if (owner && example === "blog") await migrateLegacyStorage();
   if (!owner) {
