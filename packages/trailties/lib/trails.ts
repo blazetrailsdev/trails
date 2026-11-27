@@ -5,7 +5,7 @@ import { getEnv } from "@blazetrails/activesupport";
 import { ActiveSupport, Autoload, extend } from "@blazetrails/activesupport";
 import { constSet } from "@blazetrails/ruby-compat/include";
 import { TopLevel } from "@blazetrails/ruby-compat/object";
-import type { Pathname } from "@blazetrails/ruby-compat/pathname";
+import { Pathname } from "@blazetrails/ruby-compat/pathname";
 import type { ErrorReporter } from "@blazetrails/activesupport";
 import type { CacheStore, Logger } from "@blazetrails/activesupport";
 import { Application } from "./application.js";
@@ -163,12 +163,9 @@ export class Trails {
     return app?.config.root;
   }
 
-  static async publicPath(): Promise<string | null> {
+  static publicPath(): Pathname | null {
     const app = Trails.application;
-    if (!app) return null;
-    const paths = app.paths();
-    const expanded = paths.get("public")?.expanded();
-    return expanded?.[0] ?? null;
+    return app && new Pathname(app.paths().get("public")!.first()!);
   }
 
   static get error(): ErrorReporter {
