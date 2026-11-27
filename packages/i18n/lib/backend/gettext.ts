@@ -1,4 +1,8 @@
-import { File, Hash, RuntimeError, rbInspect, stringSplit } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat/file";
+import { Hash } from "@blazetrails/ruby-compat/hash";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
+import { rbInspect } from "@blazetrails/ruby-compat/object";
+import { stringSplit } from "@blazetrails/ruby-compat/string/split";
 
 import { Gettext as I18nGettext } from "../gettext.js";
 import { PoParser } from "../gettext/po-parser.js";

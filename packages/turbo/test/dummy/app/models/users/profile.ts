@@ -8,7 +8,7 @@ import {
 } from "@blazetrails/ruby-compat";
 import { Broadcastable } from "../../../../../lib/app/models/concerns/turbo/broadcastable.js";
 
-declare module "@blazetrails/ruby-compat" {
+declare module "@blazetrails/ruby-compat/object" {
   interface TopLevelConstants {
     Users?: typeof Users;
   }

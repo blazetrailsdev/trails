@@ -1,14 +1,11 @@
 import bcryptjs from "bcryptjs";
 import { Time } from "@blazetrails/date";
-import {
-  ArgumentError,
-  OpenSSL,
-  Range,
-  rbObjAsString,
-  rbObjRespondTo,
-  toI,
-  warn,
-} from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { OpenSSL } from "@blazetrails/ruby-compat/openssl";
+import { Range } from "@blazetrails/ruby-compat/range";
+import { rbObjAsString, rbObjRespondTo } from "@blazetrails/ruby-compat/object";
+import { toI } from "@blazetrails/ruby-compat/numeric";
+import { warn } from "@blazetrails/ruby-compat/kernel-warn";
 import { Errors } from "./error.js";
 import { Password } from "./password.js";
 

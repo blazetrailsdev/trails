@@ -1,4 +1,4 @@
-import { isModuleIncluded } from "@blazetrails/ruby-compat";
+import { isModuleIncluded } from "@blazetrails/ruby-compat/include";
 
 export const BadRequest = {
   [Symbol.hasInstance](value: unknown): boolean {

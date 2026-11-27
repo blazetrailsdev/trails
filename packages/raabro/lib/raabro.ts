@@ -794,7 +794,7 @@ import "./constants.generated.js";
 
 TopLevel.Raabro = Raabro;
 
-declare module "@blazetrails/ruby-compat" {
+declare module "@blazetrails/ruby-compat/object" {
   interface TopLevelConstants {
     Raabro?: typeof Raabro;
   }

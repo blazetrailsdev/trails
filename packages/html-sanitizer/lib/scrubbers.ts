@@ -1,5 +1,9 @@
 import { type Html5Node } from "@blazetrails/nokogiri";
-import { ArgumentError, aryDelete, rbObjDup, rbObjRespondTo, warn } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { aryDelete } from "@blazetrails/ruby-compat/array";
+import { rbObjDup } from "@blazetrails/ruby-compat/include";
+import { rbObjRespondTo } from "@blazetrails/ruby-compat/object";
+import { warn } from "@blazetrails/ruby-compat/kernel-warn";
 
 import { Scrub } from "./loofah/html5/scrub.js";
 import { SafeList } from "./loofah/html5/safelist.js";

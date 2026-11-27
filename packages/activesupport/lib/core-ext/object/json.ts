@@ -60,7 +60,7 @@ export class Object {
   }
 }
 
-declare module "@blazetrails/ruby-compat" {
+declare module "@blazetrails/ruby-compat/include" {
   interface KernelModule {
     asJson(this: object, options?: EncodeOptions | null): unknown;
   }
@@ -88,7 +88,7 @@ export class String {
   }
 }
 
-declare module "@blazetrails/ruby-compat" {
+declare module "@blazetrails/ruby-compat/string/method-table" {
   interface StringInstance {
     asJson(options?: EncodeOptions | null): string;
   }

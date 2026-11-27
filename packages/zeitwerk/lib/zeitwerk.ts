@@ -30,7 +30,7 @@ export async function withLoader(block: (loader: Loader) => unknown): Promise<vo
 
 TopLevel.Zeitwerk = Zeitwerk;
 
-declare module "@blazetrails/ruby-compat" {
+declare module "@blazetrails/ruby-compat/object" {
   interface TopLevelConstants {
     Zeitwerk?: typeof Zeitwerk;
   }

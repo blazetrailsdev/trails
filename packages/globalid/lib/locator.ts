@@ -1,16 +1,12 @@
 import { GlobalID } from "./global-id.js";
 import { SignedGlobalID, type ParseOptions } from "./signed-global-id.js";
 import { GID } from "./uri/gid.js";
-import {
-  ArgumentError,
-  except,
-  Hash,
-  rbFArray,
-  rbClassInheritedP,
-  rbObjMethod,
-  slice,
-  StandardError,
-} from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { except, Hash, slice } from "@blazetrails/ruby-compat/hash";
+import { rbFArray } from "@blazetrails/ruby-compat/array";
+import { rbClassInheritedP } from "@blazetrails/ruby-compat/include";
+import { rbObjMethod } from "@blazetrails/ruby-compat/method";
+import { StandardError } from "@blazetrails/ruby-compat/standard-error";
 
 /** @noRailsEquivalent PERMANENT */
 export interface LocatorModel {
@@ -262,7 +258,6 @@ export function _resetLocators(): void {
 
 type LocatorInvalidModelIdError = typeof InvalidModelIdError;
 
-// eslint-disable-next-line @typescript-eslint/no-namespace
 export declare namespace Locator {
   let InvalidModelIdError: LocatorInvalidModelIdError;
 }

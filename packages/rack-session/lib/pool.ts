@@ -1,5 +1,6 @@
 import type { RackApp } from "@blazetrails/rack";
-import { hashAref, hashDelete, Mutex } from "@blazetrails/ruby-compat";
+import { hashAref, hashDelete } from "@blazetrails/ruby-compat/hash";
+import { Mutex } from "@blazetrails/ruby-compat/mutex";
 
 import {
   DEFAULT_OPTIONS as ID_DEFAULT_OPTIONS,

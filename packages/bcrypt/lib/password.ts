@@ -1,4 +1,5 @@
-import { ArgumentError, toI } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { toI } from "@blazetrails/ruby-compat/numeric";
 import { Engine } from "./engine.js";
 import { Errors } from "./error.js";
 

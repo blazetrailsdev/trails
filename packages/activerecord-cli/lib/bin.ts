@@ -1,4 +1,4 @@
-import { setArg0 } from "@blazetrails/ruby-compat";
+import { setArg0 } from "@blazetrails/ruby-compat/process-adapter";
 import { run } from "./cli.js";
 
 setArg0("ar");

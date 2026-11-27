@@ -411,7 +411,7 @@ Object.assign(RubyDate, { DAYS_INTO_WEEK });
 
 (TopLevel.DateAndTime ??= { name: "DateAndTime" }).Calculations = DateAndTimeCalculations;
 
-declare module "@blazetrails/ruby-compat" {
+declare module "@blazetrails/ruby-compat/object" {
   interface TopLevelConstants {
     DateAndTime?: {
       name: string;

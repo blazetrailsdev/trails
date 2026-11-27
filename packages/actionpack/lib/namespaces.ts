@@ -278,7 +278,7 @@ onLoad("action_view", () => {
   DetailsKey.clear();
 });
 
-declare module "@blazetrails/ruby-compat" {
+declare module "@blazetrails/ruby-compat/object" {
   interface TopLevelConstants {
     ActionPack?: typeof ActionPack;
     Mime?: typeof Mime;

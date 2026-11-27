@@ -1,12 +1,6 @@
-import {
-  ArgumentError,
-  dup,
-  eachPair,
-  except,
-  fetch,
-  Hash,
-  isPlainHash,
-} from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { dup, eachPair, except, fetch, Hash } from "@blazetrails/ruby-compat/hash";
+import { isPlainHash } from "@blazetrails/ruby-compat/object";
 import { Rack } from "./namespaces.js";
 
 type PairBlock = (key: string, value: string) => unknown;

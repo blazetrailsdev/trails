@@ -17,31 +17,26 @@ import {
   SubMinuteOffsetZonedDateTime,
   timeToDf,
 } from "./date.js";
+import { Rational } from "@blazetrails/ruby-compat/rational";
 import {
-  Rational,
   TEMPORAL_METHOD_TABLE,
-  cmp,
-  rbCmpint,
-  isRubyTzUptodate,
-  kernelInteger,
   rbCTime,
-  rbDefineAllocFunc,
-  rbHash,
-  rbBigNorm,
   rbObjClass,
   rbObjInstanceVariables,
   rbObjIvarGet,
   rbObjIvarSet,
   rbObjRespondTo,
   rbCheckFuncall,
-  rbCheckToInt,
-  rbIntegerTypeP,
   rbObjClassname,
-  setRubyTzUptodate,
-  stringInspect,
   TopLevel,
-  constSet,
-} from "@blazetrails/ruby-compat";
+} from "@blazetrails/ruby-compat/object";
+import { cmp, rbCmpint } from "@blazetrails/ruby-compat/comparable";
+import { isRubyTzUptodate, setRubyTzUptodate } from "@blazetrails/ruby-compat/process-adapter";
+import { kernelInteger, rbCheckToInt } from "@blazetrails/ruby-compat/kernel-integer";
+import { rbDefineAllocFunc, constSet } from "@blazetrails/ruby-compat/include";
+import { rbHash } from "@blazetrails/ruby-compat/rb-hash";
+import { rbBigNorm, rbIntegerTypeP } from "@blazetrails/ruby-compat/numeric";
+import { stringInspect } from "@blazetrails/ruby-compat/string/inspect";
 
 let localTimeZoneId: string | null = null;
 

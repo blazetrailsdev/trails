@@ -1,18 +1,14 @@
-import {
-  ArgumentError,
-  Encoding,
-  File,
-  FileUtils,
-  NoMethodError,
-  type Pathname,
-  RuntimeError,
-  StringIO,
-  Tempfile,
-  methodMissingPrototype,
-  rbFSend,
-  rbObjClassname,
-  rbObjRespondTo,
-} from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { Encoding } from "@blazetrails/ruby-compat/encoding";
+import { File } from "@blazetrails/ruby-compat/file";
+import { FileUtils } from "@blazetrails/ruby-compat/file-utils";
+import { NoMethodError } from "@blazetrails/ruby-compat/no-method-error";
+import type { Pathname } from "@blazetrails/ruby-compat/pathname";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
+import { StringIO } from "@blazetrails/ruby-compat/string-io";
+import { Tempfile } from "@blazetrails/ruby-compat/tempfile";
+import { methodMissingPrototype } from "@blazetrails/ruby-compat/method-missing-proxy";
+import { rbFSend, rbObjClassname, rbObjRespondTo } from "@blazetrails/ruby-compat/object";
 
 /* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- the merge is how the delegated surface reaches the class type. */
 export interface UploadedFile {

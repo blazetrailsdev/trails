@@ -1,10 +1,6 @@
-import {
-  Exception,
-  StandardError,
-  basicObjRespondTo,
-  rbObjRespondTo,
-  rbProcCall,
-} from "@blazetrails/ruby-compat";
+import { Exception } from "@blazetrails/ruby-compat/exception";
+import { StandardError } from "@blazetrails/ruby-compat/standard-error";
+import { basicObjRespondTo, rbObjRespondTo, rbProcCall } from "@blazetrails/ruby-compat/object";
 import type { RackApp, RackEnv, RackHeaders, RackResponse, RackBody } from "./index.js";
 import { BodyProxy } from "./body-proxy.js";
 import { Request } from "./request.js";

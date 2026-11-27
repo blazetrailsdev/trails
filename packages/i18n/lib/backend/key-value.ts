@@ -1,15 +1,9 @@
-import {
-  Hash,
-  TypeError,
-  hashAref,
-  include,
-  isModuleObject,
-  isSymbol,
-  rbInspect,
-  rbObjClass,
-  rbObjIsKindOf,
-  symbolToS,
-} from "@blazetrails/ruby-compat";
+import { Hash, hashAref } from "@blazetrails/ruby-compat/hash";
+import { TypeError } from "@blazetrails/ruby-compat/type-error";
+import { include, rbObjIsKindOf } from "@blazetrails/ruby-compat/include";
+import { isModuleObject } from "@blazetrails/ruby-compat/classpath";
+import { isSymbol, symbolToS } from "@blazetrails/ruby-compat/symbol";
+import { rbInspect, rbObjClass } from "@blazetrails/ruby-compat/object";
 
 import { EMPTY_HASH, type Locale, type TranslationKey } from "../i18n.js";
 import { deepMergeBang, deepSymbolizeKeys, type TranslationData } from "../utils.js";

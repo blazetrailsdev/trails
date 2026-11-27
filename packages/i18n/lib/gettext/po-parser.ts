@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- a racc value stack holds tokens and strings untyped, as Ruby's does. */
-import { STDERR } from "@blazetrails/ruby-compat";
+import { STDERR } from "@blazetrails/ruby-compat/io";
 import { Parser as RaccParser } from "@blazetrails/ruby-compat/racc/parser";
 
 interface PoData {

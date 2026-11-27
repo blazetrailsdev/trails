@@ -19,23 +19,16 @@ import {
   type Locale,
   type TranslationKey,
 } from "../i18n.js";
-import {
-  Hash,
-  JSON,
-  NotImplementedError,
-  hasKey,
-  hashAref,
-  isSymbol,
-  symbolToS,
-  kernelCatch,
-  kernelThrow,
-  rbInspect,
-  toSym,
-  trTrans,
-  classModule,
-  include,
-  File,
-} from "@blazetrails/ruby-compat";
+import { Hash, hasKey, hashAref } from "@blazetrails/ruby-compat/hash";
+import { JSON } from "@blazetrails/ruby-compat/json";
+import { NotImplementedError } from "@blazetrails/ruby-compat/not-implemented-error";
+import { isSymbol, symbolToS } from "@blazetrails/ruby-compat/symbol";
+import { kernelCatch, kernelThrow } from "@blazetrails/ruby-compat/kernel-catch";
+import { rbInspect, toSym } from "@blazetrails/ruby-compat/object";
+import { trTrans } from "@blazetrails/ruby-compat/string/tr";
+import { classModule } from "@blazetrails/ruby-compat/class-module";
+import { include } from "@blazetrails/ruby-compat/include";
+import { File } from "@blazetrails/ruby-compat/file";
 import { YAML } from "@blazetrails/ruby-compat/yaml";
 import { strftime } from "@blazetrails/date";
 import { interpolate as interpolateString } from "../interpolate/ruby.js";

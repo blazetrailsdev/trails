@@ -1,14 +1,12 @@
 import { isPlainObject, type Included } from "@blazetrails/activesupport";
-import {
-  Generic,
-  HTTPS,
-  URI,
-  b,
-  hashDelete,
-  pack,
-  rbFSend,
-  rbObjDup,
-} from "@blazetrails/ruby-compat";
+import { Generic } from "@blazetrails/ruby-compat/uri/generic";
+import { HTTPS } from "@blazetrails/ruby-compat/uri/https";
+import { URI } from "@blazetrails/ruby-compat/uri/common";
+import { b } from "@blazetrails/ruby-compat/string/b";
+import { hashDelete } from "@blazetrails/ruby-compat/hash";
+import { pack } from "@blazetrails/ruby-compat/array";
+import { rbFSend } from "@blazetrails/ruby-compat/object";
+import { rbObjDup } from "@blazetrails/ruby-compat/include";
 import {
   MockRequest,
   MockResponse,

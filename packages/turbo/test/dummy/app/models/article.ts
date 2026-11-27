@@ -4,7 +4,7 @@ import { parameterize } from "@blazetrails/activesupport";
 import { TopLevel } from "@blazetrails/ruby-compat";
 import { ApplicationRecord } from "./application-record.js";
 
-declare module "@blazetrails/ruby-compat" {
+declare module "@blazetrails/ruby-compat/object" {
   interface TopLevelConstants {
     Article?: typeof Article;
   }

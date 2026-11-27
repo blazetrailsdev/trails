@@ -1,18 +1,16 @@
-import {
-  Errno,
-  File,
-  LoadError,
-  Mutex,
-  Pathname,
-  Thread,
-  extend,
-  hashDelete,
-  puts,
-  rbFLoad,
-  rbGvGet,
-  stderr as $stderr,
-  type FsStatResult,
-} from "@blazetrails/ruby-compat";
+import { Errno } from "@blazetrails/ruby-compat/errno";
+import { File } from "@blazetrails/ruby-compat/file";
+import { LoadError } from "@blazetrails/ruby-compat/load-error";
+import { Mutex } from "@blazetrails/ruby-compat/mutex";
+import { Pathname } from "@blazetrails/ruby-compat/pathname";
+import { Thread } from "@blazetrails/ruby-compat/thread";
+import { extend } from "@blazetrails/ruby-compat/include";
+import { hashDelete } from "@blazetrails/ruby-compat/hash";
+import { puts } from "@blazetrails/ruby-compat/io";
+import { rbFLoad } from "@blazetrails/ruby-compat/load";
+import { rbGvGet } from "@blazetrails/ruby-compat/variable";
+import { stderr as $stderr } from "@blazetrails/ruby-compat/process-adapter";
+import type { FsStatResult } from "@blazetrails/ruby-compat/fs-adapter";
 import { Rack } from "./namespaces.js";
 
 interface StatHost {

@@ -1,13 +1,10 @@
-import {
-  Encoding,
-  File,
-  FileUtils,
-  StringIO,
-  Tempfile,
-  methodMissingPrototype,
-  rbFSend,
-  rbObjRespondTo,
-} from "@blazetrails/ruby-compat";
+import { Encoding } from "@blazetrails/ruby-compat/encoding";
+import { File } from "@blazetrails/ruby-compat/file";
+import { FileUtils } from "@blazetrails/ruby-compat/file-utils";
+import { StringIO } from "@blazetrails/ruby-compat/string-io";
+import { Tempfile } from "@blazetrails/ruby-compat/tempfile";
+import { methodMissingPrototype } from "@blazetrails/ruby-compat/method-missing-proxy";
+import { rbFSend, rbObjRespondTo } from "@blazetrails/ruby-compat/object";
 
 export interface UploadedFileOptions {
   path?: string | null;

@@ -1,5 +1,6 @@
 import type { RackHeaders } from "./index.js";
-import { rbInspect, rbObjRespondTo, toI, rbProcCall } from "@blazetrails/ruby-compat";
+import { rbInspect, rbObjRespondTo, rbProcCall } from "@blazetrails/ruby-compat/object";
+import { toI } from "@blazetrails/ruby-compat/numeric";
 import { CONTENT_TYPE, CONTENT_LENGTH, RACK_SHOWSTATUS_DETAIL } from "./constants.js";
 import { HTTP_STATUS_CODES, escapeHtml } from "./utils.js";
 import { Request } from "./request.js";

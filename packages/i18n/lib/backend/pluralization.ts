@@ -1,13 +1,7 @@
-import {
-  Hash,
-  defineModule,
-  hasKey,
-  hashAref,
-  rbCallSuper,
-  rbEqual,
-  rbObjRespondTo,
-  rbProcCall,
-} from "@blazetrails/ruby-compat";
+import { Hash, hasKey, hashAref } from "@blazetrails/ruby-compat/hash";
+import { defineModule, rbCallSuper } from "@blazetrails/ruby-compat/include";
+import { rbEqual } from "@blazetrails/ruby-compat/rb-equal";
+import { rbObjRespondTo, rbProcCall } from "@blazetrails/ruby-compat/object";
 
 import { InvalidPluralizationData } from "../exceptions.js";
 import { t, type Locale } from "../i18n.js";

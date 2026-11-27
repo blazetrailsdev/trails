@@ -1,4 +1,4 @@
-import { runtime } from "@blazetrails/ruby-compat";
+import { runtime } from "@blazetrails/ruby-compat/process-adapter";
 
 /** @noRailsEquivalent PERMANENT */
 declare const require: ((id: string) => unknown) | undefined;

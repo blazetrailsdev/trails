@@ -1,13 +1,10 @@
-import {
-  ArgumentError,
-  Encoding,
-  block as rbBlock,
-  rbBlockGivenP,
-  include,
-  rbObjClassname,
-  stringSplit,
-  URI,
-} from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { Encoding } from "@blazetrails/ruby-compat/encoding";
+import { block as rbBlock, rbBlockGivenP } from "@blazetrails/ruby-compat/hash";
+import { include } from "@blazetrails/ruby-compat/include";
+import { rbObjClassname } from "@blazetrails/ruby-compat/object";
+import { stringSplit } from "@blazetrails/ruby-compat/string/split";
+import { URI } from "@blazetrails/ruby-compat/uri/common";
 import { BadRequest } from "./bad-request.js";
 export class ParameterTypeError extends TypeError {
   constructor(message: string) {

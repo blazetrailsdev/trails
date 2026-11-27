@@ -1,7 +1,7 @@
 import { TopLevel } from "@blazetrails/ruby-compat";
 import { ApplicationMailbox } from "./application-mailbox.js";
 
-declare module "@blazetrails/ruby-compat" {
+declare module "@blazetrails/ruby-compat/object" {
   interface TopLevelConstants {
     MessagesMailbox?: typeof MessagesMailbox;
   }

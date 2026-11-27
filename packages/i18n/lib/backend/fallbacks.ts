@@ -1,4 +1,7 @@
-import { isSymbol, kernelCatch, kernelThrow, rbCallSuper, Thread } from "@blazetrails/ruby-compat";
+import { isSymbol } from "@blazetrails/ruby-compat/symbol";
+import { kernelCatch, kernelThrow } from "@blazetrails/ruby-compat/kernel-catch";
+import { rbCallSuper } from "@blazetrails/ruby-compat/include";
+import { Thread } from "@blazetrails/ruby-compat/thread";
 
 import { MissingTranslation, InvalidLocale } from "../exceptions.js";
 import * as I18n from "../i18n.js";

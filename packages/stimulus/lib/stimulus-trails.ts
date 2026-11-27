@@ -15,7 +15,7 @@ export const Stimulus = {
 
 TopLevel.Stimulus = Stimulus;
 
-declare module "@blazetrails/ruby-compat" {
+declare module "@blazetrails/ruby-compat/object" {
   interface TopLevelConstants {
     Stimulus?: typeof Stimulus;
   }

@@ -1,5 +1,8 @@
 import type { RackHeaders } from "./index.js";
-import { File, rbObjRespondTo, rbStrSub, rbProcCall, regexpEscape } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat/file";
+import { rbObjRespondTo, rbProcCall } from "@blazetrails/ruby-compat/object";
+import { rbStrSub } from "@blazetrails/ruby-compat/string/sub";
+import { regexpEscape } from "@blazetrails/ruby-compat/regexp";
 import { RACK_ERRORS } from "./constants.js";
 import type { RackApp } from "./mock-request.js";
 import { BodyProxy } from "./body-proxy.js";

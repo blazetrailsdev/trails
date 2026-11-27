@@ -1,4 +1,5 @@
-import { toSym, trTrans } from "@blazetrails/ruby-compat";
+import { toSym } from "@blazetrails/ruby-compat/object";
+import { trTrans } from "@blazetrails/ruby-compat/string/tr";
 import { defaultSeparator, newDoubleNestedCache } from "../i18n.js";
 import type { TranslationData } from "../utils.js";
 

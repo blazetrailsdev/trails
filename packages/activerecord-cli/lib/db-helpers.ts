@@ -1,6 +1,6 @@
 import { generateManifest, MANIFEST_PATH } from "./generate-manifest.js";
 import { join, resolve } from "path";
-import { File } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat/file";
 import { getEnv, presence } from "@blazetrails/activesupport";
 import { Base, DatabaseConfigurations, Migrator } from "@blazetrails/activerecord";
 import { DatabaseTasks } from "@blazetrails/activerecord/tasks/database-tasks.js";

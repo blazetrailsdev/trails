@@ -1,14 +1,8 @@
 import type { RackHeaders } from "./index.js";
-import {
-  ArgumentError,
-  Hash,
-  hashDelete,
-  eachPair,
-  isPlainHash,
-  rbFSend,
-  toI,
-  toS,
-} from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { Hash, hashDelete, eachPair } from "@blazetrails/ruby-compat/hash";
+import { isPlainHash, rbFSend, toS } from "@blazetrails/ruby-compat/object";
+import { toI } from "@blazetrails/ruby-compat/numeric";
 import {
   CONTENT_LENGTH,
   CONTENT_TYPE,
@@ -21,7 +15,7 @@ import {
 import { STATUS_WITH_NO_ENTITY_BODY } from "./constants.js";
 import { MediaType } from "./media-type.js";
 import { setCookieHeader, deleteSetCookieHeaderBang } from "./utils.js";
-import { include } from "@blazetrails/ruby-compat";
+import { include } from "@blazetrails/ruby-compat/include";
 import { Rack } from "./namespaces.js";
 
 function downcaseKey(key: string): string {

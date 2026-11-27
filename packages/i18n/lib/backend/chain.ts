@@ -1,11 +1,6 @@
-import {
-  Hash,
-  hashAref,
-  include,
-  kernelCatch,
-  kernelThrow,
-  rbObjDup,
-} from "@blazetrails/ruby-compat";
+import { Hash, hashAref } from "@blazetrails/ruby-compat/hash";
+import { include, rbObjDup } from "@blazetrails/ruby-compat/include";
+import { kernelCatch, kernelThrow } from "@blazetrails/ruby-compat/kernel-catch";
 import { MissingTranslation } from "../exceptions.js";
 import { EMPTY_HASH, type Locale, type TranslationKey } from "../i18n.js";
 import { deepMergeBang, except, type TranslationData } from "../utils.js";

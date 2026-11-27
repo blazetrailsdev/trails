@@ -1,5 +1,6 @@
 import type { RackHeaders } from "./index.js";
-import { rbCheckArrayType, rbObjRespondTo, rbProcCall } from "@blazetrails/ruby-compat";
+import { rbCheckArrayType } from "@blazetrails/ruby-compat/array";
+import { rbObjRespondTo, rbProcCall } from "@blazetrails/ruby-compat/object";
 import { CONTENT_LENGTH, TRANSFER_ENCODING, STATUS_WITH_NO_ENTITY_BODY } from "./constants.js";
 import type { RackApp } from "./mock-request.js";
 import { Rack } from "./namespaces.js";

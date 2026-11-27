@@ -11,7 +11,7 @@ import { Message } from "../dummy/app/models/message.js";
 import { ModelName } from "@blazetrails/activemodel";
 import { Turbo } from "../../lib/turbo-trails.js";
 
-declare module "@blazetrails/ruby-compat" {
+declare module "@blazetrails/ruby-compat/object" {
   interface TopLevelConstants {
     TestChannel?: typeof TestChannel;
   }

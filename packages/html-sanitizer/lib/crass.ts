@@ -1,4 +1,5 @@
-import { TopLevel, constSet } from "@blazetrails/ruby-compat";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
+import { constSet } from "@blazetrails/ruby-compat/include";
 
 import { Parser } from "./crass/parser.js";
 import { Scanner } from "./crass/scanner.js";

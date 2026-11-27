@@ -65,10 +65,12 @@
   },
   "i18n": {
     "tarball": {
-      "value": 53953
+      "value": 54495,
+      "reason": "ruby-compat barrel imports moved to longer subpath specifiers (RFC 0192)"
     },
     "unpacked": {
-      "value": 264097
+      "value": 269387,
+      "reason": "ruby-compat barrel imports moved to longer subpath specifiers (RFC 0192)"
     },
     "entries": {
       "value": 98
@@ -76,10 +78,12 @@
   },
   "globalid": {
     "tarball": {
-      "value": 15787
+      "value": 15984,
+      "reason": "ruby-compat barrel imports moved to longer subpath specifiers (RFC 0192)"
     },
     "unpacked": {
-      "value": 68122
+      "value": 69735,
+      "reason": "ruby-compat barrel imports moved to longer subpath specifiers (RFC 0192)"
     },
     "entries": {
       "value": 29
@@ -87,10 +91,12 @@
   },
   "did-you-mean": {
     "tarball": {
-      "value": 7884
+      "value": 8025,
+      "reason": "ruby-compat barrel imports moved to longer subpath specifiers (RFC 0192)"
     },
     "unpacked": {
-      "value": 27348
+      "value": 28047,
+      "reason": "ruby-compat barrel imports moved to longer subpath specifiers (RFC 0192)"
     },
     "entries": {
       "value": 29

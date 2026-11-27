@@ -1,6 +1,9 @@
 import { Time } from "@blazetrails/date";
 import { Utils } from "@blazetrails/rack";
-import { type Generic, URI, rbObjDup, regexpEscape } from "@blazetrails/ruby-compat";
+import type { Generic } from "@blazetrails/ruby-compat/uri/generic";
+import { URI } from "@blazetrails/ruby-compat/uri/common";
+import { rbObjDup } from "@blazetrails/ruby-compat/include";
+import { regexpEscape } from "@blazetrails/ruby-compat/regexp";
 import { DEFAULT_HOST } from "./test.js";
 
 /** @internal */

@@ -1,4 +1,5 @@
-import { isPlainHash, rbCallSuper } from "@blazetrails/ruby-compat";
+import { isPlainHash } from "@blazetrails/ruby-compat/object";
+import { rbCallSuper } from "@blazetrails/ruby-compat/include";
 
 import { EMPTY_HASH, defaultSeparator, normalizeKeys, type TranslationKey } from "../i18n.js";
 import type { Locale } from "../locale.js";

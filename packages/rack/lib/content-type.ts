@@ -1,5 +1,5 @@
 import type { RackHeaders } from "./index.js";
-import { rbProcCall } from "@blazetrails/ruby-compat";
+import { rbProcCall } from "@blazetrails/ruby-compat/object";
 import { CONTENT_TYPE, STATUS_WITH_NO_ENTITY_BODY } from "./constants.js";
 import type { RackApp } from "./mock-request.js";
 import { Rack } from "./namespaces.js";

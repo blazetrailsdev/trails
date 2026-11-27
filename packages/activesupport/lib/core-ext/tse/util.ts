@@ -164,7 +164,7 @@ export const Util = {
 
 TopLevel.TSE = TSE;
 
-declare module "@blazetrails/ruby-compat" {
+declare module "@blazetrails/ruby-compat/object" {
   interface TopLevelConstants {
     TSE?: typeof TSE;
   }

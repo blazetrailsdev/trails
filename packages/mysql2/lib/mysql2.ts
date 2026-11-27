@@ -10,7 +10,7 @@ export const Mysql2 = { name: "Mysql2" } as Mysql2Namespace;
 
 TopLevel.Mysql2 = Mysql2;
 
-declare module "@blazetrails/ruby-compat" {
+declare module "@blazetrails/ruby-compat/object" {
   interface TopLevelConstants {
     Mysql2?: typeof Mysql2;
   }

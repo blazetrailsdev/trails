@@ -280,7 +280,7 @@ rbClearMethodCache();
 
 TopLevel.Enumerable = Enumerable;
 
-declare module "@blazetrails/ruby-compat" {
+declare module "@blazetrails/ruby-compat/object" {
   interface TopLevelConstants {
     Enumerable?: typeof Enumerable;
   }

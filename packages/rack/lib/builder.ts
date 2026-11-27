@@ -1,16 +1,11 @@
-import {
-  ArgumentError,
-  type Binding,
-  capitalize,
-  constGet,
-  File,
-  RuntimeError,
-  rbBlockGivenP,
-  rbFBinding,
-  rbFLoad,
-  rbProcCall,
-  TopLevel,
-} from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { constGet, rbFBinding, type Binding } from "@blazetrails/ruby-compat/variable";
+import { capitalize } from "@blazetrails/ruby-compat/string/case-mapping";
+import { File } from "@blazetrails/ruby-compat/file";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
+import { rbBlockGivenP } from "@blazetrails/ruby-compat/hash";
+import { rbFLoad } from "@blazetrails/ruby-compat/load";
+import { rbProcCall, TopLevel } from "@blazetrails/ruby-compat/object";
 import { URLMap } from "./urlmap.js";
 import { Rack } from "./namespaces.js";
 

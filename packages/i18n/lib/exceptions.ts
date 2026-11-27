@@ -1,14 +1,10 @@
 import { EMPTY_HASH, normalizeKeys } from "./i18n.js";
 import type { Locale, TranslationKey } from "./i18n.js";
-import {
-  ArgumentError as RubyArgumentError,
-  NoMethodError,
-  include,
-  isSymbol,
-  rbInspect,
-  symbolToS,
-  toSym,
-} from "@blazetrails/ruby-compat";
+import { ArgumentError as RubyArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { NoMethodError } from "@blazetrails/ruby-compat/no-method-error";
+import { include } from "@blazetrails/ruby-compat/include";
+import { isSymbol, symbolToS } from "@blazetrails/ruby-compat/symbol";
+import { rbInspect, toSym } from "@blazetrails/ruby-compat/object";
 
 export { NoMethodError };
 

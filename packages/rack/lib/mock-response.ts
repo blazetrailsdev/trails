@@ -6,15 +6,11 @@
  */
 
 import { Time } from "@blazetrails/date";
-import {
-  StringIO,
-  rbFSend,
-  fetch,
-  rbFArray,
-  rbObjRespondTo,
-  rbProcCall,
-  rbStrToI,
-} from "@blazetrails/ruby-compat";
+import { StringIO } from "@blazetrails/ruby-compat/string-io";
+import { rbFSend, rbObjRespondTo, rbProcCall } from "@blazetrails/ruby-compat/object";
+import { fetch } from "@blazetrails/ruby-compat/hash";
+import { rbFArray } from "@blazetrails/ruby-compat/array";
+import { rbStrToI } from "@blazetrails/ruby-compat/string/convert";
 import { Response } from "./response.js";
 import { SET_COOKIE } from "./constants.js";
 import { Rack } from "./namespaces.js";

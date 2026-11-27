@@ -32,7 +32,7 @@ SolidCache.Configuration = Configuration;
 
 TopLevel.SolidCache = SolidCache;
 
-declare module "@blazetrails/ruby-compat" {
+declare module "@blazetrails/ruby-compat/object" {
   interface TopLevelConstants {
     SolidCache?: typeof SolidCache;
   }

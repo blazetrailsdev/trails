@@ -16,7 +16,7 @@ export class ViteTrails {
 
 TopLevel.ViteTrails = ViteTrails;
 
-declare module "@blazetrails/ruby-compat" {
+declare module "@blazetrails/ruby-compat/object" {
   interface TopLevelConstants {
     ViteTrails?: typeof ViteTrails;
   }

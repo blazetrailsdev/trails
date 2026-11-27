@@ -1,7 +1,7 @@
 import { Model } from "@blazetrails/activemodel";
 import { rbModAttrReader, rbModAttrWriter, TopLevel } from "@blazetrails/ruby-compat";
 
-declare module "@blazetrails/ruby-compat" {
+declare module "@blazetrails/ruby-compat/object" {
   interface TopLevelConstants {
     Company?: typeof Company;
   }

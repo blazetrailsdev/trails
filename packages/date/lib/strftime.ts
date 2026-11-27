@@ -1,4 +1,4 @@
-import { Rational } from "@blazetrails/ruby-compat";
+import { Rational } from "@blazetrails/ruby-compat/rational";
 import { ERANGE } from "./date.js";
 import { rbTimeZoneAbbreviation, type Time } from "./time.js";
 

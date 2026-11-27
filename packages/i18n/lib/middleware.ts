@@ -1,4 +1,5 @@
-import { rbProcCall, Thread } from "@blazetrails/ruby-compat";
+import { rbProcCall } from "@blazetrails/ruby-compat/object";
+import { Thread } from "@blazetrails/ruby-compat/thread";
 
 import { Config } from "./config.js";
 

@@ -1,4 +1,5 @@
-import { rbCallSuper, toSym } from "@blazetrails/ruby-compat";
+import { rbCallSuper } from "@blazetrails/ruby-compat/include";
+import { toSym } from "@blazetrails/ruby-compat/object";
 
 import { EMPTY_HASH, newDoubleNestedCache, type TranslationKey } from "../i18n.js";
 import type { Locale } from "../locale.js";

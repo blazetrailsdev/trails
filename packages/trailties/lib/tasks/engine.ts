@@ -9,7 +9,7 @@ import { ENGINE_ROOT, setEngineRoot } from "../app-path.js";
 import { Updater } from "../engine/updater.js";
 import { Engine } from "../engine.js";
 
-declare module "@blazetrails/ruby-compat" {
+declare module "@blazetrails/ruby-compat/object" {
   interface TopLevelConstants {
     APP_RAKEFILE?: string;
   }

@@ -1,6 +1,6 @@
 import type { RackApp } from "../mock-request.js";
 import type { RackHeaders } from "../index.js";
-import { rbProcCall } from "@blazetrails/ruby-compat";
+import { rbProcCall } from "@blazetrails/ruby-compat/object";
 import { AbstractHandler } from "./abstract/handler.js";
 import { AbstractRequest } from "./abstract/request.js";
 

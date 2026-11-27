@@ -1,4 +1,4 @@
-import { File } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat/file";
 import { ArgumentError, escapePath } from "../utils.js";
 import { UploadedFile } from "./uploaded-file.js";
 import { buildMultipart, MULTIPART_BOUNDARY } from "../multipart.js";

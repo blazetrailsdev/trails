@@ -1,4 +1,5 @@
-import { NoMethodError, rbFSend, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { NoMethodError } from "@blazetrails/ruby-compat/no-method-error";
+import { rbFSend, rbObjRespondTo } from "@blazetrails/ruby-compat/object";
 import { Rack } from "./namespaces.js";
 
 export class BodyProxy {

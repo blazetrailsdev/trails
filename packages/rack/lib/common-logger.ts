@@ -1,6 +1,8 @@
 import type { RackHeaders } from "./index.js";
 import { SERVER_PROTOCOL, CONTENT_LENGTH, RACK_ERRORS } from "./constants.js";
-import { Process, sprintf, rbObjRespondTo, rbProcCall } from "@blazetrails/ruby-compat";
+import { Process } from "@blazetrails/ruby-compat/process";
+import { sprintf } from "@blazetrails/ruby-compat/kernel-format";
+import { rbObjRespondTo, rbProcCall } from "@blazetrails/ruby-compat/object";
 import { Time } from "@blazetrails/date";
 import type { RackApp } from "./mock-request.js";
 import { Request } from "./request.js";

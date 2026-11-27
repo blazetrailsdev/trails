@@ -1,5 +1,6 @@
 import { HTML5, type Html5DocumentFragment } from "@blazetrails/nokogiri";
-import { TopLevel, constSet } from "@blazetrails/ruby-compat";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
+import { constSet } from "@blazetrails/ruby-compat/include";
 
 import { ScrubBehavior } from "./loofah/concerns.js";
 import { LibxmlWorkarounds } from "./loofah/html5/libxml2-workarounds.js";

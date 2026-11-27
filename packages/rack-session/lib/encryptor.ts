@@ -1,23 +1,19 @@
 import { Utils } from "@blazetrails/rack";
-import {
-  ArgumentError,
-  Base64,
-  JSON,
-  Marshal,
-  OpenSSL,
-  Range,
-  SecureRandom,
-  StandardError,
-  b,
-  rbObjAsString,
-  byteslice,
-  rbStrPlus,
-  pack,
-  sliceBang,
-  strlen,
-  unpack,
-  type Cipher,
-} from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { Base64 } from "@blazetrails/ruby-compat/base64";
+import { JSON } from "@blazetrails/ruby-compat/json";
+import { Marshal } from "@blazetrails/ruby-compat/marshal";
+import { OpenSSL, type Cipher } from "@blazetrails/ruby-compat/openssl";
+import { Range } from "@blazetrails/ruby-compat/range";
+import { SecureRandom } from "@blazetrails/ruby-compat/secure-random";
+import { StandardError } from "@blazetrails/ruby-compat/standard-error";
+import { b } from "@blazetrails/ruby-compat/string/b";
+import { rbObjAsString } from "@blazetrails/ruby-compat/object";
+import { byteslice } from "@blazetrails/ruby-compat/string/byte-methods";
+import { rbStrPlus } from "@blazetrails/ruby-compat/string/method-table";
+import { pack, unpack } from "@blazetrails/ruby-compat/array";
+import { sliceBang } from "@blazetrails/ruby-compat/string/slice";
+import { strlen } from "@blazetrails/ruby-compat/string/support";
 
 export interface EncryptorOptions {
   serializeJson?: boolean;

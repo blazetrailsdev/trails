@@ -18,15 +18,12 @@ import {
   HEAD,
   OPTIONS,
 } from "./constants.js";
-import {
-  Encoding,
-  type Generic,
-  isSymbol,
-  rbObjRespondTo,
-  RFC2396Parser,
-  StringIO,
-  rbProcCall,
-} from "@blazetrails/ruby-compat";
+import { Encoding } from "@blazetrails/ruby-compat/encoding";
+import type { Generic } from "@blazetrails/ruby-compat/uri/generic";
+import { isSymbol } from "@blazetrails/ruby-compat/symbol";
+import { rbObjRespondTo, rbProcCall } from "@blazetrails/ruby-compat/object";
+import { RFC2396Parser } from "@blazetrails/ruby-compat/uri/rfc2396-parser";
+import { StringIO } from "@blazetrails/ruby-compat/string-io";
 import { Lint } from "./lint.js";
 import { MockResponse } from "./mock-response.js";
 import { buildMultipart, MULTIPART_BOUNDARY } from "./multipart.js";

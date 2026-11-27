@@ -56,7 +56,7 @@ export const SQLite3 = { name: "SQLite3" } as SQLite3Namespace;
 
 TopLevel.SQLite3 = SQLite3;
 
-declare module "@blazetrails/ruby-compat" {
+declare module "@blazetrails/ruby-compat/object" {
   interface TopLevelConstants {
     SQLite3?: typeof SQLite3;
   }

@@ -1,4 +1,6 @@
-import { kernelCatch, kernelThrow, rbEnsure, Thread } from "@blazetrails/ruby-compat";
+import { kernelCatch, kernelThrow } from "@blazetrails/ruby-compat/kernel-catch";
+import { rbEnsure } from "@blazetrails/ruby-compat/ensure";
+import { Thread } from "@blazetrails/ruby-compat/thread";
 import * as I18n from "./i18n.js";
 import type { ExceptionHandlerLike } from "./config.js";
 import type { Base } from "./backend/base.js";

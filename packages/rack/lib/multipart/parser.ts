@@ -1,16 +1,13 @@
-import {
-  ArgumentError,
-  EOFError,
-  Enumerable,
-  Encoding,
-  Errno,
-  File,
-  forceEncoding,
-  include,
-  NoMethodError,
-  rbObjDup,
-  Tempfile,
-} from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { EOFError } from "@blazetrails/ruby-compat/eof-error";
+import { Enumerable } from "@blazetrails/ruby-compat/enumerable";
+import { Encoding } from "@blazetrails/ruby-compat/encoding";
+import { Errno } from "@blazetrails/ruby-compat/errno";
+import { File } from "@blazetrails/ruby-compat/file";
+import { forceEncoding } from "@blazetrails/ruby-compat/string/force-encoding";
+import { include, rbObjDup } from "@blazetrails/ruby-compat/include";
+import { NoMethodError } from "@blazetrails/ruby-compat/no-method-error";
+import { Tempfile } from "@blazetrails/ruby-compat/tempfile";
 import { BadRequest } from "../bad-request.js";
 import { QueryParser } from "../query-parser.js";
 import { multipartFileLimit, multipartTotalPartLimit, unescapePath } from "../utils.js";

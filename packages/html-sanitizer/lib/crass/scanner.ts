@@ -1,4 +1,4 @@
-import { StringScanner } from "@blazetrails/ruby-compat";
+import { StringScanner } from "@blazetrails/ruby-compat/string-scanner";
 
 export class Scanner {
   current: string | null = null;

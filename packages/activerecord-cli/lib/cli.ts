@@ -1,4 +1,6 @@
-import { File, include, setEnv } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat/file";
+import { include } from "@blazetrails/ruby-compat/include";
+import { setEnv } from "@blazetrails/ruby-compat/process-adapter";
 import { getEnv, isBlank } from "@blazetrails/activesupport";
 import { Thor, type ThorClass } from "@blazetrails/thor";
 import { Actions } from "@blazetrails/thor/actions";

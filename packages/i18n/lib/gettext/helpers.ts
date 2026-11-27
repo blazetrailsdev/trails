@@ -1,4 +1,4 @@
-import { Hash } from "@blazetrails/ruby-compat";
+import { Hash } from "@blazetrails/ruby-compat/hash";
 import { EMPTY_HASH, t } from "../i18n.js";
 import type { TranslateOptions } from "../backend/base.js";
 import { Gettext } from "../gettext.js";

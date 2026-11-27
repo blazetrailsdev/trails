@@ -1,5 +1,8 @@
 import { RACK_INPUT } from "./constants.js";
-import { Encoding, RUBY_PLATFORM, RuntimeError, Tempfile } from "@blazetrails/ruby-compat";
+import { Encoding } from "@blazetrails/ruby-compat/encoding";
+import { RUBY_PLATFORM } from "@blazetrails/ruby-compat/ruby-platform";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
+import { Tempfile } from "@blazetrails/ruby-compat/tempfile";
 import { Rack } from "./namespaces.js";
 
 export class Middleware {

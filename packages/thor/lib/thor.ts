@@ -863,7 +863,7 @@ import "./constants.generated.js";
 
 TopLevel.Thor = Thor;
 
-declare module "@blazetrails/ruby-compat" {
+declare module "@blazetrails/ruby-compat/object" {
   interface TopLevelConstants {
     Thor?: typeof Thor;
   }

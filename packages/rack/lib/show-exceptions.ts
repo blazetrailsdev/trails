@@ -1,13 +1,14 @@
 import type { RackHeaders } from "./index.js";
+import { File } from "@blazetrails/ruby-compat/file";
 import {
-  File,
   rbInspect,
   rbObjClass,
   rbObjId,
   rbObjRespondTo,
   rbProcCall,
-} from "@blazetrails/ruby-compat";
-import { chomp, isEmpty } from "@blazetrails/ruby-compat";
+} from "@blazetrails/ruby-compat/object";
+import { chomp } from "@blazetrails/ruby-compat/string/chomp";
+import { isEmpty } from "@blazetrails/ruby-compat/ruby-empty";
 
 import { CONTENT_TYPE, CONTENT_LENGTH, RACK_ERRORS } from "./constants.js";
 import { Request } from "./request.js";

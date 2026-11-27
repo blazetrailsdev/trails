@@ -2,7 +2,7 @@ import { mkdir, writeFile, access } from "fs/promises";
 import { join } from "path";
 import { camelize, underscore, pluralize } from "@blazetrails/activesupport";
 import { Migration } from "@blazetrails/activerecord";
-import { rbObjAsString } from "@blazetrails/ruby-compat";
+import { rbObjAsString } from "@blazetrails/ruby-compat/object";
 
 export interface FieldSpec {
   name: string;
