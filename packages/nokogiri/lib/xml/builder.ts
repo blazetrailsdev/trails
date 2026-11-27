@@ -1,9 +1,7 @@
-import {
-  ArgumentError,
-  methodMissingPrototype,
-  rbInspect,
-  stringSplit,
-} from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { methodMissingPrototype } from "@blazetrails/ruby-compat/method-missing-proxy";
+import { rbInspect } from "@blazetrails/ruby-compat/object";
+import { stringSplit } from "@blazetrails/ruby-compat/string/split";
 
 import { XML } from "../namespaces.js";
 

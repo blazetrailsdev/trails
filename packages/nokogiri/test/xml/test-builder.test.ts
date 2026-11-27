@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { ArgumentError } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
 import { Builder } from "../../lib/xml/builder.js";
 import { XmlDocument } from "../../lib/xml/document.js";
 import type { XmlNode } from "../../lib/xml/node.js";
