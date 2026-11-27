@@ -1374,6 +1374,12 @@ ratified here so no port re-derives them.
   `vendor/sqlite3/v2.7.3/test/test_statement.rb:491-503`) is permanently
   unportable, and no method grows a runtime arity guard for it. Ruled by the
   operator on 2026-11-23.
+- **`sqlite3_interrupt` on a binding that does not expose it.**
+  `SQLite3::Database#interrupt` is an unconditional `sqlite3_interrupt`
+  (`vendor/sqlite3/v2.7.3/ext/sqlite3/database.c:552-561`). libsql and
+  expo-sqlite expose it; better-sqlite3, node:sqlite and bun:sqlite do not,
+  so on those engines `interrupt` raises `NotImplementedError`, as the gem's
+  other unbound arms do. Ruled by the operator on 2026-11-27.
 
 - Package-specific facts:
   [activerecord](packages/activerecord/CLAUDE.md#a-classmethodsnew-that-runs-after-super-deduplicable)
