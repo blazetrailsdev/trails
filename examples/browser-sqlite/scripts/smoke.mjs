@@ -29,9 +29,20 @@ const context = await browser.newContext({ viewport: { width: 1600, height: 900 
 if (process.env.REGEXP_MODIFIERS === "off") {
   await context.addInitScript(() => {
     const Native = RegExp;
+    const hasModifierGroup = (source) => {
+      let inClass = false;
+      for (let i = 0; i < source.length; i++) {
+        const c = source[i];
+        if (c === "\\") i++;
+        else if (inClass) inClass = c !== "]";
+        else if (c === "[") inClass = true;
+        else if (c === "(" && /^\(\?(?!:)[ims]*(?:-[ims]+)?:/.test(source.slice(i))) return true;
+      }
+      return false;
+    };
     const reject = (pattern) => {
       const source = pattern instanceof Native ? pattern.source : String(pattern);
-      if (/\(\?[ims]*(?:-[ims]+)?:/.test(source.replaceAll("(?:", ""))) {
+      if (hasModifierGroup(source)) {
         throw new SyntaxError("Invalid regular expression: unrecognized character after (?");
       }
     };
