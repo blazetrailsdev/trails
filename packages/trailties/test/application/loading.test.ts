@@ -524,8 +524,7 @@ Trails.application!.routes().draw(function () {
     await t.get("/omg/show");
     expect(t.lastResponse().body).toBe("Query cache is enabled.");
   });
-  // PERMANENT-SKIP: packages/trailties/CLAUDE.md, "The application loader is Zeitwerk"
-  it.skip("constants without a matching file raise NameError", async () => {
+  it("constants without a matching file raise NameError", async () => {
     await t.appFile(
       "app/models/post.ts",
       `import { constGet } from "@blazetrails/ruby-compat";
@@ -536,29 +535,26 @@ export class Post {
 }`,
     );
 
-    await t.app("development");
+    let bootError!: NameError;
+    const boot = Promise.resolve(t.app("development")).catch((error: unknown) => {
+      bootError = error as NameError;
+      throw error;
+    });
 
-    let e = (() => {
+    let e!: NameError;
+    expect(() => {
       try {
         constGet(LoadingTest, "User");
       } catch (error) {
-        return error as NameError;
+        e = error as NameError;
+        throw error;
       }
-      throw new Error("expected NameError");
-    })();
-    expect(e).toBeInstanceOf(NameError);
-    expect(e.message).toContain(`uninitialized constant ${LoadingTest.name}::User`);
+    }).toThrow(NameError);
+    expect(e.message).toMatch(`uninitialized constant ${LoadingTest.name}::User`);
 
-    e = (() => {
-      try {
-        constGet(TopLevel, "Post");
-      } catch (error) {
-        return error as NameError;
-      }
-      throw new Error("expected NameError");
-    })();
-    expect(e).toBeInstanceOf(NameError);
-    expect(e.message).toContain("uninitialized constant Post::NON_EXISTING_CONSTANT");
+    await expect(boot).rejects.toThrow(NameError);
+    e = bootError;
+    expect(e.message).toMatch("uninitialized constant Post::NON_EXISTING_CONSTANT");
   });
 
   // PERMANENT-SKIP: packages/trailties/CLAUDE.md, "The application loader is Zeitwerk"
