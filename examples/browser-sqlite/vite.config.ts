@@ -1,6 +1,7 @@
 import { builtinModules } from "node:module";
 import { fileURLToPath } from "node:url";
 import { defineConfig, type Plugin } from "vite";
+import { declarationFiles } from "./scripts/declarations.ts";
 import { FRAMEWORK_ROOT, PACKAGE_NAMES, SEAT_FRAMEWORK_DIR } from "./src/runtime/package-names.ts";
 
 const resolve = (p: string) => fileURLToPath(new URL(p, import.meta.url));
@@ -68,6 +69,18 @@ function trailsPackageUrls(): Plugin {
   };
 }
 
+const DECLARATIONS = "\0trails-declarations";
+
+/** The `.d.ts` files the editor's type checker reads, built into a chunk of their own. */
+function trailsDeclarations(): Plugin {
+  return {
+    name: "trails-declarations",
+    resolveId: (id) => (id === "virtual:trails-declarations" ? DECLARATIONS : null),
+    load: async (id) =>
+      id === DECLARATIONS ? `export default ${JSON.stringify(await declarationFiles())};` : null,
+  };
+}
+
 function importMetaPaths(): Plugin {
   return {
     name: "import-meta-paths",
@@ -84,7 +97,8 @@ function importMetaPaths(): Plugin {
 }
 
 export default defineConfig({
-  plugins: [nodeBuiltinStubs(), trailsPackageUrls(), importMetaPaths()],
+  plugins: [nodeBuiltinStubs(), trailsPackageUrls(), trailsDeclarations(), importMetaPaths()],
+  worker: { format: "es", plugins: () => [trailsDeclarations()] },
   resolve: {
     alias: [
       { find: /^node:buffer$/, replacement: "buffer" },

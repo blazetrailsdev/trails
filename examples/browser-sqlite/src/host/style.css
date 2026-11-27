@@ -301,6 +301,9 @@ body.resizing {
   font: 12px var(--mono);
   text-align: left;
 }
+#problems button.warning {
+  color: var(--console-system);
+}
 #code {
   flex: 1;
   display: flex;
@@ -319,6 +322,11 @@ body.resizing {
 #gutter .problem {
   color: #fff;
   background: var(--console-error);
+  border-radius: 3px;
+}
+#gutter .warning {
+  color: #fff;
+  background: var(--console-system);
   border-radius: 3px;
 }
 #code-body {
