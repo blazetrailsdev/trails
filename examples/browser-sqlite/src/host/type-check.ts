@@ -10,16 +10,31 @@ export type TypeProblem = {
 
 const TSCONFIG = "/tsconfig.json";
 
-let config: ts.ParsedCommandLine = ts.parseJsonConfigFileContent({}, configHost({}), "/");
+type FileSystemEntries = { files: readonly string[]; directories: readonly string[] };
 
-function glob(spec: string): RegExp {
-  const body = spec
-    .replace(/^\.?\//, "")
-    .replace(/[.+^${}()|[\]\\]/g, "\\$&")
-    .replace(/\*\*\//g, "(.*/)?")
-    .replace(/\*/g, "[^/]*")
-    .replace(/\?/g, "[^/]");
-  return new RegExp(`^/${body}(/.*)?$`);
+/** `tsc`'s own `include` / `exclude` matcher, which `ts.sys.readDirectory` calls; TypeScript exports it untyped. */
+const matchFiles = (ts as unknown as { matchFiles: MatchFiles }).matchFiles;
+type MatchFiles = (
+  path: string,
+  extensions: readonly string[] | undefined,
+  excludes: readonly string[] | undefined,
+  includes: readonly string[] | undefined,
+  useCaseSensitiveFileNames: boolean,
+  currentDirectory: string,
+  depth: number | undefined,
+  getFileSystemEntries: (path: string) => FileSystemEntries,
+  realpath: (path: string) => string,
+) => string[];
+
+function entries(files: Record<string, string>, dir: string): FileSystemEntries {
+  const prefix = dir.endsWith("/") ? dir : `${dir}/`;
+  const found = { files: new Set<string>(), directories: new Set<string>() };
+  for (const path of Object.keys(files)) {
+    if (!path.startsWith(prefix)) continue;
+    const [name, ...rest] = path.slice(prefix.length).split("/");
+    (rest.length ? found.directories : found.files).add(name);
+  }
+  return { files: [...found.files], directories: [...found.directories] };
 }
 
 function configHost(files: Record<string, string>): ts.ParseConfigHost {
@@ -27,19 +42,22 @@ function configHost(files: Record<string, string>): ts.ParseConfigHost {
     useCaseSensitiveFileNames: true,
     fileExists: (path) => path in files,
     readFile: (path) => files[path],
-    readDirectory: (_root, extensions, excludes, includes) => {
-      const included = (includes ?? ["**/*"]).map(glob);
-      const excluded = (excludes ?? []).map(glob);
-      return Object.keys(files).filter(
-        (path) =>
-          extensions.some((ext) => path.endsWith(ext)) &&
-          !path.endsWith(".d.ts") &&
-          included.some((re) => re.test(path)) &&
-          !excluded.some((re) => re.test(path)),
-      );
-    },
+    readDirectory: (root, extensions, excludes, includes, depth) =>
+      matchFiles(
+        root,
+        extensions,
+        excludes,
+        includes,
+        true,
+        "/",
+        depth,
+        (dir) => entries(files, dir),
+        (p) => p,
+      ),
   };
 }
+
+let config: ts.ParsedCommandLine = ts.parseJsonConfigFileContent({}, configHost({}), "/");
 
 /**
  * The app's `tsconfig.json`, read as `tsc -p` reads it, with what the
