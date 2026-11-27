@@ -9,6 +9,7 @@ import { XML } from "../namespaces.js";
 
 import { XmlDocument } from "./document.js";
 import { XmlNode } from "./node.js";
+import type { NodeSet } from "./node-set.js";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- a block takes whatever its caller yields.
 type Block = (...args: any[]) => unknown;
@@ -92,11 +93,10 @@ export class Builder {
     return this.doc.toXml(...args);
   }
 
-  append(string: string): void {
-    this.doc
-      .fragment(string)
-      .children.toA()
-      .forEach((x) => this.insert(x));
+  append(string: string): NodeSet {
+    const children = this.doc.fragment(string).children;
+    children.each((x) => this.insert(x));
+    return children;
   }
 
   methodMissing(method: string, ...args: unknown[]): unknown {
