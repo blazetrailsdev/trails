@@ -8,6 +8,40 @@ const FILE_OVERHEAD_MS = 1800;
 
 type Durations = Record<string, Record<string, number>>;
 
+/** @noRailsEquivalent PERMANENT */
+export async function loadDurations(): Promise<Record<string, number> | null> {
+  const adapter = process.env.VITEST_SHARD_DURATIONS;
+  if (!adapter) return null;
+  const all = JSON.parse(
+    await readFile(new URL("./ar-shard-durations.json", import.meta.url), "utf8"),
+  ) as Durations;
+  const table = all[adapter];
+  if (!table) throw new Error(`ar-shard-durations.json has no "${adapter}" table`);
+  return table;
+}
+
+/** @noRailsEquivalent PERMANENT */
+export function specKey(root: string, spec: TestSpecification): string {
+  return relative(root, spec.moduleId).split("\\").join("/");
+}
+
+/**
+ * A file's weight: its recorded time, else the table's median, plus overhead.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function weigher(
+  root: string,
+  table: Record<string, number>,
+): (spec: TestSpecification) => number {
+  const known = Object.values(table).sort((a, b) => a - b);
+  const median = known[Math.floor(known.length / 2)] ?? 0;
+  return (spec) => {
+    const key = specKey(root, spec);
+    return (Object.hasOwn(table, key) ? table[key] : median) + FILE_OVERHEAD_MS;
+  };
+}
+
 /**
  * Splits `--shard` by measured duration instead of file count. Engaged by
  * `VITEST_SHARD_DURATIONS=<adapter>` (a key of ar-shard-durations.json);
@@ -25,27 +59,11 @@ export class DurationSequencer extends BaseSequencer {
 
   private async durations(): Promise<Record<string, number> | null> {
     if (this.table !== undefined) return this.table;
-    const adapter = process.env.VITEST_SHARD_DURATIONS;
-    if (!adapter) return (this.table = null);
-    const all = JSON.parse(
-      await readFile(new URL("./ar-shard-durations.json", import.meta.url), "utf8"),
-    ) as Durations;
-    const table = all[adapter];
-    if (!table) throw new Error(`ar-shard-durations.json has no "${adapter}" table`);
-    return (this.table = table);
-  }
-
-  private key(spec: TestSpecification): string {
-    return relative(this.ctx.config.root, spec.moduleId).split("\\").join("/");
+    return (this.table = await loadDurations());
   }
 
   private weigher(table: Record<string, number>): (spec: TestSpecification) => number {
-    const known = Object.values(table).sort((a, b) => a - b);
-    const median = known[Math.floor(known.length / 2)] ?? 0;
-    return (spec) => {
-      const key = this.key(spec);
-      return (Object.hasOwn(table, key) ? table[key] : median) + FILE_OVERHEAD_MS;
-    };
+    return weigher(this.ctx.config.root, table);
   }
 
   override async shard(files: TestSpecification[]): Promise<TestSpecification[]> {
@@ -54,7 +72,7 @@ export class DurationSequencer extends BaseSequencer {
     const { index, count } = this.ctx.config.shard!;
     const weigh = this.weigher(table);
     const weighed = files
-      .map((spec) => ({ spec, weight: weigh(spec), key: this.key(spec) }))
+      .map((spec) => ({ spec, weight: weigh(spec), key: specKey(this.ctx.config.root, spec) }))
       .sort((a, b) => b.weight - a.weight || (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
     const loads = Array.from({ length: count }, (_, i) =>
       i === 0 ? Number(process.env.VITEST_SHARD_ONE_EXTRA_MS ?? 0) : 0,
