@@ -1,3 +1,3 @@
-import { Trails } from "../../../lib/trails.js";
-import "./config/environment.js";
+import { Trails } from "@blazetrails/trailties";
+import "./config/environment.ts";
 export const Config = Trails.application;

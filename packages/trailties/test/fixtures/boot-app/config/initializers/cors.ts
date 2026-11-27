@@ -1,6 +1,6 @@
 import * as Rack from "@blazetrails/rack-cors";
 import { block } from "@blazetrails/ruby-compat/hash";
-import { Trails } from "../../../../../lib/trails.js";
+import { Trails } from "@blazetrails/trailties";
 
 Trails.application!.config.middleware.insertBefore(
   0,

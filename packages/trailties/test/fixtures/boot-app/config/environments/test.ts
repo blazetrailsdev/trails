@@ -1,4 +1,4 @@
-import { Trails } from "../../../../../lib/trails.js";
+import { Trails } from "@blazetrails/trailties";
 
 Trails.application!.configure(function () {
   this.config.enableReloading = false;

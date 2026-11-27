@@ -3,7 +3,7 @@ import { env, setEnv } from "@blazetrails/ruby-compat/process-adapter";
 
 export async function setup(): Promise<void> {
   if (env.TRAILS_ENV == null) setEnv("TRAILS_ENV", "test");
-  await import("../config/environment.js");
+  await import("../config/environment.ts");
   await import("../../../../lib/testing/maintain-test-schema.js");
 }
 

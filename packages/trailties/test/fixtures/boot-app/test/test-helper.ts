@@ -2,7 +2,7 @@ import { TestCase } from "@blazetrails/activesupport/test-case";
 import { env, setEnv } from "@blazetrails/ruby-compat/process-adapter";
 
 if (env.TRAILS_ENV == null) setEnv("TRAILS_ENV", "test");
-await import("../config/environment.js");
+await import("../config/environment.ts");
 await import("../../../../lib/test-help.js");
 
 TestCase.fixtures(":all");
