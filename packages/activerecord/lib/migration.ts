@@ -1343,7 +1343,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     const root =
       TopLevel.ENGINE_ROOT !== undefined ? TopLevel.ENGINE_ROOT : TopLevel.Trails!.root();
 
-    await FileUtils.cd(String(root), async () => {
+    await FileUtils.cd((root?.toString() ?? null) as string, async () => {
       await ActiveRecord.Base.connectionHandler.clearAllConnectionsBang("all");
       await rbFSystem("bin/trails db:test:prepare");
     });
