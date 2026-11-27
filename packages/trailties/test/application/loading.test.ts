@@ -5,6 +5,7 @@ import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
 import { Methods } from "@blazetrails/rack-test";
 import { include } from "@blazetrails/ruby-compat/include";
 import { constGet, RuntimeError, TopLevel } from "@blazetrails/ruby-compat";
+import { Base, Migration, Schema } from "@blazetrails/activerecord";
 import { Application } from "../../lib/application.js";
 import { Trails } from "../../lib/trails.js";
 import type { Generation, Rack } from "../support/isolation/abstract-unit.js";
@@ -384,4 +385,57 @@ for (const framework of ["action_controller", "action_mailer", "active_job", "ac
 
     await expect(t.bootTrails()).resolves.not.toThrow();
   });
+
+  it("constants in app are autoloaded", async () => {
+    await t.appFile(
+      "app/models/post.ts",
+      `import { Base } from "@blazetrails/activerecord";
+export class Post extends Base {
+  static {
+    this.validatesAcceptanceOf("title", { accept: "omg" });
+  }
+}`,
+    );
+
+    await t.bootTrails();
+    await setupArBang();
+
+    const Post = constGet(TopLevel, "Post") as {
+      create(attrs: object): Promise<{ title: string }>;
+      first(): Promise<{ title: string }>;
+      count(): Promise<number>;
+    };
+    let p = await Post.create({ title: "omg" });
+    expect(await Post.count()).toBe(1);
+    expect(p.title).toBe("omg");
+    p = await Post.first();
+    expect(p.title).toBe("omg");
+  });
+
+  it("models without table do not panic on scope definitions when loaded", async () => {
+    await t.appFile(
+      "app/models/user.ts",
+      `import { Base } from "@blazetrails/activerecord";
+export class User extends Base {
+  static {
+    this.defaultScope(() => this.where({ published: true }));
+  }
+}`,
+    );
+
+    await t.bootTrails();
+    await setupArBang();
+
+    constGet(TopLevel, "User");
+  });
 });
+
+async function setupArBang(): Promise<void> {
+  await Base.establishConnection();
+  Migration.verbose = false;
+  await Schema.define({ version: 1 }, async (schema) => {
+    await schema.createTable("posts", (t) => {
+      t.string("title");
+    });
+  });
+}
