@@ -6,7 +6,8 @@ import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
 import { capture } from "@blazetrails/activesupport/testing/stream";
 import { File } from "@blazetrails/ruby-compat/file";
 import { include } from "@blazetrails/ruby-compat/include";
-import { constDefined, constGet, TopLevel } from "@blazetrails/ruby-compat";
+import { constDefined, constGet, constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { descendants, type AnyClass } from "@blazetrails/activesupport/descendants-tracker";
 import { Loader } from "@blazetrails/zeitwerk";
 import { Application } from "../../lib/application.js";
 import { Trails } from "../../lib/trails.js";
@@ -259,5 +260,183 @@ export class User {}
 
     await Trails.application!.reloader.reloadBang();
     expect(globals.zeitwerkIntegrationTestEagerLoadCount).toBe(2);
+  });
+
+  it("root directories manually set by the user are honored (main)", async () => {
+    await t.appFile("app/services/x.ts", "export const X = true;");
+    await t.appFile("extras/x.ts", "export const X = true;");
+
+    await t.appFile(
+      "config/initializers/namespaces.ts",
+      `import { Dependencies } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { Trails } from "@blazetrails/trailties";
+
+class ZeitwerkIntegrationTestServices {}
+constSet(TopLevel, "ZeitwerkIntegrationTestServices", ZeitwerkIntegrationTestServices);
+class ZeitwerkIntegrationTestExtras {}
+constSet(TopLevel, "ZeitwerkIntegrationTestExtras", ZeitwerkIntegrationTestExtras);
+
+Dependencies.autoloadPaths.push(Trails.root()!.join("extras").toString());
+
+const main = Trails.autoloaders.main;
+await main.pushDir(\`\${Trails.root()}/app/services\`, { namespace: ZeitwerkIntegrationTestServices });
+await main.pushDir(\`\${Trails.root()}/extras\`, { namespace: ZeitwerkIntegrationTestExtras });`,
+    );
+
+    await boot();
+
+    expect(constGet(TopLevel, "ZeitwerkIntegrationTestServices::X")).toBeTruthy();
+    expect(constGet(TopLevel, "ZeitwerkIntegrationTestExtras::X")).toBeTruthy();
+  });
+
+  it("the once autoloader can autoload from initializers", async () => {
+    await t.appFile("extras0/x.ts", "export const X = 0;");
+    await t.appFile("extras1/y.ts", "export const Y = 0;");
+
+    await t.addToConfig("this.config.autoloadOncePaths.push(`${Trails.root()}/extras0`);");
+    await t.addToEnvConfig(
+      "development",
+      "this.config.autoloadOncePaths.push(`${Trails.root()}/extras1`);",
+    );
+
+    globals.configAutoloadOncePathsIsFrozen = false;
+    globals.globalAutoloadOncePathsIsFrozen = false;
+    await t.addToConfig(`this.initializer("test_autoload_once_paths_is_frozen", { after: "bootstrap_hook" }, async () => {
+      const { Dependencies } = await import("@blazetrails/activesupport");
+      const { constGet, TopLevel } = await import("@blazetrails/ruby-compat");
+      const globals = TopLevel as unknown as Record<string, unknown>;
+      globals.configAutoloadOncePathsIsFrozen = Object.isFrozen(this.config.autoloadOncePaths);
+      globals.globalAutoloadOncePathsIsFrozen = Object.isFrozen(Dependencies.autoloadOncePaths);
+      constGet(TopLevel, "X");
+    });`);
+
+    await t.appFile(
+      "config/initializers/autoload-y.ts",
+      `import { constGet, TopLevel } from "@blazetrails/ruby-compat";
+(constGet(TopLevel, "Y") as number) + 1;`,
+    );
+
+    expect(constDefined(TopLevel, "X")).toBeFalsy();
+    expect(constDefined(TopLevel, "Y")).toBeFalsy();
+
+    await boot();
+
+    expect(constDefined(TopLevel, "X")).toBeTruthy();
+    expect(constDefined(TopLevel, "Y")).toBeTruthy();
+    expect(globals.configAutoloadOncePathsIsFrozen).toBeTruthy();
+    expect(globals.globalAutoloadOncePathsIsFrozen).toBeTruthy();
+  });
+
+  it("eager loading loads code in engines", async () => {
+    globals.testBlogEngineEagerLoaded = false;
+
+    await t.engine("blog", async (bukkit) => {
+      await bukkit.write(
+        "lib/blog.ts",
+        `import { Engine } from "@blazetrails/trailties";
+export class BlogEngine extends Engine {
+  static {
+    Engine.register(this, import.meta.dirname);
+  }
+}`,
+      );
+      await bukkit.write(
+        "app/models/post.ts",
+        `import { TopLevel } from "@blazetrails/ruby-compat";
+export const Post = ((TopLevel as unknown as Record<string, unknown>).testBlogEngineEagerLoaded = true);`,
+      );
+    });
+
+    await boot("production");
+
+    expect(globals.testBlogEngineEagerLoaded).toBeTruthy();
+  });
+
+  it("eager loading loads anything managed by Zeitwerk", async () => {
+    globals.zeitwerkIntegrationTestUser = false;
+    await t.appFile(
+      "app/models/user.ts",
+      `import { TopLevel } from "@blazetrails/ruby-compat";
+export class User {}
+(TopLevel as unknown as Record<string, unknown>).zeitwerkIntegrationTestUser = true;`,
+    );
+
+    globals.zeitwerkIntegrationTestExtras = false;
+    await t.appDir("extras");
+    await t.appFile(
+      "extras/webhook-hacks.ts",
+      `import { TopLevel } from "@blazetrails/ruby-compat";
+export const WebhookHacks = 1;
+(TopLevel as unknown as Record<string, unknown>).zeitwerkIntegrationTestExtras = true;`,
+    );
+
+    const autoloader = new Loader();
+    await autoloader.pushDir(`${await t.appPath()}/extras`);
+    await autoloader.setup();
+
+    await boot("production");
+
+    expect(globals.zeitwerkIntegrationTestUser).toBeTruthy();
+    expect(globals.zeitwerkIntegrationTestExtras).toBeTruthy();
+  });
+
+  // PERMANENT-SKIP: packages/trailties/CLAUDE.md, "The application loader is Zeitwerk"
+  it.skip("autoload directories not present in eager load paths are not eager loaded", async () => {
+    globals.zeitwerkIntegrationTestUser = false;
+    await t.appFile(
+      "app/models/user.ts",
+      `import { TopLevel } from "@blazetrails/ruby-compat";
+export class User {}
+(TopLevel as unknown as Record<string, unknown>).zeitwerkIntegrationTestUser = true;`,
+    );
+
+    globals.zeitwerkIntegrationTestExtras = false;
+    await t.appDir("extras");
+    await t.appFile(
+      "extras/websocket-hacks.ts",
+      `import { TopLevel } from "@blazetrails/ruby-compat";
+export const WebsocketHacks = 1;
+(TopLevel as unknown as Record<string, unknown>).zeitwerkIntegrationTestExtras = true;`,
+    );
+    await t.addToConfig(`this.config.autoloadOncePaths.push("${await t.appPath()}/extras");`);
+
+    await boot("production");
+
+    expect(globals.zeitwerkIntegrationTestUser).toBeTruthy();
+    expect(globals.zeitwerkIntegrationTestExtras).toBeFalsy();
+
+    expect(constGet(TopLevel, "WebsocketHacks")).toBeTruthy();
+    expect(globals.zeitwerkIntegrationTestExtras).toBeTruthy();
+  });
+
+  it("reloading clears autoloaded tracked classes", async () => {
+    class Parent {}
+    constSet(TopLevel, "Parent", Parent);
+
+    await t.appFile(
+      "app/models/child.ts",
+      `import { constGet, TopLevel } from "@blazetrails/ruby-compat";
+export class Child extends (constGet(TopLevel, "Parent") as new () => object) {}`,
+    );
+
+    await t.appFile(
+      "app/models/grandchild.ts",
+      `import { Child } from "./child.js";
+export class Grandchild extends Child {}`,
+    );
+
+    await boot();
+    const Child = constGet(TopLevel, "Child") as AnyClass;
+    const Grandchild = constGet(TopLevel, "Grandchild") as AnyClass;
+    expect(Grandchild).toBeTruthy();
+
+    expect(Dependencies._autoloadedTrackedClasses).toEqual(new Set([Child, Grandchild]));
+    expect(descendants(Parent)).toEqual([Child, Grandchild]);
+
+    await Trails.application!.reloader.reloadBang();
+
+    expect(Dependencies._autoloadedTrackedClasses.size).toBe(0);
+    expect(descendants(Parent)).toEqual([]);
   });
 });
