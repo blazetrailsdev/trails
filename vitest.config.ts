@@ -192,10 +192,6 @@ const alias = {
     __dirname,
     "packages/activesupport/lib/core-ext/hash/slice.ts",
   ),
-  "@blazetrails/activesupport/core-ext/string/inflections": path.resolve(
-    __dirname,
-    "packages/activesupport/lib/core-ext/string/inflections.ts",
-  ),
   "@blazetrails/activesupport/temporal": path.resolve(
     __dirname,
     "packages/activesupport/lib/temporal.ts",
