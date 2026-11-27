@@ -48,9 +48,6 @@ export function weigher(
  * without it, the stock hash split. Every file lands in exactly one shard:
  * each shard computes the same greedy longest-first partition and keeps its
  * own bin. A file with no recorded time weighs the table's median.
- * `VITEST_SHARD_ONE_EXTRA_MS` preloads shard 1's bin, for a lane whose
- * shard 1 also runs the unsharded steps; it is in fork-summed ms, which run
- * ~2.8x wall-clock on the hosted lanes.
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -74,9 +71,7 @@ export class DurationSequencer extends BaseSequencer {
     const weighed = files
       .map((spec) => ({ spec, weight: weigh(spec), key: specKey(this.ctx.config.root, spec) }))
       .sort((a, b) => b.weight - a.weight || (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
-    const loads = Array.from({ length: count }, (_, i) =>
-      i === 0 ? Number(process.env.VITEST_SHARD_ONE_EXTRA_MS ?? 0) : 0,
-    );
+    const loads = new Array<number>(count).fill(0);
     const mine: TestSpecification[] = [];
     for (const { spec, weight } of weighed) {
       let bin = 0;
