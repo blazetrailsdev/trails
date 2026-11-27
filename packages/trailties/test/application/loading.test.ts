@@ -428,6 +428,102 @@ export class User extends Base {
 
     constGet(TopLevel, "User");
   });
+  it("AC load hooks can be used with metal", async () => {
+    await t.appFile(
+      "app/controllers/omg-controller.ts",
+      `import { ActionController } from "@blazetrails/actionpack";
+import { runLoadHooks } from "@blazetrails/activesupport";
+export class OmgController extends ActionController.Metal {
+  static {
+    runLoadHooks("action_controller", this);
+  }
+  async show() {
+    await this.setResponseBody(["OK"]);
+  }
+}`,
+    );
+
+    await t.appFile(
+      "config/routes.ts",
+      `import { Trails } from "@blazetrails/trailties";
+Trails.application!.routes().draw(function () {
+  this.get("/:controller(/:action)");
+});`,
+    );
+
+    await t.bootTrails();
+
+    await t.get("/omg/show");
+    expect(t.lastResponse().body).toBe("OK");
+  });
+
+  it("active record query cache hooks are installed before first request in production", async () => {
+    await t.appFile(
+      "app/controllers/omg-controller.ts",
+      `import { Base } from "@blazetrails/activerecord";
+import { ActionController } from "@blazetrails/actionpack";
+import { runLoadHooks } from "@blazetrails/activesupport";
+export class OmgController extends ActionController.Metal {
+  static {
+    runLoadHooks("action_controller", this);
+  }
+  async show() {
+    if ((await Base.leaseConnection()).queryCacheEnabled) {
+      await this.setResponseBody(["Query cache is enabled."]);
+    } else {
+      await this.setResponseBody(["Expected ActiveRecord::Base.lease_connection.query_cache_enabled to be true"]);
+    }
+  }
+}`,
+    );
+
+    await t.appFile(
+      "config/routes.ts",
+      `import { Trails } from "@blazetrails/trailties";
+Trails.application!.routes().draw(function () {
+  this.get("/:controller(/:action)");
+});`,
+    );
+
+    await t.app("production");
+
+    await t.get("/omg/show", {}, { HTTPS: "on" });
+    expect(t.lastResponse().body).toBe("Query cache is enabled.");
+  });
+
+  it("active record query cache hooks are installed before first request in development", async () => {
+    await t.appFile(
+      "app/controllers/omg-controller.ts",
+      `import { Base } from "@blazetrails/activerecord";
+import { ActionController } from "@blazetrails/actionpack";
+import { runLoadHooks } from "@blazetrails/activesupport";
+export class OmgController extends ActionController.Metal {
+  static {
+    runLoadHooks("action_controller", this);
+  }
+  async show() {
+    if ((await Base.leaseConnection()).queryCacheEnabled) {
+      await this.setResponseBody(["Query cache is enabled."]);
+    } else {
+      await this.setResponseBody(["Expected ActiveRecord::Base.lease_connection.query_cache_enabled to be true"]);
+    }
+  }
+}`,
+    );
+
+    await t.appFile(
+      "config/routes.ts",
+      `import { Trails } from "@blazetrails/trailties";
+Trails.application!.routes().draw(function () {
+  this.get("/:controller(/:action)");
+});`,
+    );
+
+    await t.app("development");
+
+    await t.get("/omg/show");
+    expect(t.lastResponse().body).toBe("Query cache is enabled.");
+  });
 });
 
 async function setupArBang(): Promise<void> {
