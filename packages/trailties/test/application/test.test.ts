@@ -150,7 +150,7 @@ Trails.application.config.activeRecord.maintainTestSchema = false;
     );
 
     const result = await t.assertSuccessfulTestRun("models/user.test.ts");
-    expect(result).not.toContain("create_table(:users)");
+    expect(result).not.toContain(`createTable("users")`);
   });
 
   it("sql structure migrations", async (t) => {
