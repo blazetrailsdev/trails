@@ -98,6 +98,8 @@
     "./dist/net/http/responses.js",
     "./dist/net/protocol.js",
     "./dist/nil-class.js",
+    "./dist/numeric-class.js",
+    "./dist/numeric.js",
     "./dist/object-space.js",
     "./dist/object.js",
     "./dist/open-uri.js",
