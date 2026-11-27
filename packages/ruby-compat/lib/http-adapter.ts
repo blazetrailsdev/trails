@@ -16,6 +16,7 @@ export interface HttpRequest {
 export interface HttpResponse {
   readonly headersSent: boolean;
   readonly writableEnded: boolean;
+  readonly destroyed: boolean;
   writeHead(status: number, headers?: Record<string, string | string[]>): unknown;
   write(chunk: string | Uint8Array): unknown;
   end(chunk?: string | Uint8Array): unknown;
