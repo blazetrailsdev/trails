@@ -53,7 +53,7 @@ describe("ruby-compat entry modules", () => {
     expect(failures).toEqual([]);
   }, 300_000);
 
-  it("seats Init_Rational / Init_Numeric work without include.js", async () => {
+  it("seats Init_Rational / Init_Numeric work when rational.js loads after any entry, without include.js", async () => {
     const files = (await readdir(DIST, { recursive: true })).filter((f) => f.endsWith(".js"));
     const failures: string[] = [];
     for (const f of files) {
