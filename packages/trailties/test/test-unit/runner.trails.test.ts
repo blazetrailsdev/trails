@@ -12,7 +12,7 @@ import { CompositeFilter, Filter, InvalidTestError, Runner } from "../../lib/tes
 
 const internals = Runner as unknown as {
   testLocations(tests: string[], name: RegExp | null): Promise<string[]>;
-  nameFilter(argv: string[]): RegExp | null;
+  nameFilter(argv: string[], tests: string[]): Promise<RegExp | null>;
 };
 
 describe("Runner", () => {
@@ -95,12 +95,26 @@ describe("Runner", () => {
     ]);
   });
 
-  it("reads -n in each spelling", () => {
-    expect(internals.nameFilter(["-n", "/a.b/"])).toEqual(/a.b/);
-    expect(internals.nameFilter(["--name", "a.b"])).toEqual(/(?:^| )a\.b$/);
-    expect(internals.nameFilter(["-nfoo"])).toEqual(/(?:^| )foo$/);
-    expect(internals.nameFilter(["--name=foo"])).toEqual(/(?:^| )foo$/);
-    expect(internals.nameFilter(["test/a.test.ts"])).toBeNull();
+  it("reads -n in each spelling", async () => {
+    expect(await internals.nameFilter(["-n", "/a.b/"], [])).toEqual(/a.b/);
+    expect(await internals.nameFilter(["--name", "a.b"], [])).toEqual(/^(?:a\.b)$/);
+    expect(await internals.nameFilter(["-nfoo"], [])).toEqual(/^(?:foo)$/);
+    expect(await internals.nameFilter(["--name=foo"], [])).toEqual(/^(?:foo)$/);
+    expect(await internals.nameFilter(["test/a.test.ts"], [])).toBeNull();
+  });
+
+  it("a string -n matches a test's own title or its whole name, never a suffix", async () => {
+    await app();
+    const file = "test/models/suffix.test.ts";
+    await getFs().writeFile!(
+      file,
+      'describe("x", () => {\n  it("bar", () => {});\n  it("foo bar", () => {});\n});\n',
+    );
+    const name = (await internals.nameFilter(["-n", "bar"], [file]))!;
+    expect(name.test("x bar")).toBe(true);
+    expect(name.test("bar")).toBe(true);
+    expect(name.test("x foo bar")).toBe(false);
+    expect((await internals.nameFilter(["-n", "x foo bar"], [file]))!.test("x foo bar")).toBe(true);
   });
 
   it("a name filter unions with a line filter", async () => {

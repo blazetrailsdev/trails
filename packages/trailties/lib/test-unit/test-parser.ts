@@ -115,12 +115,12 @@ export class TestParser {
    * @internal
    * @noRailsEquivalent PERMANENT
    */
-  static calls(filepath: string): [number, number, string][] {
+  static calls(filepath: string): [number, number, string, string][] {
     const { API } = rbRequireLoaded("typescript/unstable/sync") as unknown as typeof Sync;
     api ??= new API();
     const sourceFile = api.createSourceFile(filepath, getFs().readFileSync(filepath, "utf8"));
     const line = (position: number) => sourceFile.getLineAndCharacterOfPosition(position).line + 1;
-    const calls: [number, number, string][] = [];
+    const calls: [number, number, string, string][] = [];
     const visit = (node: Ast.Node, names: (string | null)[], isCallee: boolean): void => {
       let scope = names;
       if (ts.isCallExpression(node) && !isCallee) {
@@ -155,6 +155,7 @@ export class TestParser {
               line(node.getStart(sourceFile)),
               line(node.end),
               names.includes(null) ? "" : [...names, rendered].join(" "),
+              rendered,
             ]);
           }
         }
