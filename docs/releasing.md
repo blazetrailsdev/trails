@@ -51,3 +51,10 @@ that includes it, an owner of the `blazetrails` npm org:
 3. Pushes the next release tag within two days. npm expires a Trusted
    Publisher configuration that has not completed a publish in that window,
    and it must then be deleted and added again.
+
+Publish the new package at the version the repo is already on, the last
+released tag, not the coming one. The workflow's `pnpm -r publish` skips a
+version the registry already has, so the next tag publishes the new package's
+second version through OIDC, which is what validates its Trusted Publisher.
+npm points `latest` at a new package's first version whatever `--tag` says,
+so no `npm dist-tag` step is needed.
