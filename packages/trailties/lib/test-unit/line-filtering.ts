@@ -1,4 +1,4 @@
-import { rbCallSuper } from "@blazetrails/ruby-compat";
+import { rbCallSuper } from "@blazetrails/ruby-compat/include";
 import { Runner } from "./runner.js";
 
 type Runnable = Parameters<typeof Runner.composeFilter>[0];

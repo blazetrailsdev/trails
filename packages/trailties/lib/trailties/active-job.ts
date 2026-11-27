@@ -6,16 +6,14 @@ import {
   OrderedOptions,
   squish,
 } from "@blazetrails/activesupport";
+import { block, eachPair, except } from "@blazetrails/ruby-compat/hash";
 import {
-  block,
-  eachPair,
   rbModName,
   rbObjClass,
-  except,
   rbFSend,
   rbObjRespondTo,
   rbObjSingletonClass,
-} from "@blazetrails/ruby-compat";
+} from "@blazetrails/ruby-compat/object";
 import { ActiveJob, Base, deprecator, Serializers } from "@blazetrails/activejob";
 import { EnqueueAfterTransactionCommit } from "@blazetrails/activejob/enqueue-after-transaction-commit";
 import { LogSubscriber } from "@blazetrails/activejob/log-subscriber";

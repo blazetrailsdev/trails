@@ -1,6 +1,7 @@
 import type { MiddlewareStack } from "@blazetrails/actionpack";
 import { deepDup, isPlainObject } from "@blazetrails/activesupport";
-import { File, Hash, hashAset, hashDelete } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat/file";
+import { Hash, hashAset, hashDelete } from "@blazetrails/ruby-compat/hash";
 import { rbFSystem } from "@blazetrails/ruby-compat/kernel-system";
 import { PROTOCOL_PROBES } from "@blazetrails/ruby-compat/method-missing-proxy";
 

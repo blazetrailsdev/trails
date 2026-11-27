@@ -1,4 +1,4 @@
-import { Gem } from "@blazetrails/ruby-compat";
+import { Gem } from "@blazetrails/ruby-compat/gem";
 
 export function gemVersion(): InstanceType<typeof Gem.Version> {
   return new Gem.Version(VERSION.STRING);

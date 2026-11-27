@@ -1,7 +1,7 @@
 import "../../../constants.trails-credentials-credentials-generator.generated.js";
-import { File } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat/file";
 import { EncryptedConfiguration } from "@blazetrails/activesupport";
-import { SecureRandom } from "@blazetrails/ruby-compat";
+import { SecureRandom } from "@blazetrails/ruby-compat/secure-random";
 import { Base, type GeneratorOptions } from "../../base.js";
 
 export interface CredentialsGeneratorOptions extends GeneratorOptions {

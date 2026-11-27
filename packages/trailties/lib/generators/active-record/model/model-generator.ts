@@ -1,5 +1,5 @@
 import "../../../constants.active-record-model-model-generator.generated.js";
-import { File } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat/file";
 import { dasherize, type GeneratorOptions } from "../../base.js";
 import { Base } from "../../active-record.js";
 import type { GeneratedAttribute } from "../../generated-attribute.js";

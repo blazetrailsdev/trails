@@ -1,14 +1,12 @@
 import { classAttribute } from "@blazetrails/activesupport";
-import {
-  Dir,
-  File,
-  env as ENV,
-  Interrupt,
-  STDOUT,
-  rbObjMethod,
-  rbObjRespondTo,
-  type StringIO,
-} from "@blazetrails/ruby-compat";
+import { Dir } from "@blazetrails/ruby-compat/dir";
+import { File } from "@blazetrails/ruby-compat/file";
+import { STDOUT } from "@blazetrails/ruby-compat/io";
+import { rbObjMethod } from "@blazetrails/ruby-compat/method";
+import { rbObjRespondTo } from "@blazetrails/ruby-compat/object";
+import { env as ENV } from "@blazetrails/ruby-compat/process-adapter";
+import { Interrupt } from "@blazetrails/ruby-compat/signal-exception";
+import type { StringIO } from "@blazetrails/ruby-compat/string-io";
 import { ENGINE_ROOT } from "../app-path.js";
 import { Trails } from "../trails.js";
 

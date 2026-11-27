@@ -1,6 +1,6 @@
 import "../../../constants.test-unit-system-system-generator.generated.js";
 import { pluralize } from "@blazetrails/activesupport";
-import { File } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat/file";
 import { dasherize } from "../../base.js";
 import { Base } from "../../test-unit.js";
 

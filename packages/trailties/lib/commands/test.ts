@@ -1,5 +1,6 @@
 import "../constants.test.generated.js";
-import { LOAD_PATH, LoadError } from "@blazetrails/ruby-compat";
+import { LOAD_PATH } from "@blazetrails/ruby-compat/load";
+import { LoadError } from "@blazetrails/ruby-compat/load-error";
 import { rbFSystem } from "@blazetrails/ruby-compat/kernel-system";
 import type { ThorClass } from "@blazetrails/thor";
 import { Base } from "../command/base.js";

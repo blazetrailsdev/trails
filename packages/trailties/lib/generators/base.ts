@@ -8,20 +8,15 @@ import {
   humanize,
   isBlank,
 } from "@blazetrails/activesupport";
-import {
-  File,
-  NameError,
-  rbObjRespondTo,
-  getFs,
-  include,
-  hashDelete,
-  constGet,
-  constDefined,
-  rbModName,
-  rbClearMethodCache,
-  rbFBinding,
-  TSE,
-} from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat/file";
+import { getFs } from "@blazetrails/ruby-compat/fs-adapter";
+import { hashDelete } from "@blazetrails/ruby-compat/hash";
+import { include, constDefined } from "@blazetrails/ruby-compat/include";
+import { rbClearMethodCache } from "@blazetrails/ruby-compat/method-cache";
+import { NameError } from "@blazetrails/ruby-compat/name-error";
+import { rbObjRespondTo, rbModName } from "@blazetrails/ruby-compat/object";
+import { TSE } from "@blazetrails/ruby-compat/tse";
+import { constGet, rbFBinding } from "@blazetrails/ruby-compat/variable";
 import { rubyCommand } from "@blazetrails/thor/util";
 import { Generators, type GeneratorClass } from "../generators.js";
 import * as Actions from "./actions.js";

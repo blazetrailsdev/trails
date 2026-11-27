@@ -1,4 +1,7 @@
-import { Range, getFs, rbFRequire, rbRequireLoaded, type Method } from "@blazetrails/ruby-compat";
+import { getFs } from "@blazetrails/ruby-compat/fs-adapter";
+import { rbFRequire, rbRequireLoaded } from "@blazetrails/ruby-compat/load";
+import type { Method } from "@blazetrails/ruby-compat/method";
+import { Range } from "@blazetrails/ruby-compat/range";
 import type * as Ast from "typescript/unstable/ast";
 import type * as Sync from "typescript/unstable/sync";
 

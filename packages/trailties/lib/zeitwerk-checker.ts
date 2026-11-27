@@ -1,6 +1,7 @@
 import "./constants.zeitwerk-checker.generated.js";
 import { Dependencies } from "@blazetrails/activesupport";
-import { Dir, File } from "@blazetrails/ruby-compat";
+import { Dir } from "@blazetrails/ruby-compat/dir";
+import { File } from "@blazetrails/ruby-compat/file";
 import { Loader } from "@blazetrails/zeitwerk";
 
 export class ZeitwerkChecker {

@@ -1,6 +1,7 @@
 import "../../../constants.test-unit-authentication-authentication-generator.generated.js";
 import { TopLevel } from "@blazetrails/activesupport";
-import { File, constDefined } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat/file";
+import { constDefined } from "@blazetrails/ruby-compat/include";
 import { Base } from "../../base.js";
 
 const __dir__ = import.meta.dirname;

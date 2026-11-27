@@ -1,7 +1,7 @@
 import "./constants.info-controller.generated.js";
 import { isBlank } from "@blazetrails/activesupport";
 import { DebugView, RoutesInspector, RouteWrapper, type RouteSet } from "@blazetrails/actionpack";
-import { RFC2396_PARSER } from "@blazetrails/ruby-compat";
+import { RFC2396_PARSER } from "@blazetrails/ruby-compat/uri/common";
 import { ApplicationController } from "./application-controller.js";
 import { Trails } from "./trails.js";
 import { Info } from "./info.js";

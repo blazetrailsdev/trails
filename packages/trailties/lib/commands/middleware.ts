@@ -1,6 +1,6 @@
 import "../constants.middleware.generated.js";
 import type { MiddlewareStack } from "@blazetrails/actionpack";
-import { rbModName } from "@blazetrails/ruby-compat";
+import { rbModName } from "@blazetrails/ruby-compat/object";
 import type { ThorClass } from "@blazetrails/thor";
 import { Base } from "../command/base.js";
 import { Trails } from "../trails.js";

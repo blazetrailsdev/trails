@@ -8,7 +8,7 @@ import {
   singularize,
   underscore,
 } from "@blazetrails/activesupport";
-import { format } from "@blazetrails/ruby-compat";
+import { format } from "@blazetrails/ruby-compat/kernel-format";
 import { Error } from "../../base.js";
 import { NamedBase } from "../../named-base.js";
 import { ModelHelpers, type ModelHelpersOptions } from "../../model-helpers.js";

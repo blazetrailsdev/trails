@@ -1,5 +1,6 @@
 import "../constants.secret.generated.js";
-import { SecureRandom, STDOUT } from "@blazetrails/ruby-compat";
+import { STDOUT } from "@blazetrails/ruby-compat/io";
+import { SecureRandom } from "@blazetrails/ruby-compat/secure-random";
 import type { ThorClass } from "@blazetrails/thor";
 import { Base } from "../command/base.js";
 

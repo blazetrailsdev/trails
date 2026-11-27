@@ -1,6 +1,6 @@
 import type { Plugin, ViteDevServer } from "vite";
 import { Handler } from "@blazetrails/rackup";
-import type { HttpRequest, HttpSocket } from "@blazetrails/ruby-compat";
+import type { HttpRequest, HttpSocket } from "@blazetrails/ruby-compat/http-adapter";
 import type { RackApp, RackMiddleware } from "@blazetrails/rack";
 
 export interface TrailsPluginOptions {

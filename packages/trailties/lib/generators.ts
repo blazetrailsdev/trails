@@ -1,14 +1,12 @@
 import { dasherize, deepMergeBang, mattrAccessor, underscore } from "@blazetrails/activesupport";
 import "@blazetrails/activesupport/core-ext/string/inflections";
-import {
-  Dir,
-  File,
-  LOAD_PATH,
-  LoadError,
-  STDOUT,
-  getPath,
-  regexpEscape,
-} from "@blazetrails/ruby-compat";
+import { Dir } from "@blazetrails/ruby-compat/dir";
+import { File } from "@blazetrails/ruby-compat/file";
+import { getPath } from "@blazetrails/ruby-compat/fs-adapter";
+import { STDOUT } from "@blazetrails/ruby-compat/io";
+import { LOAD_PATH } from "@blazetrails/ruby-compat/load";
+import { LoadError } from "@blazetrails/ruby-compat/load-error";
+import { regexpEscape } from "@blazetrails/ruby-compat/regexp";
 import { exit } from "@blazetrails/ruby-compat/process-adapter";
 import type { Base, GeneratorConfig } from "./generators/base.js";
 import { noColorBang, printList as behaviorPrintList } from "./command/behavior.js";

@@ -1,5 +1,5 @@
 import "../../../constants.trails-task-task-generator.generated.js";
-import { File } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat/file";
 import { NamedBase } from "../../named-base.js";
 
 export class TaskGenerator extends NamedBase {
