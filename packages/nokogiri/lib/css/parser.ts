@@ -1,6 +1,6 @@
 import { CSS } from "../namespaces.js";
 /* eslint-disable @typescript-eslint/no-explicit-any -- a racc value stack holds tokens, Nodes and arrays untyped, as Ruby's does. */
-import { rbObjAsString } from "@blazetrails/ruby-compat";
+import { rbObjAsString } from "@blazetrails/ruby-compat/object";
 
 import { Parser as RaccParser, ParseError } from "@blazetrails/ruby-compat/racc/parser";
 import { Node } from "./node.js";

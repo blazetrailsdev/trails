@@ -1,4 +1,6 @@
-import { FrozenError, rbInspect, rbObjClassname, TypeError } from "@blazetrails/ruby-compat";
+import { FrozenError } from "@blazetrails/ruby-compat/frozen-error";
+import { rbInspect, rbObjClassname } from "@blazetrails/ruby-compat/object";
+import { TypeError } from "@blazetrails/ruby-compat/type-error";
 import type { Coder } from "./coder.js";
 import { PG } from "./namespaces.js";
 

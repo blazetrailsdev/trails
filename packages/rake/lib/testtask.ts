@@ -1,18 +1,12 @@
-import {
-  File,
-  RUBY_VERSION,
-  RuntimeError,
-  SignalException,
-  block,
-  env as ENV,
-  isPlainHash,
-  puts,
-  stdout as $stdout,
-  rbArgv,
-  flatten,
-  rbFArray,
-  rbObjRespondTo,
-} from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat/file";
+import { RUBY_VERSION } from "@blazetrails/ruby-compat/ruby-platform";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
+import { SignalException } from "@blazetrails/ruby-compat/signal-exception";
+import { block } from "@blazetrails/ruby-compat/hash";
+import { env as ENV, stdout as $stdout, rbArgv } from "@blazetrails/ruby-compat/process-adapter";
+import { isPlainHash, rbObjRespondTo } from "@blazetrails/ruby-compat/object";
+import { puts } from "@blazetrails/ruby-compat/io";
+import { flatten, rbFArray } from "@blazetrails/ruby-compat/array";
 import type { main } from "./dsl-definition.js";
 import { FileList } from "./file-list.js";
 import { FileUtilsExt } from "./file-utils-ext.js";

@@ -1,15 +1,12 @@
+import { TopLevel } from "@blazetrails/ruby-compat/object";
 import {
-  TopLevel,
   autoloadDelete,
   rbAutoloadP,
   rbAutoloadStr,
-  constDefined,
-  constSet,
-  include,
   rbConstGet,
   rbModRemoveConst,
-  type Included,
-} from "@blazetrails/ruby-compat";
+} from "@blazetrails/ruby-compat/variable";
+import { constDefined, constSet, include, type Included } from "@blazetrails/ruby-compat/include";
 import { RealModName } from "./real-mod-name.js";
 
 /** @noRailsEquivalent PERMANENT */

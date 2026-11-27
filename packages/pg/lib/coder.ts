@@ -1,15 +1,15 @@
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { FrozenError } from "@blazetrails/ruby-compat/frozen-error";
 import {
-  ArgumentError,
-  FrozenError,
   rbAnyToS,
   rbInspect,
   rbModName,
-  rbFCaller,
   rbFSend,
   rbObjClassname,
-  TypeError,
-  warn,
-} from "@blazetrails/ruby-compat";
+} from "@blazetrails/ruby-compat/object";
+import { rbFCaller } from "@blazetrails/ruby-compat/backtrace-location";
+import { TypeError } from "@blazetrails/ruby-compat/type-error";
+import { warn } from "@blazetrails/ruby-compat/kernel-warn";
 import { PG } from "./namespaces.js";
 
 function _rbCheckFrozen(obj: object): void {

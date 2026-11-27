@@ -1,6 +1,6 @@
 import { SQLite3 } from "./namespaces.js";
 import "./constants.js";
-import { ArgumentError } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
 import { Database } from "./database.js";
 import { Exception } from "./errors.js";
 

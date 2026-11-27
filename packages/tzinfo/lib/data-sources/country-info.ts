@@ -1,4 +1,5 @@
-import { ArgumentError, rbModName } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { rbModName } from "@blazetrails/ruby-compat/object";
 import type { CountryTimezone } from "../country-timezone.js";
 
 export class CountryInfo {

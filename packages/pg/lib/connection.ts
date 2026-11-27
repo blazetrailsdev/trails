@@ -1,19 +1,19 @@
+import { Addrinfo } from "@blazetrails/ruby-compat/socket";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { FrozenError } from "@blazetrails/ruby-compat/frozen-error";
+import { LoadError } from "@blazetrails/ruby-compat/load-error";
 import {
-  Addrinfo,
-  ArgumentError,
-  FrozenError,
-  LoadError,
   rbAnyToS,
-  rbClassNewInstance,
   rbInspect,
-  rbNum2Int,
   rbObjClassname,
   rbObjRespondTo,
   rbObjSingletonClass,
-  rbProgname,
-  TypeError,
-  stringValue,
-} from "@blazetrails/ruby-compat";
+} from "@blazetrails/ruby-compat/object";
+import { rbClassNewInstance } from "@blazetrails/ruby-compat/include";
+import { rbNum2Int } from "@blazetrails/ruby-compat/kernel-integer";
+import { rbProgname } from "@blazetrails/ruby-compat/process-adapter";
+import { TypeError } from "@blazetrails/ruby-compat/type-error";
+import { stringValue } from "@blazetrails/ruby-compat/string/support";
 import { Coder } from "./coder.js";
 import { ConnectionBad, Error as PgError, UnableToSend } from "./exceptions.js";
 import { PG } from "./namespaces.js";

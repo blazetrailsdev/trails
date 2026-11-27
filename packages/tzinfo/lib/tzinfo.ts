@@ -1,5 +1,6 @@
 import "./constants.generated.js";
-import { TopLevel, constSet } from "@blazetrails/ruby-compat";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
+import { constSet } from "@blazetrails/ruby-compat/include";
 import { Country, InvalidCountryCode } from "./country.js";
 import { CountryTimezone } from "./country-timezone.js";
 import { CountryDefiner } from "./format2/country-definer.js";

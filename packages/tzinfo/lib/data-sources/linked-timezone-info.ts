@@ -1,4 +1,5 @@
-import { ArgumentError, TopLevel } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
 import type { Timezone } from "../timezone.js";
 import { TimezoneInfo } from "./timezone-info.js";
 

@@ -1,4 +1,4 @@
-import { ArgumentError } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
 import type { DateTime, Time } from "@blazetrails/date";
 import type { DataTimezoneInfo } from "./data-sources/data-timezone-info.js";
 import { InfoTimezone } from "./info-timezone.js";

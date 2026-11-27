@@ -1,4 +1,4 @@
-import { extend, rbModAppendFeatures } from "@blazetrails/ruby-compat";
+import { extend, rbModAppendFeatures } from "@blazetrails/ruby-compat/include";
 import { CountryInfo } from "../data-sources/country-info.js";
 import type { CountryTimezone } from "../country-timezone.js";
 import { StringDeduper } from "../string-deduper.js";

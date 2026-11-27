@@ -1,4 +1,4 @@
-import { StandardError } from "@blazetrails/ruby-compat";
+import { StandardError } from "@blazetrails/ruby-compat/standard-error";
 import { PG } from "./namespaces.js";
 import type { Result } from "./result.js";
 

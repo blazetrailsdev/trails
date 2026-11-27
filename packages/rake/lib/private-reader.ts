@@ -1,4 +1,4 @@
-import { extend, included, rbClearMethodCache } from "@blazetrails/ruby-compat";
+import { extend, included, rbClearMethodCache } from "@blazetrails/ruby-compat/include";
 
 export const ClassMethods = {
   privateReader(this: { prototype: object }, ...names: string[]): void {

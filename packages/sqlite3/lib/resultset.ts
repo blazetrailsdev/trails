@@ -1,4 +1,5 @@
-import { Enumerable, include } from "@blazetrails/ruby-compat";
+import { Enumerable } from "@blazetrails/ruby-compat/enumerable";
+import { include } from "@blazetrails/ruby-compat/include";
 import { SQLite3 } from "./namespaces.js";
 import type { Database } from "./database.js";
 import type { Statement } from "./statement.js";

@@ -1,5 +1,5 @@
 import { LinkedList } from "./linked-list.js";
-import { map } from "@blazetrails/ruby-compat";
+import { map } from "@blazetrails/ruby-compat/enumerable";
 
 export class Scope extends LinkedList<string> {
   declare readonly tail: Scope;

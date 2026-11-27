@@ -1,4 +1,4 @@
-import { deleteIf } from "@blazetrails/ruby-compat";
+import { deleteIf } from "@blazetrails/ruby-compat/hash";
 import type { Loader } from "../loader.js";
 
 export class Autoloads {

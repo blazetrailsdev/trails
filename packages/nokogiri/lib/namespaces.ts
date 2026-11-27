@@ -1,4 +1,5 @@
-import { TopLevel, constSet, rbObjAsString, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { TopLevel, rbObjAsString, rbObjRespondTo } from "@blazetrails/ruby-compat/object";
+import { constSet } from "@blazetrails/ruby-compat/include";
 
 import type { Node } from "./html5/node.js";
 import type { Document as Html5Document } from "./html5/document.js";

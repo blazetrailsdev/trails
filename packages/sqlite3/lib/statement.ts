@@ -1,12 +1,8 @@
-import {
-  ArgumentError,
-  Enumerable,
-  Hash,
-  include,
-  rbBlockGivenP,
-  NotImplementedError,
-  rbClassNewInstance,
-} from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { Enumerable } from "@blazetrails/ruby-compat/enumerable";
+import { Hash, rbBlockGivenP } from "@blazetrails/ruby-compat/hash";
+import { include, rbClassNewInstance } from "@blazetrails/ruby-compat/include";
+import { NotImplementedError } from "@blazetrails/ruby-compat/not-implemented-error";
 import { SQLite3 } from "./namespaces.js";
 import { Exception, rbSqlite3Raise, rbSqlite3RaiseWithSql } from "./errors.js";
 import type { SqliteBindValue } from "./driver.js";

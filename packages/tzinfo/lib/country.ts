@@ -1,12 +1,7 @@
-import {
-  cmp,
-  equals,
-  isBetween,
-  rbHash,
-  rbModName,
-  StandardError,
-  type Comparable,
-} from "@blazetrails/ruby-compat";
+import { cmp, equals, isBetween, type Comparable } from "@blazetrails/ruby-compat/comparable";
+import { rbHash } from "@blazetrails/ruby-compat/rb-hash";
+import { rbModName } from "@blazetrails/ruby-compat/object";
+import { StandardError } from "@blazetrails/ruby-compat/standard-error";
 import { DataSource } from "./data-source.js";
 import type { CountryInfo } from "./data-sources/country-info.js";
 import type { CountryTimezone } from "./country-timezone.js";

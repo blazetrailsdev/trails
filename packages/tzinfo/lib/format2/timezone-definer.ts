@@ -1,4 +1,4 @@
-import { ArgumentError } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
 import type { StringDeduper } from "../string-deduper.js";
 import { TimezoneOffset } from "../timezone-offset.js";
 import { TimezoneTransition } from "../timezone-transition.js";

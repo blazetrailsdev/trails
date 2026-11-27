@@ -1,4 +1,4 @@
-import { extend, type Extended } from "@blazetrails/ruby-compat";
+import { extend, type Extended } from "@blazetrails/ruby-compat/include";
 import { Internal } from "../internal.js";
 import { constAdded } from "../core-ext/module.js";
 import type { Cref } from "../cref.js";

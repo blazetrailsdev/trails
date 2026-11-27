@@ -1,6 +1,7 @@
 // This command will automatically be run when you run "trails" from the root of your engine.
 import "@blazetrails/activesupport/node";
-import { File, resolveTsThenJs } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat/file";
+import { resolveTsThenJs } from "@blazetrails/ruby-compat/load";
 import { setAppPath, setEnginePath, setEngineRoot } from "@blazetrails/trailties/app-path";
 
 const __dir__ = import.meta.dirname;

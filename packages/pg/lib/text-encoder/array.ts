@@ -1,4 +1,5 @@
-import { ArgumentError, rbObjAsString } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { rbObjAsString } from "@blazetrails/ruby-compat/object";
 import { CompositeEncoder } from "../composite-encoder.js";
 import { PG } from "../namespaces.js";
 

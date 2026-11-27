@@ -1,4 +1,5 @@
-import { rbFLoad, TopLevel } from "@blazetrails/ruby-compat";
+import { rbFLoad } from "@blazetrails/ruby-compat/load";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
 import type { Application } from "./application.js";
 import { CpuCounter } from "./cpu-counter.js";
 

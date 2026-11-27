@@ -1,4 +1,5 @@
-import { StandardError, getOs } from "@blazetrails/ruby-compat";
+import { StandardError } from "@blazetrails/ruby-compat/standard-error";
+import { getOs } from "@blazetrails/ruby-compat/os-adapter";
 
 export class CpuCounter {
   static count(): number {

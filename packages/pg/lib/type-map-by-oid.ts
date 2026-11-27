@@ -1,4 +1,7 @@
-import { ArgumentError, include, rbObjClassname, TypeError } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { include } from "@blazetrails/ruby-compat/include";
+import { rbObjClassname } from "@blazetrails/ruby-compat/object";
+import { TypeError } from "@blazetrails/ruby-compat/type-error";
 import { Coder } from "./coder.js";
 import { PG } from "./namespaces.js";
 import { _pgTypemapAllStrings } from "./type-map-all-strings.js";

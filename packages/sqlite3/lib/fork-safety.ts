@@ -1,11 +1,8 @@
-import {
-  Process,
-  Thread,
-  prepend,
-  rbCallSuper,
-  rbSingletonClass,
-  warn,
-} from "@blazetrails/ruby-compat";
+import { Process } from "@blazetrails/ruby-compat/process";
+import { Thread } from "@blazetrails/ruby-compat/thread";
+import { prepend, rbCallSuper } from "@blazetrails/ruby-compat/include";
+import { rbSingletonClass } from "@blazetrails/ruby-compat/object";
+import { warn } from "@blazetrails/ruby-compat/kernel-warn";
 import { SQLite3 } from "./namespaces.js";
 import type { Database } from "./database.js";
 

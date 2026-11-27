@@ -1,4 +1,4 @@
-import { StandardError } from "@blazetrails/ruby-compat";
+import { StandardError } from "@blazetrails/ruby-compat/standard-error";
 
 export class RuleRecursionOverflowError extends StandardError {
   private _targets: string[];

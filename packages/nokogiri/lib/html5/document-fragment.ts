@@ -1,5 +1,5 @@
 import { defaultTreeAdapter, type DefaultTreeAdapterMap } from "parse5";
-import { ArgumentError } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
 
 import { Gumbo } from "../gumbo.js";
 

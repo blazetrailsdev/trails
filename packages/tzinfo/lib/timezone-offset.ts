@@ -1,4 +1,5 @@
-import { rbHash, rbModName } from "@blazetrails/ruby-compat";
+import { rbHash } from "@blazetrails/ruby-compat/rb-hash";
+import { rbModName } from "@blazetrails/ruby-compat/object";
 
 export class TimezoneOffset {
   readonly baseUtcOffset: number;

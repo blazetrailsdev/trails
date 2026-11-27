@@ -1,4 +1,5 @@
-import { Mutex, ThreadError } from "@blazetrails/ruby-compat";
+import { Mutex } from "@blazetrails/ruby-compat/mutex";
+import { ThreadError } from "@blazetrails/ruby-compat/thread-error";
 import { Cref } from "../cref.js";
 
 export class Map<V = unknown> {

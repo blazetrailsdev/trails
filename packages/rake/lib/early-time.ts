@@ -5,7 +5,7 @@ import {
   lessThan,
   lessThanOrEqual,
   type Comparable,
-} from "@blazetrails/ruby-compat";
+} from "@blazetrails/ruby-compat/comparable";
 
 export class EarlyTime implements Comparable {
   static readonly instance = new EarlyTime();

@@ -1,5 +1,7 @@
 import { Time } from "@blazetrails/date";
-import { Rational, rbFCaller, warn } from "@blazetrails/ruby-compat";
+import { Rational } from "@blazetrails/ruby-compat/rational";
+import { rbFCaller } from "@blazetrails/ruby-compat/backtrace-location";
+import { warn } from "@blazetrails/ruby-compat/kernel-warn";
 import { Coder } from "../coder.js";
 import { SimpleDecoder } from "../simple-decoder.js";
 import { PG } from "../namespaces.js";

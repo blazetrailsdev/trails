@@ -1,15 +1,11 @@
-import {
-  File,
-  LOADED_FEATURES,
-  LoadError,
-  NameError,
-  StandardError,
-  TopLevel,
-  constDefined,
-  constGet,
-  rbFRequire,
-  rbRequireLoaded,
-} from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat/file";
+import { LOADED_FEATURES, rbFRequire, rbRequireLoaded } from "@blazetrails/ruby-compat/load";
+import { LoadError } from "@blazetrails/ruby-compat/load-error";
+import { NameError } from "@blazetrails/ruby-compat/name-error";
+import { StandardError } from "@blazetrails/ruby-compat/standard-error";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
+import { constDefined } from "@blazetrails/ruby-compat/include";
+import { constGet } from "@blazetrails/ruby-compat/variable";
 import { DataSource } from "../data-source.js";
 import { InvalidTimezoneIdentifier } from "../timezone.js";
 import type { CountryInfo } from "./country-info.js";

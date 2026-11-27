@@ -1,4 +1,4 @@
-import { extend, rbModAppendFeatures } from "@blazetrails/ruby-compat";
+import { extend, rbModAppendFeatures } from "@blazetrails/ruby-compat/include";
 import { StringDeduper } from "../string-deduper.js";
 
 export interface TimezoneIndexDefinitionHost {

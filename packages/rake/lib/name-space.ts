@@ -1,4 +1,4 @@
-import { rbObjDup } from "@blazetrails/ruby-compat";
+import { rbObjDup } from "@blazetrails/ruby-compat/include";
 import type { Scope } from "./scope.js";
 import type { Task } from "./task.js";
 import type { TaskManager } from "./task-manager.js";

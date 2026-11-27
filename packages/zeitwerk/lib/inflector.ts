@@ -1,4 +1,5 @@
-import { capitalize, stringSplit } from "@blazetrails/ruby-compat";
+import { capitalize } from "@blazetrails/ruby-compat/string/case-mapping";
+import { stringSplit } from "@blazetrails/ruby-compat/string/split";
 
 export class Inflector {
   private _overrides?: Record<string, string>;

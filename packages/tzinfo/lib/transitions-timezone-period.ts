@@ -1,4 +1,7 @@
-import { ArgumentError, rbEqual, rbHash, rbInspect, rbModName } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { rbEqual } from "@blazetrails/ruby-compat/rb-equal";
+import { rbHash } from "@blazetrails/ruby-compat/rb-hash";
+import { rbInspect, rbModName } from "@blazetrails/ruby-compat/object";
 import { TimezonePeriod } from "./timezone-period.js";
 import type { TimezoneTransition } from "./timezone-transition.js";
 

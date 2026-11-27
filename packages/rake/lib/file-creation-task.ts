@@ -1,4 +1,4 @@
-import { File } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat/file";
 import { EARLY } from "./early-time.js";
 import { FileTask } from "./file-task.js";
 import type { Timestamp } from "./task.js";

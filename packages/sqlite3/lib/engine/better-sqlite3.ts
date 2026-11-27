@@ -1,6 +1,6 @@
 import { bindValue } from "./bind-value.js";
 import BetterSqlite3 from "better-sqlite3";
-import { RuntimeError } from "@blazetrails/ruby-compat";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
 import { SQLite3 } from "../namespaces.js";
 import "../constants.js";
 import type {

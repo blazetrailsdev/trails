@@ -1,4 +1,6 @@
-import { File, Mutex, getFs } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat/file";
+import { Mutex } from "@blazetrails/ruby-compat/mutex";
+import { getFs } from "@blazetrails/ruby-compat/fs-adapter";
 import type { Loader } from "./loader.js";
 import { Autoloads } from "./registry/autoloads.js";
 import { ExplicitNamespaces } from "./registry/explicit-namespaces.js";

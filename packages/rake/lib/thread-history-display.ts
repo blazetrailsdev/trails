@@ -1,4 +1,6 @@
-import { include, printf, puts, stdout as $stdout } from "@blazetrails/ruby-compat";
+import { include } from "@blazetrails/ruby-compat/include";
+import { printf, puts } from "@blazetrails/ruby-compat/io";
+import { stdout as $stdout } from "@blazetrails/ruby-compat/process-adapter";
 import { succ } from "@blazetrails/ruby-compat/string/succ";
 import { PrivateReader } from "./private-reader.js";
 import type { HistoryEvent } from "./thread-pool.js";

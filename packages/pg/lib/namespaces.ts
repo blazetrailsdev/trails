@@ -1,4 +1,4 @@
-import { TopLevel } from "@blazetrails/ruby-compat";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
 import type {
   ConnectionBad,
   Error,

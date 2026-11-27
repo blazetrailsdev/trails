@@ -1,4 +1,6 @@
-import { File, RbConfig, regexpEscape } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat/file";
+import { RbConfig } from "@blazetrails/ruby-compat/rb-config";
+import { regexpEscape } from "@blazetrails/ruby-compat/regexp";
 import { Rake } from "./rake-module.js";
 
 const SYS_KEYS = Object.keys(RbConfig.CONFIG).filter((k) => /(?:[a-z]prefix|libdir)$/.test(k));

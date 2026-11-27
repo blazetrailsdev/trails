@@ -1,7 +1,7 @@
 import { bindValue } from "./bind-value.js";
 import { createRequire } from "node:module";
 import type { AggregateOptions, DatabaseSync, SQLInputValue, StatementSync } from "node:sqlite";
-import { LoadError } from "@blazetrails/ruby-compat";
+import { LoadError } from "@blazetrails/ruby-compat/load-error";
 import { SQLite3 } from "../namespaces.js";
 import "../constants.js";
 import type {

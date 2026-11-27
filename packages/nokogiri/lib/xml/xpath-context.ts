@@ -4,14 +4,10 @@ import type {
   XmlElement as LibXmlElement,
   XmlNode,
 } from "libxml2-wasm";
-import {
-  RuntimeError,
-  stringValue,
-  toS,
-  rbFSend,
-  rbObjRespondTo,
-  warn,
-} from "@blazetrails/ruby-compat";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
+import { stringValue } from "@blazetrails/ruby-compat/string/support";
+import { toS, rbFSend, rbObjRespondTo } from "@blazetrails/ruby-compat/object";
+import { warn } from "@blazetrails/ruby-compat/kernel-warn";
 
 import { Node } from "../html5/node.js";
 import { XML, Nokogiri } from "../namespaces.js";

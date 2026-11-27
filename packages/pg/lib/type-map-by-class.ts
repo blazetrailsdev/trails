@@ -1,4 +1,5 @@
-import { include, rbModAncestors, rbObjClass } from "@blazetrails/ruby-compat";
+import { include, rbModAncestors } from "@blazetrails/ruby-compat/include";
+import { rbObjClass } from "@blazetrails/ruby-compat/object";
 import type { Coder } from "./coder.js";
 import { PG } from "./namespaces.js";
 import { _pgTypemapAllStrings } from "./type-map-all-strings.js";

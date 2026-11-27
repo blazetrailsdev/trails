@@ -1,4 +1,7 @@
-import { File, RuntimeError, StandardError, block } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat/file";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
+import { StandardError } from "@blazetrails/ruby-compat/standard-error";
+import { block } from "@blazetrails/ruby-compat/hash";
 import type { main } from "./dsl-definition.js";
 import { FileList } from "./file-list.js";
 import type { FileUtils } from "./file-utils.js";

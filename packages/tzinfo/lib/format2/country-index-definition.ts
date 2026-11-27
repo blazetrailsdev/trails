@@ -1,4 +1,4 @@
-import { extend, rbModAppendFeatures } from "@blazetrails/ruby-compat";
+import { extend, rbModAppendFeatures } from "@blazetrails/ruby-compat/include";
 import type { CountryInfo } from "../data-sources/country-info.js";
 import { StringDeduper } from "../string-deduper.js";
 import { CountryIndexDefiner } from "./country-index-definer.js";

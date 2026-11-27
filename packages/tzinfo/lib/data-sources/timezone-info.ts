@@ -1,4 +1,6 @@
-import { ArgumentError, NotImplementedError, rbModName } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { NotImplementedError } from "@blazetrails/ruby-compat/not-implemented-error";
+import { rbModName } from "@blazetrails/ruby-compat/object";
 import type { Timezone } from "../timezone.js";
 
 export class TimezoneInfo {

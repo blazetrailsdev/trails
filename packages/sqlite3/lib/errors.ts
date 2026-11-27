@@ -1,4 +1,4 @@
-import { StandardError } from "@blazetrails/ruby-compat";
+import { StandardError } from "@blazetrails/ruby-compat/standard-error";
 import { SQLite3 } from "./namespaces.js";
 import "./constants.js";
 import type { EngineErrors } from "./database.js";

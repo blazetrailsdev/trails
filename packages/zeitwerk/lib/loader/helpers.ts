@@ -1,14 +1,14 @@
+import { Dir } from "@blazetrails/ruby-compat/dir";
+import { File } from "@blazetrails/ruby-compat/file";
+import { NameError as RubyNameError } from "@blazetrails/ruby-compat/name-error";
+import { TypeError } from "@blazetrails/ruby-compat/type-error";
+import { constDefined } from "@blazetrails/ruby-compat/include";
 import {
-  Dir,
-  File,
-  NameError as RubyNameError,
-  TypeError,
-  constDefined,
   rbInspect,
   rbObjClassname,
   rbObjRespondTo,
   rbProcCall,
-} from "@blazetrails/ruby-compat";
+} from "@blazetrails/ruby-compat/object";
 import { NameError } from "../error.js";
 import type { Loader, Logger } from "../loader.js";
 

@@ -1,10 +1,10 @@
 // Configure Trails Environment
-import { setEnv } from "@blazetrails/ruby-compat";
+import { setEnv } from "@blazetrails/ruby-compat/process-adapter";
 setEnv("TRAILS_ENV", "test");
 
 await import("<%= `../${this.options.dummyPath}/config/environment.js` %>");
 <% if (!this.options.skipActiveRecord) { -%>
-const { File } = await import("@blazetrails/ruby-compat");
+const { File } = await import("@blazetrails/ruby-compat/file");
 const { ActiveRecord } = await import("@blazetrails/activerecord");
 const { ActiveSupport } = await import("@blazetrails/activesupport");
 const { ActionDispatch } = await import("@blazetrails/actionpack");

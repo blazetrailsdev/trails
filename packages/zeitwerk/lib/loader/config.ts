@@ -1,16 +1,14 @@
-import { extend, type Extended } from "@blazetrails/ruby-compat";
+import { extend, type Extended } from "@blazetrails/ruby-compat/include";
 import { Internal } from "../internal.js";
 import { _generations } from "../core-ext/kernel.js";
-import {
-  Dir,
-  File,
-  Pathname,
-  ThreadError,
-  TypeError,
-  getFs,
-  rbInspect,
-  stdout,
-} from "@blazetrails/ruby-compat";
+import { Dir } from "@blazetrails/ruby-compat/dir";
+import { File } from "@blazetrails/ruby-compat/file";
+import { Pathname } from "@blazetrails/ruby-compat/pathname";
+import { ThreadError } from "@blazetrails/ruby-compat/thread-error";
+import { TypeError } from "@blazetrails/ruby-compat/type-error";
+import { getFs } from "@blazetrails/ruby-compat/fs-adapter";
+import { rbInspect } from "@blazetrails/ruby-compat/object";
+import { stdout } from "@blazetrails/ruby-compat/process-adapter";
 import { _isModule } from "../core-ext/module.js";
 import { Error as ZeitwerkError } from "../error.js";
 import type { Loader } from "../loader.js";

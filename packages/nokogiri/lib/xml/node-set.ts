@@ -1,4 +1,6 @@
-import { Enumerable, include, toEnum, type Enumerator } from "@blazetrails/ruby-compat";
+import { Enumerable } from "@blazetrails/ruby-compat/enumerable";
+import { include } from "@blazetrails/ruby-compat/include";
+import { toEnum, type Enumerator } from "@blazetrails/ruby-compat/enumerator";
 
 import { XML } from "../namespaces.js";
 import { Namespace } from "./namespace.js";

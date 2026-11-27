@@ -1,5 +1,6 @@
 import { CSS } from "../namespaces.js";
-import { StringScanner, constSet } from "@blazetrails/ruby-compat";
+import { StringScanner } from "@blazetrails/ruby-compat/string-scanner";
+import { constSet } from "@blazetrails/ruby-compat/include";
 
 export class ScanError extends Error {
   override name = "Nokogiri::CSS::Tokenizer::ScanError";

@@ -1,5 +1,5 @@
 import { days } from "@blazetrails/activesupport";
-import { getFs } from "@blazetrails/ruby-compat";
+import { getFs } from "@blazetrails/ruby-compat/fs-adapter";
 import { Trails } from "@blazetrails/trailties";
 
 const cachingDev = await getFs().exists(Trails.root()!.join("tmp/caching-dev.txt").toString());

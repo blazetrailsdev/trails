@@ -1,13 +1,10 @@
-import {
-  ArgumentError,
-  Encoding,
-  LoadError,
-  StandardError,
-  TopLevel,
-  rbAryBsearch,
-  rbModName,
-  rbRequireLoaded,
-} from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { Encoding } from "@blazetrails/ruby-compat/encoding";
+import { LoadError } from "@blazetrails/ruby-compat/load-error";
+import { StandardError } from "@blazetrails/ruby-compat/standard-error";
+import { TopLevel, rbModName } from "@blazetrails/ruby-compat/object";
+import { rbAryBsearch } from "@blazetrails/ruby-compat/array";
+import { rbRequireLoaded } from "@blazetrails/ruby-compat/load";
 import { InvalidCountryCode } from "./country.js";
 import type { CountryInfo } from "./data-sources/country-info.js";
 import type { TimezoneInfo } from "./data-sources/timezone-info.js";

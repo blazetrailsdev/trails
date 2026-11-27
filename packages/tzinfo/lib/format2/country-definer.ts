@@ -1,4 +1,5 @@
-import { ArgumentError, rational } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { rational } from "@blazetrails/ruby-compat/rational";
 import { CountryTimezone } from "../country-timezone.js";
 import type { StringDeduper } from "../string-deduper.js";
 

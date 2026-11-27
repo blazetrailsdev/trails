@@ -1,4 +1,6 @@
-import { File, LOAD_PATH, abort, rbArgv, rbFRequireFile } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat/file";
+import { LOAD_PATH, rbFRequireFile } from "@blazetrails/ruby-compat/load";
+import { abort, rbArgv } from "@blazetrails/ruby-compat/process-adapter";
 import { FileList } from "./file-list.js";
 
 const argv: string[] = [];

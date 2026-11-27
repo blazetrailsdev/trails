@@ -1,4 +1,8 @@
-import { ArgumentError, File, chomp, rbStrSub, stringSplit } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { File } from "@blazetrails/ruby-compat/file";
+import { chomp } from "@blazetrails/ruby-compat/string/chomp";
+import { rbStrSub } from "@blazetrails/ruby-compat/string/sub";
+import { stringSplit } from "@blazetrails/ruby-compat/string/split";
 
 type PathmapBlock = (match: string) => string;
 

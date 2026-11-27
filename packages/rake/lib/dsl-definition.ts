@@ -1,13 +1,9 @@
-import {
-  ArgumentError,
-  File,
-  block,
-  extend,
-  flatten,
-  include,
-  rbBlockGivenP,
-  rbObjRespondTo,
-} from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { File } from "@blazetrails/ruby-compat/file";
+import { block, rbBlockGivenP } from "@blazetrails/ruby-compat/hash";
+import { extend, include } from "@blazetrails/ruby-compat/include";
+import { flatten } from "@blazetrails/ruby-compat/array";
+import { rbObjRespondTo } from "@blazetrails/ruby-compat/object";
 import { FileCreationTask } from "./file-creation-task.js";
 import { eachDirParent, FileList, fromPathname } from "./file-list.js";
 import { FileTask } from "./file-task.js";

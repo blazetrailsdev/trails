@@ -1,10 +1,9 @@
+import { rbCallSuper, rbObjClone } from "@blazetrails/ruby-compat/include";
 import {
-  rbCallSuper,
-  rbObjClone,
   rbObjInstanceVariables,
   rbObjIvarGet,
   rbObjIvarSet,
-} from "@blazetrails/ruby-compat";
+} from "@blazetrails/ruby-compat/object";
 
 export const Cloneable = {
   initializeCopy(this: object, source: object): void {

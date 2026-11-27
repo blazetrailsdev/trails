@@ -1,6 +1,6 @@
 import { Base } from "@blazetrails/activerecord";
 import { buildViews } from "@blazetrails/trails-tsc";
-import { env, setEnv } from "@blazetrails/ruby-compat";
+import { env, setEnv } from "@blazetrails/ruby-compat/process-adapter";
 
 export async function setup(): Promise<void> {
   if (env.TRAILS_ENV == null) setEnv("TRAILS_ENV", "test");

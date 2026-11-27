@@ -1,6 +1,8 @@
 import "./boot.ts";
 
-import { Bundler, constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { Bundler } from "@blazetrails/ruby-compat/bundler";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
 import { Trails } from "@blazetrails/trailties";
 
 <%= this.trailsRequireStatement() %>

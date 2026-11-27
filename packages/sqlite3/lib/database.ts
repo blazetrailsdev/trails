@@ -1,20 +1,15 @@
-import {
-  ArgumentError,
-  Encoding,
-  NotImplementedError,
-  Process,
-  Thread,
-  RuntimeError,
-  TypeError,
-  include,
-  rbBlockGivenP,
-  rbEnsure,
-  rbObjClone,
-  rbInspect,
-  rbFSleep,
-  rbObjRespondTo,
-} from "@blazetrails/ruby-compat";
-import type { Included } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { Encoding } from "@blazetrails/ruby-compat/encoding";
+import { NotImplementedError } from "@blazetrails/ruby-compat/not-implemented-error";
+import { Process } from "@blazetrails/ruby-compat/process";
+import { Thread, rbFSleep } from "@blazetrails/ruby-compat/thread";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
+import { TypeError } from "@blazetrails/ruby-compat/type-error";
+import { include, rbObjClone } from "@blazetrails/ruby-compat/include";
+import { rbBlockGivenP } from "@blazetrails/ruby-compat/hash";
+import { rbEnsure } from "@blazetrails/ruby-compat/ensure";
+import { rbInspect, rbObjRespondTo } from "@blazetrails/ruby-compat/object";
+import type { Included } from "@blazetrails/ruby-compat/include";
 import { SQLite3 } from "./namespaces.js";
 import { Constants } from "./constants.js";
 import { Pragmas } from "./pragmas.js";

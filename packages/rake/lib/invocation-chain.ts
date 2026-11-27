@@ -1,4 +1,4 @@
-import { RuntimeError } from "@blazetrails/ruby-compat";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
 import { LinkedList } from "./linked-list.js";
 
 export class InvocationChain<T = unknown> extends LinkedList<T> {

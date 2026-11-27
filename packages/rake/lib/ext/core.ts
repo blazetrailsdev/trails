@@ -1,4 +1,6 @@
-import { puts, rbModMethodDefined, rbModName, stderr as $stderr } from "@blazetrails/ruby-compat";
+import { puts } from "@blazetrails/ruby-compat/io";
+import { rbModMethodDefined, rbModName } from "@blazetrails/ruby-compat/object";
+import { stderr as $stderr } from "@blazetrails/ruby-compat/process-adapter";
 
 export function rakeExtension(
   this: { prototype: object },

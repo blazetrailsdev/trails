@@ -1,36 +1,28 @@
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { Dir } from "@blazetrails/ruby-compat/dir";
+import { File } from "@blazetrails/ruby-compat/file";
+import { LOADED_FEATURES, LOAD_PATH, rbFRequireFile } from "@blazetrails/ruby-compat/load";
+import { LoadError } from "@blazetrails/ruby-compat/load-error";
+import { NotImplementedError } from "@blazetrails/ruby-compat/not-implemented-error";
+import { OptionParser } from "@blazetrails/ruby-compat/optparse";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
+import { STDERR, STDOUT, printf, puts } from "@blazetrails/ruby-compat/io";
+import { StandardError } from "@blazetrails/ruby-compat/standard-error";
 import {
-  ArgumentError,
-  Dir,
-  File,
-  LOADED_FEATURES,
-  LOAD_PATH,
-  LoadError,
-  NotImplementedError,
-  OptionParser,
-  RuntimeError,
-  STDERR,
-  STDOUT,
-  StandardError,
   SystemExit,
-  RbConfig,
   env as ENV,
-  excBacktrace,
   exit,
-  getChildProcess,
-  include,
-  printf,
-  puts,
   rbArgv,
-  rbFCaller,
-  rbFRequireFile,
-  rbModName,
-  rbObjRespondTo,
-  rtest,
   setEnv,
   stderr as $stderr,
   stdout as $stdout,
-  stringSplit,
-} from "@blazetrails/ruby-compat";
+} from "@blazetrails/ruby-compat/process-adapter";
+import { RbConfig } from "@blazetrails/ruby-compat/rb-config";
+import { excBacktrace, rbFCaller } from "@blazetrails/ruby-compat/backtrace-location";
+import { getChildProcess } from "@blazetrails/ruby-compat/child-process-adapter";
+import { include } from "@blazetrails/ruby-compat/include";
+import { rbModName, rbObjRespondTo, rtest } from "@blazetrails/ruby-compat/object";
+import { stringSplit } from "@blazetrails/ruby-compat/string/split";
 import { FileList } from "./file-list.js";
 import { Backtrace } from "./backtrace.js";
 import { DefaultLoader } from "./default-loader.js";
