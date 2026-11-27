@@ -8,6 +8,7 @@ import { Engine } from "../../lib/engine.js";
 import { loadQueueSchema, loadShardSchemas } from "./queue-schema.js";
 import "./dummy/config/initializers/solid-queue-record.js";
 
+setEnv("TRAILS_ENV", "test");
 setEnv(
   "NODE_OPTIONS",
   [getEnv("NODE_OPTIONS"), `--import ${import.meta.dirname}/fork-loader.mjs`]
