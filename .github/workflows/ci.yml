@@ -1238,7 +1238,7 @@ jobs:
           - shard: configuration-multi-dbs
             files: packages/trailties/test/application/configuration.test.ts packages/trailties/test/application/rake/multi-dbs.test.ts
           - shard: routing-mailers-frameworks
-            files: packages/trailties/test/application/routing.test.ts packages/trailties/test/application/mailer-previews.test.ts packages/trailties/test/application/initializers/frameworks.test.ts packages/trailties/test/application/middleware/exceptions.test.ts
+            files: packages/trailties/test/application/routing.test.ts packages/trailties/test/application/initializers/frameworks.test.ts packages/trailties/test/application/middleware/exceptions.test.ts
           - shard: test-runner
             files: packages/trailties/test/application/test-runner.test.ts
     steps:
@@ -1249,7 +1249,7 @@ jobs:
       - run: pnpm build
       - if: needs.changes.outputs.thor_only != 'true' && needs.changes.outputs.actioncable_only != 'true' && !matrix.files
         env:
-          TRAILTIES_EXCLUDE: packages/trailties/test/application/configuration.test.ts,packages/trailties/test/application/routing.test.ts,packages/trailties/test/application/mailer-previews.test.ts,packages/trailties/test/application/initializers/frameworks.test.ts,packages/trailties/test/application/middleware/exceptions.test.ts,packages/trailties/test/application/rake/multi-dbs.test.ts,packages/trailties/test/application/test-runner.test.ts
+          TRAILTIES_EXCLUDE: packages/trailties/test/application/configuration.test.ts,packages/trailties/test/application/routing.test.ts,packages/trailties/test/application/initializers/frameworks.test.ts,packages/trailties/test/application/middleware/exceptions.test.ts,packages/trailties/test/application/rake/multi-dbs.test.ts,packages/trailties/test/application/test-runner.test.ts
           VITEST_SHARD_DURATIONS: trailties
         run: pnpm vitest run packages/trailties packages/thor --shard=${{ matrix.shard }}/${{ env.TRAILTIES_SHARD_TOTAL }}
       - if: needs.changes.outputs.thor_only != 'true' && needs.changes.outputs.actioncable_only != 'true' && matrix.files
