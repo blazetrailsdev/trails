@@ -4,8 +4,56 @@ const moduleRoot = `${base}rt/`;
 const runtimePage = `${base}runtime.html`;
 const ANSWER_TIMEOUT = 120_000;
 
+const PRECACHE = self.__PRECACHE__;
+const CACHE_PREFIX = "trails-playground-";
+const cacheName = PRECACHE ? `${CACHE_PREFIX}${PRECACHE.version}` : null;
+const hashed = new Set(PRECACHE ? PRECACHE.files.filter((f) => f.startsWith("assets/")) : []);
+
 self.addEventListener("install", () => self.skipWaiting());
-self.addEventListener("activate", (event) => event.waitUntil(self.clients.claim()));
+self.addEventListener("activate", (event) =>
+  event.waitUntil(
+    (async () => {
+      for (const key of await caches.keys()) {
+        if (key.startsWith(CACHE_PREFIX) && key !== cacheName) await caches.delete(key);
+      }
+      await self.clients.claim();
+    })(),
+  ),
+);
+
+self.addEventListener("message", (event) => {
+  if (event.data?.type === "sw:precache" && cacheName) event.waitUntil(precache());
+});
+
+async function precache() {
+  const cache = await caches.open(cacheName);
+  const have = new Set((await cache.keys()).map((r) => new URL(r.url).pathname));
+  const missing = ["", ...PRECACHE.files].filter((f) => !have.has(`${base}${f}`));
+  for (let i = 0; i < missing.length; i += 8) {
+    await Promise.allSettled(missing.slice(i, i + 8).map((f) => cache.add(`${base}${f}`)));
+  }
+}
+
+async function offline(request, url) {
+  const cache = await caches.open(cacheName);
+  const file = url.pathname.slice(base.length);
+  if (hashed.has(file)) {
+    const hit = await cache.match(request, { ignoreSearch: true });
+    if (hit) return hit;
+  }
+  let response;
+  try {
+    response = await fetch(request);
+  } catch (error) {
+    const hit = await cache.match(url.pathname);
+    if (hit) return hit;
+    throw error;
+  }
+  if (response.status === 200) {
+    await cache.put(url.pathname, response.clone()).catch(() => null);
+  }
+  return response;
+}
 
 function tabUnder(root, url) {
   if (!url.pathname.startsWith(root)) return null;
@@ -46,6 +94,10 @@ self.addEventListener("fetch", (event) => {
         ? Response.redirect(moved.href, 302)
         : forward(event.request, moved, from),
     );
+    return;
+  }
+  if (cacheName && event.request.method === "GET" && url.pathname.startsWith(base)) {
+    event.respondWith(offline(event.request, url));
   }
 });
 

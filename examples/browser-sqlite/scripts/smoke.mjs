@@ -61,6 +61,7 @@ page.on("pageerror", (e) => console.log("[pageerror]", e.message));
 const mailerRequests = [];
 const infoRequests = [];
 context.on("request", (r) => {
+  if (r.serviceWorker()) return;
   if (/mailers-controller|\/actionmailer\//.test(r.url())) mailerRequests.push(r.url());
   if (/info-controller/.test(r.url())) infoRequests.push(r.url());
 });
@@ -250,6 +251,25 @@ try {
   await page.locator("#status", { hasText: /^Running$/ }).waitFor({ timeout: 120_000 });
   await see("h1", "Found posts");
   console.log("switching back to the blog keeps its edits");
+
+  if (dist && engine === "chromium") {
+    await page.waitForFunction(
+      async () => {
+        const sw = await (await fetch("sw.js")).text();
+        const { version, files } = JSON.parse(/const PRECACHE = (\{.*?\});/.exec(sw)[1]);
+        const cache = await caches.open(`trails-playground-${version}`);
+        return (await cache.keys()).length > files.length;
+      },
+      null,
+      { timeout: 120_000, polling: 1000 },
+    );
+    await context.setOffline(true);
+    await page.reload();
+    await page.locator("#status", { hasText: /^Running$/ }).waitFor({ timeout: 120_000 });
+    await see("h1", "Found posts");
+    await context.setOffline(false);
+    console.log("offline, the playground boots from its cache and serves the app");
+  }
 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.locator("#phone-note").waitFor({ state: "visible" });
