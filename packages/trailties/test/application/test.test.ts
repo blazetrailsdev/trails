@@ -3,6 +3,7 @@ import { TestCase } from "@blazetrails/activesupport/test-case";
 import { Isolation } from "@blazetrails/activesupport/testing/isolation";
 import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
 import { include } from "@blazetrails/ruby-compat/include";
+import { File } from "@blazetrails/ruby-compat/file";
 import { Process } from "@blazetrails/ruby-compat/process";
 import { env as ENV, setEnv } from "@blazetrails/ruby-compat/process-adapter";
 import type { Generation } from "../support/isolation/abstract-unit.js";
@@ -99,5 +100,111 @@ describe("FailingTest", () => {
     const output = await t.runTestFile("unit/failing.test.ts");
     expect(output).toMatch(/test\/unit\/failing\.test\.ts/);
     expect(output).toMatch(/test\/unit\/failing\.test\.ts:4/);
+  });
+
+  it("ruby schema migrations", async (t) => {
+    const output = await t.trails("generate", "model", "user", "name:string");
+    const version = output.match(/(\d+)_create_users\.ts/)![1];
+
+    await t.appFile(
+      "test/models/user.test.ts",
+      `import "../test-helper.ts";
+import { describe, it } from "vitest";
+import { User } from "../../app/models/user.ts";
+
+describe("UserTest", () => {
+  it("user", async () => {
+    await User.createBang({ name: "Jon" });
+  });
+});
+`,
+    );
+    await t.appFile("db/schema.ts", "");
+
+    await t.assertUnsuccessfulRun("models/user.test.ts", "Migrations are pending");
+
+    await t.appFile(
+      "db/schema.ts",
+      `import { Schema } from "@blazetrails/activerecord";
+
+await Schema.define({ version: ${version} }, async (ctx) => {
+  await ctx.createTable("users", (t) => {
+    t.string("name");
+  });
+});
+`,
+    );
+
+    await t.appFile(
+      "config/initializers/disable-maintain-test-schema.ts",
+      `import { Trails } from "@blazetrails/trailties";
+
+Trails.application.config.activeRecord.maintainTestSchema = false;
+`,
+    );
+
+    await t.assertUnsuccessfulRun("models/user.test.ts", "Could not find table 'users'");
+
+    await File.deleteAsync(
+      `${await t.appPath()}/config/initializers/disable-maintain-test-schema.ts`,
+    );
+
+    const result = await t.assertSuccessfulTestRun("models/user.test.ts");
+    expect(result).not.toContain("create_table(:users)");
+  });
+
+  it("sql structure migrations", async (t) => {
+    const output = await t.trails("generate", "model", "user", "name:string");
+    const version = output.match(/(\d+)_create_users\.ts/)![1];
+
+    await t.appFile(
+      "test/models/user.test.ts",
+      `import "../test-helper.ts";
+import { describe, it } from "vitest";
+import { User } from "../../app/models/user.ts";
+
+describe("UserTest", () => {
+  it("user", async () => {
+    await User.createBang({ name: "Jon" });
+  });
+});
+`,
+    );
+
+    await t.appFile("db/structure.sql", "");
+    await t.appFile(
+      "config/initializers/enable-sql-schema-format.ts",
+      `import { Trails } from "@blazetrails/trailties";
+
+Trails.application.config.activeRecord.schemaFormat = "sql";
+`,
+    );
+
+    await t.assertUnsuccessfulRun("models/user.test.ts", "Migrations are pending");
+
+    await t.appFile(
+      "db/structure.sql",
+      `CREATE TABLE "schema_migrations" ("version" varchar(255) NOT NULL);
+CREATE UNIQUE INDEX "unique_schema_migrations" ON "schema_migrations" ("version");
+CREATE TABLE "users" ("id" INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, "name" varchar(255));
+INSERT INTO schema_migrations (version) VALUES ('${version}');
+`,
+    );
+
+    await t.appFile(
+      "config/initializers/disable-maintain-test-schema.ts",
+      `import { Trails } from "@blazetrails/trailties";
+
+Trails.application.config.activeRecord.maintainTestSchema = false;
+`,
+    );
+
+    await t.assertUnsuccessfulRun("models/user.test.ts", "Could not find table 'users'");
+
+    await File.deleteAsync(
+      `${await t.appPath()}/config/initializers/disable-maintain-test-schema.ts`,
+    );
+
+    await t.assertSuccessfulTestRun("models/user.test.ts");
   });
 });
