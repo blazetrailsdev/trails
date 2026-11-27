@@ -436,7 +436,7 @@ export class Grandchild extends Child {}`,
 
     await Trails.application!.reloader.reloadBang();
 
-    expect(Dependencies._autoloadedTrackedClasses.size).toBe(0);
+    expect(Dependencies._autoloadedTrackedClasses).toBeEmpty();
     expect(descendants(Parent)).toEqual([]);
   });
 });
