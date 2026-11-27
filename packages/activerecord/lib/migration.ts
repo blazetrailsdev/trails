@@ -1,7 +1,6 @@
 import type { RackApp } from "@blazetrails/rack";
 import { groupBy, filterMap, sortBy } from "@blazetrails/ruby-compat/enumerable";
 import {
-  getEnv,
   camelize,
   constantize,
   underscore,
@@ -38,6 +37,7 @@ import { Dir } from "@blazetrails/ruby-compat/dir";
 import { excSetupMessage } from "@blazetrails/ruby-compat/exception";
 import { File } from "@blazetrails/ruby-compat/file";
 import { FileUtils } from "@blazetrails/ruby-compat/file-utils";
+import { rbFSystem } from "@blazetrails/ruby-compat/kernel-system";
 import { StandardError } from "@blazetrails/ruby-compat/standard-error";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { NoMethodError } from "@blazetrails/ruby-compat/no-method-error";
@@ -71,7 +71,6 @@ import { InternalMetadata, NullInternalMetadata } from "./internal-metadata.js";
 import { ActiveRecord } from "./namespaces.js";
 import type * as CompatibilityModule from "./migration/compatibility.js";
 import type { DatabaseConfig } from "./database-configurations/database-config.js";
-import type { SchemaFormat } from "./tasks/database-tasks.js";
 import { ExecutionStrategy } from "./migration/execution-strategy.js";
 import { DefaultStrategy } from "./migration/default-strategy.js";
 import * as JoinTableModule from "./migration/join-table.js";
@@ -90,7 +89,6 @@ import { ActiveRecordError, NoDatabaseError } from "./errors.js";
 import {
   maintainTestSchema,
   migrationStrategy,
-  schemaFormat as _schemaFormat,
   timestampedMigrations,
   validateMigrationTimestamps,
 } from "./active-record.js";
@@ -1342,21 +1340,12 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
 
   /** @internal */
   private static async loadSchemaBang(): Promise<void> {
-    const databaseTasks = ActiveRecord.Tasks.DatabaseTasks;
+    const root =
+      TopLevel.ENGINE_ROOT !== undefined ? TopLevel.ENGINE_ROOT : TopLevel.Trails!.root();
 
-    await ActiveRecord.Base.connectionHandler.clearAllConnectionsBang("all");
-
-    const testConfigs = ActiveRecord.Base.configurations().configsFor({ envName: "test" });
-    for (const dbConfig of testConfigs) {
-      await databaseTasks.purge(dbConfig);
-    }
-
-    const { Schema } = await import("./schema.js");
-    await databaseTasks.withTemporaryPoolForEach({ env: "test" }, async (pool) => {
-      const dbConfig = pool.dbConfig;
-      Schema.verbose = false;
-      const schemaFormat = (getEnv("SCHEMA_FORMAT") ?? _schemaFormat()) as SchemaFormat;
-      await databaseTasks.loadSchema(dbConfig, schemaFormat);
+    await FileUtils.cd(String(root), async () => {
+      await ActiveRecord.Base.connectionHandler.clearAllConnectionsBang("all");
+      await rbFSystem("bin/trails db:test:prepare");
     });
   }
 }

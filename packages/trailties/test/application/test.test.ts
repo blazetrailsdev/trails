@@ -32,39 +32,8 @@ class TestTest extends TestCase {
 include(TestTest, Isolation);
 registerSpecType(/^TestTest$/, TestTest);
 
-const USERTEST1 = `import "../test-helper.ts";
-import { describe, it } from "vitest";
-import { User } from "../../app/models/user.ts";
-
-describe("UserTest", () => {
-  it("user", async () => {
-    await User.createBang({ name: "Jon" });
-  });
-});
-`;
-const USERTEST2 = `import "../test-helper.ts";
-import { describe, it } from "vitest";
-import { User } from "../../app/models/user.ts";
-
-describe("UserTest", () => {
-  it("user", async () => {
-    await User.createBang({ name: "Jon", email: "jon@doe.com" });
-  });
-});
-`;
-const USERTEST3 = `import "../test-helper.ts";
-import { describe, it, expect } from "vitest";
-import { User } from "../../app/models/user.ts";
-
-describe("UserTest", () => {
-  it("user", async () => {
-    expect(Object.keys(User.columnsHash())).toEqual(["id", "name"]);
-  });
-});
-`;
-
-function it(name: string, block: (t: Host) => Promise<void>): void {
-  test(name, async () => {
+function it(name: string, block: (t: Host) => Promise<void>, skip = false): void {
+  test.skipIf(skip)(name, async () => {
     const old = ENV["PARALLEL_WORKERS"];
     setEnv("PARALLEL_WORKERS", "0");
     const t = new TestTest(name) as Host;
@@ -150,16 +119,22 @@ export class PostsController extends ActionController.Base {}
 
     await t.appFile(
       "test/integration/posts.test.ts",
-      `import "../test-helper.ts";
-import { describe, it, expect } from "vitest";
-import { ActionDispatch } from "@blazetrails/actionpack";
+      `import { describe, it, expect } from "vitest";
+import { IntegrationTest } from "@blazetrails/actionpack/testing";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
+import "../test-helper.ts";
+
+export class PostsTest extends IntegrationTest {
+  static {
+    constSet(TopLevel, "PostsTest", this);
+  }
+}
 
 describe("PostsTest", () => {
-  const t = new ActionDispatch.IntegrationTest("test_index");
-
-  it("test_index", async () => {
+  it<{ testCase: PostsTest }>("test_index", async ({ testCase: t }) => {
     await t.get("/posts");
-    t.assertResponse("success");
+    t.assertResponse(":success");
     expect(t.response.body).toContain("Posts#index");
   });
 });
@@ -297,7 +272,19 @@ Trails.application.config.activeRecord.maintainTestSchema = false;
     const output1 = await t.trails("generate", "model", "user", "name:string");
     const version1 = output1.match(/(\d+)_create_users\.ts/)![1];
 
-    await t.appFile("test/models/user.test.ts", USERTEST1);
+    await t.appFile(
+      "test/models/user.test.ts",
+      `import "../test-helper.ts";
+import { describe, it } from "vitest";
+import { User } from "../../app/models/user.ts";
+
+describe("UserTest", () => {
+  it("user", async () => {
+    await User.createBang({ name: "Jon" });
+  });
+});
+`,
+    );
 
     await t.appFile(
       "config/initializers/enable-sql-schema-format.ts",
@@ -321,7 +308,19 @@ INSERT INTO schema_migrations (version) VALUES ('${version1}');
     const output2 = await t.trails("generate", "migration", "add_email_to_users");
     const version2 = output2.match(/(\d+)_add_email_to_users\.ts/)![1];
 
-    await t.appFile("test/models/user.test.ts", USERTEST2);
+    await t.appFile(
+      "test/models/user.test.ts",
+      `import "../test-helper.ts";
+import { describe, it } from "vitest";
+import { User } from "../../app/models/user.ts";
+
+describe("UserTest", () => {
+  it("user", async () => {
+    await User.createBang({ name: "Jon", email: "jon@doe.com" });
+  });
+});
+`,
+    );
 
     await t.appFile(
       "db/structure.sql",
@@ -340,7 +339,19 @@ INSERT INTO schema_migrations (version) VALUES ('${version2}');
     const output = await t.trails("generate", "model", "user", "name:string");
     const version = output.match(/(\d+)_create_users\.ts/)![1];
 
-    await t.appFile("test/models/user.test.ts", USERTEST3);
+    await t.appFile(
+      "test/models/user.test.ts",
+      `import "../test-helper.ts";
+import { describe, it, expect } from "vitest";
+import { User } from "../../app/models/user.ts";
+
+describe("UserTest", () => {
+  it("user", async () => {
+    expect(Object.keys(User.columnsHash())).toEqual(["id", "name"]);
+  });
+});
+`,
+    );
     await t.appFile(
       "db/schema.ts",
       `import { Schema } from "@blazetrails/activerecord";
@@ -370,8 +381,7 @@ await Schema.define({ version: ${version} }, async (ctx) => {
 
     await t.assertUnsuccessfulRun(
       "models/user.test.ts",
-      `- Expected
-+ Received`,
+      "expected [ 'id', 'name', 'age' ] to deeply equal [ 'id', 'name' ]",
     );
   });
 
@@ -382,13 +392,13 @@ await Schema.define({ version: ${version} }, async (ctx) => {
     await t.appFile(
       "lib/tasks/hooks.rake.ts",
       `import { DSL, Task } from "@blazetrails/rake";
-import { block } from "@blazetrails/ruby-compat/block";
+import { block } from "@blazetrails/ruby-compat/hash";
 import { Base } from "@blazetrails/activerecord";
 
 DSL.task(
   "before_hook",
   block(async () => {
-    const hasUserTable = await Base.leaseConnection().isTableExists("users");
+    const hasUserTable = await (await Base.leaseConnection()).tableExists("users");
     console.log("before: " + String(hasUserTable));
   }),
 );
@@ -396,20 +406,32 @@ DSL.task(
 DSL.task(
   "after_hook",
   block(async () => {
-    const hasUserTable = await Base.leaseConnection().isTableExists("users");
+    const hasUserTable = await (await Base.leaseConnection()).tableExists("users");
     console.log("after: " + String(hasUserTable));
   }),
 );
 
-Task.get("db:test:prepare").enhance(
+(await Task.get("db:test:prepare")).enhance(
   ["before_hook"],
   block(async () => {
-    await Task.get("after_hook").invoke();
+    await (await Task.get("after_hook")).invoke();
   }),
 );
 `,
     );
-    await t.appFile("test/models/user.test.ts", USERTEST1);
+    await t.appFile(
+      "test/models/user.test.ts",
+      `import "../test-helper.ts";
+import { describe, it } from "vitest";
+import { User } from "../../app/models/user.ts";
+
+describe("UserTest", () => {
+  it("user", async () => {
+    await User.createBang({ name: "Jon" });
+  });
+});
+`,
+    );
 
     await t.appFile(
       "db/schema.ts",
@@ -471,17 +493,19 @@ export class User extends ApplicationRecord {
     await t.assertUnsuccessfulRun("models/user.test.ts", "SCHEMA LOADED!");
   });
 
-  it("database-dependent attribute types are resolved when parallel tests are run in eager load context", async (t) => {
-    await t.usePostgresql();
-    try {
-      await t.trails("db:drop", "db:create");
+  it(
+    "database-dependent attribute types are resolved when parallel tests are run in eager load context",
+    async (t) => {
+      await t.usePostgresql();
+      try {
+        await t.trails("db:drop", "db:create");
 
-      const output = await t.trails("generate", "model", "user");
-      const version = output.match(/(\d+)_create_users\.ts/)![1];
+        const output = await t.trails("generate", "model", "user");
+        const version = output.match(/(\d+)_create_users\.ts/)![1];
 
-      await t.appFile(
-        "db/schema.ts",
-        `import { Schema } from "@blazetrails/activerecord";
+        await t.appFile(
+          "db/schema.ts",
+          `import { Schema } from "@blazetrails/activerecord";
 
 await Schema.define({ version: ${version} }, async (ctx) => {
   await ctx.createEnum("user_favorite_color", ["red", "green", "blue"]);
@@ -491,19 +515,19 @@ await Schema.define({ version: ${version} }, async (ctx) => {
   });
 });
 `,
-      );
+        );
 
-      await t.appFile(
-        "config/initializers/enable-eager-load.ts",
-        `import { Trails } from "@blazetrails/trailties";
+        await t.appFile(
+          "config/initializers/enable-eager-load.ts",
+          `import { Trails } from "@blazetrails/trailties";
 
 Trails.application.config.eagerLoad = true;
 `,
-      );
+        );
 
-      await t.appFile(
-        "test/models/user.test.ts",
-        `import "../test-helper.ts";
+        await t.appFile(
+          "test/models/user.test.ts",
+          `import "../test-helper.ts";
 import { describe, it, expect } from "vitest";
 import { ActiveSupport } from "@blazetrails/activesupport";
 import { setEnv } from "@blazetrails/ruby-compat/process-adapter";
@@ -521,11 +545,13 @@ describe("UserTest", () => {
   }
 });
 `,
-      );
+        );
 
-      await t.assertSuccessfulTestRun("models/user.test.ts");
-    } finally {
-      await t.trails("db:drop").catch(() => null);
-    }
-  });
+        await t.assertSuccessfulTestRun("models/user.test.ts");
+      } finally {
+        await t.trails("db:drop").catch(() => null);
+      }
+    },
+    ENV["ARCONN"] !== "postgresql",
+  );
 });

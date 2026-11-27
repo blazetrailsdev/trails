@@ -6,10 +6,14 @@ import type { ConnectionPool } from "../../../lib/connection-adapters/abstract/c
 import { currentAdapter } from "../../support/adapter-helper.js";
 import { DatabaseTasks } from "../../../lib/tasks/database-tasks.js";
 import { DEFAULT_ENV } from "../../../lib/connection-handling.js";
+import { getChildProcess } from "@blazetrails/ruby-compat/child-process-adapter";
+import { Dir } from "@blazetrails/ruby-compat/dir";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
+
+let calls: string[];
 
 describe.skipIf(!currentAdapter("SQLite3Adapter"))("Migration.loadSchemaIfPendingBang", () => {
   let originalConfigurations: DatabaseConfigurations;
-  let calls: string[];
   let upToDate: boolean;
 
   beforeEach(() => {
@@ -32,11 +36,12 @@ describe.skipIf(!currentAdapter("SQLite3Adapter"))("Migration.loadSchemaIfPendin
     ) => {
       await block({ dbConfig: Base.configurations().configsFor({})[0] } as ConnectionPool);
     }) as never);
-    vi.spyOn(DatabaseTasks, "purge").mockImplementation(async () => {
-      calls.push("purge");
-    });
-    vi.spyOn(DatabaseTasks, "loadSchema").mockImplementation(async () => {
-      calls.push("loadSchema");
+    TopLevel.ENGINE_ROOT = Dir.pwd();
+    const childProcess = getChildProcess();
+    const system = childProcess.system!.bind(childProcess);
+    vi.spyOn(childProcess, "system").mockImplementation(async (command, env, args) => {
+      calls.push([command, ...(args ?? [])].join(" "));
+      return await system("true", env);
     });
     vi.spyOn(Base.connectionHandler, "clearAllConnectionsBang").mockImplementation(async () => {
       calls.push("clearAllConnectionsBang");
@@ -45,6 +50,7 @@ describe.skipIf(!currentAdapter("SQLite3Adapter"))("Migration.loadSchemaIfPendin
 
   afterEach(() => {
     vi.restoreAllMocks();
+    TopLevel.ENGINE_ROOT = undefined;
     Base.configurations(originalConfigurations);
   });
 
@@ -59,6 +65,10 @@ describe.skipIf(!currentAdapter("SQLite3Adapter"))("Migration.loadSchemaIfPendin
 
     await Migration.loadSchemaIfPendingBang();
 
-    expect(calls).toEqual(["schemaUpToDate", "clearAllConnectionsBang", "purge", "loadSchema"]);
+    expect(calls).toEqual([
+      "schemaUpToDate",
+      "clearAllConnectionsBang",
+      "bin/trails db:test:prepare",
+    ]);
   });
 });
