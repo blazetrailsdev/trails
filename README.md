@@ -91,7 +91,7 @@ overrides, then install:
 node -e '
 const fs = require("fs"), app = JSON.parse(fs.readFileSync("package.json"));
 const meta = require(process.env.TRAILS + "/packages/trails/package.json");
-for (const name of [...Object.keys(meta.dependencies), "@blazetrails/ruby-compat"])
+for (const name of [...Object.keys(meta.dependencies), "@blazetrails/ruby-compat", "@blazetrails/date"])
   app.dependencies[name] = `link:${process.env.TRAILS}/packages/${name.slice(13)}`;
 fs.writeFileSync("package.json", JSON.stringify(app, null, 2) + "\n");
 '
