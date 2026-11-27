@@ -1,5 +1,3 @@
-import { Dir, File, FileUtils, env as ENV, getFs } from "@blazetrails/ruby-compat";
-import { AppGenerator } from "../../../lib/generators/trails/app/app-generator.js";
 import { Paths, TRAILS_FRAMEWORK_ROOT } from "./paths.js";
 
 export default async function setup(): Promise<void> {
