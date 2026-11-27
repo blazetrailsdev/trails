@@ -199,7 +199,7 @@ Trails.application!.routes().draw(function () {
     expect(t.lastResponse().body).toBe("1");
   });
 
-  // BLOCKED: trailties-tests-broken-while-shards-ran-zero
+  // BLOCKED: non-eager-boot-defers-autoload-to-first-reference
   it.skip("dependencies reloading is followed by routes reloading", async () => {
     await t.addToConfig("this.config.enableReloading = true;");
 
@@ -243,7 +243,7 @@ export class User {}
     expect(t.lastResponse().body).toBe("7");
   });
 
-  // BLOCKED: trailties-tests-broken-while-shards-ran-zero
+  // BLOCKED: non-eager-boot-defers-autoload-to-first-reference
   it.skip("routes reloading triggers after_routes_loaded", async () => {
     await t.addToConfig("this.config.enableReloading = true;");
 
@@ -610,8 +610,7 @@ Trails.application!.routes().draw(function () {
     ).toEqual([]);
   });
 
-  // BLOCKED: trailties-tests-broken-while-shards-ran-zero
-  it.skip("columns migrations also trigger reloading", async () => {
+  it("columns migrations also trigger reloading", async () => {
     await t.addToConfig(`this.config.enableReloading = true;
     this.config.activeRecord.timestampedMigrations = false;`);
 

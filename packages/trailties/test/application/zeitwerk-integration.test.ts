@@ -8,6 +8,7 @@ import {
   constDefined,
   constGet,
   constSet,
+  extend,
   File,
   include,
   TopLevel,
@@ -294,7 +295,7 @@ await main.pushDir(\`\${Trails.root()}/extras\`, { namespace: ZeitwerkIntegratio
     expect(constGet(TopLevel, "ZeitwerkIntegrationTestExtras::X")).toBeTruthy();
   });
 
-  // BLOCKED: zeitwerk-integration-test-isolated-child-crashes
+  // BLOCKED: non-eager-boot-defers-autoload-to-first-reference
   it.skip("the once autoloader can autoload from initializers", async () => {
     await t.appFile("extras0/x.ts", "export const X = 0;");
     await t.appFile("extras1/y.ts", "export const Y = 0;");
@@ -415,9 +416,10 @@ export const WebsocketHacks = 1;
     expect(globals.zeitwerkIntegrationTestExtras).toBeTruthy();
   });
 
-  // BLOCKED: zeitwerk-integration-test-isolated-child-crashes
+  // BLOCKED: non-eager-boot-defers-autoload-to-first-reference
   it.skip("reloading clears autoloaded tracked classes", async () => {
     class Parent {}
+    extend(Parent, DescendantsTracker);
     constSet(TopLevel, "Parent", Parent);
 
     await t.appFile(

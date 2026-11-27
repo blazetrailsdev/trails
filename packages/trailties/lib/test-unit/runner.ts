@@ -86,7 +86,7 @@ export class Runner {
   static async run(argv: string[] = []): Promise<void> {
     const tests = await this.loadTests(argv);
     this.rejectUnknownOptions(argv);
-    const name = this.nameFilter(argv);
+    const name = await this.nameFilter(argv, tests);
     const locations = await this.testLocations(tests, name);
 
     const lineFiltered = this.filters.some(([, lines]) => lines.length > 0);
@@ -272,12 +272,20 @@ export class Runner {
   }
 
   /** @internal */
-  private static nameFilter(argv: string[]): RegExp | null {
+  private static async nameFilter(argv: string[], tests: string[]): Promise<RegExp | null> {
     const index = argv.findIndex((arg) => /^(-n|--name)$/.test(arg));
     const inline = argv.map((arg) => /^(?:-n|--name=)(.+)$/.exec(arg)).find((match) => match);
     const name = index === -1 ? inline?.[1] : argv[index + 1];
     if (name == null) return null;
-    return new RegExp(this.isRegexpFilter(name) ? name.slice(1, -1) : regexpEscape(name));
+    if (this.isRegexpFilter(name)) return new RegExp(name.slice(1, -1));
+    await TestParser.requireParser();
+    const names = new Set([name]);
+    for (const path of tests) {
+      for (const [, , fullName, title] of TestParser.calls(path)) {
+        if (title === name && fullName !== "") names.add(fullName);
+      }
+    }
+    return new RegExp(`^(?:${[...names].map(regexpEscape).join("|")})$`);
   }
 }
 

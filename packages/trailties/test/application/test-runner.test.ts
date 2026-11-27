@@ -450,8 +450,7 @@ describe.concurrent("TestRunnerTest", { timeout: 600_000 }, () => {
     expect(output).not.toMatch("Sanae");
   });
 
-  // BLOCKED: trailties-tests-broken-while-shards-ran-zero
-  it.skip("declarative style string filter", async (t) => {
+  it("declarative style string filter", async (t) => {
     await t.appFile(
       "test/models/post.test.ts",
       `import "../test-helper.ts"; import { describe, it, expect } from "vitest";
@@ -551,8 +550,7 @@ describe("PostTest", () => {
     expect(output).toMatch("2 runs, 0 failures, 0 errors, 0 skips");
   });
 
-  // BLOCKED: trailties-tests-broken-while-shards-ran-zero
-  it.skip("run multiple folders with absolute paths", async (t) => {
+  it("run multiple folders with absolute paths", async (t) => {
     await t.createTestFile("models", "account");
     await t.createTestFile("controllers", "accounts_controller");
     await t.createTestFile("helpers", "foo_helper");
