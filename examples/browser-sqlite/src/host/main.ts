@@ -36,7 +36,13 @@ const SHARE_PREFIX = "#code=";
 const LONG_LINE = 600;
 const MAX_LINES = 3000;
 
-type Problem = { path: string; line: number; column: number; message: string };
+type Problem = {
+  path: string;
+  line: number;
+  column: number;
+  message: string;
+  severity?: "warning";
+};
 type Table = { name: string; count: number };
 type Rows = { columns: string[]; values: unknown[][] };
 
@@ -106,6 +112,24 @@ let current = EXAMPLES[example].open;
 let session = 0;
 let runtime: HTMLIFrameElement | null = null;
 let problems: Problem[] = [];
+let typeWarnings: Problem[] = [];
+let checker: Worker | null = null;
+let checkTimer: ReturnType<typeof setTimeout> | undefined;
+
+const allProblems = (): Problem[] => [...typeWarnings, ...problems];
+
+function checkTypes(): void {
+  if (!checker) {
+    checker = new Worker(new URL("./type-check.worker.ts", import.meta.url), { type: "module" });
+    checker.onmessage = (event: MessageEvent<Problem[]>) => {
+      typeWarnings = event.data;
+      renderProblems();
+    };
+    checker.onerror = (e) => log("warn", `The type checker stopped: ${e.message}`);
+  }
+  clearTimeout(checkTimer);
+  checkTimer = setTimeout(() => checker!.postMessage(files), 300);
+}
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const tree = $<HTMLElement>("tree");
@@ -152,7 +176,11 @@ function syncScroll(): void {
 editor.addEventListener("scroll", syncScroll);
 
 function renderGutter(): void {
-  const marked = new Map(problems.filter((p) => p.path === current).map((p) => [p.line, p]));
+  const marked = new Map(
+    allProblems()
+      .filter((p) => p.path === current)
+      .map((p) => [p.line, p]),
+  );
   const count = editor.value.split("\n").length;
   if (gutter.childElementCount !== count) {
     gutter.replaceChildren(
@@ -165,20 +193,22 @@ function renderGutter(): void {
   }
   for (const [i, line] of [...gutter.children].entries()) {
     const problem = marked.get(i + 1);
-    line.classList.toggle("problem", problem !== undefined);
+    line.classList.toggle("problem", problem !== undefined && !problem.severity);
+    line.classList.toggle("warning", problem?.severity === "warning");
     (line as HTMLElement).title = problem?.message ?? "";
   }
 }
 
 function renderProblems(): void {
   const list = $("problems");
-  const mine = problems.filter((p) => p.path === current);
+  const mine = allProblems().filter((p) => p.path === current);
   list.hidden = mine.length === 0;
   list.replaceChildren(
     ...mine.map((p) => {
       const item = document.createElement("li");
       const jump = document.createElement("button");
       jump.textContent = `Line ${p.line}: ${p.message}`;
+      jump.classList.toggle("warning", p.severity === "warning");
       jump.onclick = () => goToLine(editor, p.line);
       item.append(jump);
       return item;
@@ -337,6 +367,7 @@ function open(path: string): void {
 
 function saveFiles(): void {
   store(FILES_KEY, JSON.stringify(files));
+  if (checker) checkTypes();
 }
 
 const hinted = new Set<string>();
@@ -784,6 +815,7 @@ addEventListener("message", (event: MessageEvent) => {
       break;
     case "booted":
       overlay.hidden = true;
+      if (!checker) checkTypes();
       navigate(previewLocation() ?? (urlInput.value || "/"));
       break;
   }

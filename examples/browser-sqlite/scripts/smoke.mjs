@@ -154,6 +154,21 @@ try {
   await see("h1", "Edited posts");
   console.log("a syntax error names its file and line over the preview, and fixing it recovers");
 
+  await editor.fill(
+    model.replace("export class Post", 'const typo: number = "x";\nexport class Post'),
+  );
+  await page
+    .locator("#problems button.warning", { hasText: "Line 6: Type 'string' is not assignable" })
+    .waitFor({ timeout: 60_000 });
+  await page.locator("#gutter .warning").first().waitFor();
+  await status.filter({ hasText: "Running" }).waitFor({ timeout: 30_000 });
+  await see("h1", "Edited posts");
+  await shot("type-error");
+  await editor.fill(model);
+  await page.locator("#problems").waitFor({ state: "hidden", timeout: 30_000 });
+  await status.filter({ hasText: "Running" }).waitFor({ timeout: 30_000 });
+  console.log("a type error is a warning in the editor, and the app keeps running");
+
   if (engine === "chromium") {
     const cdp = await context.newCDPSession(page);
     await cdp.send("ServiceWorker.enable");
