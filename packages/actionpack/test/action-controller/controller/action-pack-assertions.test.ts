@@ -1,3 +1,5 @@
+import { Dir } from "@blazetrails/ruby-compat/dir";
+import { File } from "@blazetrails/ruby-compat/file";
 import { constSet } from "@blazetrails/ruby-compat/include";
 import { TopLevel } from "@blazetrails/ruby-compat/object";
 import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
@@ -29,6 +31,14 @@ import "../../support/abstract-unit.js";
 class ActionPackAssertionsController extends Base {
   declare routeOneUrl: () => string;
   declare routeTwoUrl: () => string;
+
+  async renderFileAbsolutePath() {
+    await this.render({ file: File.expandPath("../../../README.rdoc", import.meta.dirname) });
+  }
+
+  async renderFileRelativePath() {
+    await this.render({ file: "README.rdoc" });
+  }
 
   async nothing() {
     await this.head(200);
@@ -182,9 +192,17 @@ describe("ActionPackAssertionsControllerTest", () => {
     await tc.beforeSetup();
   });
 
-  // BLOCKED: action-pack-assertions-port-render-file-tests-and-park-the-builder-three
-  it.skip("render file absolute path", () => {});
-  it.skip("render file relative path", () => {});
+  it("render file absolute path", async () => {
+    await tc.get("renderFileAbsolutePath");
+    expect(tc.response.body).toMatch(/^= Action Pack/);
+  });
+
+  it("render file relative path", async () => {
+    await Dir.chdir(File.expandPath("../../..", import.meta.dirname), async () => {
+      await tc.get("renderFileRelativePath");
+    });
+    expect(tc.response.body).toMatch(/^= Action Pack/);
+  });
 
   it("get request", async () => {
     await expect(tc.get("raiseExceptionOnGet")).rejects.toThrow("get");
