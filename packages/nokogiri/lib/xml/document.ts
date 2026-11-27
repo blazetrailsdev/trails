@@ -226,6 +226,22 @@ export class XmlDocument extends XmlNode {
     );
   }
 
+  createCdata(string: unknown): XmlNode {
+    const libxml = Nokogiri.LibXml2!;
+    return new XmlNode(
+      libxml.createNode(libxml.xmlNewCDataBlock(this.pointerId, String(string))),
+      this,
+    );
+  }
+
+  createComment(string: unknown): XmlNode {
+    const libxml = Nokogiri.LibXml2!;
+    return new XmlNode(
+      libxml.createNode(libxml.xmlNewDocComment(this.pointerId, String(string))),
+      this,
+    );
+  }
+
   decorators(key: unknown): object[] {
     this._decorators ??= new Map();
     if (!this._decorators.has(key)) this._decorators.set(key, []);

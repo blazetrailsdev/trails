@@ -108,6 +108,8 @@ export type LibXml2 = typeof import("libxml2-wasm") & {
     | "xmlSaveTree"
     | "xmlSaveClose"
     | "xmlDocGetRootElement"
+    | "xmlNewCDataBlock"
+    | "xmlNewDocComment"
     | "xmlNewDocNode"
     | "xmlNewDocText"
     | "xmlNewNs"

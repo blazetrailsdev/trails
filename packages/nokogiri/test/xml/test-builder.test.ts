@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { ArgumentError } from "@blazetrails/ruby-compat";
 import { Builder } from "../../lib/xml/builder.js";
 import { XmlDocument } from "../../lib/xml/document.js";
+import type { XmlNode } from "../../lib/xml/node.js";
 
 describe("Nokogiri::XML::TestBuilder", () => {
   it("attribute sensitivity", () => {
@@ -156,5 +157,35 @@ describe("Nokogiri::XML::TestBuilder", () => {
       });
     });
     expect(builder.doc.xpath('//foo[@id = "hello"]').length).toBe(1);
+  });
+
+  it("raw append", () => {
+    const builder = new Builder((xml: Builder) => {
+      xml.root(() => {
+        xml.append("hello");
+      });
+    });
+
+    expect(builder.doc.atXpath("/root")!.content).toBe("hello");
+  });
+
+  it("cdata", () => {
+    const builder = new Builder(function (this: Builder) {
+      this.root(function (this: Builder) {
+        this.cdata("hello world");
+      });
+    });
+    expect(builder.toXml().replaceAll("\n", "")).toBe(
+      '<?xml version="1.0"?><root><![CDATA[hello world]]></root>',
+    );
+  });
+
+  it("comment", () => {
+    const builder = new Builder(function (this: Builder) {
+      this.root(function (this: Builder) {
+        this.comment("this is a comment");
+      });
+    });
+    expect((builder.doc.root!.children.first() as XmlNode).isComment()).toBe(true);
   });
 });

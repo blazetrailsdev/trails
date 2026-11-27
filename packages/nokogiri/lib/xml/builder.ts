@@ -75,6 +75,14 @@ export class Builder {
     return this.insert(this.doc.createTextNode(string));
   }
 
+  cdata(string: unknown): NodeBuilder {
+    return this.insert(this.doc.createCdata(string));
+  }
+
+  comment(string: unknown): NodeBuilder {
+    return this.insert(this.doc.createComment(string));
+  }
+
   get(nsPrefix: unknown): this {
     this.nsPrefix = String(nsPrefix);
     return this;
@@ -82,6 +90,13 @@ export class Builder {
 
   toXml(...args: Parameters<XmlDocument["toXml"]>): string {
     return this.doc.toXml(...args);
+  }
+
+  append(string: string): void {
+    this.doc
+      .fragment(string)
+      .children.toA()
+      .forEach((x) => this.insert(x));
   }
 
   methodMissing(method: string, ...args: unknown[]): unknown {
