@@ -38,10 +38,8 @@ describe("isSourceUnported package scoping", () => {
   });
 
   it("matches a package-scoped pattern only inside that package", () => {
-    // did-you-mean and activesupport both ship `core_ext/name_error.rb`,
-    // but only did-you-mean's is unported.
-    expect(isSourceUnported("core_ext/name_error.rb", "did-you-mean")).toBe(true);
-    expect(isSourceUnported("core_ext/name_error.rb", "activesupport")).toBe(false);
+    expect(isSourceUnported("tree_spell_checker.rb", "did-you-mean")).toBe(true);
+    expect(isSourceUnported("tree_spell_checker.rb", "activesupport")).toBe(false);
   });
 
   it("accounts for every file in the vendored i18n lib tree", async () => {
@@ -116,7 +114,7 @@ describe("isSourceUnported package scoping", () => {
   });
 
   it("treats an absent pkg argument as 'any package' to preserve legacy callers", () => {
-    expect(isSourceUnported("core_ext/name_error.rb")).toBe(true);
+    expect(isSourceUnported("tree_spell_checker.rb")).toBe(true);
   });
 
   it("does not match unrelated source files", () => {
