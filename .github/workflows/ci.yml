@@ -3334,11 +3334,23 @@ jobs:
                 s=$1; m=int(s/60); r=s-m*60;
                 printf("| %s | %s | %dm%02ds |\n", $2, $3, m, r)
               }' >> "$GITHUB_STEP_SUMMARY"
-      - name: Delete this run's refs/ci-queue refs
+      - name: Delete finished runs' refs/ci-queue refs
         if: ${{ always() }}
         continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
+          PASSED: ${{ !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') }}
         run: |
-          gh api --paginate "repos/$GITHUB_REPOSITORY/git/matching-refs/ci-queue/$GITHUB_RUN_ID-" --jq '.[].ref' |
-            while read -r ref; do gh api -X DELETE "repos/$GITHUB_REPOSITORY/git/$ref" >/dev/null; done
+          cutoff=$(date -u -d '30 days ago' +%s)
+          gh api --paginate "repos/$GITHUB_REPOSITORY/git/matching-refs/ci-queue/" --jq '.[].ref' > refs.txt
+          cut -d/ -f3 refs.txt | sort -u | while read -r run; do
+            if [ "$run" = "$GITHUB_RUN_ID" ]; then
+              [ "$PASSED" = "true" ] || continue
+            else
+              created=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run" --jq .created_at 2>/dev/null) &&
+                [ "$(date -u -d "$created" +%s)" -gt "$cutoff" ] && continue
+            fi
+            grep "^refs/ci-queue/$run/" refs.txt | while read -r ref; do
+              gh api -X DELETE "repos/$GITHUB_REPOSITORY/git/$ref" >/dev/null
+            done
+          done
