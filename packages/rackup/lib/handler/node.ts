@@ -236,7 +236,7 @@ export class Node {
             for await (const chunk of body) {
               if (hijacked) return;
               if (closing) break;
-              if (res.write(rbObjAsString(chunk)) === false && !res.destroyed)
+              if (res.write(rbObjAsString(chunk)) === false)
                 await new Promise<void>((resolve) => (wake = resolve));
               wake = null;
             }
