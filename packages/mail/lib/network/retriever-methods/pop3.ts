@@ -25,7 +25,7 @@ interface NetPOP3Class {
   new (addr: unknown, port: unknown, isapop: unknown): NetPOP3Session;
 }
 
-declare module "@blazetrails/ruby-compat/net/protocol" {
+declare module "@blazetrails/ruby-compat" {
   interface NetModule {
     /** @noRailsEquivalent PERMANENT */
     POP3?: NetPOP3Class;

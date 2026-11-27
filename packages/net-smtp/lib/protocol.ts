@@ -13,7 +13,7 @@ export {
   ReadTimeout,
 } from "@blazetrails/ruby-compat";
 
-declare module "@blazetrails/ruby-compat/net/protocol" {
+declare module "@blazetrails/ruby-compat" {
   interface NetModule {
     /** @noRailsEquivalent PERMANENT */
     SMTP: typeof SMTP;

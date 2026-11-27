@@ -34,7 +34,7 @@ interface NetIMAPClass {
   encodeUtf7(s: string): string;
 }
 
-declare module "@blazetrails/ruby-compat/net/protocol" {
+declare module "@blazetrails/ruby-compat" {
   interface NetModule {
     /** @noRailsEquivalent PERMANENT */
     IMAP?: NetIMAPClass;
@@ -146,7 +146,7 @@ export class IMAP extends Retriever {
     if (options.keys == null || options.keys === false) options.keys = "ALL";
     if (options.uid == null || options.uid === false) options.uid = null;
     options.deleteAfterFind ??= false;
-    options.mailbox = TopLevel.Net!.IMAP!.encodeUtf7(options.mailbox);
+    options.mailbox = TopLevel.Net!.IMAP!.encodeUtf7(options.mailbox as string);
     options.readOnly ??= false;
 
     return options;
