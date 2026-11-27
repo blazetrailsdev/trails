@@ -36,10 +36,7 @@ import { Enumerable } from "./enumerable.js";
 import { Hash } from "./hash.js";
 import { TypeError } from "./type-error.js";
 import { FrozenError } from "./frozen-error.js";
-import { BigDecimal } from "./big-decimal.js";
-import { Complex } from "./complex.js";
 import { Rational } from "./rational.js";
-import { toI } from "./numeric.js";
 import {
   FL_SINGLETON,
   T_ICLASS,
@@ -52,9 +49,6 @@ import {
   rbCClass,
   rbCDate,
   rbCNumeric,
-  rbCInteger,
-  rbCFloat,
-  rbModDefineMethod,
   rbObjClass,
   rbObjSingletonClass,
   rbInspect,
@@ -2395,40 +2389,6 @@ Object.setPrototypeOf(rbCClass.prototype, Module.prototype);
 rbDefineAllocFunc(Rational, (klass) => new klass(0, 1));
 rbDefineAllocFunc(Hash, (klass) => new klass());
 rbSetClassPathString(Rational.compatible, Rational, "compatible");
-for (const klass of [Rational, Complex, BigDecimal]) {
-  Object.setPrototypeOf(klass, rbCNumeric);
-  Object.setPrototypeOf(klass.prototype, rbCNumeric.prototype);
-}
-
-/**
- * `Integer#to_r` (`vendor/ruby/v3.3.11/rational.c:2148`).
- * @noRailsEquivalent PERMANENT
- */
-rbModDefineMethod(rbCInteger, "toR", function (this: number | bigint) {
-  return new Rational(this, 1);
-});
-/**
- * `Integer#to_int` (`vendor/ruby/v3.3.11/numeric.rb:255`).
- * @noRailsEquivalent PERMANENT
- */
-rbModDefineMethod(rbCInteger, "toInt", function (this: number | bigint) {
-  return this;
-});
-/**
- * `Float#to_r` (`vendor/ruby/v3.3.11/rational.c:2199`).
- * @noRailsEquivalent PERMANENT
- */
-rbModDefineMethod(rbCFloat, "toR", function (this: unknown) {
-  return new Rational(Number(this), 1);
-});
-/**
- * `Float#to_int` (`vendor/ruby/v3.3.11/numeric.c:2597`).
- * @noRailsEquivalent PERMANENT
- */
-rbModDefineMethod(rbCFloat, "toInt", function (this: unknown) {
-  return toI(Number(this));
-});
-
 include(rbCNumeric, rbMComparable);
 include(rbCString, rbMComparable);
 include(rbCTime, rbMComparable);
