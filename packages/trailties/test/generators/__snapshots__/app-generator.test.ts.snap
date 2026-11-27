@@ -59,7 +59,9 @@ await Trails.application.loadServer();
 exports[`AppGeneratorTest > snapshots emitted TypeScript sources > config/application.ts 1`] = `
 "import "./boot.ts";
 
-import { Bundler, constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { Bundler } from "@blazetrails/ruby-compat/bundler";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
 import { Trails } from "@blazetrails/trailties";
 
 import "@blazetrails/trailties/all";
@@ -180,7 +182,7 @@ exports[`AppGeneratorTest > snapshots emitted TypeScript sources > config/storag
 
 exports[`AppGeneratorTest > snapshots emitted TypeScript sources > environments/development.ts 1`] = `
 "import { days } from "@blazetrails/activesupport";
-import { getFs } from "@blazetrails/ruby-compat";
+import { getFs } from "@blazetrails/ruby-compat/fs-adapter";
 import { Trails } from "@blazetrails/trailties";
 
 const cachingDev = await getFs().exists(Trails.root()!.join("tmp/caching-dev.txt").toString());
@@ -260,7 +262,8 @@ Trails.application.configure(function () {
 
 exports[`AppGeneratorTest > snapshots emitted TypeScript sources > environments/production.ts 1`] = `
 "import { TaggedLogging } from "@blazetrails/activesupport";
-import { env, STDOUT } from "@blazetrails/ruby-compat";
+import { env } from "@blazetrails/ruby-compat/process-adapter";
+import { STDOUT } from "@blazetrails/ruby-compat/io";
 import { Trails } from "@blazetrails/trailties";
 
 Trails.application.configure(function () {
@@ -360,7 +363,7 @@ exports[`AppGeneratorTest > snapshots emitted TypeScript sources > environments/
 // and recreated between test runs. Don't rely on the data there!
 
 import { isPresent } from "@blazetrails/activesupport";
-import { env } from "@blazetrails/ruby-compat";
+import { env } from "@blazetrails/ruby-compat/process-adapter";
 import { Trails } from "@blazetrails/trailties";
 
 Trails.application.configure(function () {
@@ -417,7 +420,7 @@ Trails.application.configure(function () {
 exports[`AppGeneratorTest > snapshots emitted TypeScript sources > global-setup.ts 1`] = `
 "import { Base } from "@blazetrails/activerecord";
 import { buildViews } from "@blazetrails/trails-tsc";
-import { env, setEnv } from "@blazetrails/ruby-compat";
+import { env, setEnv } from "@blazetrails/ruby-compat/process-adapter";
 
 export async function setup(): Promise<void> {
   if (env.TRAILS_ENV == null) setEnv("TRAILS_ENV", "test");
@@ -434,7 +437,7 @@ export async function teardown(): Promise<void> {
 
 exports[`AppGeneratorTest > snapshots emitted TypeScript sources > test-helper.ts 1`] = `
 "import { TestCase } from "@blazetrails/activesupport/test-case";
-import { env, setEnv } from "@blazetrails/ruby-compat";
+import { env, setEnv } from "@blazetrails/ruby-compat/process-adapter";
 
 if (env.TRAILS_ENV == null) setEnv("TRAILS_ENV", "test");
 await import("../config/environment.ts");
