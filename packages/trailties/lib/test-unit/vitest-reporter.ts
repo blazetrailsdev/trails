@@ -57,9 +57,15 @@ export default class VitestReporter implements Reporter {
 
   results: VitestResult[] = [];
 
+  startTime = 0;
+
   onInit(vitest: Vitest): void {
     vitest.config.includeTaskLocation = true;
     TestUnitReporter.appRoot ??= vitest.config.root;
+  }
+
+  onTestRunStart(): void {
+    this.startTime = performance.now();
   }
 
   onUserConsoleLog(log: UserConsoleLog): void {
@@ -89,6 +95,11 @@ export default class VitestReporter implements Reporter {
     const errors = [...testModules.flatMap((mod) => mod.errors()), ...unhandledErrors];
     const codes = this.results.map((result) => result.resultCode);
     const count = (code: string) => codes.filter((resultCode) => resultCode === code).length;
+    const totalTime = (performance.now() - this.startTime) / 1000;
+    STDOUT.puts();
+    STDOUT.puts(
+      `Finished in ${totalTime.toFixed(6)}s, ${(codes.length / totalTime).toFixed(4)} runs/s.`,
+    );
     STDOUT.puts();
     for (const error of errors) {
       const missing = /Cannot find (?:module|package) '([^']+)'/.exec(error.message);

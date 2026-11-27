@@ -446,6 +446,82 @@ describe.concurrent("TestRunnerTest", { timeout: 600_000 }, () => {
     expect(output).not.toMatch("Sanae");
   });
 
+  it("declarative style string filter", async (t) => {
+    await t.appFile(
+      "test/models/post.test.ts",
+      `import "../test-helper.ts"; import { describe, it, expect } from "vitest";
+
+describe("PostTest", () => {
+  it("foo", () => {
+    console.log("hello foo");
+    expect(true).toBe(true);
+  });
+
+  it("foo +  + again", () => {
+    console.log("hello again");
+    expect(true).toBe(true);
+  });
+
+  it("foo no more", () => {
+    expect(false).toBe(true);
+  });
+});
+`,
+    );
+
+    let output = await t.runTestCommand("test/models/post.test.ts -n 'foo'");
+    expect(output).toMatch("hello foo");
+    expect(output).toMatch("1 runs, 0 failures");
+
+    output = await t.runTestCommand("test/models/post.test.ts -n 'foo +  + again'");
+    expect(output).toMatch("hello again");
+    expect(output).toMatch("1 runs, 0 failures");
+  });
+
+  it("declarative style regexp filter", async (t) => {
+    await t.appFile(
+      "test/models/post.test.ts",
+      `import "../test-helper.ts"; import { describe, it, expect } from "vitest";
+
+describe("PostTest", () => {
+  it("greets foo", () => {
+    console.log("hello foo");
+    expect(true).toBe(true);
+  });
+
+  it("greets foo again", () => {
+    console.log("hello again foo");
+    expect(true).toBe(true);
+  });
+
+  it("greets +  + bar", () => {
+    console.log("hello bar");
+    expect(true).toBe(true);
+  });
+
+  it("greets no one", () => {
+    expect(false).toBe(true);
+  });
+});
+`,
+    );
+
+    const output = await t.runTestCommand(
+      "test/models/post.test.ts -n '/greets foo|greets .  .\\ bar/'",
+    );
+    expect(output).toMatch("hello foo");
+    expect(output).toMatch("hello again foo");
+    expect(output).toMatch("hello bar");
+    expect(output).toMatch("3 runs, 0 failures");
+  });
+
+  it("only inline failure output", async (t) => {
+    await t.createTestFile("models", "post", { pass: false });
+
+    const output = await t.runTestCommand("test/models/post.test.ts");
+    expect(output).toMatch(/Finished in.*1 runs/s);
+  });
+
   it("run in test environment by default", async (t) => {
     await createEnvTest(t);
 
