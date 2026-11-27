@@ -235,3 +235,23 @@ describe("Nokogiri::XML::Document < Node (trails)", () => {
     doc.dispose();
   });
 });
+
+describe("Nokogiri::XML::Document decorators (trails)", () => {
+  it("decorate extends a node with each decorator registered for its class", () => {
+    const doc = XmlDocument.parse("<root/>");
+    const decorator = { decorated: () => "yes" };
+    doc.decorators(XmlNode).push(decorator);
+    const node = doc.root!;
+    doc.decorate(node);
+    expect((node as unknown as { decorated(): string }).decorated()).toBe("yes");
+    doc.dispose();
+  });
+
+  it("decorate is a no-op before any decorator is registered", () => {
+    const doc = XmlDocument.parse("<root/>");
+    const node = doc.root!;
+    doc.decorate(node);
+    expect("decorated" in node).toBe(false);
+    doc.dispose();
+  });
+});

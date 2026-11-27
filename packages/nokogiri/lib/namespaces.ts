@@ -7,6 +7,7 @@ import type { DocumentFragment as Html5DocumentFragment } from "./html5/document
 import type { NodeSet } from "./xml/node-set.js";
 import type { Attr } from "./xml/attr.js";
 import type { Namespace } from "./xml/namespace.js";
+import type { Builder } from "./xml/builder.js";
 import type { XmlNode } from "./xml/node.js";
 import type { XmlDocument } from "./xml/document.js";
 import type { DocumentFragment } from "./xml/document-fragment.js";
@@ -35,6 +36,7 @@ export const XML = {
   XPathContext: typeof XPathContext;
   Attr: typeof Attr;
   Namespace: typeof Namespace;
+  Builder: typeof Builder;
   ParseOptions: typeof ParseOptions;
   Document: typeof XmlDocument;
   DocumentFragment: typeof DocumentFragment;
@@ -105,6 +107,15 @@ export type LibXml2 = typeof import("libxml2-wasm") & {
     | "xmlSaveSetIndentString"
     | "xmlSaveTree"
     | "xmlSaveClose"
+    | "xmlDocGetRootElement"
+    | "xmlNewDocNode"
+    | "xmlNewDocText"
+    | "xmlNewNs"
+    | "XmlNodeStruct"
+    | "xmlNodeSetContent"
+    | "XmlNsStruct"
+    | "xmlSearchNs"
+    | "xmlSetNs"
   > & {
     xmlNewDoc(version: string): number;
     createNode(nodePtr: number): import("libxml2-wasm").XmlNode;

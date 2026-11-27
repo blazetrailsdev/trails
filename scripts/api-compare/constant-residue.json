@@ -1070,7 +1070,7 @@
     }
   },
   "nokogiri": {
-    "rows": 27,
+    "rows": 29,
     "excluded": [],
     "unwalked": [],
     "residue": {
@@ -1089,6 +1089,8 @@
       "html5/document.ts::QuirksMode": "Nokogiri::HTML5::QuirksMode",
       "html5/node.ts::Node": "Nokogiri::HTML5::Node",
       "xml/attr.ts::Attr": "Nokogiri::XML::Attr",
+      "xml/builder.ts::Builder": "Nokogiri::XML::Builder",
+      "xml/builder.ts::NodeBuilder": "Nokogiri::XML::Builder::NodeBuilder",
       "xml/document-fragment.ts::DocumentFragment": "Nokogiri::XML::DocumentFragment",
       "xml/document.ts::XmlDocument": "Nokogiri::XML::Document",
       "xml/namespace.ts::Namespace": "Nokogiri::XML::Namespace",

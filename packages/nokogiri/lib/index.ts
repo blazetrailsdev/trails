@@ -1,5 +1,6 @@
 import { XmlDocument } from "./xml/document.js";
 import { XmlNode } from "./xml/node.js";
+import { Builder as XmlBuilder } from "./xml/builder.js";
 import { DocumentFragment as XmlDocumentFragment } from "./xml/document-fragment.js";
 import { parseXml } from "./xml/parse.js";
 import { SyntaxError } from "./xml/syntax-error.js";
@@ -8,6 +9,7 @@ import { SaxParser } from "./xml/sax/parser.js";
 import "./xml/xpath-context.js";
 
 export const XML = {
+  Builder: XmlBuilder,
   Document: XmlDocument,
   DocumentFragment: XmlDocumentFragment,
   Node: XmlNode,
