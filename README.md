@@ -16,8 +16,19 @@ development. The model is typed from the schema by `trails-tsc`, and the
 scaffold's functional tests, ported from Rails' templates, pass. The
 [quickstart](#quickstart) walks through all of it.
 
-It is pre-release. Nothing is published to npm yet, so you run it from a
-checkout of this repository.
+It is pre-release. Alpha builds are published to npm under the `alpha`
+dist-tag. Generate an app with the `trails` command from
+`@blazetrails/trailties`; its `package.json` depends on the matching `~`
+version of `@blazetrails/trails`:
+
+```sh
+pnpm --package=@blazetrails/trailties@alpha --allow-build=esbuild dlx trails new blog --skip-install
+cd blog
+pnpm install
+```
+
+The [quickstart](#quickstart) below runs from a checkout of this repository,
+the contributor path, so CI can verify it against `main`.
 
 - [Quickstart](#quickstart), verified end to end on 2026-10-23
 - [Models: the ActiveRecord surface](#models-the-activerecord-surface)
@@ -76,8 +87,8 @@ cd blog
 ```
 
 The generated `package.json` asks for `@blazetrails/*` packages from the npm
-registry, where they do not exist yet. Point them at your checkout with pnpm
-overrides, then install:
+registry (the `alpha` builds above). To run against your checkout instead, point
+them at it with pnpm overrides, then install:
 
 ```sh
 {
