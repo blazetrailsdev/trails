@@ -17,11 +17,14 @@ scaffold's functional tests, ported from Rails' templates, pass. The
 [quickstart](#quickstart) walks through all of it.
 
 It is pre-release. Alpha builds are published to npm under the `alpha`
-dist-tag:
+dist-tag. Generate an app with the `trails` command from
+`@blazetrails/trailties`; its `package.json` depends on
+`@blazetrails/trails@~0.1.0-alpha0.1`:
 
 ```sh
-pnpm add @blazetrails/trails@alpha
-pnpm exec trails new blog
+pnpm --package=@blazetrails/trailties@alpha --allow-build=esbuild dlx trails new blog --skip-install
+cd blog
+pnpm install
 ```
 
 The [quickstart](#quickstart) below runs from a checkout of this repository,
