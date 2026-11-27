@@ -10,7 +10,7 @@ import { PriceEstimate } from "../../models/price-estimate.js";
 import { CpkOrderWithSingularBookChapters } from "../../models/cpk.js";
 import { Base } from "../../../lib/index.js";
 import { quoteColumnName } from "../../support/quote-regex.js";
-import { constSet } from "@blazetrails/ruby-compat/include";
+import { constDefined, constSet } from "@blazetrails/ruby-compat/include";
 import { TopLevel } from "@blazetrails/ruby-compat/object";
 import { Range } from "@blazetrails/ruby-compat/range";
 import { regexpEscape } from "@blazetrails/ruby-compat/regexp";
@@ -367,15 +367,17 @@ describe("PredicateBuilder hash building and bind handling", () => {
       }
     }
 
+    let savedPost: unknown;
+
     beforeAll(() => {
-      constSet(TopLevel, "Author", Author);
+      savedPost = constDefined(TopLevel, "Post", false) ? rbModRemoveConst(TopLevel, "Post") : null;
       constSet(TopLevel, "Post", PbTestPost);
       DescendantsTracker.registerSubclass(Base, PbTestPost);
     });
 
     afterAll(() => {
-      rbModRemoveConst(TopLevel, "Author");
       rbModRemoveConst(TopLevel, "Post");
+      if (savedPost != null) constSet(TopLevel, "Post", savedPost);
     });
 
     it("expands where({authors: {name: 'Rails'}}) to \"authors\".\"name\" = 'Rails'", () => {

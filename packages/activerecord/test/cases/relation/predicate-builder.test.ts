@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect } from "vitest";
 import { testConnection } from "@blazetrails/arel/test/support/connection.js";
 import { Visitors, Nodes } from "@blazetrails/arel";
 import { PredicateBuilder } from "../../../lib/relation/predicate-builder.js";
@@ -20,16 +20,6 @@ describe("PredicateBuilderTest", () => {
   };
 
   const { self } = fixtures(["topics", "posts", "authors", "products"]);
-
-  beforeAll(() => {
-    constSet(TopLevel, "Topic", Topic);
-    constSet(TopLevel, "Reply", Reply);
-  });
-
-  afterAll(() => {
-    rbModRemoveConst(TopLevel, "Topic");
-    rbModRemoveConst(TopLevel, "Reply");
-  });
 
   it("registering new handlers", () => {
     Topic.predicateBuilder.registerHandler(RegexFilter, regexpHandler);

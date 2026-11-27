@@ -4,7 +4,7 @@ import { presence } from "@blazetrails/activesupport";
 import { Correctable, SpellChecker } from "@blazetrails/did-you-mean";
 import { rbAryReplace } from "@blazetrails/ruby-compat/array";
 import { File } from "@blazetrails/ruby-compat/file";
-import { prepend, rbObjDup } from "@blazetrails/ruby-compat/include";
+import { include, rbObjDup } from "@blazetrails/ruby-compat/include";
 import { rbInspect } from "@blazetrails/ruby-compat/object";
 import { Pathname } from "@blazetrails/ruby-compat/pathname";
 import { env, rbArgv, stdout } from "@blazetrails/ruby-compat/process-adapter";
@@ -38,7 +38,7 @@ export class CorrectableNameError extends StandardError {
   }
 }
 
-prepend(CorrectableNameError, Correctable);
+include(CorrectableNameError, Correctable);
 
 export class UnrecognizedCommandError extends CorrectableNameError {
   constructor(name: string, commands: string[]) {

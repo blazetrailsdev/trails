@@ -1,5 +1,4 @@
 import { Pathname } from "@blazetrails/ruby-compat/pathname";
-import { LoadError } from "@blazetrails/ruby-compat/load-error";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import { File } from "@blazetrails/ruby-compat/file";
 import { include, constSet } from "@blazetrails/ruby-compat/include";
@@ -93,6 +92,7 @@ describe("Annotation", () => {
     vi.resetModules();
     vi.doMock("@blazetrails/ruby-compat/load", async (importOriginal) => {
       const original = await importOriginal<typeof import("@blazetrails/ruby-compat/load")>();
+      const { LoadError } = await import("@blazetrails/ruby-compat/load-error");
       return {
         ...original,
         rbFRequire: async (_loadPath: unknown, feature: string) => {
@@ -109,7 +109,7 @@ describe("Annotation", () => {
       )!;
       expect(extension[1]("TODO")).toBeInstanceOf(RegExp);
     } finally {
-      vi.doUnmock("@blazetrails/ruby-compat");
+      vi.doUnmock("@blazetrails/ruby-compat/load");
       vi.resetModules();
     }
   });

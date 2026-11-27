@@ -1,6 +1,6 @@
 import { DescendantsTracker } from "@blazetrails/activesupport";
 import { Hash } from "@blazetrails/ruby-compat/hash";
-import { constSet } from "@blazetrails/ruby-compat/include";
+import { constDefined, constSet } from "@blazetrails/ruby-compat/include";
 import { TopLevel } from "@blazetrails/ruby-compat/object";
 import { rbModRemoveConst } from "@blazetrails/ruby-compat/variable";
 import { describe, it, expect, beforeAll } from "vitest";
@@ -377,6 +377,12 @@ describe("RelationTest", () => {
   });
 
   it("eagerLoad with LIMIT emits direct LIMIT for non-collection associations", () => {
+    const savedAuthor = constDefined(TopLevel, "Author", false)
+      ? rbModRemoveConst(TopLevel, "Author")
+      : null;
+    const savedBook = constDefined(TopLevel, "Book", false)
+      ? rbModRemoveConst(TopLevel, "Book")
+      : null;
     try {
       class Author extends Base {
         static {
@@ -398,6 +404,8 @@ describe("RelationTest", () => {
     } finally {
       rbModRemoveConst(TopLevel, "Author");
       rbModRemoveConst(TopLevel, "Book");
+      if (savedAuthor != null) constSet(TopLevel, "Author", savedAuthor);
+      if (savedBook != null) constSet(TopLevel, "Book", savedBook);
     }
   });
 
