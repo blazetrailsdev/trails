@@ -180,7 +180,7 @@ try {
 
   const other = await context.newPage();
   await other.goto(url);
-  await other.locator("#status", { hasText: "Running" }).waitFor({ timeout: 120_000 });
+  await other.locator("#status", { hasText: /^Running$/ }).waitFor({ timeout: 120_000 });
   await other.locator("#console", { hasText: "open in another tab" }).waitFor({ timeout: 30_000 });
   await other.close();
   await page.locator("#reload").click();
@@ -203,7 +203,7 @@ try {
   await page.locator("#generate").click();
   await page.locator("#tree .file", { hasText: "tag.ts" }).first().waitFor({ timeout: 60_000 });
   await page.locator("#tree .file", { hasText: "_create_tags.ts" }).waitFor();
-  await page.locator("#status", { hasText: "Running" }).waitFor({ timeout: 60_000 });
+  await page.locator("#status", { hasText: /^Running$/ }).waitFor({ timeout: 60_000 });
   await page.locator("#repl-input").fill("await Tag.count()");
   await page.locator("#repl-input").press("Enter");
   await consoleHas(/› await Tag\.count\(\)\s[\s\S]*\b0\b/);
@@ -211,13 +211,13 @@ try {
 
   await page.locator("#example").selectOption("library");
   await page.waitForURL(/./);
-  await page.locator("#status", { hasText: "Running" }).waitFor({ timeout: 120_000 });
+  await page.locator("#status", { hasText: /^Running$/ }).waitFor({ timeout: 120_000 });
   await frame.locator("body", { hasText: "Ursula K. Le Guin" }).waitFor({ timeout: 30_000 });
   if (await page.locator("#tree .file", { hasText: "tag.ts" }).count())
     throw new Error("the library example shows the blog's files");
   console.log("the library example runs with its own files and database");
   await page.locator("#example").selectOption("blog");
-  await page.locator("#status", { hasText: "Running" }).waitFor({ timeout: 120_000 });
+  await page.locator("#status", { hasText: /^Running$/ }).waitFor({ timeout: 120_000 });
   await see("h1", "Found posts");
   console.log("switching back to the blog keeps its edits");
 
