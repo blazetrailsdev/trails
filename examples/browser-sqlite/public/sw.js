@@ -41,15 +41,18 @@ async function offline(request, url) {
     const hit = await cache.match(request, { ignoreSearch: true });
     if (hit) return hit;
   }
+  let response;
   try {
-    const response = await fetch(request);
-    if (response.ok) await cache.put(url.pathname, response.clone());
-    return response;
+    response = await fetch(request);
   } catch (error) {
     const hit = await cache.match(url.pathname);
     if (hit) return hit;
     throw error;
   }
+  if (response.status === 200) {
+    await cache.put(url.pathname, response.clone()).catch(() => null);
+  }
+  return response;
 }
 
 function tabUnder(root, url) {

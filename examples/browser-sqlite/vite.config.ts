@@ -116,7 +116,10 @@ function offlinePrecache(): Plugin {
       for (const file of files) hash.update(file).update(await readFile(join(outDir, file)));
       const sw = join(outDir, "sw.js");
       const precache = JSON.stringify({ version: hash.digest("hex").slice(0, 16), files });
-      await writeFile(sw, (await readFile(sw, "utf8")).replace("self.__PRECACHE__", precache));
+      await writeFile(
+        sw,
+        (await readFile(sw, "utf8")).replace("self.__PRECACHE__", () => precache),
+      );
     },
   };
 }
