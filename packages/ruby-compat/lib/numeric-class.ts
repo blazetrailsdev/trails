@@ -16,11 +16,10 @@ export function rbDefineClass(name: string, superclass: Klass = Object): new () 
  * `rb_cNumeric` (`vendor/ruby/v3.3.11/numeric.c:6156`). `Rational`
  * (`vendor/ruby/v3.3.11/rational.c:2759`), `Complex`
  * (`vendor/ruby/v3.3.11/complex.c:2529`) and `BigDecimal`
- * (`vendor/ruby/v3.3.11/ext/bigdecimal/bigdecimal.c:4407`) seat
- * themselves beneath it, each at the foot of its own module, not by
- * `extends`: object.ts reaches rational.ts before its own body runs, so an
- * `extends` would read the class in its TDZ. This module imports nothing that
- * reaches back, so its classes are set whichever module is entered first.
+ * (`vendor/ruby/v3.3.11/ext/bigdecimal/bigdecimal.c:4407`) `extends` it,
+ * as `rb_define_class(name, rb_cNumeric)` makes it their superclass. This
+ * module imports nothing that reaches back into them, so it has run before
+ * any of their class bodies, whichever module is entered first.
  * @noRailsEquivalent PERMANENT
  */
 export const rbCNumeric = rbDefineClass("Numeric");
