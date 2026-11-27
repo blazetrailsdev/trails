@@ -138,7 +138,7 @@ export const TZInfo = {
 };
 constSet(TopLevel, "TZInfo", TZInfo);
 
-declare module "@blazetrails/ruby-compat" {
+declare module "@blazetrails/ruby-compat/object" {
   interface TopLevelConstants {
     TZInfo?: typeof TZInfo;
   }

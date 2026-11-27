@@ -1,12 +1,10 @@
+import { FloatDomainError } from "@blazetrails/ruby-compat/float-domain-error";
+import { FrozenError } from "@blazetrails/ruby-compat/frozen-error";
+import { NoMethodError } from "@blazetrails/ruby-compat/no-method-error";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
+import { constSet } from "@blazetrails/ruby-compat/include";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
 import {
-  FloatDomainError,
-  FrozenError,
-  NoMethodError,
-  TopLevel,
-  constSet,
-} from "@blazetrails/ruby-compat";
-import {
-  ArgumentError,
   cmp,
   equals as cmpEquals,
   greaterThan,
@@ -14,15 +12,15 @@ import {
   isBetween,
   lessThan,
   lessThanOrEqual,
-  Rational,
-  rational,
+} from "@blazetrails/ruby-compat/comparable";
+import { Rational, rational } from "@blazetrails/ruby-compat/rational";
+import {
   rbCDate,
-  rbObjIsKindOf,
-  rbDbl2num,
-  rbDefineAllocFunc,
   rbSetClassPathString,
   TEMPORAL_METHOD_TABLE,
-} from "@blazetrails/ruby-compat";
+} from "@blazetrails/ruby-compat/object";
+import { rbObjIsKindOf, rbDefineAllocFunc } from "@blazetrails/ruby-compat/include";
+import { rbDbl2num } from "@blazetrails/ruby-compat/numeric";
 import { rbWarning } from "./rb-warning.js";
 import { Time, nowTimeZoneId } from "./time.js";
 

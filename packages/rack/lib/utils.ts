@@ -8,22 +8,16 @@ import {
   ParamsTooDeepError,
   Params,
 } from "./query-parser.js";
-import {
-  ArgumentError,
-  aryDeleteIf,
-  block,
-  fetch,
-  Process,
-  RFC2396_PARSER,
-  URI,
-  Encoding,
-  isSymbol,
-  rbInspect,
-  stringToSym,
-  symbolToS,
-  b as rbB,
-  Range,
-} from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { aryDeleteIf } from "@blazetrails/ruby-compat/array";
+import { block, fetch } from "@blazetrails/ruby-compat/hash";
+import { Process } from "@blazetrails/ruby-compat/process";
+import { RFC2396_PARSER, URI } from "@blazetrails/ruby-compat/uri/common";
+import { Encoding } from "@blazetrails/ruby-compat/encoding";
+import { isSymbol, stringToSym, symbolToS } from "@blazetrails/ruby-compat/symbol";
+import { rbInspect } from "@blazetrails/ruby-compat/object";
+import { b as rbB } from "@blazetrails/ruby-compat/string/b";
+import { Range } from "@blazetrails/ruby-compat/range";
 import { warn } from "@blazetrails/ruby-compat/kernel-warn";
 
 export { ArgumentError };

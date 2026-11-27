@@ -1,4 +1,5 @@
-import { Range, valuesAt } from "@blazetrails/ruby-compat";
+import { Range } from "@blazetrails/ruby-compat/range";
+import { valuesAt } from "@blazetrails/ruby-compat/hash";
 import { ActiveJob, Serializers } from "../namespaces.js";
 import { ObjectSerializer } from "./object-serializer.js";
 

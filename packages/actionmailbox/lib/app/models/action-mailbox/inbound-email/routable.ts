@@ -4,7 +4,7 @@ import { TopLevel } from "@blazetrails/ruby-compat";
 import type { InboundEmail } from "../inbound-email.js";
 import { RoutingJob } from "../../../../routing-job.js";
 
-declare module "@blazetrails/ruby-compat" {
+declare module "@blazetrails/ruby-compat/object" {
   interface TopLevelConstants {
     ApplicationMailbox?: { route(inboundEmail: InboundEmail): Promise<unknown> };
   }

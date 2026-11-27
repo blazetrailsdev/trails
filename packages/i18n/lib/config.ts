@@ -1,6 +1,6 @@
 import { enforceAvailableLocalesBang, type Locale, type TranslationKey } from "./i18n.js";
 import { ExceptionHandler, MissingInterpolationArgument, NoMethodError } from "./exceptions.js";
-import { TopLevel, rbInspect } from "@blazetrails/ruby-compat";
+import { TopLevel, rbInspect } from "@blazetrails/ruby-compat/object";
 import { DEFAULT_INTERPOLATION_PATTERNS } from "./interpolate/ruby.js";
 import type { Base } from "./backend/base.js";
 

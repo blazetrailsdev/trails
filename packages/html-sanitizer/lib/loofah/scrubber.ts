@@ -1,5 +1,8 @@
 import { HTML5, type Html5Node } from "@blazetrails/nokogiri";
-import { ArgumentError, RuntimeError, rbModName, stringSplit } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
+import { rbModName } from "@blazetrails/ruby-compat/object";
+import { stringSplit } from "@blazetrails/ruby-compat/string/split";
 
 import { Scrub } from "./html5/scrub.js";
 

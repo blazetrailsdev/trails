@@ -261,7 +261,7 @@ export const Mail: MailConstants = {
 
 TopLevel.Mail = Mail;
 
-declare module "@blazetrails/ruby-compat" {
+declare module "@blazetrails/ruby-compat/object" {
   interface TopLevelConstants {
     Mail?: typeof Mail;
   }

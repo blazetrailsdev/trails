@@ -1,4 +1,7 @@
-import { Exception, excToS, rbCallSuper, StandardError } from "@blazetrails/ruby-compat";
+import { Exception } from "@blazetrails/ruby-compat/exception";
+import { excToS } from "@blazetrails/ruby-compat/exc-to-s";
+import { rbCallSuper } from "@blazetrails/ruby-compat/include";
+import { StandardError } from "@blazetrails/ruby-compat/standard-error";
 import { formatter } from "../did-you-mean.js";
 
 interface CorrectableHost extends Error {

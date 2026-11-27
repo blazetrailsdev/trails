@@ -1,14 +1,10 @@
-import {
-  ArgumentError,
-  EOFError,
-  Hash,
-  rbFSend,
-  rbObjClassname,
-  rbObjIsKindOf,
-  rbObjRespondTo,
-  stringValue,
-  TypeError,
-} from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { EOFError } from "@blazetrails/ruby-compat/eof-error";
+import { Hash } from "@blazetrails/ruby-compat/hash";
+import { rbFSend, rbObjClassname, rbObjRespondTo } from "@blazetrails/ruby-compat/object";
+import { rbObjIsKindOf } from "@blazetrails/ruby-compat/include";
+import { stringValue } from "@blazetrails/ruby-compat/string/support";
+import { TypeError } from "@blazetrails/ruby-compat/type-error";
 import { MessagePack } from "./namespaces.js";
 
 const MSGPACK_BUFFER_STRING_WRITE_REFERENCE_DEFAULT = 512 * 1024;

@@ -1,4 +1,6 @@
-import { Hash, StandardError, toSym } from "@blazetrails/ruby-compat";
+import { Hash } from "@blazetrails/ruby-compat/hash";
+import { StandardError } from "@blazetrails/ruby-compat/standard-error";
+import { toSym } from "@blazetrails/ruby-compat/object";
 import {
   EMPTY_HASH,
   loadPath,

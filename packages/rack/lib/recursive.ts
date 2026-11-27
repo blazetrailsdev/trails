@@ -1,6 +1,10 @@
 import type { RackHeaders } from "./index.js";
-import { ArgumentError, StringIO, URI, rbObjDup, rbProcCall } from "@blazetrails/ruby-compat";
-import type { Generic } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { StringIO } from "@blazetrails/ruby-compat/string-io";
+import { URI } from "@blazetrails/ruby-compat/uri/common";
+import { rbObjDup } from "@blazetrails/ruby-compat/include";
+import { rbProcCall } from "@blazetrails/ruby-compat/object";
+import type { Generic } from "@blazetrails/ruby-compat/uri/generic";
 import {
   GET,
   HTTP_HOST,

@@ -1,4 +1,4 @@
-import { fetch } from "@blazetrails/ruby-compat";
+import { fetch } from "@blazetrails/ruby-compat/hash";
 import { MIME_TYPES } from "./mime-types.js";
 
 export { MIME_TYPES };

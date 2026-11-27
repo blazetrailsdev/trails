@@ -1,4 +1,4 @@
-import type { TCPSocket } from "@blazetrails/ruby-compat";
+import type { TCPSocket } from "@blazetrails/ruby-compat/socket";
 import type { RackHeaders, RackResponse } from "@blazetrails/rack";
 import { describe, expectTypeOf, it } from "vitest";
 

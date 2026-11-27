@@ -1,20 +1,18 @@
+import { hashDelete, eachPair, hashAref } from "@blazetrails/ruby-compat/hash";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { getCrypto } from "@blazetrails/ruby-compat/crypto-adapter";
+import { kernelRand } from "@blazetrails/ruby-compat/kernel-rand";
+import { NotImplementedError } from "@blazetrails/ruby-compat/not-implemented-error";
+import { SecureRandom } from "@blazetrails/ruby-compat/secure-random";
+import { verbose } from "@blazetrails/ruby-compat/verbose";
 import {
-  hashDelete,
-  ArgumentError,
-  getCrypto,
-  kernelRand,
-  NotImplementedError,
-  SecureRandom,
-  verbose,
   rbInspect as inspect,
   rbObjClassname,
-  KeyError,
-  eachPair,
   rbProcCall,
-  hashAref,
   TopLevel,
-  isModuleIncluded,
-} from "@blazetrails/ruby-compat";
+} from "@blazetrails/ruby-compat/object";
+import { KeyError } from "@blazetrails/ruby-compat/key-error";
+import { isModuleIncluded } from "@blazetrails/ruby-compat/include";
 import { Time } from "@blazetrails/date";
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
 import { RACK_ERRORS, Request, Raw } from "@blazetrails/rack";

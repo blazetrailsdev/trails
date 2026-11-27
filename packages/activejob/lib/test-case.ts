@@ -1,6 +1,6 @@
 import { runLoadHooks } from "@blazetrails/activesupport";
 import { TestCase as ActiveSupportTestCase } from "@blazetrails/activesupport/test-case";
-import { include } from "@blazetrails/ruby-compat";
+import { include } from "@blazetrails/ruby-compat/include";
 import { ActiveJob } from "./namespaces.js";
 import { TestHelper } from "./test-helper.js";
 import "./constants.test-case.generated.js";

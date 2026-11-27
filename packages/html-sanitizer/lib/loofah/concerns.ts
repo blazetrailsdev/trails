@@ -5,7 +5,7 @@ import {
   type Html5Node,
   type NodeSet,
 } from "@blazetrails/nokogiri";
-import { rbInspect } from "@blazetrails/ruby-compat";
+import { rbInspect } from "@blazetrails/ruby-compat/object";
 
 import { Scrubber, ScrubberNotFound } from "./scrubber.js";
 import { Scrubbers } from "./scrubbers.js";

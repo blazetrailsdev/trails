@@ -1,4 +1,4 @@
-import { stringSplit } from "@blazetrails/ruby-compat";
+import { stringSplit } from "@blazetrails/ruby-compat/string/split";
 import { Rack } from "./namespaces.js";
 export class MediaType {
   static SPLIT_PATTERN = /[;,]/;

@@ -1,6 +1,6 @@
 import { TopLevel } from "@blazetrails/ruby-compat";
 
-declare module "@blazetrails/ruby-compat" {
+declare module "@blazetrails/ruby-compat/object" {
   interface TopLevelConstants {
     ApplicationHelper?: typeof ApplicationHelper;
   }

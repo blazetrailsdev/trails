@@ -1,5 +1,5 @@
 import * as ts from "typescript/unstable/ast";
-import { File } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat/file";
 import { walk, type ClassInfo } from "./walker.js";
 import { resolveAssociationTarget } from "./resolve-target.js";
 import { tsApi } from "./ts-api.js";

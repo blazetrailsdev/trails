@@ -1,4 +1,7 @@
-import { Dir, File, FileUtils, Pathname } from "@blazetrails/ruby-compat";
+import { Dir } from "@blazetrails/ruby-compat/dir";
+import { File } from "@blazetrails/ruby-compat/file";
+import { FileUtils } from "@blazetrails/ruby-compat/file-utils";
+import { Pathname } from "@blazetrails/ruby-compat/pathname";
 
 import * as ts from "typescript/unstable/ast";
 import { tsApi } from "./type-virtualization/ts-api.js";

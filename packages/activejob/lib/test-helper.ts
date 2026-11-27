@@ -16,26 +16,23 @@ import {
   _assertNothingRaisedOrWarn,
 } from "@blazetrails/activesupport/testing/assertions";
 import { Time } from "@blazetrails/date";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { aryDelete } from "@blazetrails/ruby-compat/array";
+import { Range } from "@blazetrails/ruby-compat/range";
+import { classModule } from "@blazetrails/ruby-compat/class-module";
+import { fetch } from "@blazetrails/ruby-compat/hash";
+import { include, rbCallSuper, rbObjDup } from "@blazetrails/ruby-compat/include";
+import { rbEql, rbEqual } from "@blazetrails/ruby-compat/rb-equal";
+import { rbGetKwargs } from "@blazetrails/ruby-compat/keyword-splat";
 import {
-  ArgumentError,
-  aryDelete,
-  Range,
-  classModule,
-  fetch,
-  include,
-  rbCallSuper,
-  rbEql,
-  rbEqual,
-  rbGetKwargs,
   rbInspect,
   rbModName,
   rbObjClass,
-  rbObjDup,
   rbObjIsProc,
   rbObjRespondTo,
-  toF,
   toS,
-} from "@blazetrails/ruby-compat";
+} from "@blazetrails/ruby-compat/object";
+import { toF } from "@blazetrails/ruby-compat/numeric";
 import { Base } from "./base.js";
 import { Arguments } from "./arguments.js";
 import { TestAdapter } from "./queue-adapters/test-adapter.js";

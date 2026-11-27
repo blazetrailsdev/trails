@@ -1,4 +1,4 @@
-import { CGI } from "@blazetrails/ruby-compat";
+import { CGI } from "@blazetrails/ruby-compat/cgi";
 import { usesLibxml, type Html5Document, type Html5Node } from "@blazetrails/nokogiri";
 
 import { Crass } from "../../crass.js";

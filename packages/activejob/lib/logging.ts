@@ -6,15 +6,10 @@ import {
   Logger,
   TaggedLogging,
 } from "@blazetrails/activesupport";
-import {
-  block as rbBlock,
-  defineModule,
-  rbCallSuper,
-  rbModName,
-  rbObjClass,
-  rbObjRespondTo,
-  STDOUT,
-} from "@blazetrails/ruby-compat";
+import { block as rbBlock } from "@blazetrails/ruby-compat/hash";
+import { defineModule, rbCallSuper } from "@blazetrails/ruby-compat/include";
+import { rbModName, rbObjClass, rbObjRespondTo } from "@blazetrails/ruby-compat/object";
+import { STDOUT } from "@blazetrails/ruby-compat/io";
 
 interface TaggedLike {
   tagged(...tags: unknown[]): unknown;

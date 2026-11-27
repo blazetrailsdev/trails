@@ -1,7 +1,9 @@
 import type { ConfiguredJob } from "./configured-job.js";
 import { constantize, I18n, seconds, zone } from "@blazetrails/activesupport";
 import { Time } from "@blazetrails/date";
-import { NoMethodError, rbModName, rbObjClass, toF, toI } from "@blazetrails/ruby-compat";
+import { NoMethodError } from "@blazetrails/ruby-compat/no-method-error";
+import { rbModName, rbObjClass } from "@blazetrails/ruby-compat/object";
+import { toF, toI } from "@blazetrails/ruby-compat/numeric";
 import { Arguments } from "./arguments.js";
 import { ActiveJob } from "./namespaces.js";
 

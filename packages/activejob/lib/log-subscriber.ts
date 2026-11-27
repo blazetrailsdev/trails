@@ -11,25 +11,22 @@ import {
 } from "@blazetrails/activesupport";
 import { GlobalID } from "@blazetrails/globalid";
 import { Time } from "@blazetrails/date";
+import { excBacktrace } from "@blazetrails/ruby-compat/backtrace-location";
+import { Hash, transformValues } from "@blazetrails/ruby-compat/hash";
+import { rbFArray } from "@blazetrails/ruby-compat/array";
 import {
-  excBacktrace,
-  Hash,
-  rbFArray,
   rbInspect,
   rbModName,
   rbObjAsString,
   rbObjClass,
-  rbObjIsKindOf,
-  round,
-  StandardError,
-  Exception,
   rtest,
-  toI,
-  transformValues,
-  sortBy,
-  tally,
   rbModToS,
-} from "@blazetrails/ruby-compat";
+} from "@blazetrails/ruby-compat/object";
+import { rbObjIsKindOf } from "@blazetrails/ruby-compat/include";
+import { round, toI } from "@blazetrails/ruby-compat/numeric";
+import { StandardError } from "@blazetrails/ruby-compat/standard-error";
+import { Exception } from "@blazetrails/ruby-compat/exception";
+import { sortBy, tally } from "@blazetrails/ruby-compat/enumerable";
 import { verboseEnqueueLogs } from "./active-job.js";
 import { Base } from "./base.js";
 import { ActiveJob } from "./namespaces.js";

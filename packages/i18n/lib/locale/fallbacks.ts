@@ -1,4 +1,9 @@
-import { rbInspect, rbObjClassname, rbSetClassPathString, toSym } from "@blazetrails/ruby-compat";
+import {
+  rbInspect,
+  rbObjClassname,
+  rbSetClassPathString,
+  toSym,
+} from "@blazetrails/ruby-compat/object";
 import { InvalidLocale, Disabled } from "../exceptions.js";
 import { type Locale } from "../i18n.js";
 import { tag as tagFor } from "./tag.js";

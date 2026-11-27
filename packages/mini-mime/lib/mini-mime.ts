@@ -229,7 +229,7 @@ export const MiniMime = {
 };
 TopLevel.MiniMime = MiniMime;
 
-declare module "@blazetrails/ruby-compat" {
+declare module "@blazetrails/ruby-compat/object" {
   interface TopLevelConstants {
     MiniMime?: typeof MiniMime;
   }

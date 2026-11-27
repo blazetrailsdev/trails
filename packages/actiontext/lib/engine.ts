@@ -27,7 +27,7 @@ declare module "@blazetrails/trailties/trailtie/configuration" {
   }
 }
 
-declare module "@blazetrails/ruby-compat" {
+declare module "@blazetrails/ruby-compat/object" {
   interface TrailsConfiguration {
     actionText: ActionTextConfig;
   }

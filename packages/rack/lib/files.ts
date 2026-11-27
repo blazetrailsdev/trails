@@ -1,4 +1,6 @@
-import { File, IO, Range } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat/file";
+import { IO } from "@blazetrails/ruby-compat/io";
+import { Range } from "@blazetrails/ruby-compat/range";
 import { CONTENT_TYPE, CONTENT_LENGTH } from "./constants.js";
 import { mimeType as lookupMime } from "./mime.js";
 import { Request } from "./request.js";

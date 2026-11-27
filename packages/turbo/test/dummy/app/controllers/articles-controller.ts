@@ -3,7 +3,7 @@ import { RuntimeError, TopLevel } from "@blazetrails/ruby-compat";
 import { Article } from "../models/article.js";
 import { ApplicationController } from "./application-controller.js";
 
-declare module "@blazetrails/ruby-compat" {
+declare module "@blazetrails/ruby-compat/object" {
   interface TopLevelConstants {
     ArticlesController?: typeof ArticlesController;
   }

@@ -1,4 +1,9 @@
-import { Dir, File, Hash, rbObjIsKindOf, rbProcCall, regexpEscape } from "@blazetrails/ruby-compat";
+import { Dir } from "@blazetrails/ruby-compat/dir";
+import { File } from "@blazetrails/ruby-compat/file";
+import { Hash } from "@blazetrails/ruby-compat/hash";
+import { rbObjIsKindOf } from "@blazetrails/ruby-compat/include";
+import { rbProcCall } from "@blazetrails/ruby-compat/object";
+import { regexpEscape } from "@blazetrails/ruby-compat/regexp";
 import { CACHE_CONTROL, CONTENT_TYPE } from "./constants.js";
 import { Files } from "./files.js";
 import { mimeType } from "./mime.js";

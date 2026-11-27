@@ -1,5 +1,5 @@
 import type { RackHeaders } from "./index.js";
-import { rbObjRespondTo, rbProcCall } from "@blazetrails/ruby-compat";
+import { rbObjRespondTo, rbProcCall } from "@blazetrails/ruby-compat/object";
 import { Time } from "@blazetrails/date";
 import { REQUEST_METHOD, ETAG, CONTENT_TYPE, CONTENT_LENGTH } from "./constants.js";
 import type { RackApp } from "./mock-request.js";

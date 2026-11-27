@@ -12,7 +12,7 @@ export type { ServerOptions } from "./server.js";
 const Rackup = { name: "Rackup", VERSION, Handler, Lobster, Server, Stream };
 TopLevel.Rackup = Rackup;
 
-declare module "@blazetrails/ruby-compat" {
+declare module "@blazetrails/ruby-compat/object" {
   interface TopLevelConstants {
     Rackup?: typeof Rackup;
   }

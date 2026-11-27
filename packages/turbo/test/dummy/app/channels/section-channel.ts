@@ -3,7 +3,7 @@ import { Broadcasts } from "../../../../lib/app/channels/turbo/streams/broadcast
 import { StreamName } from "../../../../lib/app/channels/turbo/streams/stream-name.js";
 import { ApplicationCable } from "./application-cable/channel.js";
 
-declare module "@blazetrails/ruby-compat" {
+declare module "@blazetrails/ruby-compat/object" {
   interface TopLevelConstants {
     SectionChannel?: typeof SectionChannel;
   }

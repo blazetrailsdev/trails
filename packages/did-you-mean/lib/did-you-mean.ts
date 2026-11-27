@@ -1,4 +1,7 @@
-import { Hash, rbClassInheritedP, toS, warn, TopLevel } from "@blazetrails/ruby-compat";
+import { Hash } from "@blazetrails/ruby-compat/hash";
+import { rbClassInheritedP } from "@blazetrails/ruby-compat/include";
+import { toS, TopLevel } from "@blazetrails/ruby-compat/object";
+import { warn } from "@blazetrails/ruby-compat/kernel-warn";
 import { prepend } from "@blazetrails/ruby-compat/include";
 import * as DidYouMean from "./did-you-mean.js";
 import { Correctable } from "./core-ext/name-error.js";
@@ -65,7 +68,7 @@ export function setFormatter<T extends FormatterLike | null>(formatter: T): T {
 
 TopLevel.DidYouMean = DidYouMean;
 
-declare module "@blazetrails/ruby-compat" {
+declare module "@blazetrails/ruby-compat/object" {
   interface TopLevelConstants {
     DidYouMean?: typeof DidYouMean;
   }

@@ -1,5 +1,5 @@
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
-import { ArgumentError } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
 import { GlobalID } from "./global-id.js";
 
 export class Verifier extends MessageVerifier {

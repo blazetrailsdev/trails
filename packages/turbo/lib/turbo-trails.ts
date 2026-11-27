@@ -45,7 +45,7 @@ export const Turbo = {
     "turbo/system_test_helper": () => import("@blazetrails/turbo/system-test-helper"),
     "turbo/test_assertions/integration_test_assertions": () =>
       import("@blazetrails/turbo/test-assertions/integration-test-assertions"),
-  } as Record<string, () => Promise<unknown>>,
+  },
 
   setSignedStreamVerifierKey(signedStreamVerifierKey: string | Uint8Array | null): void {
     this._signedStreamVerifierKey = signedStreamVerifierKey;
@@ -132,7 +132,7 @@ Turbo.Native = {};
 Turbo.Streams = {};
 TopLevel.Turbo = Turbo;
 
-declare module "@blazetrails/ruby-compat" {
+declare module "@blazetrails/ruby-compat/object" {
   interface TopLevelConstants {
     Turbo?: typeof Turbo;
   }

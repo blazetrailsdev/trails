@@ -1,7 +1,7 @@
 import { LoadError } from "@blazetrails/ruby-compat/load-error";
 import { rbClearMethodCache } from "@blazetrails/ruby-compat/method-cache";
 
-declare module "@blazetrails/ruby-compat" {
+declare module "@blazetrails/ruby-compat/load-error" {
   interface LoadError {
     isMissing(location: string): boolean;
   }

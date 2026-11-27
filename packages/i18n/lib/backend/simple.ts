@@ -7,7 +7,10 @@ import {
   type Locale,
   type TranslationKey,
 } from "../i18n.js";
-import { Hash, hashAref, include, isSymbol, toSym } from "@blazetrails/ruby-compat";
+import { Hash, hashAref } from "@blazetrails/ruby-compat/hash";
+import { include } from "@blazetrails/ruby-compat/include";
+import { isSymbol } from "@blazetrails/ruby-compat/symbol";
+import { toSym } from "@blazetrails/ruby-compat/object";
 import { deepMergeBang, deepSymbolizeKeys, except, type TranslationData } from "../utils.js";
 import { Base, type TranslateOptions } from "./base.js";
 

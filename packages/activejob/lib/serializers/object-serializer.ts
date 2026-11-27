@@ -1,4 +1,7 @@
-import { NotImplementedError, rbModName, rbObjIsKindOf, update } from "@blazetrails/ruby-compat";
+import { NotImplementedError } from "@blazetrails/ruby-compat/not-implemented-error";
+import { rbModName } from "@blazetrails/ruby-compat/object";
+import { rbObjIsKindOf } from "@blazetrails/ruby-compat/include";
+import { update } from "@blazetrails/ruby-compat/hash";
 import { ActiveJob, Serializers } from "../namespaces.js";
 
 export class ObjectSerializer {

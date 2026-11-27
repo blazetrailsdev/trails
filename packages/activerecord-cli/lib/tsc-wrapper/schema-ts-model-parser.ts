@@ -1,7 +1,7 @@
 import * as ts from "typescript/unstable/ast";
 import { tsApi } from "../type-virtualization/ts-api.js";
 import { singularize } from "@blazetrails/activesupport";
-import { getCrypto } from "@blazetrails/ruby-compat";
+import { getCrypto } from "@blazetrails/ruby-compat/crypto-adapter";
 import { ForeignKeyDefinition, type ReferentialAction } from "@blazetrails/activerecord";
 import type { IntrospectedTable } from "../model-codegen.js";
 import {

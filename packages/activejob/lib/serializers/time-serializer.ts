@@ -1,5 +1,5 @@
 import { Time } from "@blazetrails/date";
-import { hashAref } from "@blazetrails/ruby-compat";
+import { hashAref } from "@blazetrails/ruby-compat/hash";
 import { Serializers } from "../namespaces.js";
 import { TimeObjectSerializer } from "./time-object-serializer.js";
 

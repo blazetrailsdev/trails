@@ -100,7 +100,7 @@ import "./constants.generated.js";
 
 TopLevel.MiniMagick = MiniMagick;
 
-declare module "@blazetrails/ruby-compat" {
+declare module "@blazetrails/ruby-compat/object" {
   interface TopLevelConstants {
     MiniMagick?: typeof MiniMagick;
   }

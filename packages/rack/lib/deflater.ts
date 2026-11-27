@@ -1,4 +1,6 @@
-import { File, GzipWriter, rbProcCall } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat/file";
+import { GzipWriter } from "@blazetrails/ruby-compat/zlib-adapter";
+import { rbProcCall } from "@blazetrails/ruby-compat/object";
 import { Time } from "@blazetrails/date";
 import { BodyProxy } from "./body-proxy.js";
 import { Request } from "./request.js";

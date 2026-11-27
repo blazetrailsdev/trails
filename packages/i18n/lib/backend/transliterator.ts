@@ -1,4 +1,5 @@
-import { TopLevel, isSymbol, symbolToS } from "@blazetrails/ruby-compat";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
+import { isSymbol, symbolToS } from "@blazetrails/ruby-compat/symbol";
 import type { Locale } from "../i18n.js";
 import type { Base } from "./base.js";
 

@@ -1,5 +1,6 @@
 import { squish, TopLevel } from "@blazetrails/activesupport";
-import { rbCallSuper, rbModName, rbObjClass } from "@blazetrails/ruby-compat";
+import { rbCallSuper } from "@blazetrails/ruby-compat/include";
+import { rbModName, rbObjClass } from "@blazetrails/ruby-compat/object";
 import { deprecator } from "./deprecator.js";
 import { ActiveJob } from "./namespaces.js";
 

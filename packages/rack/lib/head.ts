@@ -1,6 +1,6 @@
 import type { RackHeaders } from "./index.js";
-import { rbObjRespondTo, rbProcCall } from "@blazetrails/ruby-compat";
-import type { Method } from "@blazetrails/ruby-compat";
+import { rbObjRespondTo, rbProcCall } from "@blazetrails/ruby-compat/object";
+import type { Method } from "@blazetrails/ruby-compat/method";
 import { REQUEST_METHOD, HEAD as HEAD_METHOD } from "./constants.js";
 import type { RackApp } from "./mock-request.js";
 import { Rack } from "./namespaces.js";

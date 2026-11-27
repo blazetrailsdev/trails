@@ -1,15 +1,12 @@
 import { classAttribute, Concern, extend } from "@blazetrails/activesupport";
-import {
-  aryCount,
-  classModule,
-  flatten,
-  groupBy,
-  rbBlockGivenP,
-  rbObjIsKindOf,
-  rbObjRespondTo,
-  StandardError,
-  toF,
-} from "@blazetrails/ruby-compat";
+import { aryCount, flatten } from "@blazetrails/ruby-compat/array";
+import { classModule } from "@blazetrails/ruby-compat/class-module";
+import { groupBy } from "@blazetrails/ruby-compat/enumerable";
+import { rbBlockGivenP } from "@blazetrails/ruby-compat/hash";
+import { rbObjIsKindOf } from "@blazetrails/ruby-compat/include";
+import { rbObjRespondTo } from "@blazetrails/ruby-compat/object";
+import { StandardError } from "@blazetrails/ruby-compat/standard-error";
+import { toF } from "@blazetrails/ruby-compat/numeric";
 import { ActiveJob } from "./namespaces.js";
 
 export class EnqueueError extends StandardError {}

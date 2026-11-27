@@ -1,4 +1,4 @@
-import type { TCPSocket } from "@blazetrails/ruby-compat";
+import type { TCPSocket } from "@blazetrails/ruby-compat/socket";
 
 export { VERSION, RELEASE, release } from "./version.js";
 

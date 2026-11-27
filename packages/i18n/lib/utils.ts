@@ -2,9 +2,9 @@ import {
   Hash,
   block as rbBlock,
   except as hashExcept,
-  rbObjDup,
   update,
-} from "@blazetrails/ruby-compat";
+} from "@blazetrails/ruby-compat/hash";
+import { rbObjDup } from "@blazetrails/ruby-compat/include";
 import * as Utils from "./utils.js";
 
 export type TranslationData = Hash<unknown, unknown>;

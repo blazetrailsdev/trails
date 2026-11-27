@@ -158,7 +158,7 @@ export async function writeArtifacts(
   );
   await fs.writeFile!(
     File.join(dir, "constants.generated.d.ts"),
-    `declare module "@blazetrails/ruby-compat" {\n  interface ConstantTable {\n${types.join("\n")}\n  }\n}\n\nexport {};\n`,
+    `declare module "@blazetrails/ruby-compat/object" {\n  interface ConstantTable {\n${types.join("\n")}\n  }\n}\n\nexport {};\n`,
   );
   return dir;
 }

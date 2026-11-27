@@ -1,16 +1,10 @@
 import { classAttribute, Concern, Duration, extend, seconds } from "@blazetrails/activesupport";
-import {
-  block,
-  classModule,
-  Kernel,
-  rbBlockGivenP,
-  rbInspect,
-  rbObjClass,
-  rbObjDup,
-  slice,
-  RuntimeError,
-  StandardError,
-} from "@blazetrails/ruby-compat";
+import { block, rbBlockGivenP, slice } from "@blazetrails/ruby-compat/hash";
+import { classModule } from "@blazetrails/ruby-compat/class-module";
+import { Kernel, rbObjDup } from "@blazetrails/ruby-compat/include";
+import { rbInspect, rbObjClass } from "@blazetrails/ruby-compat/object";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
+import { StandardError } from "@blazetrails/ruby-compat/standard-error";
 import { ActiveJob } from "./namespaces.js";
 
 type AfterDiscardProc = {

@@ -15,11 +15,14 @@ type Store = Map<IsolatedKey, unknown>;
 
 type IsolationLevel = "thread" | "fiber";
 
-declare module "@blazetrails/ruby-compat" {
+declare module "@blazetrails/ruby-compat/thread" {
   interface Thread {
     activeSupportExecutionState(): Store | null;
     setActiveSupportExecutionState(value: Store | null): Store | null;
   }
+}
+
+declare module "@blazetrails/ruby-compat/fiber" {
   interface Fiber {
     activeSupportExecutionState(): Store | null;
     setActiveSupportExecutionState(value: Store | null): Store | null;

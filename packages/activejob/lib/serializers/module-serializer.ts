@@ -1,5 +1,7 @@
 import { constantize } from "@blazetrails/activesupport";
-import { Module, hashAref, rbModName } from "@blazetrails/ruby-compat";
+import { Module } from "@blazetrails/ruby-compat/include";
+import { hashAref } from "@blazetrails/ruby-compat/hash";
+import { rbModName } from "@blazetrails/ruby-compat/object";
 import { ActiveJob, Serializers } from "../namespaces.js";
 import { ObjectSerializer } from "./object-serializer.js";
 

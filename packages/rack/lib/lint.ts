@@ -1,26 +1,23 @@
+import { File } from "@blazetrails/ruby-compat/file";
+import { b } from "@blazetrails/ruby-compat/string/b";
 import {
-  File,
-  b,
   basicObjRespondTo,
-  rbCheckArrayType,
-  each,
-  rbEqual,
   rbInspect,
   rbObjClassname,
   rbObjRespondTo,
-  stringInspect,
-  RuntimeError,
   rbObjAsString,
-  rbToHashType,
-  Hash,
-  eachPair,
-  rbObjIsKindOf,
-  IO,
-  Encoding,
-  toEnum,
   rbProcCall,
-  rbClearMethodCache,
-} from "@blazetrails/ruby-compat";
+} from "@blazetrails/ruby-compat/object";
+import { rbCheckArrayType, each } from "@blazetrails/ruby-compat/array";
+import { rbEqual } from "@blazetrails/ruby-compat/rb-equal";
+import { stringInspect } from "@blazetrails/ruby-compat/string/inspect";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
+import { rbToHashType, Hash, eachPair } from "@blazetrails/ruby-compat/hash";
+import { rbObjIsKindOf } from "@blazetrails/ruby-compat/include";
+import { IO } from "@blazetrails/ruby-compat/io";
+import { Encoding } from "@blazetrails/ruby-compat/encoding";
+import { toEnum } from "@blazetrails/ruby-compat/enumerator";
+import { rbClearMethodCache } from "@blazetrails/ruby-compat/method-cache";
 import type { RackApp } from "./mock-request.js";
 import { URI_PARSER } from "./utils.js";
 import {

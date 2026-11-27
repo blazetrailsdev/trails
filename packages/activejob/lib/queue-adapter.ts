@@ -8,16 +8,15 @@ import {
   tryCall,
   underscore,
 } from "@blazetrails/activesupport";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { classModule } from "@blazetrails/ruby-compat/class-module";
+import { rbCModule, rbObjIsKindOf } from "@blazetrails/ruby-compat/include";
 import {
-  ArgumentError,
-  classModule,
-  rbCModule,
   rbClassSuperclass,
   rbModName,
   rbObjClass,
-  rbObjIsKindOf,
   rbObjRespondTo,
-} from "@blazetrails/ruby-compat";
+} from "@blazetrails/ruby-compat/object";
 import { ActiveJob, QueueAdapters } from "./namespaces.js";
 
 interface QueueAdapterClass {

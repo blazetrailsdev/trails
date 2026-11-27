@@ -1,6 +1,10 @@
 import { defineModule, include, isPlainObject } from "@blazetrails/activesupport";
 import { escape, escapePath, unescape } from "@blazetrails/rack";
-import { ArgumentError, Encoding, StringIO, b, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { Encoding } from "@blazetrails/ruby-compat/encoding";
+import { StringIO } from "@blazetrails/ruby-compat/string-io";
+import { b } from "@blazetrails/ruby-compat/string/b";
+import { rbObjRespondTo } from "@blazetrails/ruby-compat/object";
 import { UploadedFile } from "./uploaded-file.js";
 import { END_BOUNDARY, START_BOUNDARY, Session } from "./test.js";
 

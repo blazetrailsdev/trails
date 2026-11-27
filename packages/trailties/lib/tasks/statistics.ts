@@ -8,7 +8,7 @@ import { stdout } from "@blazetrails/ruby-compat/process-adapter";
 import { CodeStatistics, DIRECTORIES, type DirectoryPair } from "../code-statistics.js";
 import { deprecator } from "../deprecator.js";
 
-declare module "@blazetrails/ruby-compat" {
+declare module "@blazetrails/ruby-compat/object" {
   interface TopLevelConstants {
     STATS_DIRECTORIES?: DirectoryPair[];
   }

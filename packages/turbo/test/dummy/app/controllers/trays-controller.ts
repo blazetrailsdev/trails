@@ -1,7 +1,7 @@
 import { TopLevel } from "@blazetrails/ruby-compat";
 import { ApplicationController } from "./application-controller.js";
 
-declare module "@blazetrails/ruby-compat" {
+declare module "@blazetrails/ruby-compat/object" {
   interface TopLevelConstants {
     TraysController?: typeof TraysController;
   }

@@ -1,5 +1,5 @@
 import { Date, dNewByFrags } from "@blazetrails/date";
-import { hashAref } from "@blazetrails/ruby-compat";
+import { hashAref } from "@blazetrails/ruby-compat/hash";
 import { Serializers } from "../namespaces.js";
 import { ObjectSerializer } from "./object-serializer.js";
 

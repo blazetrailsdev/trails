@@ -1,4 +1,4 @@
-import { TopLevel } from "@blazetrails/ruby-compat";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
 import { BadRequest } from "./bad-request.js";
 import { Mime } from "./mime.js";
 import { QueryParser } from "./query-parser.js";
@@ -16,7 +16,7 @@ Rack.Mime = Mime;
 Rack.QueryParser = QueryParser;
 TopLevel.Rack = Rack;
 
-declare module "@blazetrails/ruby-compat" {
+declare module "@blazetrails/ruby-compat/object" {
   interface TopLevelConstants {
     Rack?: typeof Rack;
   }

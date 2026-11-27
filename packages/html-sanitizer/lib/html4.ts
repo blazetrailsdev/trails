@@ -1,4 +1,4 @@
-import { extend } from "@blazetrails/ruby-compat";
+import { extend } from "@blazetrails/ruby-compat/include";
 import "./html5.js";
 import {
   HTML4FullSanitizer,

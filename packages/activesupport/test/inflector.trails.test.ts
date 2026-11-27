@@ -8,7 +8,7 @@ import { constSet, constDefined } from "@blazetrails/ruby-compat/include";
 import { TopLevel } from "@blazetrails/ruby-compat/object";
 import { rbModRemoveConst } from "@blazetrails/ruby-compat/variable";
 
-declare module "@blazetrails/ruby-compat" {
+declare module "@blazetrails/ruby-compat/object" {
   interface ConstantTable {
     "Typed::Literal": typeof Date;
   }

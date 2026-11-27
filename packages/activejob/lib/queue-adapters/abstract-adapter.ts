@@ -1,4 +1,4 @@
-import { NotImplementedError } from "@blazetrails/ruby-compat";
+import { NotImplementedError } from "@blazetrails/ruby-compat/not-implemented-error";
 import { QueueAdapters } from "../namespaces.js";
 
 export class AbstractAdapter {

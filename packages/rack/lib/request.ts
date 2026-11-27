@@ -33,17 +33,11 @@ import {
   RACK_REQUEST_COOKIE_STRING,
 } from "./constants.js";
 import { forwardedValues, defaultQueryParser, parseCookiesHeader, QueryParser } from "./utils.js";
-import type { Enumerator } from "@blazetrails/ruby-compat";
-import {
-  block as rbBlock,
-  fetch,
-  hashDelete,
-  hashReplace,
-  include,
-  rbObjDup,
-  toEnum,
-  strNew,
-} from "@blazetrails/ruby-compat";
+import type { Enumerator } from "@blazetrails/ruby-compat/enumerator";
+import { block as rbBlock, fetch, hashDelete, hashReplace } from "@blazetrails/ruby-compat/hash";
+import { include, rbObjDup } from "@blazetrails/ruby-compat/include";
+import { toEnum } from "@blazetrails/ruby-compat/enumerator";
+import { strNew } from "@blazetrails/ruby-compat/string/bytes";
 import { warn } from "@blazetrails/ruby-compat/kernel-warn";
 import { MediaType } from "./media-type.js";
 import * as Multipart from "./multipart.js";

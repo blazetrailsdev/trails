@@ -1,5 +1,6 @@
 import { Concern, extend, Notifications } from "@blazetrails/activesupport";
-import { block, defineModule, rbCallSuper } from "@blazetrails/ruby-compat";
+import { block } from "@blazetrails/ruby-compat/hash";
+import { defineModule, rbCallSuper } from "@blazetrails/ruby-compat/include";
 import { ActiveJob } from "./namespaces.js";
 
 interface InstrumentationJob {

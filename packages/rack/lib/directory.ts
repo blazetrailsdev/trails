@@ -1,12 +1,10 @@
-import {
-  Dir,
-  File,
-  rbObjMethod,
-  regexpEscape,
-  sprintf,
-  stringSplit,
-} from "@blazetrails/ruby-compat";
-import type { FsStatResult } from "@blazetrails/ruby-compat";
+import { Dir } from "@blazetrails/ruby-compat/dir";
+import { File } from "@blazetrails/ruby-compat/file";
+import { rbObjMethod } from "@blazetrails/ruby-compat/method";
+import { regexpEscape } from "@blazetrails/ruby-compat/regexp";
+import { sprintf } from "@blazetrails/ruby-compat/kernel-format";
+import { stringSplit } from "@blazetrails/ruby-compat/string/split";
+import type { FsStatResult } from "@blazetrails/ruby-compat/fs-adapter";
 import { CONTENT_TYPE, CONTENT_LENGTH, PATH_INFO, SCRIPT_NAME } from "./constants.js";
 import { escapeHtml, escapePath, unescapePath, validPath } from "./utils.js";
 import { mimeType } from "./mime.js";

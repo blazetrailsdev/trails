@@ -1,4 +1,4 @@
-import { TopLevel } from "@blazetrails/ruby-compat";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
 export { Config } from "./config.js";
 export { VERSION } from "./version.js";
 export type { ExceptionHandlerLike, MissingInterpolationArgumentHandler } from "./config.js";
@@ -98,7 +98,7 @@ import * as I18n from "./index.js";
 
 TopLevel.I18n = I18n;
 
-declare module "@blazetrails/ruby-compat" {
+declare module "@blazetrails/ruby-compat/object" {
   interface TopLevelConstants {
     I18n?: typeof import("./index.js");
   }

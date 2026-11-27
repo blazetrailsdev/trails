@@ -1,6 +1,8 @@
 import type { RackHeaders } from "./index.js";
 import { ETAG, CACHE_CONTROL } from "./constants.js";
-import { Digest, rbCheckArrayType, rbObjRespondTo, rbProcCall } from "@blazetrails/ruby-compat";
+import { Digest } from "@blazetrails/ruby-compat/digest";
+import { rbCheckArrayType } from "@blazetrails/ruby-compat/array";
+import { rbObjRespondTo, rbProcCall } from "@blazetrails/ruby-compat/object";
 import type { RackApp } from "./mock-request.js";
 import { Rack } from "./namespaces.js";
 

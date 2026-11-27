@@ -1,4 +1,4 @@
-import { TopLevel } from "@blazetrails/ruby-compat";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
 import { currentTimeInstant } from "@blazetrails/activesupport";
 import { InvalidSignature, MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { GID } from "./uri/gid.js";
@@ -190,7 +190,7 @@ export function _resetSignedGlobalIDClassConfig(): void {
 
 TopLevel.SignedGlobalID = SignedGlobalID;
 
-declare module "@blazetrails/ruby-compat" {
+declare module "@blazetrails/ruby-compat/object" {
   interface TopLevelConstants {
     SignedGlobalID?: typeof SignedGlobalID;
   }

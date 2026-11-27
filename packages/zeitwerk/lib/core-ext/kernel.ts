@@ -132,7 +132,7 @@ export async function autoloadGet(cref: Cref): Promise<unknown> {
   return cref.get();
 }
 
-declare module "@blazetrails/ruby-compat" {
+declare module "@blazetrails/ruby-compat/include" {
   interface KernelModule {
     zeitwerkOriginalRequire?: KernelModule["require"];
   }

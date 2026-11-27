@@ -1,5 +1,5 @@
 import { camelize } from "@blazetrails/activesupport";
-import { constGet } from "@blazetrails/ruby-compat";
+import { constGet } from "@blazetrails/ruby-compat/variable";
 import { ActiveJob, QueueAdapters } from "./namespaces.js";
 import "./queue-adapters/abstract-adapter.js";
 import "./queue-adapters/async-adapter.js";

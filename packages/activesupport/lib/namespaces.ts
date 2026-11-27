@@ -117,7 +117,7 @@ interface ParametersInstance {
 
 export { TopLevel } from "@blazetrails/ruby-compat/object";
 
-declare module "@blazetrails/ruby-compat" {
+declare module "@blazetrails/ruby-compat/object" {
   interface TrailsConfiguration {
     generators(): {
       options: { get(namespace: unknown): Record<string, unknown> | undefined };

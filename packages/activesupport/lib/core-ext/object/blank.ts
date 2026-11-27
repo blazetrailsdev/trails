@@ -93,7 +93,7 @@ export class String {
   }
 }
 
-declare module "@blazetrails/ruby-compat" {
+declare module "@blazetrails/ruby-compat/string/method-table" {
   interface StringInstance {
     isBlank(): boolean;
   }

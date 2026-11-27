@@ -1,5 +1,6 @@
 import { Autoload, extend, type Extended } from "@blazetrails/activesupport";
-import { TopLevel, constSet } from "@blazetrails/ruby-compat";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
+import { constSet } from "@blazetrails/ruby-compat/include";
 import type { Base } from "./base.js";
 import type * as ArgumentsModule from "./arguments.js";
 import type * as SerializersModule from "./serializers.js";

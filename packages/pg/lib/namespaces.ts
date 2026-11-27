@@ -96,7 +96,7 @@ export const PG = {
 
 TopLevel.PG = PG;
 
-declare module "@blazetrails/ruby-compat" {
+declare module "@blazetrails/ruby-compat/object" {
   interface TopLevelConstants {
     PG?: typeof PG;
   }

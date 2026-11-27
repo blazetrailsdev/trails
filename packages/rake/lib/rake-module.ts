@@ -66,7 +66,7 @@ export const Rake: {
 
 TopLevel.Rake = Rake;
 
-declare module "@blazetrails/ruby-compat" {
+declare module "@blazetrails/ruby-compat/object" {
   interface TopLevelConstants {
     Rake?: typeof Rake;
   }

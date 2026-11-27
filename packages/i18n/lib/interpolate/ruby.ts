@@ -1,4 +1,5 @@
-import { sprintf, toS, toSym } from "@blazetrails/ruby-compat";
+import { sprintf } from "@blazetrails/ruby-compat/kernel-format";
+import { toS, toSym } from "@blazetrails/ruby-compat/object";
 import { ArgumentError, ReservedInterpolationKey } from "../exceptions.js";
 import { config, reservedKeysPattern } from "../i18n.js";
 

@@ -7,7 +7,7 @@ import {
   RACK_MULTIPART_TEMPFILE_FACTORY,
   RACK_TEMPFILES,
 } from "./constants.js";
-import { include } from "@blazetrails/ruby-compat";
+import { include } from "@blazetrails/ruby-compat/include";
 import { BadRequest } from "./bad-request.js";
 import type { QueryParser } from "./query-parser.js";
 

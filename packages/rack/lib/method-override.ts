@@ -1,5 +1,7 @@
 import type { RackHeaders } from "./index.js";
-import { ArgumentError, toS, upcase, rbProcCall } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { toS, rbProcCall } from "@blazetrails/ruby-compat/object";
+import { upcase } from "@blazetrails/ruby-compat/string/case-mapping";
 import { REQUEST_METHOD, RACK_METHODOVERRIDE_ORIGINAL_METHOD, RACK_ERRORS } from "./constants.js";
 import type { RackApp } from "./mock-request.js";
 import { Request } from "./request.js";

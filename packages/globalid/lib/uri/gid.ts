@@ -1,17 +1,17 @@
 import { HashWithIndifferentAccess, isBlank, underscore } from "@blazetrails/activesupport";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
 import {
-  ArgumentError,
   BadURIError,
-  CGI,
   Error as URIError,
-  Generic,
   InvalidComponentError,
-  rbModName,
-  RFC2396Parser,
-  stringSplit,
   URI,
   Util,
-} from "@blazetrails/ruby-compat";
+} from "@blazetrails/ruby-compat/uri/common";
+import { CGI } from "@blazetrails/ruby-compat/cgi";
+import { Generic } from "@blazetrails/ruby-compat/uri/generic";
+import { rbModName } from "@blazetrails/ruby-compat/object";
+import { RFC2396Parser } from "@blazetrails/ruby-compat/uri/rfc2396-parser";
+import { stringSplit } from "@blazetrails/ruby-compat/string/split";
 
 export { BadURIError, InvalidComponentError };
 

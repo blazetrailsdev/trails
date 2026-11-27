@@ -1,4 +1,6 @@
-import { OpenSSL, rbCallSuper, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { OpenSSL } from "@blazetrails/ruby-compat/openssl";
+import { rbCallSuper } from "@blazetrails/ruby-compat/include";
+import { rbObjRespondTo } from "@blazetrails/ruby-compat/object";
 
 import { InvalidLocaleData } from "../exceptions.js";
 import type { Locale } from "../locale.js";

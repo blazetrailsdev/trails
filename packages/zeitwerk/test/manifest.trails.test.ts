@@ -98,7 +98,7 @@ describe("autoload artifacts", () => {
       expect(imports).toContain(`"X": () => import("../../../x.ts")`);
       expect(imports).not.toContain(`"Admin":`);
       const types = await read("constants.generated.d.ts");
-      expect(types).toContain(`declare module "@blazetrails/ruby-compat"`);
+      expect(types).toContain(`declare module "@blazetrails/ruby-compat/object"`);
       expect(types).toContain(`"Admin": object;`);
       expect(types).toContain(`"X": typeof import("../../../x.js").X;`);
       expect(Object.keys(JSON.parse(await read("manifest.json")))).toEqual([

@@ -7,7 +7,9 @@ import {
   SERVER_NAME,
   SERVER_PORT,
 } from "./constants.js";
-import { ArgumentError, regexpEscape, rbProcCall } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { regexpEscape } from "@blazetrails/ruby-compat/regexp";
+import { rbProcCall } from "@blazetrails/ruby-compat/object";
 import type { RackApp } from "./mock-request.js";
 import { Rack } from "./namespaces.js";
 

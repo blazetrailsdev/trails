@@ -2,7 +2,7 @@ import type { Article } from "./article.js";
 import { TopLevel } from "@blazetrails/ruby-compat";
 import { ApplicationRecord } from "./application-record.js";
 
-declare module "@blazetrails/ruby-compat" {
+declare module "@blazetrails/ruby-compat/object" {
   interface TopLevelConstants {
     Comment?: typeof Comment;
   }

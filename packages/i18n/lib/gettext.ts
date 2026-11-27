@@ -1,4 +1,5 @@
-import { stringSplit, toS } from "@blazetrails/ruby-compat";
+import { stringSplit } from "@blazetrails/ruby-compat/string/split";
+import { toS } from "@blazetrails/ruby-compat/object";
 import type { Helpers } from "./gettext/helpers.js";
 
 const _pluralKeys: Record<string, string[]> = { en: ["one", "other"] };

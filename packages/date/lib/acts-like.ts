@@ -1,4 +1,4 @@
-import { TEMPORAL_METHOD_TABLE } from "@blazetrails/ruby-compat";
+import { TEMPORAL_METHOD_TABLE } from "@blazetrails/ruby-compat/object";
 
 const actsLikeTrue = () => true;
 Object.assign(TEMPORAL_METHOD_TABLE["Temporal.PlainDate"], { actsLikeDate: actsLikeTrue });

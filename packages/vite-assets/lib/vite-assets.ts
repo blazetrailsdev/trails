@@ -316,7 +316,7 @@ ViteAssets.Runner = Runner;
 
 TopLevel.ViteAssets = ViteAssets;
 
-declare module "@blazetrails/ruby-compat" {
+declare module "@blazetrails/ruby-compat/object" {
   interface TopLevelConstants {
     ViteAssets?: typeof ViteAssets;
   }

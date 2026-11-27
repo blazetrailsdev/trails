@@ -3,7 +3,7 @@ import { Message } from "../models/message.js";
 import type { TagBuilder } from "../../../../lib/app/models/turbo/streams/tag-builder.js";
 import { ApplicationController } from "./application-controller.js";
 
-declare module "@blazetrails/ruby-compat" {
+declare module "@blazetrails/ruby-compat/object" {
   interface TopLevelConstants {
     MessagesController?: typeof MessagesController;
   }

@@ -1,13 +1,10 @@
 import { getEnv } from "@blazetrails/activesupport";
 import { Time } from "@blazetrails/date";
-import {
-  ImmediateExecutor,
-  ScheduledTask,
-  SecureRandom,
-  ThreadPoolExecutor,
-  toF,
-  toI,
-} from "@blazetrails/ruby-compat";
+import { ImmediateExecutor } from "@blazetrails/ruby-compat/immediate-executor";
+import { ScheduledTask } from "@blazetrails/ruby-compat/scheduled-task";
+import { SecureRandom } from "@blazetrails/ruby-compat/secure-random";
+import { ThreadPoolExecutor } from "@blazetrails/ruby-compat/thread-pool-executor";
+import { toF, toI } from "@blazetrails/ruby-compat/numeric";
 import { Base } from "../base.js";
 import { QueueAdapters } from "../namespaces.js";
 import { AbstractAdapter } from "./abstract-adapter.js";
