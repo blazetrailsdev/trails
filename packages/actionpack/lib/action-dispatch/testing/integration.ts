@@ -379,7 +379,10 @@ export class Session {
     const controllerResponse = (this.request.controllerInstance as Metal | undefined)?.response;
     const stream = controllerResponse?.stream;
     if (stream instanceof Buffer && !(stream instanceof LiveBuffer)) await stream.awaitBody();
-    else if (stream instanceof ReadableStream && !stream.locked) {
+    /** @inventedArm if — PERMANENT */ else if (
+      stream instanceof ReadableStream &&
+      !stream.locked
+    ) {
       const parts: unknown[] = [];
       for await (const part of stream as ReadableStream<unknown>) parts.push(part);
       await controllerResponse!.setBody(parts);

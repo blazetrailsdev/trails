@@ -248,7 +248,7 @@ export class RackBody {
 
   close(): unknown {
     /** @inventedArm if — PERMANENT */
-    if (this._reader) return this._reader.cancel();
+    if (this._reader) return this._reader.cancel().then(() => this._response.abort());
     return this._response.abort();
   }
 
