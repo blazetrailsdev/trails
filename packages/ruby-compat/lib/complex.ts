@@ -6,6 +6,7 @@ import {
   rbIntegerTypeP,
   rbPlus,
 } from "./numeric.js";
+import { rbCNumeric } from "./numeric-class.js";
 import { rbObjClassname } from "./object.js";
 import { Rational } from "./rational.js";
 import { rbEqual } from "./rb-equal.js";
@@ -84,7 +85,7 @@ function fComplexNew2(x: unknown, y: unknown): Complex {
  * @noRailsEquivalent PERMANENT — Ruby core. Rails defines no Complex; its
  * `Enumerable#sum` tests (`core_ext/enumerable_test.rb:112-115`) sum one.
  */
-export class Complex {
+export class Complex extends rbCNumeric {
   /** `Complex::I` (`vendor/ruby/v3.3.11/complex.c:2638`).
    * @noRailsEquivalent PERMANENT — Ruby core, part of the Complex above. */
   static readonly I = new Complex(0, 1);
@@ -98,7 +99,9 @@ export class Complex {
     /** `Complex#imaginary` (`vendor/ruby/v3.3.11/complex.c:794` `rb_complex_imag`).
      * @noRailsEquivalent PERMANENT — Ruby core, part of the Complex above. */
     readonly imaginary: unknown,
-  ) {}
+  ) {
+    super();
+  }
 
   /** `Complex#imag` (`vendor/ruby/v3.3.11/complex.c:2557`).
    * @noRailsEquivalent PERMANENT — Ruby core, part of the Complex above. */

@@ -10,9 +10,10 @@ import { FloatDomainError } from "./float-domain-error.js";
 import { FrozenError } from "./frozen-error.js";
 import { warn } from "./kernel-warn.js";
 import { rbIntegerTypeP } from "./numeric.js";
+import { rbModDefineMethod } from "./method-cache.js";
+import { rbCFloat, rbCInteger, rbCNumeric } from "./numeric-class.js";
 import {
   rbBuiltinClassName,
-  rbCNumeric,
   rbFSend,
   rbInspect,
   rbObjClassname,
@@ -90,7 +91,7 @@ function floatToR(x: number | bigint): { numerator: bigint; denominator: bigint 
  * inherits Ruby's, and `Date._parse` answers one for a fractional-hour
  * `:offset`, so trails needs the value type to answer the same.
  */
-export class Rational {
+export class Rational extends rbCNumeric {
   /** `vendor/ruby/v3.3.11/rational.c:580` `nurat_numerator` (`Rational#numerator`).
    *
    * Ruby's is an Integer — arbitrary precision — so a `bigint` is the JS
@@ -126,6 +127,7 @@ export class Rational {
    *
    * @noRailsEquivalent PERMANENT — Ruby core, part of the Rational above. */
   constructor(num: number | bigint, den: number | bigint) {
+    super();
     const a = floatToR(num);
     const b = floatToR(den);
     let n = a.numerator * b.denominator;
@@ -605,3 +607,18 @@ function stringToRStrict(self: string): Rational | number {
 }
 
 classpaths.set(Rational, { path: "Rational", permanent: true });
+
+/**
+ * `Integer#to_r` (`vendor/ruby/v3.3.11/rational.c:2148`).
+ * @noRailsEquivalent PERMANENT
+ */
+rbModDefineMethod(rbCInteger, "toR", function (this: number | bigint) {
+  return new Rational(this, 1);
+});
+/**
+ * `Float#to_r` (`vendor/ruby/v3.3.11/rational.c:2199`).
+ * @noRailsEquivalent PERMANENT
+ */
+rbModDefineMethod(rbCFloat, "toR", function (this: unknown) {
+  return new Rational(Number(this), 1);
+});

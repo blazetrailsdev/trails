@@ -4,6 +4,8 @@ import { FloatDomainError } from "./float-domain-error.js";
 import { NameError } from "./name-error.js";
 import { NilClass } from "./nil-class.js";
 import { NoMethodError } from "./no-method-error.js";
+import { rbModDefineMethod } from "./method-cache.js";
+import { rbCFloat, rbCInteger } from "./numeric-class.js";
 import { rbBuiltinClassName, rbInspect, rbObjClassname, toS } from "./object.js";
 import { Rational, ZeroDivisionError } from "./rational.js";
 import { StandardError } from "./standard-error.js";
@@ -795,3 +797,18 @@ export function intDigits(num: number, base: number = 10): number[] {
  * @noRailsEquivalent PERMANENT
  */
 export class MathDomainError extends StandardError {}
+
+/**
+ * `Integer#to_int` (`vendor/ruby/v3.3.11/numeric.rb:255`).
+ * @noRailsEquivalent PERMANENT
+ */
+rbModDefineMethod(rbCInteger, "toInt", function (this: number | bigint) {
+  return this;
+});
+/**
+ * `Float#to_int` (`vendor/ruby/v3.3.11/numeric.c:2597`).
+ * @noRailsEquivalent PERMANENT
+ */
+rbModDefineMethod(rbCFloat, "toInt", function (this: unknown) {
+  return toI(Number(this));
+});

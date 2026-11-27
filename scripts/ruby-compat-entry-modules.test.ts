@@ -52,4 +52,25 @@ describe("ruby-compat entry modules", () => {
     }
     expect(failures).toEqual([]);
   }, 300_000);
+
+  it("seats Init_Rational / Init_Numeric work without include.js", async () => {
+    const files = (await readdir(DIST, { recursive: true })).filter((f) => f.endsWith(".js"));
+    const failures: string[] = [];
+    for (const f of files) {
+      const script = [
+        `await import(${JSON.stringify(`./${f}`)});`,
+        `const { rbFSend } = await import("./object.js");`,
+        `const { rbCNumeric } = await import("./numeric-class.js");`,
+        `const { Rational } = await import("./rational.js");`,
+        `if (Object.getPrototypeOf(Rational) !== rbCNumeric) throw new Error("Rational is not a Numeric");`,
+        `if (!(rbFSend(1, "toR") instanceof Rational)) throw new Error("Integer#to_r is unset");`,
+      ].join("\n");
+      await promisify(execFile)(process.execPath, ["--input-type=module", "-e", script], {
+        cwd: DIST,
+      }).catch((e: { stderr: string }) => {
+        failures.push(`${f}: ${e.stderr.split("\n").find((l) => /Error/.test(l))}`);
+      });
+    }
+    expect(failures).toEqual([]);
+  }, 300_000);
 });

@@ -1,5 +1,6 @@
 import { ArgumentError } from "./argument-error.js";
 import { FloatDomainError } from "./float-domain-error.js";
+import { rbCNumeric } from "./numeric-class.js";
 import { stringValue } from "./string/support.js";
 
 const BASE_FIG = 9;
@@ -31,7 +32,7 @@ type Parsed = {
  *
  * @noRailsEquivalent PERMANENT
  */
-export class BigDecimal {
+export class BigDecimal extends rbCNumeric {
   private _sign: "" | "-";
   private digits: string;
   private exp: number;
@@ -43,6 +44,7 @@ export class BigDecimal {
     value: string | number | bigint | BigDecimal | { numerator: bigint; denominator: bigint },
     ndigits = 0,
   ) {
+    super();
     if (value instanceof BigDecimal) {
       this._sign = value._sign;
       this.digits = value.digits;
