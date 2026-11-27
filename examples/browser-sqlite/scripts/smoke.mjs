@@ -203,6 +203,7 @@ try {
   await page.locator("#generate").click();
   await page.locator("#tree .file", { hasText: "tag.ts" }).first().waitFor({ timeout: 60_000 });
   await page.locator("#tree .file", { hasText: "_create_tags.ts" }).waitFor();
+  await consoleHas(/CreateTags: migrated/);
   await page.locator("#status", { hasText: "Running" }).waitFor({ timeout: 60_000 });
   await page.locator("#repl-input").fill("await Tag.count()");
   await page.locator("#repl-input").press("Enter");
