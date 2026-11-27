@@ -244,6 +244,10 @@ function it(name: string, block: (t: Host) => Promise<void>): void {
   });
 }
 
+it.skip = (name: string, _block: (t: Host) => Promise<void>): void => {
+  test.skip(name, () => {});
+};
+
 describe.concurrent("TestRunnerTest", { timeout: 600_000 }, () => {
   let trailsEnv: string | undefined;
 
