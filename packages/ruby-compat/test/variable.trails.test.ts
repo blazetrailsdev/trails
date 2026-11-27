@@ -209,6 +209,15 @@ describe("rb_mod_constants", () => {
     expect(rbModConstants(Outer)).toEqual(["LIMIT", "Nested"]);
   });
 
+  it("lists TopLevel's constants for Object", () => {
+    constSet(TopLevel, "ConstantsTopLevel", class ConstantsTopLevel {});
+    try {
+      expect(rbModConstants(Object)).toContain("ConstantsTopLevel");
+    } finally {
+      delete (TopLevel as Record<string, unknown>)["ConstantsTopLevel"];
+    }
+  });
+
   it("lists only the receiver's own constants when inherit is false", () => {
     expect(rbModConstants(Child, false)).toEqual(["Own"]);
     expect(rbModConstants(Child, null)).toEqual(["Own"]);

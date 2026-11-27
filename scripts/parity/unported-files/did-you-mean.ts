@@ -7,24 +7,11 @@ import type { UnportedFile } from "./types.js";
 
 export const DID_YOU_MEAN_UNPORTED_FILES: UnportedFile[] = [
   // --- did-you-mean: Ruby-only checkers ---
-  // The DidYouMean port is scoped to the algorithms Rails consumes
-  // (SpellChecker + Jaro/JaroWinkler/Levenshtein). The remaining files
-  // patch Ruby's exception hierarchy (NameError#corrections via
-  // core_ext/name_error.rb), or implement checkers that
-  // suggest names for Ruby-only failure modes — NoMethodError method
-  // names, NameError class/variable names, KeyError keys,
+  // The remaining files implement checkers that suggest names for
+  // Ruby-only failure modes — NoMethodError method names, NameError
+  // variable names, KeyError keys,
   // NoMatchingPatternKeyError keys, $LOAD_PATH require targets. None of
   // these map onto JS errors.
-  {
-    package: "did-you-mean",
-    pattern: "core_ext/name_error.rb",
-    testFile: "core_ext/test_name_error_extension.rb",
-    reason:
-      "Patches Ruby's NameError with `corrections`, `original_message`, " +
-      "`detailed_message`, `spell_checker`. JS has no NameError; trails " +
-      "errors carry their own per-subclass `corrections` getter (see " +
-      "ActionNotFound, ParameterMissing, AssociationNotFoundError, etc.).",
-  },
   {
     package: "did-you-mean",
     pattern: "spell_checkers/key_error_checker.rb",
@@ -38,19 +25,6 @@ export const DID_YOU_MEAN_UNPORTED_FILES: UnportedFile[] = [
     reason:
       "Suggests method names on Ruby NoMethodError using receiver.methods. " +
       "JS has no NoMethodError; undefined property access returns undefined.",
-  },
-  {
-    package: "did-you-mean",
-    pattern: "spell_checkers/name_error_checkers.rb",
-    reason: "Dispatcher for class/variable name checkers; both checkers are Ruby-only (see below).",
-  },
-  {
-    package: "did-you-mean",
-    pattern: "spell_checkers/name_error_checkers/class_name_checker.rb",
-    testFile: "spell_checking/test_class_name_check.rb",
-    reason:
-      "Suggests constant/class names by walking Module#constants + ancestor scopes. " +
-      "Ruby-only — JS has no equivalent constant introspection.",
   },
   {
     package: "did-you-mean",

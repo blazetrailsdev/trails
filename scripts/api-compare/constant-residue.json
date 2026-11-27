@@ -868,10 +868,14 @@
     "residue": { "date.ts::DateInfinity": "Date::Infinity" }
   },
   "did-you-mean": {
-    "rows": 7,
-    "excluded": [],
+    "rows": 9,
+    "excluded": ["spell-checkers/name-error-checkers.ts::NameErrorCheckers"],
     "unwalked": [],
-    "residue": { "spell-checkers/null-checker.ts::NullChecker": "DidYouMean::NullChecker" }
+    "residue": {
+      "core-ext/name-error.ts::Correctable": "DidYouMean::Correctable",
+      "spell-checkers/name-error-checkers/class-name-checker.ts::ClassNameChecker": "DidYouMean::ClassNameChecker",
+      "spell-checkers/null-checker.ts::NullChecker": "DidYouMean::NullChecker"
+    }
   },
   "et-orbi": {
     "rows": 1,

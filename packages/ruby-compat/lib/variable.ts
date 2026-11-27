@@ -320,7 +320,8 @@ export function rbModConstants(mod: object, inherit: unknown = true): string[] {
       : [mod];
   for (const tmp of ancestors) {
     if (tmp === Object && mod !== Object) break;
-    for (const id of Object.keys(tmp)) if (/^[\p{Lu}\p{Lt}]/u.test(id)) tbl.add(id);
+    for (const id of Object.keys(tmp === Object ? TopLevel : tmp))
+      if (/^[\p{Lu}\p{Lt}]/u.test(id)) tbl.add(id);
   }
   return [...tbl];
 }
