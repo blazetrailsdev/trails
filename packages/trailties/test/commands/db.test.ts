@@ -506,9 +506,11 @@ describe("db subcommand CLI actions", { timeout: 30_000 }, () => {
   let logs: string[];
   let errs: string[];
   let origExitCode: typeof process.exitCode;
+  const origTrailsEnv = env.TRAILS_ENV;
   const origRackEnv = env.RACK_ENV;
 
   beforeEach(() => {
+    setEnv("TRAILS_ENV", undefined);
     setEnv("RACK_ENV", undefined);
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-db-cli-"));
     originalCwd = process.cwd();
@@ -536,6 +538,7 @@ describe("db subcommand CLI actions", { timeout: 30_000 }, () => {
   });
 
   afterEach(() => {
+    setEnv("TRAILS_ENV", origTrailsEnv);
     setEnv("RACK_ENV", origRackEnv);
     process.chdir(originalCwd);
     vi.restoreAllMocks();
@@ -1830,6 +1833,7 @@ describe("db command multi-database parity", { timeout: 30_000 }, () => {
   let logs: string[];
   let stdout: string;
   let previousProcessAdapter: ReturnType<typeof getProcessAdapter>;
+  const origTrailsEnv = env.TRAILS_ENV;
   const origRackEnv = env.RACK_ENV;
   const primaryDb = () => path.join(tmpDir, "primary.sqlite3");
   const animalsDb = () => path.join(tmpDir, "animals.sqlite3");
@@ -1882,6 +1886,7 @@ fs.appendFileSync(${JSON.stringify(marker)}, "loaded\\n");`,
   }
 
   beforeEach(() => {
+    setEnv("TRAILS_ENV", undefined);
     setEnv("RACK_ENV", undefined);
     setEnv("TRAILS_ENV", "development");
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-db-multi-"));
@@ -1909,6 +1914,7 @@ fs.appendFileSync(${JSON.stringify(marker)}, "loaded\\n");`,
 
   afterEach(async () => {
     registerProcessAdapter(previousProcessAdapter);
+    setEnv("TRAILS_ENV", origTrailsEnv);
     setEnv("RACK_ENV", origRackEnv);
     setEnv("TRAILS_ENV", undefined);
     setAppPath(undefined);
