@@ -1,4 +1,6 @@
-import { rbForkPayload } from "@blazetrails/ruby-compat";
+import { rbForkPayload, setEnv } from "@blazetrails/ruby-compat";
+
+setEnv("TRAILS_ENV", "test");
 
 if (rbForkPayload() == null) {
   await import("./dummy-environment.js");
