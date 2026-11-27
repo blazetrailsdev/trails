@@ -74,7 +74,8 @@ async function runTaskLogging(task: string, logs: string[]): Promise<void> {
   }
 }
 
-async function runTask(task: string, vars: Record<string, string> = {}): Promise<void> {
+async function runTask(task: string, taskVars: Record<string, string> = {}): Promise<void> {
+  const vars = { TRAILS_ENV: "development", ...taskVars };
   const was = Object.fromEntries(Object.keys(vars).map((k) => [k, env[k]]));
   const seats = DatabaseTasks as unknown as Record<string, unknown>;
   const migratorPathsWas = Migrator.migrationsPaths;
@@ -753,7 +754,7 @@ export class CreatePosts extends Migration.Current {
 };`,
     );
 
-    await runTask("db:environment:set");
+    await runTask("db:environment:set", { TRAILS_ENV: "test" });
 
     const { SQLite3Adapter } =
       await import("@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js");

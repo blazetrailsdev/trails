@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { Dependencies } from "@blazetrails/activesupport";
+import { Dependencies, DescendantsTracker } from "@blazetrails/activesupport";
 import { TestCase } from "@blazetrails/activesupport/test-case";
 import { Isolation } from "@blazetrails/activesupport/testing/isolation";
 import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
@@ -7,7 +7,6 @@ import { capture } from "@blazetrails/activesupport/testing/stream";
 import { File } from "@blazetrails/ruby-compat/file";
 import { include } from "@blazetrails/ruby-compat/include";
 import { constDefined, constGet, constSet, TopLevel } from "@blazetrails/ruby-compat";
-import { descendants, type AnyClass } from "@blazetrails/activesupport/descendants-tracker";
 import { Loader } from "@blazetrails/zeitwerk";
 import { Application } from "../../lib/application.js";
 import { Trails } from "../../lib/trails.js";
@@ -268,7 +267,7 @@ export class User {}
 
     await t.appFile(
       "config/initializers/namespaces.ts",
-      `import { Dependencies } from "@blazetrails/activesupport";
+      `import { Dependencies, DescendantsTracker } from "@blazetrails/activesupport";
 import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { Trails } from "@blazetrails/trailties";
 
@@ -427,16 +426,20 @@ export class Grandchild extends Child {}`,
     );
 
     await boot();
-    const Child = constGet(TopLevel, "Child") as AnyClass;
-    const Grandchild = constGet(TopLevel, "Grandchild") as AnyClass;
+    const Child = constGet(TopLevel, "Child") as Parameters<
+      typeof DescendantsTracker.descendants
+    >[0];
+    const Grandchild = constGet(TopLevel, "Grandchild") as Parameters<
+      typeof DescendantsTracker.descendants
+    >[0];
     expect(Grandchild).toBeTruthy();
 
     expect(Dependencies._autoloadedTrackedClasses).toEqual(new Set([Child, Grandchild]));
-    expect(descendants(Parent)).toEqual([Child, Grandchild]);
+    expect(DescendantsTracker.descendants(Parent)).toEqual([Child, Grandchild]);
 
     await Trails.application!.reloader.reloadBang();
 
     expect(Dependencies._autoloadedTrackedClasses).toBeEmpty();
-    expect(descendants(Parent)).toEqual([]);
+    expect(DescendantsTracker.descendants(Parent)).toEqual([]);
   });
 });
