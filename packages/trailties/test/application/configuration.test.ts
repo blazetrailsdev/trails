@@ -64,6 +64,7 @@ import * as ActiveRecord from "@blazetrails/activerecord";
 import { Dependencies } from "@blazetrails/activesupport";
 import { Numeric } from "@blazetrails/activesupport/core-ext/numeric/bytes";
 import { File } from "@blazetrails/ruby-compat/file";
+import { Dir } from "@blazetrails/ruby-compat/dir";
 import { LOAD_PATH } from "@blazetrails/ruby-compat/load";
 import { OpenSSL } from "@blazetrails/ruby-compat/openssl";
 import { StandardError } from "@blazetrails/ruby-compat/standard-error";
@@ -2505,6 +2506,16 @@ describe("ApplicationTests::ConfigurationTest", { concurrent: true, timeout: 120
     return (await t.app(env)) as unknown as Application;
   }
 
+  async function newApp(): Promise<string> {
+    return File.expandPath(`${await t.appPath()}/../new_app`);
+  }
+
+  async function copyApp(): Promise<void> {
+    await FileUtils.cpRAsync(await t.appPath(), await newApp());
+    const path = await newApp();
+    onTestFinished(() => FileUtils.rmRfAsync(path));
+  }
+
   async function makeBasicApp(block?: (app: typeof Application) => unknown): Promise<void> {
     ActiveStorageEngine.config.activeStorage.serviceConfigurations ??= {};
     await t.makeBasicApp(block);
@@ -2611,11 +2622,53 @@ describe("ApplicationTests::ConfigurationTest", { concurrent: true, timeout: 120
     expect([...Dependencies._eagerLoadPaths]).toContain(`${Trails.root()}/vendor/eager`);
   });
 
+  it("the application root can be set", async () => {
+    await copyApp();
+    await t.addToConfig(`this.config.setRoot(${JSON.stringify(await newApp())});`);
+
+    await t.useFrameworks([]);
+
+    await app("development");
+
+    expect(Trails.application!.root()).toEqual(new Pathname(await newApp()));
+  });
+
+  it("the application root is Dir.pwd if there is no config.ru", async () => {
+    await File.deleteAsync(`${await t.appPath()}/config.ts`);
+
+    await t.useFrameworks([]);
+
+    const pwd = Dir.pwd();
+    Dir.chdir(await t.appPath());
+    try {
+      await app("development");
+      expect(Trails.application!.root()).toEqual(new Pathname(await t.appPath()));
+    } finally {
+      Dir.chdir(pwd);
+    }
+  });
+
+  it("Rails.root should be a Pathname", async () => {
+    await t.addToConfig(`this.config.setRoot(${JSON.stringify(await t.appPath())});`);
+
+    await app("development");
+
+    expect(Trails.root()).toBeInstanceOf(Pathname);
+  });
+
+  it("Rails.public_path should be a Pathname", async () => {
+    await t.addToConfig(`this.config.paths().set("public", "somewhere");`);
+
+    await app("development");
+
+    expect(Trails.publicPath()).toBeInstanceOf(Pathname);
+  });
+
   it("config.paths.public sets Rails.public_path", async () => {
     await t.addToConfig(`this.config.paths().set("public", "somewhere");`);
 
     await app("development");
-    expect(String(await Trails.publicPath())).toBe(
+    expect(String(Trails.publicPath())).toBe(
       String(new Pathname(await t.appPath()).join("somewhere")),
     );
   });

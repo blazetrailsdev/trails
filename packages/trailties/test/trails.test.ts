@@ -186,7 +186,7 @@ describe("Trails", () => {
     Application.register(OverriddenPubApp);
     const app = OverriddenPubApp.instance();
     app.config.setRoot("/srv/override");
-    expect(await Trails.publicPath()).toBe("/srv/override/public");
+    expect(String(Trails.publicPath())).toBe("/srv/override/public");
   });
 
   it("Trails.initialized() is false before initialize, true after", async () => {
@@ -206,18 +206,18 @@ describe("Trails", () => {
   });
 
   it("Trails.publicPath returns null when no application is registered", async () => {
-    expect(await Trails.publicPath()).toBeNull();
+    expect(Trails.publicPath()).toBeNull();
   });
 
   it('Trails.publicPath returns the first expanded entry of paths["public"]', async () => {
     class PubApp extends Application {}
     Application.register(PubApp);
     const app = PubApp.instance();
-    const stubPath = { expanded: () => ["/srv/app/public", "/srv/app/public-alt"] };
+    const stubPath = { first: () => "/srv/app/public" };
     app.paths = () =>
       ({ get: (k: string) => (k === "public" ? stubPath : undefined) }) as unknown as ReturnType<
         typeof app.paths
       >;
-    expect(await Trails.publicPath()).toBe("/srv/app/public");
+    expect(String(Trails.publicPath())).toBe("/srv/app/public");
   });
 });
