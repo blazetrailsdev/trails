@@ -2,10 +2,12 @@ import { Hash } from "@blazetrails/ruby-compat/hash";
 import { rbClassInheritedP } from "@blazetrails/ruby-compat/include";
 import { toS, TopLevel } from "@blazetrails/ruby-compat/object";
 import { warn } from "@blazetrails/ruby-compat/kernel-warn";
+import { NameError } from "@blazetrails/ruby-compat/name-error";
 import { prepend } from "@blazetrails/ruby-compat/include";
 import * as DidYouMean from "./did-you-mean.js";
 import { Correctable } from "./core-ext/name-error.js";
 import { Formatter } from "./formatter.js";
+import { NameErrorCheckers } from "./spell-checkers/name-error-checkers.js";
 import { NullChecker } from "./spell-checkers/null-checker.js";
 
 let _spellCheckers = new Hash<string, unknown>(NullChecker);
@@ -26,6 +28,11 @@ export function correctError(errorClass: object, spellChecker: unknown): void {
     prepend(errorClass, Correctable);
   }
 }
+
+correctError(NameError, NameErrorCheckers);
+
+export { ClassNameChecker } from "./spell-checkers/name-error-checkers/class-name-checker.js";
+export { Correctable, NameErrorCheckers };
 
 /** @internal */
 export class DeprecatedMapping {

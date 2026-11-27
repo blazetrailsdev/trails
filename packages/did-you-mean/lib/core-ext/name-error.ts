@@ -1,11 +1,14 @@
 import { Exception } from "@blazetrails/ruby-compat/exception";
 import { excToS } from "@blazetrails/ruby-compat/exc-to-s";
+import { hashAref } from "@blazetrails/ruby-compat/hash";
 import { rbCallSuper } from "@blazetrails/ruby-compat/include";
+import { toS, TopLevel } from "@blazetrails/ruby-compat/object";
 import { StandardError } from "@blazetrails/ruby-compat/standard-error";
-import { formatter } from "../did-you-mean.js";
 
 interface CorrectableHost extends Error {
   readonly corrections: string[];
+  _corrections?: string[];
+  spellChecker(): { readonly corrections: string[] };
 }
 
 function originalMessage(this: CorrectableHost): string {
@@ -27,7 +30,7 @@ function detailedMessage(
 
     if (!didYouMean) return msg;
 
-    let suggestion = formatter().messageFor(this.corrections);
+    let suggestion = TopLevel.DidYouMean!.formatter().messageFor(this.corrections);
 
     if (highlight) {
       suggestion = suggestion.replace(/.+/g, (match) => "\x1b[1m" + match + "\x1b[m");
@@ -41,4 +44,17 @@ function detailedMessage(
   }
 }
 
-export const Correctable = { originalMessage, detailedMessage };
+export const Correctable = {
+  originalMessage,
+  detailedMessage,
+  get corrections(): string[] {
+    const self = this as unknown as CorrectableHost;
+    return (self._corrections ??= self.spellChecker().corrections);
+  },
+  spellChecker(this: CorrectableHost): { readonly corrections: string[] } {
+    const checker = hashAref(TopLevel.DidYouMean!.spellCheckers(), toS(this.constructor)) as new (
+      exception: CorrectableHost,
+    ) => { readonly corrections: string[] };
+    return new checker(this);
+  },
+};
