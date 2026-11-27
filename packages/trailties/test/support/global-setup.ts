@@ -1,17 +1,18 @@
 const SETUPS = [
-  () => import("./build-templates.js"),
-  () => import("./isolation/global-setup.js"),
-  () => import("../../../solid-cable/test/support/build-templates.js"),
-  () => import("../../../solid-queue/test/support/build-templates.js"),
-  () => import("../../../solid-cache/test/support/build-templates.js"),
-  () => import("../../../actionmailbox/test/support/build-templates.js"),
-  () => import("../../../actiontext/test/support/build-templates.js"),
-  () => import("../../../stimulus/test/support/build-templates.js"),
+  "./build-templates.ts",
+  "./isolation/global-setup.ts",
+  "../../../solid-cable/test/support/build-templates.ts",
+  "../../../solid-queue/test/support/build-templates.ts",
+  "../../../solid-cache/test/support/build-templates.ts",
+  "../../../actionmailbox/test/support/build-templates.ts",
+  "../../../actiontext/test/support/build-templates.ts",
+  "../../../stimulus/test/support/build-templates.ts",
 ];
 
 export default async function setup(): Promise<void> {
   for (const file of SETUPS) {
-    const { default: run } = await file();
+    const path = decodeURIComponent(new URL(file, import.meta.url).pathname);
+    const { default: run } = (await import(path)) as { default: () => Promise<void> };
     await run();
   }
 }
