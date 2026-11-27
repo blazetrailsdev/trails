@@ -8,7 +8,6 @@ import { rbObjRespondTo } from "@blazetrails/ruby-compat/object";
 import { env as ENV } from "@blazetrails/ruby-compat/process-adapter";
 import { Interrupt } from "@blazetrails/ruby-compat/signal-exception";
 import type { StringIO } from "@blazetrails/ruby-compat/string-io";
-
 import { Trails } from "../trails.js";
 
 type Io = Pick<StringIO, "print" | "puts" | "write"> & { isTty?(): boolean };

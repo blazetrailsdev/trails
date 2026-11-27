@@ -13,7 +13,6 @@ import type { Command as ThorCommand } from "@blazetrails/thor/command";
 import type { Base as ThorBase, BaseConfig } from "@blazetrails/thor/base";
 import { Error as ThorError } from "@blazetrails/thor/error";
 import type { Shell } from "@blazetrails/thor/shell";
-
 import { HELP_MAPPINGS, hiddenCommands } from "../command.js";
 import { Actions } from "./actions.js";
 import { subclasses } from "./behavior.js";

@@ -52,7 +52,6 @@ import {
 import type { Application } from "../application.js";
 import { Trails } from "../trails.js";
 import { Trailtie as BaseTrailtie } from "../trailtie.js";
-
 import { Engine } from "../engine.js";
 
 export type ActiveRecordEncryptionConfig = Parameters<typeof Encryption.configure>[0];

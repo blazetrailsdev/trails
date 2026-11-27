@@ -1,5 +1,4 @@
-import { TopLevel } from "@blazetrails/ruby-compat/object";
-import { rbFSend } from "@blazetrails/ruby-compat/object";
+import { TopLevel, rbFSend } from "@blazetrails/ruby-compat/object";
 import { PluginGenerator } from "../generators/trails/plugin/plugin-generator.js";
 
 export class Updater {
