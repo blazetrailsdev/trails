@@ -91,15 +91,16 @@
   },
   "did-you-mean": {
     "tarball": {
-      "value": 8025,
-      "reason": "ruby-compat barrel imports moved to longer subpath specifiers (RFC 0192)"
+      "value": 9994,
+      "reason": "ports did_you_mean's NameError Correctable wiring: name_error_checkers.rb and class_name_checker.rb"
     },
     "unpacked": {
-      "value": 28047,
-      "reason": "ruby-compat barrel imports moved to longer subpath specifiers (RFC 0192)"
+      "value": 36888,
+      "reason": "ports did_you_mean's NameError Correctable wiring: name_error_checkers.rb and class_name_checker.rb"
     },
     "entries": {
-      "value": 29
+      "value": 35,
+      "reason": "ports did_you_mean's NameError Correctable wiring: name_error_checkers.rb and class_name_checker.rb"
     }
   },
   "ruby-compat": {
