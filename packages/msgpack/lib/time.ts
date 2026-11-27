@@ -1,6 +1,5 @@
 import { Time as RubyTime } from "@blazetrails/date";
-import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
-import { Rational } from "@blazetrails/ruby-compat/rational";
+import { ArgumentError, Rational } from "@blazetrails/ruby-compat";
 import { MessagePack } from "./namespaces.js";
 import { Timestamp } from "./timestamp.js";
 

@@ -1,6 +1,6 @@
 import { Concern, extend } from "@blazetrails/activesupport";
 import { withLocale } from "@blazetrails/i18n";
-import { block as rbBlock } from "@blazetrails/ruby-compat/hash";
+import { block as rbBlock } from "@blazetrails/ruby-compat";
 
 interface TranslationJob {
   locale: string | null;

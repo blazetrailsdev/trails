@@ -1,30 +1,30 @@
 import { Encoder, ExtData } from "@msgpack/msgpack";
 import {
   moduleVisibility,
-  rbClassInheritedP,
-  rbObjIsKindOf,
-} from "@blazetrails/ruby-compat/include";
-import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
-import { FrozenError } from "@blazetrails/ruby-compat/frozen-error";
-import { Hash } from "@blazetrails/ruby-compat/hash";
-import { NoMethodError } from "@blazetrails/ruby-compat/no-method-error";
-import { RangeError } from "@blazetrails/ruby-compat/range-error";
-import { TypeError } from "@blazetrails/ruby-compat/type-error";
-import { isSymbol, symbolToS } from "@blazetrails/ruby-compat/symbol";
-import { kernelFloat } from "@blazetrails/ruby-compat/kernel-float";
-import {
+  ArgumentError,
+  FrozenError,
+  Hash,
+  NoMethodError,
+  RangeError,
+  TypeError,
+  isSymbol,
+  kernelFloat,
   rbBuiltinClassName,
   rbCString,
   rbCSymbol,
+  rbClassInheritedP,
   rbClassOf,
   rbFSend,
   rbInspect,
+  isStruct,
   rbCNumeric,
   rbObjAsString,
   rbObjClass,
-} from "@blazetrails/ruby-compat/object";
-import { isStruct, type StructInstance } from "@blazetrails/ruby-compat/struct";
-import { stringValue } from "@blazetrails/ruby-compat/string/support";
+  rbObjIsKindOf,
+  stringValue,
+  symbolToS,
+  type StructInstance,
+} from "@blazetrails/ruby-compat";
 import { Buffer } from "./buffer.js";
 import { MessagePack } from "./namespaces.js";
 

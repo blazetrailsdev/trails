@@ -1,5 +1,4 @@
-import { pack, unpack } from "@blazetrails/ruby-compat/array";
-import { rbBigNorm } from "@blazetrails/ruby-compat/numeric";
+import { pack, rbBigNorm, unpack } from "@blazetrails/ruby-compat";
 import { MessagePack } from "./namespaces.js";
 
 const CHUNK_BITLENGTH = 32;

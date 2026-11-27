@@ -1,7 +1,13 @@
 import { kernelArray } from "@blazetrails/activesupport";
-import { cmp, rbCmpint } from "@blazetrails/ruby-compat/comparable";
-import { fetch } from "@blazetrails/ruby-compat/hash";
-import { rbObjClass, rbObjIsProc, rtest, toS } from "@blazetrails/ruby-compat/object";
+import {
+  cmp,
+  fetch,
+  rbCmpint,
+  rbObjClass,
+  rbObjIsProc,
+  rtest,
+  toS,
+} from "@blazetrails/ruby-compat";
 import { Base } from "../base.js";
 import { QueueAdapters } from "../namespaces.js";
 import { AbstractAdapter } from "./abstract-adapter.js";

@@ -1,5 +1,4 @@
-import { Struct } from "@blazetrails/ruby-compat/struct";
-import { include } from "@blazetrails/ruby-compat/include";
+import { Struct, include } from "@blazetrails/ruby-compat";
 import { CoreExt } from "./core-ext.js";
 import { MessagePack } from "./namespaces.js";
 import type { Packer } from "./packer.js";

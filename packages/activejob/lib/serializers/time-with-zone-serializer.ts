@@ -1,6 +1,6 @@
 import { TimeWithZone, type TimeZone, zone } from "@blazetrails/activesupport";
 import { Time } from "@blazetrails/date";
-import { hashAref } from "@blazetrails/ruby-compat/hash";
+import { hashAref } from "@blazetrails/ruby-compat";
 import { Serializers } from "../namespaces.js";
 import { ObjectSerializer } from "./object-serializer.js";
 

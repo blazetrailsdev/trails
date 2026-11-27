@@ -5,9 +5,7 @@ import {
   mattrAccessor,
   presence,
 } from "@blazetrails/activesupport";
-import { aryJoin } from "@blazetrails/ruby-compat/array";
-import { classModule } from "@blazetrails/ruby-compat/class-module";
-import { rbObjClass, rbObjIsProc } from "@blazetrails/ruby-compat/object";
+import { aryJoin, classModule, rbObjClass, rbObjIsProc } from "@blazetrails/ruby-compat";
 import { ActiveJob } from "./namespaces.js";
 
 interface QueueNameClass {

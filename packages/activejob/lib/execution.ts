@@ -1,7 +1,5 @@
 import { Concern, ExecutionContext, extend, Rescuable } from "@blazetrails/activesupport";
-import { classModule } from "@blazetrails/ruby-compat/class-module";
-import { include } from "@blazetrails/ruby-compat/include";
-import { NotImplementedError } from "@blazetrails/ruby-compat/not-implemented-error";
+import { classModule, include, NotImplementedError } from "@blazetrails/ruby-compat";
 import { Callbacks } from "./callbacks.js";
 import { ActiveJob } from "./namespaces.js";
 

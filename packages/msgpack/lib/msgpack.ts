@@ -1,4 +1,4 @@
-import { constSet } from "@blazetrails/ruby-compat/include";
+import { constSet } from "@blazetrails/ruby-compat";
 import { Factory } from "./factory.js";
 import { MessagePack } from "./namespaces.js";
 import type { Unpacker } from "./unpacker.js";

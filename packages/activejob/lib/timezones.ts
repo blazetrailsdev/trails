@@ -1,5 +1,5 @@
 import { Concern, extend, useZone } from "@blazetrails/activesupport";
-import { block as rbBlock } from "@blazetrails/ruby-compat/hash";
+import { block as rbBlock } from "@blazetrails/ruby-compat";
 
 interface TimezonesJob {
   timezone: string | null;

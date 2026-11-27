@@ -6,11 +6,18 @@ import {
   runLoadHooks,
   zone,
 } from "@blazetrails/activesupport";
-import { extend, include, isModuleIncluded, rbObjIsKindOf } from "@blazetrails/ruby-compat/include";
-import { Hash, rbHashSRuby2KeywordsHash } from "@blazetrails/ruby-compat/hash";
-import { NoMethodError } from "@blazetrails/ruby-compat/no-method-error";
-import { rbObjClass, TopLevel } from "@blazetrails/ruby-compat/object";
-import { SecureRandom } from "@blazetrails/ruby-compat/secure-random";
+import {
+  extend,
+  Hash,
+  include,
+  isModuleIncluded,
+  NoMethodError,
+  rbHashSRuby2KeywordsHash,
+  rbObjClass,
+  rbObjIsKindOf,
+  SecureRandom,
+  TopLevel,
+} from "@blazetrails/ruby-compat";
 import { Callbacks, ClassMethods as CallbacksClassMethods } from "./callbacks.js";
 import { ClassMethods, Core } from "./core.js";
 import { Enqueuing, ClassMethods as EnqueuingClassMethods } from "./enqueuing.js";

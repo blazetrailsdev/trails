@@ -1,5 +1,5 @@
 import { Duration } from "@blazetrails/activesupport";
-import { hashAref } from "@blazetrails/ruby-compat/hash";
+import { hashAref } from "@blazetrails/ruby-compat";
 import { ActiveJob, Serializers } from "../namespaces.js";
 import { ObjectSerializer } from "./object-serializer.js";
 

@@ -1,6 +1,4 @@
-import { hashAref } from "@blazetrails/ruby-compat/hash";
-import { rbCSymbol, toSym } from "@blazetrails/ruby-compat/object";
-import { symbolToS } from "@blazetrails/ruby-compat/symbol";
+import { hashAref, rbCSymbol, symbolToS, toSym } from "@blazetrails/ruby-compat";
 import { Serializers } from "../namespaces.js";
 import { ObjectSerializer } from "./object-serializer.js";
 

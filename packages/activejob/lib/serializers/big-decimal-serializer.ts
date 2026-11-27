@@ -1,5 +1,4 @@
-import { BigDecimal } from "@blazetrails/ruby-compat/big-decimal";
-import { hashAref } from "@blazetrails/ruby-compat/hash";
+import { BigDecimal, hashAref } from "@blazetrails/ruby-compat";
 import { Serializers } from "../namespaces.js";
 import { ObjectSerializer } from "./object-serializer.js";
 

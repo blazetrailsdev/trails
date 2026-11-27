@@ -1,7 +1,12 @@
 import { mattrAccessor, safeConstantize } from "@blazetrails/activesupport";
-import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
-import { hashAref } from "@blazetrails/ruby-compat/hash";
-import { rtest, rbInspect, rbModName, rbObjClass } from "@blazetrails/ruby-compat/object";
+import {
+  ArgumentError,
+  hashAref,
+  rtest,
+  rbInspect,
+  rbModName,
+  rbObjClass,
+} from "@blazetrails/ruby-compat";
 import { Arguments, SerializationError } from "./arguments.js";
 import { ActiveJob, Serializers, type SerializerLike } from "./namespaces.js";
 import { SymbolSerializer } from "./serializers/symbol-serializer.js";

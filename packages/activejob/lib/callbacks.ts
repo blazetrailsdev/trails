@@ -4,8 +4,7 @@ import {
   extend,
   type FilterListEntry,
 } from "@blazetrails/activesupport";
-import { defineModule, include } from "@blazetrails/ruby-compat/include";
-import { rbObjSingletonClass } from "@blazetrails/ruby-compat/object";
+import { defineModule, include, rbObjSingletonClass } from "@blazetrails/ruby-compat";
 import { ActiveJob } from "./namespaces.js";
 
 interface CallbacksClass {
