@@ -1404,8 +1404,6 @@ jobs:
       needs.changes.outputs.docs_only != 'true' &&
       needs.changes.outputs.activerecord_affected == 'true'
     runs-on: ${{ fromJSON(needs.changes.outputs.sqlite_runs_on) }}
-    # contents: write creates the refs/ci-queue/* refs scripts/ci/ar-shard-queue.mts
-    # claims batches with.
     permissions:
       contents: write
     timeout-minutes: 20
@@ -1456,8 +1454,6 @@ jobs:
         env:
           VITEST_SHARD_DURATIONS: sqlite3
       - if: needs.changes.outputs.ar_scope == ''
-        # Legs pull batches from a queue the lane shares (scripts/ci/ar-shard-queue.mts),
-        # so a slow runner takes fewer files and shard 1's extra steps balance out.
         run: node scripts/ci/ar-shard-queue.mts ${{ matrix.shard }}/${{ strategy.job-total }} packages/activerecord/ packages/solid-queue/ packages/solid-cable/ packages/solid-cache/ packages/activestorage/ packages/actionmailbox/ packages/actiontext/ packages/turbo/ --project '!system'
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -1701,8 +1697,6 @@ jobs:
       needs.changes.outputs.db_adapter_affected == 'true' ||
       contains(github.event.pull_request.labels.*.name, 'run-db-adapters'))
     runs-on: ubuntu-24.04
-    # contents: write creates the refs/ci-queue/* refs scripts/ci/ar-shard-queue.mts
-    # claims batches with.
     permissions:
       contents: write
     timeout-minutes: 20
@@ -1824,8 +1818,6 @@ jobs:
           PGPORT: "5432"
           PGUSER: rails
       - if: needs.changes.outputs.ar_scope == ''
-        # Legs pull batches from a queue the lane shares (scripts/ci/ar-shard-queue.mts),
-        # so a slow runner takes fewer files and shard 1's extra steps balance out.
         run: node scripts/ci/ar-shard-queue.mts ${{ matrix.shard }}/${{ strategy.job-total }} packages/activerecord/ packages/solid-queue/ packages/solid-cable/ packages/solid-cache/ packages/activestorage/ packages/actionmailbox/ packages/actiontext/ packages/turbo/ --project '!system'
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -2150,8 +2142,6 @@ jobs:
       needs.changes.outputs.db_adapter_affected == 'true' ||
       contains(github.event.pull_request.labels.*.name, 'run-db-adapters'))
     runs-on: ubuntu-24.04
-    # contents: write creates the refs/ci-queue/* refs scripts/ci/ar-shard-queue.mts
-    # claims batches with.
     permissions:
       contents: write
     timeout-minutes: 20
@@ -2214,8 +2204,6 @@ jobs:
           MYSQL_HOST: localhost
           MYSQL_PORT: "3306"
       - if: needs.changes.outputs.ar_scope == ''
-        # Legs pull batches from a queue the lane shares (scripts/ci/ar-shard-queue.mts),
-        # so a slow runner takes fewer files and shard 1's extra steps balance out.
         run: node scripts/ci/ar-shard-queue.mts ${{ matrix.shard }}/${{ strategy.job-total }} packages/activerecord/ packages/solid-queue/ packages/solid-cable/ packages/solid-cache/ packages/activestorage/ packages/actionmailbox/ packages/actiontext/ packages/turbo/ --project '!system'
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -3347,7 +3335,6 @@ jobs:
                 s=$1; m=int(s/60); r=s-m*60;
                 printf("| %s | %s | %dm%02ds |\n", $2, $3, m, r)
               }' >> "$GITHUB_STEP_SUMMARY"
-      # The AR lanes' work-queue claims (scripts/ci/ar-shard-queue.mts).
       - name: Delete this run's refs/ci-queue refs
         if: ${{ always() }}
         continue-on-error: true
