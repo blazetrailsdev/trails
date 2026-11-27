@@ -1,0 +1,33 @@
+<% const indexLink = await render("books/index-link"); %>
+<% contentFor("title", user.name); %>
+<% const transfer = Current.user!.isCanAdminister() ? await render("users/transfer", { user }) : ""; %>
+
+<% contentFor("header", () => { %>
+  <nav>
+    <%= linkTo(usersPath(), { class: "btn" }, null, () => { %>
+      <%= imageTag("arrow-left.svg", { aria: { hidden: true }, size: 24 }) %>
+      <span class="for-screen-reader">Go back</span>
+    <% }) %>
+
+    <div class="breadcrumbs">
+      <%= indexLink %>
+      <span class="flex-item-no-shrink">▸</span>
+      <%= linkTo(usersPath(), { class: "btn borderless txt-small flex-item-no-shrink" }, null, () => { %>
+        <%= imageTag("people.svg", { aria: { label: "People" }, size: 19, class: "colorize--black", alt: "People" }) %>
+        <span class="for-screen-reader">Manage people</span>
+      <% }) %>
+      <span class="flex-item-no-shrink">▸</span>
+      <%= user.name %>
+    </div>
+  </nav>
+<% }) %>
+
+<div class="panel margin-block-double shadow center">
+  <h2 class="margin-none-block-end"><%= user.name %></h2>
+  <p class="margin-none-block-start"><%= mailTo(user.email_address) %></p>
+
+  <% if (Current.user!.isCanAdminister()) { %>
+    <hr class="full-width margin-block-double" aria-hidden="true">
+    <%= transfer %>
+  <% } %>
+</div>

@@ -1,0 +1,44 @@
+<% contentFor("title", "Create your account"); %>
+<% turboPageRequiresReload(); %>
+<% const alertMessage = (await flash).get("alert"); %>
+
+<% contentFor("header", () => { %>
+  <nav>
+    <%= linkTo(newSessionPath(), { class: "btn flex-item-justify-end" }, null, () => { %>
+      <%= imageTag("login-keys.svg", { aria: { hidden: true }, size: 24 }) %>
+      <span class="for-screen-reader">Sign in instead</span>
+    <% }) %>
+  </nav>
+<% }) %>
+
+<div class="panel shadow center <%= alertMessage ? "shake" : "" %>">
+  <h1 class="margin-none-block-start margin-block-end-double">Bookshelf</h1>
+
+  <%= await formWith({ model: user, url: joinPath(params.get("join_code")), class: "flex flex-column gap" }, (form) => { %>
+    <div class="flex align-center gap">
+      <%= translationButton("userName") %>
+      <label class="flex align-center gap input input--actor">
+        <%= form.textField("name", { class: "input full-width", autocomplete: "name", placeholder: "Name", autofocus: true, required: true, data: { "1p-ignore": true } }) %>
+        <%= imageTag("person.svg", { aria: { hidden: "true" }, size: 30, class: "colorize--black" }) %>
+      </label>
+    </div>
+    <div class="flex align-center gap">
+      <%= translationButton("emailAddress") %>
+      <label class="flex align-center gap input input--actor">
+        <%= form.emailField("email_address", { class: "input full-width", autocomplete: "username", placeholder: "Email address", required: true }) %>
+        <%= imageTag("email.svg", { aria: { hidden: "true" }, size: 30, class: "colorize--black" }) %>
+      </label>
+    </div>
+    <div class="flex align-center gap">
+      <%= translationButton("password") %>
+      <label class="flex align-center gap input input--actor">
+        <%= form.passwordField("password", { class: "input full-width", autocomplete: "new-password", placeholder: "Password", required: true, maxlength: 72 }) %>
+        <%= imageTag("password.svg", { aria: { hidden: "true" }, size: 30, class: "colorize--black" }) %>
+      </label>
+    </div>
+    <button type="submit" id="log_in" class="btn btn--reversed center">
+      <%= imageTag("arrow-right.svg", { aria: { hidden: true }, size: 24 }) %>
+      <span class="for-screen-reader">Sign in</span>
+    </button>
+  <% }) %>
+</div>

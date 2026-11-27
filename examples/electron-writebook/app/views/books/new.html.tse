@@ -1,0 +1,20 @@
+<% contentFor("title", "Create a new book"); %>
+
+<% contentFor("header", () => { %>
+  <nav>
+    <%= linkTo(rootPath(), { class: "btn flex-item-justify-start" }, null, () => { %>
+      <%= imageTag("arrow-left.svg", { aria: { hidden: true }, size: 24 }) %>
+      <span class="for-screen-reader">Cancel and go back</span>
+    <% }) %>
+  </nav>
+<% }) %>
+
+<%= await render("books/form", { book, users, creatingUser: Current.user }) %>
+
+<% contentFor("footer", () => { %>
+  <nav class="new-book-btn flex justify-center pad">
+    <button type="submit" form="book-editor", class="btn btn--reversed txt-medium--responsive" aria-label="Create book" title="Create book">
+      <%= imageTag("arrow-right.svg", { aria: { hidden: true }, size: 24 }) %>
+    </button>
+  </nav>
+<% }) %>

@@ -176,6 +176,9 @@ export default defineConfig(
       // Byte-for-byte copies of vendor/rails/v8.0.5.2/actionpack/test/fixtures/{public,公共}.
       "packages/actionpack/test/fixtures/public/**",
       "packages/actionpack/test/fixtures/公共/**",
+      "examples/electron-writebook/app/javascript/**",
+      "examples/electron-writebook/vendor/javascript/**",
+      "examples/electron-writebook/public/assets/**",
       // Byte-for-byte copies of vendor/marcel/v1.0.4/test/fixtures.
       "packages/marcel/test/fixtures/**",
       // Generator destination fixtures, mirroring vendor/solid_cache/v1.0.9/test/fixtures/generators.

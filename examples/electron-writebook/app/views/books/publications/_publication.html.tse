@@ -1,0 +1,46 @@
+<% const editable = await book.isEditable(); %>
+<div class="flex flex-column gap margin-block-start pad <%= book.published ? "fill-selected" : "fill-shade" %> border-radius">
+  <% if (editable) { %>
+    <div class="flex align-center justify-center gap-half center">
+      <%= imageTag("lock.svg", { aria: { hidden: true }, size: 36, class: "colorize--black" }) %>
+        <%= await formWith({ model: book, url: bookPublicationPath(book), data: { controller: "form", action: "change->form#submit" }, html: { contents: true } }, (form) => { %>
+          <label class="switch txt-medium">
+            <%= form.checkBox("published", { checked: book.published, class: "switch__input" }) %>
+            <span class="switch__btn round"></span>
+            <span class="for-screen-reader">Publish this book</span>
+          </label>
+        <% }) %>
+      <%= imageTag("world.svg", { aria: { hidden: true }, size: 36, class: "colorize--black" }) %>
+    </div>
+  <% } %>
+
+  <% if (book.published) { %>
+    <div class="flex flex-column align-center gap txt-medium">
+      <% const publicUrl = bookSlugUrl(book); %>
+
+      <label class="flex flex-column gap full-width txt-align-center">
+        <strong id="invite_label" class="invite-label for-screen-reader">Public link to this book</strong>
+        <input type="text" class="input fill-white" id="invite_url" value="<%= publicUrl %>" aria-labelledby="invite_label" readonly>
+      </label>
+
+      <div class="flex align-center gap">
+        <%= buttonToCopyToClipboard(publicUrl, () => { %>
+          <%= imageTag("copy-paste.svg", { aria: { hidden: "true" }, size: 24, class: "colorize--black" }) %>
+          <span class="for-screen-reader">Copy public link</span>
+        <% }) %>
+
+        <%= webShareButton(publicUrl, "Link to this book", "Hit this link to read my book.", () => { %>
+          <%= imageTag("share.svg", { aria: { hidden: "true" }, size: 24, class: "colorize--black" }) %>
+          <span class="for-screen-reader">Share public link</span>
+        <% }) %>
+
+        <% if (editable) { %>
+          <%= linkTo(editBookPublicationPath(book), { class: "btn" }, null, () => { %>
+            <%= imageTag("pencil.svg", { aria: { hidden: "true" }, size: 24, class: "colorize--black" }) %>
+            <span class="for-screen-reader">Edit link URL</span>
+          <% }) %>
+        <% } %>
+      </div>
+    </div>
+  <% } %>
+</div>

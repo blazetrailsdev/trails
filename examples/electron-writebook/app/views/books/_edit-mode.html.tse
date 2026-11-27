@@ -1,0 +1,9 @@
+<%= tag().div({ class: "flex align-center gap flex-item-no-shrink", data: { controller: "edit-mode", editModeTargetUrlValue: targetUrl, editModeEditingClass: "edit-mode", editModeAutosaveOutlet: "[data-controller='autosave']" } }, () => { %>
+  <%= imageTag("eye.svg", { aria: { hidden: true }, size: 28, class: "colorize--black" }) %>
+  <label class="switch txt-medium">
+    <%= checkBoxTag("edit_mode_enabled", { checked, class: "switch__input", data: { action: "edit-mode#change" } }) %>
+    <span class="switch__btn round"></span>
+    <span class="for-screen-reader">Editing mode</span>
+  </label>
+  <%= imageTag("write.svg", { aria: { hidden: true }, size: 24, class: "colorize--black" }) %>
+<% }) %>

@@ -1,0 +1,38 @@
+<% const indexLink = await render("books/index-link"); %>
+<% contentFor("title", "People on the account"); %>
+<% const invite = await render("users/invite"); %>
+<% const people = await render(users); %>
+
+<% contentFor("header", () => { %>
+  <nav>
+    <%= linkTo(rootPath(), { class: "btn" }, null, () => { %>
+      <%= imageTag("arrow-left.svg", { aria: { hidden: true }, size: 24 }) %>
+      <span class="for-screen-reader">Go back</span>
+    <% }) %>
+
+    <div class="breadcrumbs">
+      <%= indexLink %>
+      <span class="flex-item-no-shrink">▸</span>
+      <%= imageTag("settings.svg", { aria: { label: "Settings" }, size: 19, class: "colorize--black", alt: "Settings" }) %>
+    </div>
+
+    <% if (Current.user!.isCanAdminister()) { %>
+      <%= linkTo(editAccountCustomStylesUrl(), { class: "btn" }, null, () => { %>
+        <%= imageTag("art.svg", { aria: { hidden: true }, size: 24 }) %>
+        <span class="for-screen-reader">Custom styles</span>
+      <% }) %>
+    <% } %>
+  </nav>
+<% }) %>
+
+<div class="panel borderless center pad fill-shade flex flex-column margin-block">
+  <%= invite %>
+</div>
+
+<div class="panel borderless center pad fill-none flex flex-column gap">
+  <%= people %>
+</div>
+
+<% contentFor("footer", () => { %>
+  <div class="txt-align-center center margin-block-double txt-subtle">Bookshelf version <%= versionBadge() %></div>
+<% }) %>

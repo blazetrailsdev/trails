@@ -1,0 +1,42 @@
+<% contentFor("title", `Edit ${await section.title()}`); %>
+<% const header = await render("leafables/edit-header", { leaf, book }); %>
+<% const toggle = await editingModeToggleSwitch(leaf, { checked: true }); %>
+<% const sidebar = await render("leaves/sidebar", { book }); %>
+<% const form = await render("sections/form", { book, section }); %>
+<% const footer = await render("leaves/edit-footer", { leaf }); %>
+
+<% contentFor("header", () => { %>
+  <%= header %>
+<% }) %>
+
+<% contentFor("toolbar", () => { %>
+  <div class="page-toolbar fill-selected align-center gap-half margin-block-end-double">
+    <%= toggle %>
+
+    <span class="separator margin-inline-half" aria-hidden="true"></span>
+
+    <label class="btn txt-small">
+      <%= hiddenFieldTag("section[theme]", null, { id: null, form: "leafable-editor" }) %>
+      <%= checkBoxTag("section[theme]", "dark", isPresent(section.theme), { class: "switch__input", form: "leafable-editor" }) %>
+      <%= imageTag("theme-switch.svg", { aria: { hidden: true }, size: 24 }) %>
+      <span class="for-screen-reader">Change theme</span>
+    </label>
+
+    <span class="separator margin-inline-half" aria-hidden="true"></span>
+
+    <button type="submit" form="leafable-editor" class="btn flex page-toolbar__save flex-item-justify-end flex-item-no-shrink txt-small">
+      <%= imageTag("check.svg", { aria: { hidden: true }, size: 24 }) %>
+      <span class="for-screen-reader">Save</span>
+    </button>
+  </div>
+<% }) %>
+
+<% contentFor("sidebar", () => { %>
+  <%= sidebar %>
+<% }) %>
+
+<div class="page--section <%= section.theme === "dark" ? "theme--dark" : "" %>">
+  <%= form %>
+</div>
+
+<%= footer %>

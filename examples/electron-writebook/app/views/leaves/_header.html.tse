@@ -1,0 +1,43 @@
+<% const indexLink = await render("books/index-link"); %>
+<% const sidebarToggle = await render("leaves/sidebar-toggle"); %>
+<% const previousLink = await linkToPreviousLeafable(leaf); %>
+<% const leafable = await leaf.leafable; %>
+<% const title = await leafable.title(); %>
+<% const search = await render("books/searches/search", { book }); %>
+<% const editable = await book.isEditable(); %>
+<% const toggle = editable ? await editingModeToggleSwitch(leaf, { checked: false }) : ""; %>
+<% const banner = await render("books/searches/banner", { leaf }); %>
+<% contentFor("header", () => { %>
+  <%= leafNavTag(leaf, {}, () => { %>
+    <%= sidebarToggle %>
+
+    <%= previousLink %>
+
+    <div class="breadcrumbs">
+      <%= indexLink %>
+      <span class="flex-item-no-shrink">▸</span>
+      <%= linkTo(book.title, bookSlugPath(book)) %>
+      <span class="flex-item-no-shrink">▸</span>
+      <strong><%= title %></strong>
+    </div>
+
+    <button class="btn" data-action="fullscreen#toggle" data-fullscreen-target="button">
+      <%= imageTag("expand.svg", { aria: { hidden: true }, size: 24 }) %>
+      <span class="for-screen-reader">Enter fullscreen</span>
+    </button>
+
+    <%= search %>
+  <% }) %>
+<% }) %>
+
+<% contentFor("toolbar", () => { %>
+  <div class="flex flex-column">
+    <% if (editable) { %>
+      <div class="page-toolbar fill-shade">
+        <%= toggle %>
+      </div>
+    <% } %>
+
+    <%= banner %>
+  </div>
+<% }) %>

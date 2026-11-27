@@ -1,0 +1,46 @@
+<% const houseToolbarPartial = await render("pages/house-toolbar"); %>
+<% contentFor("title", `Edit ${await page.title()}`); %>
+<% const header = await render("leafables/edit-header", { leaf, book }); %>
+<% const toggle = await editingModeToggleSwitch(leaf, { checked: true }); %>
+<% const history = await render("leaves/history", { leaf }); %>
+<% const sidebar = await render("leaves/sidebar", { book }); %>
+<% const indicator = await render("leaves/being-edited-indicator", { leaf }); %>
+<% const form = await render("pages/form", { book, page }); %>
+<% const footer = await render("leaves/edit-footer", { leaf }); %>
+
+<% contentFor("header", () => { %>
+  <%= header %>
+<% }) %>
+
+<% contentFor("toolbar", () => { %>
+  <div class="page-toolbar fill-selected align-center gap-half margin-block-end-double">
+    <%= toggle %>
+
+    <span class="separator margin-inline-half" aria-hidden="true"></span>
+
+    <span class="overflow-y overflow-hide-scrollbar">
+      <%= houseToolbarPartial %>
+    </span>
+
+    <span class="separator margin-inline-half" aria-hidden="true"></span>
+
+    <%= history %>
+
+    <button type="submit" form="leafable-editor" class="btn flex page-toolbar__save flex-item-justify-end flex-item-no-shrink txt-small">
+      <%= imageTag("check.svg", { aria: { hidden: true }, size: 24 }) %>
+      <span class="for-screen-reader">Save</span>
+    </button>
+  </div>
+<% }) %>
+
+<% contentFor("sidebar", () => { %>
+  <%= sidebar %>
+<% }) %>
+
+<article class="layout--reading">
+  <%= indicator %>
+
+  <%= form %>
+</article>
+
+<%= footer %>

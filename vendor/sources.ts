@@ -911,6 +911,17 @@ export const SOURCES: readonly UpstreamSource[] = [
     ],
   },
   {
+    name: "writebook",
+    origin: {
+      type: "git",
+      // 37signals' book-authoring app, MIT-licensed (MIT-LICENSE). A Rails
+      // application rather than a gem, read by examples/electron-writebook.
+      url: "https://github.com/basecamp/writebook.git",
+      ref: "v1.2.9",
+    },
+    packages: [],
+  },
+  {
     name: "libyaml",
     origin: {
       type: "git",

@@ -1,0 +1,84 @@
+<% await book.cover.load(); if (book.cover.isAttached()) await (await book.cover.attachment)?.blob; %>
+<% const accesses: unknown[] = []; %>
+<% for (const user of users) accesses.push(await render("books/accesses/access", { user, book, creatingUser })); %>
+<%= await formWith({ model: book, id: "book-editor" }, (form) => { %>
+  <%= tag().div({ class: `book__form flex align-center gap full-width ${book.cover.isAttached() ? "" : `theme--${book?.theme}`}`, style: "--input-padding: 0.5rem 1rem; --input-border-radius: 0.5rem" }, () => { %>
+    <div class="flex gap-half">
+      <fieldset class="flex flex-column unpad margin-block-end borderless justify-space-between">
+        <legend class="for-screen-reader">Cover color</legend>
+
+        <% for (const theme of Object.keys(Book.themes)) { %>
+          <label class="btn btn--circle txt-small" style="--btn-background: var(--theme-color--<%= theme %>)" >
+            <%= form.radioButton("theme", theme) %>
+            <%= imageTag("check.svg", { aria: { hidden: "true" }, size: 24, class: "checked" }) %>
+            <span class="for-screen-reader"><%= theme %></span>
+          </label>
+        <% } %>
+      </fieldset>
+      <%= tag().div({ class: "flex flex-column", data: { controller: "upload-preview", uploadPreviewDefaultImageValue: assetUrl("empty-cover.png") } }, () => { %>
+        <label class="align-center center gap position-relative margin-block-end">
+          <% if (!book.cover.isAttached()) { %>
+            <span class="btn btn--reversed txt-medium book__cover--add">
+              <%= imageTag("camera.svg", { aria: { hidden: "true" }, size: 24 }) %>
+              <span class="for-screen-reader">Upload a cover</span>
+            </span>
+          <% } %>
+
+          <div class="input--file">
+            <%= imageTag(book.cover.isAttached() ? book.cover : "empty-cover.png", { alt: "Book cover", class: "book__cover margin-none", style: "--cover-height: 60vh", data: { uploadPreviewTarget: "image" } }) %>
+            <%= form.fileField("cover", { class: "input", accept: "image/png, image/jpeg, image/jpg, image/webp", data: { uploadPreviewTarget: "input", action: "upload-preview#previewImage" }, title: book.cover.isAttached() ? "Replace book cover" : "Upload book cover" }) %>
+          </div>
+        </label>
+
+        <% if (book.cover.isAttached()) { %>
+          <%= tag().label({ class: "btn btn--negative txt-small center book__cover--remove", data: { action: "click->upload-preview#clear", uploadPreviewTarget: "button" } }, () => { %>
+            <%= imageTag("minus.svg", { aria: { hidden: "true" }, size: 24 }) %>
+            <%= checkBoxTag("remove_cover", "true") %>
+            <span class="for-screen-reader">Remove cover image</span>
+          <% }) %>
+        <% } %>
+      <% }) %>
+    </div>
+
+    <div class="flex flex-column gap full-width">
+      <div class="flex align-center gap txt-medium">
+        <%= translationButton("bookTitle") %>
+        <h1 class="txt-xx-large margin-none full-width">
+          <%= form.textField("title", { required: true, autofocus: true, class: "input", placeholder: "Book title", autocomplete: "off" }) %>
+        </h1>
+      </div>
+      <div class="flex align-center gap txt-medium">
+        <%= translationButton("bookSubtitle") %>
+        <small class="txt-normal txt-large txt-tight-lines full-width"><%= form.textArea("subtitle", { class: "input", placeholder: "Subtitle", autocomplete: "off" }) %></small>
+      </div>
+      <div class="flex align-center gap txt-medium">
+        <%= translationButton("bookAuthor") %>
+        <small class="txt-normal txt-large txt-tight-lines full-width"><%= form.textField("author", { class: "input", placeholder: "Author", autocomplete: "off" }) %></small>
+      </div>
+    </div>
+  <% }) %>
+
+  <div class="book-access border-radius center pad-double fill-shade flex flex-column gap margin-block-double">
+    <div class="flex align-center gap txt-medium--responsive">
+      <%= imageTag("eye.svg", { aria: { hidden: true }, size: 36, class: "colorize--black" }) %>
+
+      <div class="min-width">
+        <div class="overflow-ellipsis fill-shade"><strong>Everyone</strong></div>
+      </div>
+
+      <hr class="flex-item-grow margin-none" aria-hidden="true" style="--border-style: dashed">
+
+      <label for="book_everyone_access" class="switch">
+        <%= form.checkBox("everyone_access", { class: "switch__input book-access__switch" }) %>
+        <span class="switch__btn"></span>
+        <span class="for-screen-reader">Only allow some people to read this book</span>
+      </label>
+    </div>
+
+    <hr class="full-width margin-block-start margin-block-end-half">
+
+    <% for (const access of accesses) { %><%= access %><% } %>
+  </div>
+
+  <%= form.submit("Save", { hidden: true }) %>
+<% }) %>

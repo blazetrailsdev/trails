@@ -1,0 +1,19 @@
+<% const locked = user.isCurrent() || !Current.user!.isCanAdminister(); %>
+<% const removeButton = await buttonTo(userPath(user), { method: "delete", class: "btn btn--small btn--negative flex-item-no-shrink", disabled: locked ? "disabled" : null, data: { turboConfirm: "Are you sure you want to permanently remove this person from the account? This can’t be undone." } }, null, () => { %>
+  <%= imageTag("minus.svg", { aria: { hidden: true }, size: 24 }) %>
+  <span class="for-screen-reader">Remove <%= user.name %> from the account</span>
+<% }); %>
+<div class="flex align-center gap-half pad-inline txt-medium--responsive">
+  <strong class="overflow-ellipsis txt-medium--responsive"><%= linkTo(user.name, user.isCurrent() ? editUserProfilePath(user) : userProfilePath(user)) %></strong>
+  <hr class="flex-item-grow margin-none" aria-hidden="true">
+
+  <%= await formWith({ model: user, url: userPath(user), data: { controller: "form" }, method: "patch" }, (form) => { %>
+    <label class="btn btn--small flex-item-no-shrink" for="<%= domId(user, "role") %>">
+      <span class="for-screen-reader"><%= user.name %>'s role: <%= user.isAdministrator() ? "Administrator" : "Member" %></span>
+      <%= imageTag("crown.svg", { size: 24, aria: { hidden: "true" } }) %>
+      <%= form.checkBox("role", { data: { action: "form#submit" }, hidden: true, id: domId(user, "role"), disabled: locked ? "disabled" : null }, "administrator", "member") %>
+    </label>
+  <% }) %>
+
+  <%= removeButton %>
+</div>

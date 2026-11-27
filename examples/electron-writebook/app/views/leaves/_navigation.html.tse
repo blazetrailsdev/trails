@@ -1,0 +1,3 @@
+<nav class="book__nav flex align-center gap justify-center">
+  <%= await linkToNextLeafable(leaf) %>
+</nav>

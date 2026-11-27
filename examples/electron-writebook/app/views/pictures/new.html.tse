@@ -1,0 +1,20 @@
+<% contentFor("title", "New image page"); %>
+<% const form = await render("pictures/form", { book, picture: this.picture }); %>
+
+<% contentFor("header", () => { %>
+  <nav>
+    <%= linkTo(book, { class: "btn flex-item-justify-start" }, null, () => { %>
+      <%= imageTag("remove.svg", { aria: { hidden: true }, size: 24 }) %>
+      <span class="for-screen-reader">Cancel</span>
+    <% }) %>
+
+    <button type="submit" form="leafable-editor", class="btn flex-item-justify-end">
+      <%= imageTag("check.svg", { aria: { hidden: true }, size: 24 }) %>
+      <span class="for-screen-reader">Save</span>
+    </button>
+  </nav>
+<% }) %>
+
+<div class="page--picture">
+  <%= form %>
+</div>

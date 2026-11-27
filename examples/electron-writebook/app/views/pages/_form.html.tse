@@ -1,0 +1,4 @@
+<% const markdown = await page.safeMarkdownAttribute("body"); %>
+<%= leafableEditForm(page, { id: "leafable-editor" }, (form) => { %>
+  <%= form.markdownArea("body", { value: String(markdown?.content ?? ""), toolbar: "house_toolbar", required: true, autofocus: true, class: "page__editor" }) %>
+<% }) %>

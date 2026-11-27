@@ -1,0 +1,41 @@
+<%= await houseToolbar({ id: "house_toolbar" }, () => { %>
+  <%= await houseToolbarButton("bold", {}, () => { %>
+    <%= imageTag("text-bold.svg", { aria: { hidden: "true" }, size: "16", class: "colorize--black" }) %>
+    <span class="for-screen-reader">Text style: bold</span>
+  <% }) %>
+
+  <%= await houseToolbarButton("italic", {}, () => { %>
+    <%= imageTag("text-italic.svg", { aria: { hidden: "true" }, size: "16", class: "colorize--black" }) %>
+    <span class="for-screen-reader">Text style: italic</span>
+  <% }) %>
+
+  <%= await houseToolbarButton("quote", {}, () => { %>
+    <%= imageTag("text-quote.svg", { aria: { hidden: "true" }, size: "18", class: "colorize--black" }) %>
+    <span class="for-screen-reader">Text style: quote</span>
+  <% }) %>
+
+  <%= await houseToolbarButton("code", {}, () => { %>
+    <%= imageTag("text-code.svg", { aria: { hidden: "true" }, size: "18", class: "colorize--black" }) %>
+    <span class="for-screen-reader">Text style: code</span>
+  <% }) %>
+
+  <%= await houseToolbarButton("link", {}, () => { %>
+    <%= imageTag("text-link.svg", { aria: { hidden: "true" }, size: "18", class: "colorize--black" }) %>
+    <span class="for-screen-reader">Text style: link</span>
+  <% }) %>
+
+  <%= await houseToolbarButton("bulletList", {}, () => { %>
+    <%= imageTag("text-bullets.svg", { aria: { hidden: "true" }, size: "18", class: "colorize--black" }) %>
+    <span class="for-screen-reader">Text style: bulleted list</span>
+  <% }) %>
+
+  <%= await houseToolbarButton("numberList", {}, () => { %>
+    <%= imageTag("text-numbers.svg", { aria: { hidden: "true" }, size: "18", class: "colorize--black" }) %>
+    <span class="for-screen-reader">Text style: numbered list</span>
+  <% }) %>
+
+  <%= await houseToolbarFileUploadButton({}, () => { %>
+    <%= imageTag("text-image.svg", { aria: { hidden: "true" }, size: "18", class: "colorize--black" }) %>
+    <span class="for-screen-reader">Add image</span>
+  <% }) %>
+<% }) %>

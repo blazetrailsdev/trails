@@ -1,0 +1,5 @@
+/storage/*.sqlite3*
+/public/assets
+/.trails
+/tmp
+/log

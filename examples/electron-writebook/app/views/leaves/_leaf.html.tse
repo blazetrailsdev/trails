@@ -1,0 +1,67 @@
+<% const book = await leaf.book; %>
+<% const editable = await book.isEditable(); %>
+<% const page = await leaf.page; const section = await leaf.section; const picture = await leaf.picture; %>
+<% if (picture) { await picture.image.load(); if (picture.image.isAttached()) await (await picture.image.attachment)!.blob; } %>
+<% const deleteButton = await render("leaves/delete", { leaf }); %>
+<% const bodyMarkdown = page ? await page.body() : null; %>
+<% const preview = page ? sanitizeContent(await page.htmlPreview()) : ""; %>
+<%= await cache([leaf, book, editable, HtmlScrubber.cacheVersion()], {}, () => { %>
+<%= leafItemTag(leaf, {}, () => { %>
+  <span class="btn btn--link arrangement__handle txt-small">
+    <%= imageTag("handle.svg", { aria: { hidden: true }, size: 24 }) %>
+    <span class="for-screen-reader">Move <%= leaf.title %></span>
+  </span>
+
+  <%= deleteButton %>
+
+  <div class="toc__thumbnail <%= section?.theme === "dark" ? "toc__thumbnail--dark" : "" %>">
+    <% if (editable) { %>
+      <%= linkTo(editLeafablePath(leaf), { class: "toc__link hide_from_reading_mode", data: { turboFrame: "_top" } }, null, () => { %>
+        <span class="for-screen-reader">Edit <%= leaf.title %></span>
+      <% }) %>
+
+      <%= linkTo(leafableSlugPath(leaf), { class: "toc__link hide_from_edit_mode", data: { turboFrame: "_top" } }, null, () => { %>
+        <span class="for-screen-reader">Open <%= leaf.title %></span>
+      <% }) %>
+    <% } else { %>
+      <%= linkTo(leafableSlugPath(leaf), { class: "toc__link", data: { turboFrame: "_top" } }, null, () => { %>
+        <span class="for-screen-reader">Open <%= leaf.title %></span>
+      <% }) %>
+    <% } %>
+
+    <%= section ? tag().span(simpleFormat(section.body), { class: "txt-align-center" }) : "" %>
+
+    <%= preview %>
+
+    <% if (picture) { %>
+      <%= imageTag(picture.image.isAttached() ? picture.largeImage() : "default-picture.webp") %>
+    <% } %>
+  </div>
+
+  <% if (editable) { %>
+    <%= linkTo(editLeafablePath(leaf), { class: "toc__title min-width hide_from_reading_mode", data: { turboFrame: "_top" } }, null, () => { %>
+      <span class="overflow-ellipsis"><%= leaf.title %></span>
+    <% }) %>
+
+    <%= linkTo(leafableSlugPath(leaf), { class: "toc__title min-width hide_from_edit_mode", data: { turboFrame: "_top" } }, null, () => { %>
+      <span class="overflow-ellipsis"><%= leaf.title %></span>
+    <% }) %>
+  <% } else { %>
+    <%= linkTo(leafableSlugPath(leaf), { class: "toc__title min-width", data: { turboFrame: "_top" } }, null, () => { %>
+      <span class="overflow-ellipsis"><%= leaf.title %></span>
+    <% }) %>
+  <% } %>
+
+  <span class="toc__bookmark">
+    <svg viewBox="0 0 64 64" width="64px" height="64px" xmlns="http://www.w3.org/2000/svg">
+      <path d="m17.01 54.01v-42.98.00000045c-.00000025-1.65685 1.34315-3 3-3h24-.00000013c1.65685-.00000007 3 1.34315 3 3v42.98.0001206c0 1.10457-.895431 2-2 2-.34994 0-.693756-.0918173-.997105-.266281l-11.5039-6.61564c-.308638-.17748-.688362-.17748-.997 0l-11.5046 6.6153.00000011-.00000006c-.957413.550849-2.1801.221264-2.73095-.736149-.174564-.303405-.266442-.647312-.266451-.997351z" fill-rule="evenodd" fill="var(--color-marker)" />
+    </svg>
+  </span>
+
+  <small class="toc__wordcount txt-small--responsive">
+    <% if (bodyMarkdown) { %>
+      <%= wordCount(bodyMarkdown.content) %>
+    <% } %>
+  </small>
+<% }) %>
+<% }) %>

@@ -1,0 +1,7 @@
+<% if (isPresent(params.get("position"))) { %>
+  <%= await turboStream.replace("dragged_item", null, { partial: "leaves/edit", locals: { leaf } }) %>
+<% } else { %>
+  <%= await turboStream.append("leaves", null, { partial: "leaves/edit", locals: { leaf } }) %>
+<% } %>
+
+<%= await turboStream.scrollIntoView(leaf, { animation: "wiggle" }) %>

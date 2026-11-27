@@ -1,0 +1,31 @@
+<% contentFor("title", "Library"); %>
+<% this.layoutClass = "books"; %>
+
+<% contentFor("header", () => { %>
+  <nav>
+    <span class="btn btn--placeholder" aria-hidden="true"></span>
+
+    <span class="product__wordmark btn btn--plain txt-large center">
+      <span>Bookshelf</span>
+    </span>
+
+    <% if (Current.user) { %>
+      <%= linkTo(usersPath(), { class: "btn" }, null, () => { %>
+        <%= imageTag("settings.svg", { aria: { hidden: true }, size: 24 }) %>
+        <span class="for-screen-reader">Manage people and settings</span>
+      <% }) %>
+    <% } else { %>
+      <%= linkTo(newSessionPath(), { class: "btn" }, null, () => { %>
+        <%= imageTag("login-keys.svg", { aria: { hidden: true }, size: 24 }) %>
+        <span class="for-screen-reader">Sign in</span>
+      <% }) %>
+    <% } %>
+  </nav>
+<% }) %>
+
+<%= await cache([books, isSignedIn()], {}, () => { %>
+<div class="library">
+  <%= await render(books) %>
+  <%= isSignedIn() ? await render("books/new") : "" %>
+</div>
+<% }) %>

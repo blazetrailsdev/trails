@@ -1,0 +1,74 @@
+<% const indexLink = await render("books/index-link"); %>
+<% contentFor("title", `Changes to ${leaf.title}`); %>
+<% this.layoutClass = "books"; %>
+<% const book = await leaf.book; %>
+<% const previous = await edit.previous(); %>
+<% const next = await edit.next(); %>
+<% const editLeafable = await edit.page; %>
+<% const previousHtml = editLeafable ? sanitizeContent((await editLeafable.body()).toHtml()) : ""; %>
+<% const currentHtml = sanitizeContent((await (await leaf.page)!.body()).toHtml()); %>
+
+<% contentFor("header", () => { %>
+  <nav>
+    <%= linkTo(editLeafablePath(leaf), { class: "btn" }, null, () => { %>
+      <%= imageTag("arrow-left.svg", { aria: { hidden: true }, size: 24 }) %>
+      <span class="for-screen-reader">Go back</span>
+    <% }) %>
+
+    <div class="breadcrumbs">
+      <%= indexLink %>
+      <span class="flex-item-no-shrink">▸</span>
+      <%= linkTo(book.title, bookSlugPath(book)) %>
+      <span class="flex-item-no-shrink">▸</span>
+      <strong><%= leaf.title %></strong>
+    </div>
+  </nav>
+<% }) %>
+
+<div class="library">
+  <section class="txt-align-start">
+    <%= turboFrameTag("previous_version", block(() => { %>
+      <header class="flex align-center justify-center gap">
+        <% if (previous) { %>
+          <%= linkTo(pageEditPath(leaf, previous), { data: { turboAction: "advance" }, class: "btn btn--reversed txt-small" }, null, () => { %>
+            <%= imageTag("arrow-left.svg", { aria: { hidden: true }, size: 24 }) %>
+            <span class="for-screen-reader">Previous version</span>
+          <% }) %>
+        <% } else { %>
+          <span class="btn btn-reversed txt-small" disabled>
+            <%= imageTag("arrow-left.svg", { aria: { hidden: true }, size: 24 }) %>
+            <span class="for-screen-reader">Previous version</span>
+          </span>
+        <% } %>
+
+        <h2 class="btn btn--reversed txt-medium margin-none overflow-ellipsis">
+          <%= timeAgoInWords(edit.updated_at) %> ago
+        </h2>
+
+        <% if (next) { %>
+          <%= linkTo(pageEditPath(leaf, next), { data: { turboAction: "advance" }, class: "btn btn--reversed txt-small" }, null, () => { %>
+            <%= imageTag("arrow-right.svg", { aria: { hidden: true }, size: 24 }) %>
+            <span class="for-screen-reader">Next version</span>
+          <% }) %>
+        <% } else { %>
+          <span class="btn btn-reversed txt-small" disabled>
+            <%= imageTag("arrow-right.svg", { aria: { hidden: true }, size: 24 }) %>
+            <span class="for-screen-reader">Next version</span>
+          </span>
+        <% } %>
+      </header>
+
+      <%= previousHtml %>
+    <% }) %>
+  </section>
+
+  <section class="page-edit__current txt-align-start">
+    <header class="flex align-center gap justify-center">
+      <%= linkTo(editLeafablePath(leaf), { class: "btn btn--positive txt-medium center margin-none" }, null, () => { %>
+        Current
+      <% }) %>
+    </header>
+
+    <%= currentHtml %>
+  </section>
+</div>

@@ -1,0 +1,10 @@
+<% if (isPresent(params.get("search"))) { %>
+  <div class="search__banner flex-inline align-center gap-half txt-medium--responsive">
+    <span>Highlighted: <strong><%= params.get("search") %></strong></span>
+
+    <%= linkTo(leafableSlugPath(leaf), { class: "btn txt-small borderless" }, null, () => { %>
+      <%= imageTag("remove.svg", { aria: { hidden: true }, size: 24 }) %>
+      <span class="for-screen-reader">Clear highlights</span>
+    <% }) %>
+  </div>
+<% } %>

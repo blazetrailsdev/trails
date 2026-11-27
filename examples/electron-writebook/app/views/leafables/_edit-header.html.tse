@@ -1,0 +1,26 @@
+<% const indexLink = await render("books/index-link"); %>
+<% const sidebarToggle = await render("leaves/sidebar-toggle"); %>
+<% const previousLink = await linkToPreviousLeafable(leaf, { hotkey: false, forEdit: true }); %>
+<% const search = await render("books/searches/search", { book }); %>
+<nav>
+  <%= sidebarToggle %>
+
+  <%= previousLink %>
+
+  <div class="breadcrumbs">
+    <%= indexLink %>
+    <span class="flex-item-no-shrink">▸</span>
+    <%= linkTo(book.title, bookSlugPath(book)) %>
+    <span class="flex-item-no-shrink">▸</span>
+    <%= await formWith({ model: [book, leaf], url: leafablePath(leaf), class: "flex align-center gap-half", format: "html" }, (form) => { %>
+      <strong class="min-width"><%= form.textField("title", { form: "leafable-editor", class: "input full-width", autocomplete: "off" }) %></strong>
+    <% }) %>
+  </div>
+
+  <button class="btn" data-action="fullscreen#toggle" data-fullscreen-target="button">
+    <%= imageTag("expand.svg", { aria: { hidden: true }, size: 24 }) %>
+    <span class="for-screen-reader">Enter fullscreen</span>
+  </button>
+
+  <%= search %>
+</nav>
