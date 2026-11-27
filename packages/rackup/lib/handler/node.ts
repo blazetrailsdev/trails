@@ -238,7 +238,6 @@ export class Node {
               if (closing) break;
               if (res.write(rbObjAsString(chunk)) === false && !res.destroyed)
                 await new Promise<void>((resolve) => (wake = resolve));
-              if (res.destroyed) onClose();
               wake = null;
             }
           } finally {
