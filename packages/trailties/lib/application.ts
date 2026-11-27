@@ -315,7 +315,7 @@ export class Application extends Engine {
 
   /** @inventedArm if — CONVERGEABLE compiled-root-entry-import-placement-ruling */
   async initializeBang(group: InitializerGroup = "default"): Promise<this> {
-    if (this._initialized) throw new Error("Application has been already initialized.");
+    if (this._initialized) throw new RuntimeError("Application has been already initialized.");
     setSourceMapsSupport(true);
     setTrailsRoot(() => this.config.root?.toString() ?? null);
     this._resetAutoloadState();
