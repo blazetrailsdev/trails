@@ -1,17 +1,12 @@
-import {
-  block,
-  AsyncEnumerable,
-  cmp,
-  extend,
-  max,
-  Monitor,
-  rbCheckArrayType,
-  rbCmpint,
-  rbModName,
-  rbObjRespondTo,
-  stringSplit,
-  strip,
-} from "@blazetrails/ruby-compat";
+import { block } from "@blazetrails/ruby-compat/hash";
+import { AsyncEnumerable } from "@blazetrails/ruby-compat/enumerable";
+import { cmp, max, rbCmpint } from "@blazetrails/ruby-compat/comparable";
+import { extend } from "@blazetrails/ruby-compat/include";
+import { Monitor } from "@blazetrails/ruby-compat/monitor";
+import { rbCheckArrayType } from "@blazetrails/ruby-compat/array";
+import { rbModName, rbObjRespondTo } from "@blazetrails/ruby-compat/object";
+import { stringSplit } from "@blazetrails/ruby-compat/string/split";
+import { strip } from "@blazetrails/ruby-compat/string/method-table";
 import type { EarlyTime } from "./early-time.js";
 import { InvocationChain } from "./invocation-chain.js";
 import { InvocationExceptionMixin } from "./invocation-exception-mixin.js";

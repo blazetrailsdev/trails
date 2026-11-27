@@ -1,4 +1,4 @@
-import { TypeError } from "@blazetrails/ruby-compat";
+import { TypeError } from "@blazetrails/ruby-compat/type-error";
 import { Coder } from "../coder.js";
 import { CompositeDecoder } from "../composite-decoder.js";
 import { PG } from "../namespaces.js";

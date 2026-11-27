@@ -1,4 +1,6 @@
-import { Enumerable, include, map, rbInspect } from "@blazetrails/ruby-compat";
+import { Enumerable, map } from "@blazetrails/ruby-compat/enumerable";
+import { include } from "@blazetrails/ruby-compat/include";
+import { rbInspect } from "@blazetrails/ruby-compat/object";
 
 export class LinkedList<T = unknown> {
   readonly head!: T;

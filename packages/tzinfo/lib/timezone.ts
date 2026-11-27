@@ -17,13 +17,10 @@ import {
   tzdataIsdstFlips,
   tzdataOffsetInstant,
 } from "@blazetrails/date";
-import {
-  ArgumentError,
-  Rational,
-  StandardError,
-  TopLevel,
-  rbModName,
-} from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { Rational } from "@blazetrails/ruby-compat/rational";
+import { StandardError } from "@blazetrails/ruby-compat/standard-error";
+import { TopLevel, rbModName } from "@blazetrails/ruby-compat/object";
 import { OffsetTimezonePeriod } from "./offset-timezone-period.js";
 import { TimezoneOffset } from "./timezone-offset.js";
 import { TimezonePeriod } from "./timezone-period.js";

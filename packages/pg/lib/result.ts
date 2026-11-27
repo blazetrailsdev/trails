@@ -1,14 +1,11 @@
-import {
-  ArgumentError,
-  block as rbBlock,
-  Enumerable,
-  IndexError,
-  rbNum2Int,
-  include,
-  rbAnyToS,
-  toEnum,
-  type Enumerator,
-} from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { block as rbBlock } from "@blazetrails/ruby-compat/hash";
+import { Enumerable } from "@blazetrails/ruby-compat/enumerable";
+import { IndexError } from "@blazetrails/ruby-compat/index-error";
+import { rbNum2Int } from "@blazetrails/ruby-compat/kernel-integer";
+import { include } from "@blazetrails/ruby-compat/include";
+import { rbAnyToS } from "@blazetrails/ruby-compat/object";
+import { toEnum, type Enumerator } from "@blazetrails/ruby-compat/enumerator";
 import type pg from "pg";
 import { Constants as PGConstants } from "./pg.js";
 import { Error as PgError, lookupErrorClass } from "./exceptions.js";

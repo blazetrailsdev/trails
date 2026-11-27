@@ -1,4 +1,5 @@
-import { ArgumentError, NotImplementedError } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { NotImplementedError } from "@blazetrails/ruby-compat/not-implemented-error";
 import type { Timestamp } from "./timestamp.js";
 import type { TimezoneOffset } from "./timezone-offset.js";
 import type { TimezoneTransition } from "./timezone-transition.js";

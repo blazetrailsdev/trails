@@ -1,11 +1,8 @@
-import {
-  Enumerable,
-  fetch,
-  include,
-  KERNEL_METHODS,
-  PROTOCOL_PROBES,
-  rbModName,
-} from "@blazetrails/ruby-compat";
+import { Enumerable } from "@blazetrails/ruby-compat/enumerable";
+import { fetch } from "@blazetrails/ruby-compat/hash";
+import { include } from "@blazetrails/ruby-compat/include";
+import { KERNEL_METHODS, PROTOCOL_PROBES } from "@blazetrails/ruby-compat/method-missing-proxy";
+import { rbModName } from "@blazetrails/ruby-compat/object";
 
 export class TaskArguments {
   readonly names: string[];

@@ -4,7 +4,10 @@ import type {
   XmlTreeNode,
 } from "libxml2-wasm";
 import type { DefaultTreeAdapterMap } from "parse5";
-import { ArgumentError, StringIO, include, rbObjClassname } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { StringIO } from "@blazetrails/ruby-compat/string-io";
+import { include } from "@blazetrails/ruby-compat/include";
+import { rbObjClassname } from "@blazetrails/ruby-compat/object";
 
 import { XML, Nokogiri } from "../namespaces.js";
 

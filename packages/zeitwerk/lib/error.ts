@@ -1,4 +1,5 @@
-import { NameError as RubyNameError, StandardError } from "@blazetrails/ruby-compat";
+import { NameError as RubyNameError } from "@blazetrails/ruby-compat/name-error";
+import { StandardError } from "@blazetrails/ruby-compat/standard-error";
 
 export class Error extends StandardError {}
 

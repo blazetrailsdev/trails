@@ -1,4 +1,8 @@
-import { Digest, Dir, File, getFs, getPath, rbObjClassname } from "@blazetrails/ruby-compat";
+import { Digest } from "@blazetrails/ruby-compat/digest";
+import { Dir } from "@blazetrails/ruby-compat/dir";
+import { File } from "@blazetrails/ruby-compat/file";
+import { getFs, getPath } from "@blazetrails/ruby-compat/fs-adapter";
+import { rbObjClassname } from "@blazetrails/ruby-compat/object";
 import type { Loader } from "../loader.js";
 import { Registry } from "../registry.js";
 

@@ -1,22 +1,17 @@
 import { _generations, _installResolveHook, autoloadGet } from "./core-ext/kernel.js";
 import { Internal } from "./internal.js";
-import {
-  File,
-  LOADED_FEATURES,
-  Monitor,
-  Mutex,
-  NameError as RubyNameError,
-  SecureRandom,
-  constGet,
-  extend,
-  type Extended,
-  getFs,
-  include,
-  rbInspect,
-  type Included,
-  type Pathname,
-  ThreadError,
-} from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat/file";
+import { LOADED_FEATURES } from "@blazetrails/ruby-compat/load";
+import { Monitor } from "@blazetrails/ruby-compat/monitor";
+import { Mutex } from "@blazetrails/ruby-compat/mutex";
+import { NameError as RubyNameError } from "@blazetrails/ruby-compat/name-error";
+import { SecureRandom } from "@blazetrails/ruby-compat/secure-random";
+import { constGet } from "@blazetrails/ruby-compat/variable";
+import { extend, type Extended, include, type Included } from "@blazetrails/ruby-compat/include";
+import { getFs } from "@blazetrails/ruby-compat/fs-adapter";
+import { rbInspect } from "@blazetrails/ruby-compat/object";
+import { type Pathname } from "@blazetrails/ruby-compat/pathname";
+import { ThreadError } from "@blazetrails/ruby-compat/thread-error";
 import { Cref } from "./cref.js";
 import { Map } from "./cref/map.js";
 import { ReloadingDisabledError, Error as ZeitwerkError, SetupRequired } from "./error.js";

@@ -1,14 +1,10 @@
-import {
-  ArgumentError,
-  FileUtils as StdlibFileUtils,
-  extend,
-  include,
-  isPlainHash,
-  puts,
-  rbEnsure,
-  rtest,
-  stderr as $stderr,
-} from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { FileUtils as StdlibFileUtils } from "@blazetrails/ruby-compat/file-utils";
+import { extend, include } from "@blazetrails/ruby-compat/include";
+import { isPlainHash, rtest } from "@blazetrails/ruby-compat/object";
+import { puts } from "@blazetrails/ruby-compat/io";
+import { rbEnsure } from "@blazetrails/ruby-compat/ensure";
+import { stderr as $stderr } from "@blazetrails/ruby-compat/process-adapter";
 import { FileUtils } from "./file-utils.js";
 import { Rake } from "./rake-module.js";
 

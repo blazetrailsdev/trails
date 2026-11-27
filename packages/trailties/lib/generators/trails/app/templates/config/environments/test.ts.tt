@@ -4,7 +4,7 @@
 // and recreated between test runs. Don't rely on the data there!
 
 import { isPresent } from "@blazetrails/activesupport";
-import { env } from "@blazetrails/ruby-compat";
+import { env } from "@blazetrails/ruby-compat/process-adapter";
 import { Trails } from "@blazetrails/trailties";
 
 Trails.application.configure(function () {

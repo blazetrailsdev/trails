@@ -1,12 +1,7 @@
 import { CSS } from "../namespaces.js";
-import {
-  ArgumentError,
-  fixMod,
-  rbFSend,
-  rbInspect,
-  rbObjRespondTo,
-  toI,
-} from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { fixMod, toI } from "@blazetrails/ruby-compat/numeric";
+import { rbFSend, rbInspect, rbObjRespondTo } from "@blazetrails/ruby-compat/object";
 
 import { libxml2Patches, usesLibxml } from "../version/info.js";
 import { GLOBAL_SEARCH_PREFIX } from "../xml/xpath.js";

@@ -1,22 +1,15 @@
 import { formatter, SpellChecker } from "@blazetrails/did-you-mean";
-import {
-  File,
-  Method,
-  RuntimeError,
-  classModule,
-  flatten,
-  isPlainHash,
-  rbCheckArrayType,
-  rtest,
-  rbBlockGivenP,
-  rbClassInheritedP,
-  rbFCaller,
-  rbInspect,
-  rbProcCall,
-  rbStrSub,
-  regexpEscape,
-  stringSplit,
-} from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat/file";
+import { Method } from "@blazetrails/ruby-compat/method";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
+import { classModule, rbClassInheritedP } from "@blazetrails/ruby-compat/include";
+import { flatten, rbCheckArrayType } from "@blazetrails/ruby-compat/array";
+import { isPlainHash, rtest, rbInspect, rbProcCall } from "@blazetrails/ruby-compat/object";
+import { rbBlockGivenP } from "@blazetrails/ruby-compat/hash";
+import { rbFCaller } from "@blazetrails/ruby-compat/backtrace-location";
+import { rbStrSub } from "@blazetrails/ruby-compat/string/sub";
+import { regexpEscape } from "@blazetrails/ruby-compat/regexp";
+import { stringSplit } from "@blazetrails/ruby-compat/string/split";
 import { toA } from "@blazetrails/ruby-compat/enumerable";
 import type { Application, ApplicationOptions } from "./application.js";
 import { ext as stringExt, pathmap } from "./ext/string.js";

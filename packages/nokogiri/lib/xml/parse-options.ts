@@ -1,4 +1,5 @@
-import { rbObjInspect, rbClearMethodCache } from "@blazetrails/ruby-compat";
+import { rbObjInspect } from "@blazetrails/ruby-compat/object";
+import { rbClearMethodCache } from "@blazetrails/ruby-compat/include";
 
 import { XML } from "../namespaces.js";
 

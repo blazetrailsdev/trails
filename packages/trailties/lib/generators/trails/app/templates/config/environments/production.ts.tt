@@ -1,5 +1,6 @@
 import { TaggedLogging } from "@blazetrails/activesupport";
-import { env, STDOUT } from "@blazetrails/ruby-compat";
+import { env } from "@blazetrails/ruby-compat/process-adapter";
+import { STDOUT } from "@blazetrails/ruby-compat/io";
 import { Trails } from "@blazetrails/trailties";
 
 Trails.application.configure(function () {

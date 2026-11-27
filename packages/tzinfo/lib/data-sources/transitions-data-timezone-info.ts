@@ -1,4 +1,6 @@
-import { ArgumentError, rbAryBsearchIndex, rbEqual } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { rbAryBsearchIndex } from "@blazetrails/ruby-compat/array";
+import { rbEqual } from "@blazetrails/ruby-compat/rb-equal";
 import type { Timestamp } from "../timestamp.js";
 import type { TimezoneTransition } from "../timezone-transition.js";
 import { TransitionsTimezonePeriod } from "../transitions-timezone-period.js";

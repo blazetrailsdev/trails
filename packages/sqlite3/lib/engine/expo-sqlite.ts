@@ -1,5 +1,6 @@
 import { bindValue } from "./bind-value.js";
-import { LoadError, RuntimeError } from "@blazetrails/ruby-compat";
+import { LoadError } from "@blazetrails/ruby-compat/load-error";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
 import { SQLite3 } from "../namespaces.js";
 import "../constants.js";
 import type { BusyHandler, EngineDatabase, EngineErrors, EngineOpenV2 } from "../database.js";

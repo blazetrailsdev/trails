@@ -1,4 +1,4 @@
-import { ArgumentError } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
 import { OffsetTimezonePeriod } from "../offset-timezone-period.js";
 import type { Timestamp } from "../timestamp.js";
 import type { TimezoneOffset } from "../timezone-offset.js";

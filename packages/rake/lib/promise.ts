@@ -1,4 +1,4 @@
-import { rbObjId } from "@blazetrails/ruby-compat";
+import { rbObjId } from "@blazetrails/ruby-compat/object";
 
 export const NOT_SET: object = Object.freeze({});
 

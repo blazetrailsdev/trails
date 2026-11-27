@@ -1,13 +1,11 @@
-import {
-  File,
-  FileUtils,
-  StandardError,
-  block,
-  extend,
-  puts,
-  rbObjAsString,
-  stdout as $stdout,
-} from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat/file";
+import { FileUtils } from "@blazetrails/ruby-compat/file-utils";
+import { StandardError } from "@blazetrails/ruby-compat/standard-error";
+import { block } from "@blazetrails/ruby-compat/hash";
+import { extend } from "@blazetrails/ruby-compat/include";
+import { puts } from "@blazetrails/ruby-compat/io";
+import { rbObjAsString } from "@blazetrails/ruby-compat/object";
+import { stdout as $stdout } from "@blazetrails/ruby-compat/process-adapter";
 import "./rake.js";
 import { DSL } from "./dsl-definition.js";
 import { FileList } from "./file-list.js";

@@ -1,4 +1,5 @@
-import { isModuleObject, rbObjClassname } from "@blazetrails/ruby-compat";
+import { isModuleObject } from "@blazetrails/ruby-compat/classpath";
+import { rbObjClassname } from "@blazetrails/ruby-compat/object";
 import { Cref } from "../cref.js";
 import { Error as ZeitwerkError } from "../error.js";
 import { Registry } from "../registry.js";

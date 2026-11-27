@@ -1,5 +1,7 @@
 import { autoloadGet } from "../core-ext/kernel.js";
-import { File, rbInspect, type Pathname } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat/file";
+import { rbInspect } from "@blazetrails/ruby-compat/object";
+import { type Pathname } from "@blazetrails/ruby-compat/pathname";
 import { _isModule } from "../core-ext/module.js";
 import { Cref } from "../cref.js";
 import { Error as ZeitwerkError, SetupRequired } from "../error.js";

@@ -1,4 +1,4 @@
-import { aryJoin } from "@blazetrails/ruby-compat";
+import { aryJoin } from "@blazetrails/ruby-compat/array";
 
 import type { Node } from "../html5/node.js";
 import type { NodeSet } from "./node-set.js";

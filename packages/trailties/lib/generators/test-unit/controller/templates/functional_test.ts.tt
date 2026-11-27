@@ -1,6 +1,10 @@
 import { describe, it } from "vitest";
 import { IntegrationTest } from "@blazetrails/actionpack/testing";
-import { <%= this.isMountableEngine() ? "constGet, include, " : "" %>constSet, TopLevel } from "@blazetrails/ruby-compat";
+<% if (this.isMountableEngine()) { -%>
+import { constGet } from "@blazetrails/ruby-compat/variable";
+<% } -%>
+import { <%= this.isMountableEngine() ? "include, " : "" %>constSet } from "@blazetrails/ruby-compat/include";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
 import "<%= "../".repeat(this.classPathParts.length + 1) %>test-helper.js";
 
 <% this.moduleNamespacing(() => { -%>

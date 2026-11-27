@@ -1,4 +1,5 @@
-import { File, include } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat/file";
+import { include } from "@blazetrails/ruby-compat/include";
 import { DSL } from "../dsl-definition.js";
 import { Rake } from "../rake-module.js";
 

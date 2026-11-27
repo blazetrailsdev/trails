@@ -1,4 +1,6 @@
-import { rbBlockGivenP, rbObjId, Thread } from "@blazetrails/ruby-compat";
+import { rbBlockGivenP } from "@blazetrails/ruby-compat/hash";
+import { rbObjId } from "@blazetrails/ruby-compat/object";
+import { Thread } from "@blazetrails/ruby-compat/thread";
 import { Promise as RakePromise } from "./promise.js";
 
 export interface HistoryEvent {

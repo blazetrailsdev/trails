@@ -1,5 +1,8 @@
 import { SQLite3 } from "./namespaces.js";
-import { block, fetch, isSymbol, rbInspect, rbObjAsString, toI } from "@blazetrails/ruby-compat";
+import { block, fetch } from "@blazetrails/ruby-compat/hash";
+import { isSymbol } from "@blazetrails/ruby-compat/symbol";
+import { rbInspect, rbObjAsString } from "@blazetrails/ruby-compat/object";
+import { toI } from "@blazetrails/ruby-compat/numeric";
 
 import type { SqliteBinds } from "./driver.js";
 import { Exception } from "./errors.js";

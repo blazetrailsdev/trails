@@ -1,4 +1,4 @@
-import { TopLevel } from "@blazetrails/ruby-compat";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
 import * as Zeitwerk from "./zeitwerk.js";
 import { Loader } from "./loader.js";
 import "./constants.generated.js";

@@ -1,4 +1,8 @@
-import { AsyncEnumerable, cmp, Errno, File, rbCmpint, rbObjClass } from "@blazetrails/ruby-compat";
+import { AsyncEnumerable } from "@blazetrails/ruby-compat/enumerable";
+import { cmp, rbCmpint } from "@blazetrails/ruby-compat/comparable";
+import { Errno } from "@blazetrails/ruby-compat/errno";
+import { File } from "@blazetrails/ruby-compat/file";
+import { rbObjClass } from "@blazetrails/ruby-compat/object";
 import { LATE } from "./late-time.js";
 import { fromPathname } from "./file-list.js";
 import type { Scope } from "./scope.js";

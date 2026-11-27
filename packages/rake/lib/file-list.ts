@@ -1,57 +1,51 @@
 import {
   ARRAY_METHOD_TABLE,
-  ArgumentError,
-  Dir,
-  Enumerable,
-  Enumerator,
-  File,
-  type FileOpenOpt,
-  FrozenError,
-  IndexError,
-  Range,
-  rbObjRespondTo,
-  StandardError,
   arySlice,
   aryJoin,
-  cmp,
   compactBang,
   deleteAt,
-  enumChain,
-  enumerableLazy,
-  eachCons,
-  eachSlice,
   flatten,
-  groupBy,
-  include,
   isIntersect,
-  maxBy,
-  minBy,
   pack,
   product,
-  puts,
   rbAryFetch,
-  rbBlockGivenP,
   rbCheckArrayType,
-  rbCmpint,
-  rbEqq,
-  rbEqual,
+  uniq,
+} from "@blazetrails/ruby-compat/array";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { Dir } from "@blazetrails/ruby-compat/dir";
+import {
+  Enumerable,
+  eachCons,
+  eachSlice,
+  groupBy,
+  maxBy,
+  minBy,
+  sortBy,
+  tally,
+} from "@blazetrails/ruby-compat/enumerable";
+import { Enumerator, enumChain, enumerableLazy } from "@blazetrails/ruby-compat/enumerator";
+import { File, type FileOpenOpt } from "@blazetrails/ruby-compat/file";
+import { FrozenError } from "@blazetrails/ruby-compat/frozen-error";
+import { IndexError } from "@blazetrails/ruby-compat/index-error";
+import { Range } from "@blazetrails/ruby-compat/range";
+import {
+  rbObjRespondTo,
   rbFSend,
   rbInspect,
   rbObjIsProc,
   rbProcCall,
-  rbRegMatchM,
-  rbStrMatchM,
-  RuntimeError,
-  rbStrSub,
   rtest,
-  sortBy,
-  stderr as $stderr,
-  stdout as $stdout,
-  strGsub,
-  tally,
-  uniq,
-  rbClearMethodCache,
-} from "@blazetrails/ruby-compat";
+} from "@blazetrails/ruby-compat/object";
+import { StandardError } from "@blazetrails/ruby-compat/standard-error";
+import { cmp, rbCmpint } from "@blazetrails/ruby-compat/comparable";
+import { include, rbClearMethodCache } from "@blazetrails/ruby-compat/include";
+import { puts } from "@blazetrails/ruby-compat/io";
+import { rbBlockGivenP } from "@blazetrails/ruby-compat/hash";
+import { rbEqq, rbEqual } from "@blazetrails/ruby-compat/rb-equal";
+import { rbRegMatchM, rbStrMatchM, rbStrSub, strGsub } from "@blazetrails/ruby-compat/string/sub";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
+import { stderr as $stderr, stdout as $stdout } from "@blazetrails/ruby-compat/process-adapter";
 import { Cloneable } from "./cloneable.js";
 import { ext as stringExt, pathmap as stringPathmap } from "./ext/string.js";
 

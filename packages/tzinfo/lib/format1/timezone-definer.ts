@@ -1,4 +1,4 @@
-import { ArgumentError } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
 import { TimezoneDefiner as Format2TimezoneDefiner } from "../format2/timezone-definer.js";
 
 /** @internal */

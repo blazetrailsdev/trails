@@ -3,14 +3,11 @@ import { defaultTreeAdapter, html, parseFragment, type DefaultTreeAdapterMap } f
 import { Attr } from "../xml/attr.js";
 import { Namespace } from "../xml/namespace.js";
 import { NodeSet } from "../xml/node-set.js";
-import {
-  ArgumentError,
-  RuntimeError,
-  StringIO,
-  include,
-  rbObjRespondTo,
-  rbObjClassname,
-} from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
+import { StringIO } from "@blazetrails/ruby-compat/string-io";
+import { include } from "@blazetrails/ruby-compat/include";
+import { rbObjRespondTo, rbObjClassname } from "@blazetrails/ruby-compat/object";
 import type { DocumentFragment } from "./document-fragment.js";
 import { HTML5 } from "../namespaces.js";
 import * as Searchable from "../xml/searchable.js";

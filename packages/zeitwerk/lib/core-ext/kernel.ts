@@ -1,14 +1,9 @@
-import {
-  Kernel,
-  LOADED_FEATURES,
-  NotImplementedError,
-  loadingTable,
-  loadedFileExports,
-  getAsyncContext,
-  getPath,
-  getProcessAdapter,
-  type AsyncContext,
-} from "@blazetrails/ruby-compat";
+import { Kernel } from "@blazetrails/ruby-compat/include";
+import { LOADED_FEATURES, loadingTable, loadedFileExports } from "@blazetrails/ruby-compat/load";
+import { NotImplementedError } from "@blazetrails/ruby-compat/not-implemented-error";
+import { getAsyncContext, type AsyncContext } from "@blazetrails/ruby-compat/async-context-adapter";
+import { getPath } from "@blazetrails/ruby-compat/fs-adapter";
+import { getProcessAdapter } from "@blazetrails/ruby-compat/process-adapter";
 import type { Cref } from "../cref.js";
 import { Registry } from "../registry.js";
 

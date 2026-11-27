@@ -1,4 +1,4 @@
-import { rational } from "@blazetrails/ruby-compat";
+import { rational } from "@blazetrails/ruby-compat/rational";
 import { CountryTimezone } from "../country-timezone.js";
 import { CountryInfo } from "../data-sources/country-info.js";
 import type { StringDeduper } from "../string-deduper.js";

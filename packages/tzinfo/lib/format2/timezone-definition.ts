@@ -1,4 +1,4 @@
-import { extend, rbModAppendFeatures } from "@blazetrails/ruby-compat";
+import { extend, rbModAppendFeatures } from "@blazetrails/ruby-compat/include";
 import { ConstantOffsetDataTimezoneInfo } from "../data-sources/constant-offset-data-timezone-info.js";
 import { LinkedTimezoneInfo } from "../data-sources/linked-timezone-info.js";
 import type { TimezoneInfo } from "../data-sources/timezone-info.js";

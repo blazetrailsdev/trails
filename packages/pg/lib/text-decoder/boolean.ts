@@ -1,4 +1,4 @@
-import { TypeError } from "@blazetrails/ruby-compat";
+import { TypeError } from "@blazetrails/ruby-compat/type-error";
 import { SimpleDecoder } from "../simple-decoder.js";
 import { PG } from "../namespaces.js";
 

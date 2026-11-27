@@ -1,4 +1,4 @@
-import { TopLevel } from "@blazetrails/ruby-compat";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
 import type * as Errors from "./errors.js";
 import type { Database } from "./database.js";
 import type { Pragmas } from "./pragmas.js";

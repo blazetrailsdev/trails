@@ -1,4 +1,4 @@
-import { rbHash } from "@blazetrails/ruby-compat";
+import { rbHash } from "@blazetrails/ruby-compat/rb-hash";
 import { Timestamp } from "./timestamp.js";
 import type { TimezoneOffset } from "./timezone-offset.js";
 

@@ -1,4 +1,4 @@
-import { rbClearMethodCache } from "@blazetrails/ruby-compat";
+import { rbClearMethodCache } from "@blazetrails/ruby-compat/include";
 export class SaveOptions {
   static readonly FORMAT = 1;
   static readonly NO_DECLARATION = 2;

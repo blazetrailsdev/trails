@@ -1,21 +1,16 @@
 import { DateTime, Time } from "@blazetrails/date";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { RangeError } from "@blazetrails/ruby-compat/range-error";
+import { Rational, rational } from "@blazetrails/ruby-compat/rational";
+import { cmp, equals, isBetween, type Comparable } from "@blazetrails/ruby-compat/comparable";
+import { rbHash } from "@blazetrails/ruby-compat/rb-hash";
 import {
-  ArgumentError,
-  RangeError,
-  Rational,
-  cmp,
-  equals,
-  isBetween,
-  rbHash,
   rbInspect,
-  rbIntegerTypeP,
   rbModName,
   rbObjClassname,
   rbObjRespondTo,
-  rational,
-  toI,
-  type Comparable,
-} from "@blazetrails/ruby-compat";
+} from "@blazetrails/ruby-compat/object";
+import { rbIntegerTypeP, toI } from "@blazetrails/ruby-compat/numeric";
 
 type UtcOffset = number | "utc" | null;
 type SubSecond = number | Rational;

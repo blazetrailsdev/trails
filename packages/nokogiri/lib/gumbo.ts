@@ -1,4 +1,5 @@
-import { ArgumentError, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { rbObjRespondTo } from "@blazetrails/ruby-compat/object";
 import { Parser, defaultTreeAdapter, html, type DefaultTreeAdapterMap } from "parse5";
 
 import { HTML5, Nokogiri } from "./namespaces.js";

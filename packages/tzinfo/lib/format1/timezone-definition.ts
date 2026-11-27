@@ -1,4 +1,4 @@
-import { extend, rbModAppendFeatures } from "@blazetrails/ruby-compat";
+import { extend, rbModAppendFeatures } from "@blazetrails/ruby-compat/include";
 import { ClassMethods as Format2ClassMethods } from "../format2/timezone-definition.js";
 import { TimezoneDefiner } from "./timezone-definer.js";
 

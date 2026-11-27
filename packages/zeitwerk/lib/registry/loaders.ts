@@ -1,4 +1,4 @@
-import { aryDelete } from "@blazetrails/ruby-compat";
+import { aryDelete } from "@blazetrails/ruby-compat/array";
 import type { Loader } from "../loader.js";
 
 export class Loaders {

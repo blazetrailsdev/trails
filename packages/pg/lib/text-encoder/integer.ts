@@ -1,4 +1,4 @@
-import { rbObjAsString } from "@blazetrails/ruby-compat";
+import { rbObjAsString } from "@blazetrails/ruby-compat/object";
 import { SimpleEncoder } from "../simple-encoder.js";
 import { PG } from "../namespaces.js";
 

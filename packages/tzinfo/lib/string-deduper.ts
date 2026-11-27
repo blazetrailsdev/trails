@@ -1,4 +1,5 @@
-import { Concurrent, Hash } from "@blazetrails/ruby-compat";
+import { Concurrent } from "@blazetrails/ruby-compat/concurrent/map";
+import { Hash } from "@blazetrails/ruby-compat/hash";
 
 type StringHash = Hash<string, string> | InstanceType<typeof Concurrent.Map<string, string>>;
 

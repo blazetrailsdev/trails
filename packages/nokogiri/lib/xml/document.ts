@@ -1,5 +1,7 @@
 import type { XmlDocument as LibXmlDocument } from "libxml2-wasm";
-import { Pathname, RuntimeError, include } from "@blazetrails/ruby-compat";
+import { Pathname } from "@blazetrails/ruby-compat/pathname";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
+import { include } from "@blazetrails/ruby-compat/include";
 
 import { HTML5, XML, Nokogiri } from "../namespaces.js";
 

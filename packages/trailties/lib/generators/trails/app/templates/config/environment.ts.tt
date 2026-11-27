@@ -1,4 +1,4 @@
-import { setLoadImporter } from "@blazetrails/ruby-compat";
+import { setLoadImporter } from "@blazetrails/ruby-compat/load";
 import { Trails } from "@blazetrails/trailties";
 
 // Load the trails application.

@@ -1,4 +1,5 @@
-import { classModule, rbOutputRs } from "@blazetrails/ruby-compat";
+import { classModule } from "@blazetrails/ruby-compat/include";
+import { rbOutputRs } from "@blazetrails/ruby-compat/io";
 
 export class TraceOutput {
   static readonly [classModule] = true;

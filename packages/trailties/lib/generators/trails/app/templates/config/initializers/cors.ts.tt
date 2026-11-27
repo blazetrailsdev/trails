@@ -8,7 +8,7 @@
 // Run `pnpm add @blazetrails/rack-cors`, then uncomment the block below.
 
 // import * as Rack from "@blazetrails/rack-cors";
-// import { block } from "@blazetrails/ruby-compat";
+// import { block } from "@blazetrails/ruby-compat/include";
 // import { Trails } from "@blazetrails/trailties";
 //
 // Trails.application!.config.middleware.insertBefore(

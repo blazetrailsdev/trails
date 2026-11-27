@@ -1,4 +1,5 @@
-import { ArgumentError, rbInspect } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { rbInspect } from "@blazetrails/ruby-compat/object";
 
 import { Parser } from "./css/parser.js";
 import { SelectorCache } from "./css/selector-cache.js";

@@ -1,4 +1,4 @@
-import { include } from "@blazetrails/ruby-compat";
+import { include } from "@blazetrails/ruby-compat/include";
 import { Cloneable } from "./cloneable.js";
 import { DSL } from "./dsl-definition.js";
 

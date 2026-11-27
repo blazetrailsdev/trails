@@ -1,5 +1,6 @@
-import { rbEqual, rbHash } from "@blazetrails/ruby-compat";
-import type { Rational } from "@blazetrails/ruby-compat";
+import { rbEqual } from "@blazetrails/ruby-compat/rb-equal";
+import { rbHash } from "@blazetrails/ruby-compat/rb-hash";
+import type { Rational } from "@blazetrails/ruby-compat/rational";
 import { Timezone } from "./timezone.js";
 
 export class CountryTimezone {

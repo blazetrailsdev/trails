@@ -1,4 +1,4 @@
-import { BigDecimal } from "@blazetrails/ruby-compat";
+import { BigDecimal } from "@blazetrails/ruby-compat/big-decimal";
 import { SimpleDecoder } from "../simple-decoder.js";
 import { PG } from "../namespaces.js";
 

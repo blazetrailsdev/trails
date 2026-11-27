@@ -1,4 +1,7 @@
-import { File, RbConfig, RuntimeError, env as ENV } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat/file";
+import { RbConfig } from "@blazetrails/ruby-compat/rb-config";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
+import { env as ENV } from "@blazetrails/ruby-compat/process-adapter";
 
 export class Win32HomeError extends RuntimeError {}
 

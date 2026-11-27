@@ -1,4 +1,5 @@
-import { NotImplementedError, TopLevel } from "@blazetrails/ruby-compat";
+import { NotImplementedError } from "@blazetrails/ruby-compat/not-implemented-error";
+import { TopLevel } from "@blazetrails/ruby-compat/object";
 import type { DataTimezone } from "../data-timezone.js";
 import type { Timestamp } from "../timestamp.js";
 import type { TimezonePeriod } from "../timezone-period.js";

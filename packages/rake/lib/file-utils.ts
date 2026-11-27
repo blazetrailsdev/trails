@@ -1,16 +1,13 @@
-import {
-  File,
-  NotImplementedError,
-  Process,
-  RbConfig,
-  RuntimeError,
-  StandardError,
-  env as ENV,
-  isPlainHash,
-  rbBlockGivenP,
-  rbFSystem,
-  rtest,
-} from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat/file";
+import { NotImplementedError } from "@blazetrails/ruby-compat/not-implemented-error";
+import { Process } from "@blazetrails/ruby-compat/process";
+import { RbConfig } from "@blazetrails/ruby-compat/rb-config";
+import { RuntimeError } from "@blazetrails/ruby-compat/runtime-error";
+import { StandardError } from "@blazetrails/ruby-compat/standard-error";
+import { env as ENV } from "@blazetrails/ruby-compat/process-adapter";
+import { isPlainHash, rtest } from "@blazetrails/ruby-compat/object";
+import { rbBlockGivenP } from "@blazetrails/ruby-compat/hash";
+import { rbFSystem } from "@blazetrails/ruby-compat/kernel-system";
 import { PseudoStatus } from "./pseudo-status.js";
 import { Rake } from "./rake-module.js";
 
