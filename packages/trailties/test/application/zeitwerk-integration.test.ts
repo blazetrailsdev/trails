@@ -6,7 +6,7 @@ import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
 import { capture } from "@blazetrails/activesupport/testing/stream";
 import { File } from "@blazetrails/ruby-compat/file";
 import { include } from "@blazetrails/ruby-compat/include";
-import { TopLevel } from "@blazetrails/ruby-compat/object";
+import { constDefined, constGet, TopLevel } from "@blazetrails/ruby-compat";
 import { Loader } from "@blazetrails/zeitwerk";
 import { Application } from "../../lib/application.js";
 import { Trails } from "../../lib/trails.js";
@@ -181,5 +181,83 @@ export class Post {}
 
     expect(out).toMatch(/^Zeitwerk@trails.main: autoload set for ApplicationRecord/m);
     expect(out).toMatch(/^Zeitwerk@trails.once: autoload set for Utils/m);
+  });
+
+  it("autoloaders inflect with Active Support", async () => {
+    await t.appFile(
+      "config/initializers/inflections.ts",
+      `import { inflections } from "@blazetrails/activesupport";
+inflections("en", (inflect) => {
+  inflect.acronym("RESTful");
+});`,
+    );
+
+    await t.appFile(
+      "app/controllers/restful-controller.ts",
+      `import { ApplicationController } from "./application-controller.js";
+export class RESTfulController extends ApplicationController {}`,
+    );
+
+    await boot();
+
+    const basename = "restful-controller";
+    const abspath = `${Trails.root()}/app/controllers/${basename}.ts`;
+    const camelized = "RESTfulController";
+
+    Trails.autoloaders.each((autoloader) => {
+      expect(autoloader.inflector.camelize(basename, abspath)).toBe(camelized);
+    });
+
+    expect(constGet(TopLevel, "RESTfulController")).toBeTruthy();
+  });
+
+  it("the once autoloader can eager load", async () => {
+    await t.appFile(
+      "app/serializers/money-serializer.ts",
+      'export const MoneySerializer = "dummy_value";',
+    );
+
+    await t.addToConfig("this.config.autoloadOncePaths.push(`${Trails.root()}/app/serializers`);");
+    await t.addToConfig("this.config.eagerLoadPaths.push(`${Trails.root()}/app/serializers`);");
+
+    expect(constDefined(TopLevel, "MoneySerializer")).toBe(false);
+
+    await boot("production");
+
+    expect(constDefined(TopLevel, "MoneySerializer")).toBe(true);
+  });
+
+  // PERMANENT-SKIP: packages/trailties/CLAUDE.md, "The application loader is Zeitwerk"
+  it.skip("eager loading loads the application code if invoked manually too (regression test)", async () => {
+    globals.zeitwerkIntegrationTestUser = false;
+    globals.zeitwerkIntegrationTestPost = false;
+
+    await boot();
+
+    expect(globals.zeitwerkIntegrationTestUser).toBe(false);
+    expect(globals.zeitwerkIntegrationTestPost).toBe(false);
+
+    await Trails.application!.eagerLoadBang();
+
+    expect(globals.zeitwerkIntegrationTestUser).toBeTruthy();
+    expect(globals.zeitwerkIntegrationTestPost).toBeTruthy();
+  });
+
+  it("reloading eager loads again, if enabled", async () => {
+    await t.addToEnvConfig("development", "this.config.eagerLoad = true;");
+
+    globals.zeitwerkIntegrationTestEagerLoadCount = 0;
+    await t.appFile(
+      "app/models/user.ts",
+      `import { TopLevel } from "@blazetrails/ruby-compat";
+export class User {}
+(TopLevel as unknown as Record<string, number>).zeitwerkIntegrationTestEagerLoadCount += 1;`,
+    );
+
+    await boot();
+    expect(globals.zeitwerkIntegrationTestEagerLoadCount).toBe(1);
+
+    await Trails.application!.reloader.reloadBang();
+    expect(globals.zeitwerkIntegrationTestEagerLoadCount).toBe(2);
   });
 });
