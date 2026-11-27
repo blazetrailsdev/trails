@@ -220,11 +220,11 @@ export class RESTfulController extends ApplicationController {}`,
     await t.addToConfig("this.config.autoloadOncePaths.push(`${Trails.root()}/app/serializers`);");
     await t.addToConfig("this.config.eagerLoadPaths.push(`${Trails.root()}/app/serializers`);");
 
-    expect(constDefined(TopLevel, "MoneySerializer")).toBe(false);
+    expect(constDefined(TopLevel, "MoneySerializer")).toBeFalsy();
 
     await boot("production");
 
-    expect(constDefined(TopLevel, "MoneySerializer")).toBe(true);
+    expect(constDefined(TopLevel, "MoneySerializer")).toBeTruthy();
   });
 
   // PERMANENT-SKIP: packages/trailties/CLAUDE.md, "The application loader is Zeitwerk"
@@ -234,8 +234,8 @@ export class RESTfulController extends ApplicationController {}`,
 
     await boot();
 
-    expect(globals.zeitwerkIntegrationTestUser).toBe(false);
-    expect(globals.zeitwerkIntegrationTestPost).toBe(false);
+    expect(globals.zeitwerkIntegrationTestUser).toBeFalsy();
+    expect(globals.zeitwerkIntegrationTestPost).toBeFalsy();
 
     await Trails.application!.eagerLoadBang();
 
