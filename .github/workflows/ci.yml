@@ -1403,6 +1403,10 @@ jobs:
       needs.changes.outputs.docs_only != 'true' &&
       needs.changes.outputs.activerecord_affected == 'true'
     runs-on: ${{ fromJSON(needs.changes.outputs.sqlite_runs_on) }}
+    # contents: write creates the refs/ci-queue/* refs scripts/ci/ar-shard-queue.mts
+    # claims batches with.
+    permissions:
+      contents: write
     timeout-minutes: 20
     # 3-way file-level shard on hosted (RFC 0028 shard-ar-adapter-suites) — see the
     # postgres-tests job below for the rationale. That story left this lane
@@ -1451,11 +1455,13 @@ jobs:
         env:
           VITEST_SHARD_DURATIONS: sqlite3
       - if: needs.changes.outputs.ar_scope == ''
-        run: pnpm vitest run packages/activerecord/ packages/solid-queue/ packages/solid-cable/ packages/solid-cache/ packages/activestorage/ packages/actionmailbox/ packages/actiontext/ packages/turbo/ --project '!system' --shard=${{ matrix.shard }}/${{ strategy.job-total }}
+        # Legs pull batches from a queue the lane shares (scripts/ci/ar-shard-queue.mts),
+        # so a slow runner takes fewer files and shard 1's extra steps balance out.
+        run: node scripts/ci/ar-shard-queue.mts ${{ matrix.shard }}/${{ strategy.job-total }} packages/activerecord/ packages/solid-queue/ packages/solid-cable/ packages/solid-cache/ packages/activestorage/ packages/actionmailbox/ packages/actiontext/ packages/turbo/ --project '!system'
         env:
+          GITHUB_TOKEN: ${{ github.token }}
           AR_SPLIT: ${{ (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && 'all' || 'rest' }}
           VITEST_SHARD_DURATIONS: sqlite3
-          VITEST_SHARD_ONE_EXTRA_MS: "110000"
       - if: needs.changes.outputs.ar_scope != ''
         env:
           AR_SCOPE: ${{ needs.changes.outputs.ar_scope }}
@@ -1694,6 +1700,10 @@ jobs:
       needs.changes.outputs.db_adapter_affected == 'true' ||
       contains(github.event.pull_request.labels.*.name, 'run-db-adapters'))
     runs-on: ubuntu-24.04
+    # contents: write creates the refs/ci-queue/* refs scripts/ci/ar-shard-queue.mts
+    # claims batches with.
+    permissions:
+      contents: write
     timeout-minutes: 20
     # 3-way file-level shard (RFC 0028 shard-ar-adapter-suites). This suite is
     # the CI critical path; vitest --shard splits the file set across three free
@@ -1813,11 +1823,13 @@ jobs:
           PGPORT: "5432"
           PGUSER: rails
       - if: needs.changes.outputs.ar_scope == ''
-        run: pnpm vitest run packages/activerecord/ packages/solid-queue/ packages/solid-cable/ packages/solid-cache/ packages/activestorage/ packages/actionmailbox/ packages/actiontext/ packages/turbo/ --project '!system' --shard=${{ matrix.shard }}/${{ strategy.job-total }}
+        # Legs pull batches from a queue the lane shares (scripts/ci/ar-shard-queue.mts),
+        # so a slow runner takes fewer files and shard 1's extra steps balance out.
+        run: node scripts/ci/ar-shard-queue.mts ${{ matrix.shard }}/${{ strategy.job-total }} packages/activerecord/ packages/solid-queue/ packages/solid-cable/ packages/solid-cache/ packages/activestorage/ packages/actionmailbox/ packages/actiontext/ packages/turbo/ --project '!system'
         env:
+          GITHUB_TOKEN: ${{ github.token }}
           AR_SPLIT: ${{ (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && 'all' || 'rest' }}
           VITEST_SHARD_DURATIONS: postgresql
-          VITEST_SHARD_ONE_EXTRA_MS: "110000"
           ARCONN: postgresql
           PGHOST: localhost
           PGPORT: "5432"
@@ -2137,6 +2149,10 @@ jobs:
       needs.changes.outputs.db_adapter_affected == 'true' ||
       contains(github.event.pull_request.labels.*.name, 'run-db-adapters'))
     runs-on: ubuntu-24.04
+    # contents: write creates the refs/ci-queue/* refs scripts/ci/ar-shard-queue.mts
+    # claims batches with.
+    permissions:
+      contents: write
     timeout-minutes: 20
     # 3-way file-level shard (RFC 0028 shard-ar-adapter-suites) — see the
     # postgres-tests job above for the rationale. Each matrix leg gets its own
@@ -2197,11 +2213,13 @@ jobs:
           MYSQL_HOST: localhost
           MYSQL_PORT: "3306"
       - if: needs.changes.outputs.ar_scope == ''
-        run: pnpm vitest run packages/activerecord/ packages/solid-queue/ packages/solid-cable/ packages/solid-cache/ packages/activestorage/ packages/actionmailbox/ packages/actiontext/ packages/turbo/ --project '!system' --shard=${{ matrix.shard }}/${{ strategy.job-total }}
+        # Legs pull batches from a queue the lane shares (scripts/ci/ar-shard-queue.mts),
+        # so a slow runner takes fewer files and shard 1's extra steps balance out.
+        run: node scripts/ci/ar-shard-queue.mts ${{ matrix.shard }}/${{ strategy.job-total }} packages/activerecord/ packages/solid-queue/ packages/solid-cable/ packages/solid-cache/ packages/activestorage/ packages/actionmailbox/ packages/actiontext/ packages/turbo/ --project '!system'
         env:
+          GITHUB_TOKEN: ${{ github.token }}
           AR_SPLIT: ${{ (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && 'all' || 'rest' }}
           VITEST_SHARD_DURATIONS: mysql2
-          VITEST_SHARD_ONE_EXTRA_MS: "110000"
           ARCONN: mysql2
           MYSQL_HOST: localhost
           MYSQL_PORT: "3306"
@@ -3047,6 +3065,7 @@ jobs:
     runs-on: ubuntu-24.04
     permissions:
       actions: read
+      contents: write
       issues: write
     steps:
       - name: Fail if any required job failed, was cancelled, or unexpectedly skipped
@@ -3327,3 +3346,12 @@ jobs:
                 s=$1; m=int(s/60); r=s-m*60;
                 printf("| %s | %s | %dm%02ds |\n", $2, $3, m, r)
               }' >> "$GITHUB_STEP_SUMMARY"
+      # The AR lanes' work-queue claims (scripts/ci/ar-shard-queue.mts).
+      - name: Delete this run's refs/ci-queue refs
+        if: ${{ always() }}
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api --paginate "repos/$GITHUB_REPOSITORY/git/matching-refs/ci-queue/$GITHUB_RUN_ID-" --jq '.[].ref' |
+            while read -r ref; do gh api -X DELETE "repos/$GITHUB_REPOSITORY/git/$ref" >/dev/null; done
