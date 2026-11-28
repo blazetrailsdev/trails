@@ -21,7 +21,6 @@ export const NOKOGIRI_UNPORTED_FILES: UnportedFile[] = [
   { pattern: "/html4/entity_lookup.rb", package: "nokogiri", reason: NOT_CALLED },
   { pattern: "/html5/builder.rb", package: "nokogiri", reason: NOT_CALLED },
   { pattern: "/xml/attribute_decl.rb", package: "nokogiri", reason: NOT_CALLED },
-  { pattern: "/xml/builder.rb", package: "nokogiri", reason: NOT_CALLED },
   { pattern: "/xml/element_content.rb", package: "nokogiri", reason: NOT_CALLED },
   { pattern: "/xml/element_decl.rb", package: "nokogiri", reason: NOT_CALLED },
   { pattern: "/xml/entity_decl.rb", package: "nokogiri", reason: NOT_CALLED },

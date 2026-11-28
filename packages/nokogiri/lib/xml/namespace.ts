@@ -10,6 +10,7 @@ export class Namespace {
       readonly owner?: unknown;
       readonly prefix: string | null;
       readonly href: string;
+      readonly nsPtr?: number;
     },
     readonly document: unknown = null,
   ) {}

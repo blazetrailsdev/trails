@@ -395,7 +395,7 @@ export class Node extends XmlNode {
   }
 
   /** @internal */
-  private setNamespace(namespace: Namespace | null): void {
+  protected override setNamespace(namespace: Namespace | null): void {
     (this._node as { namespaceURI: string }).namespaceURI = namespace?.href ?? "";
   }
 

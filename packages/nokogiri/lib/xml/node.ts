@@ -6,6 +6,7 @@ import type {
 import type { DefaultTreeAdapterMap } from "parse5";
 import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
 import { StringIO } from "@blazetrails/ruby-compat/string-io";
+import { TypeError } from "@blazetrails/ruby-compat/type-error";
 import { include } from "@blazetrails/ruby-compat/include";
 import { rbObjClassname } from "@blazetrails/ruby-compat/object";
 
@@ -14,6 +15,7 @@ import { XML, Nokogiri } from "../namespaces.js";
 import type { Node } from "../html5/node.js";
 import type { XmlDocument } from "./document.js";
 import type { DocumentFragment } from "./document-fragment.js";
+import { Namespace } from "./namespace.js";
 import { NodeSet } from "./node-set.js";
 import { SaveOptions } from "./node/save-options.js";
 import * as Searchable from "./searchable.js";
@@ -28,12 +30,16 @@ export interface XmlNode {
   css(...args: unknown[]): NodeSet;
   atCss(...args: unknown[]): XmlNode | undefined;
   at(...args: unknown[]): XmlNode | undefined;
+  search(...args: unknown[]): NodeSet;
   xpath(...args: unknown[]): NodeSet;
   atXpath(...args: unknown[]): XmlNode | undefined;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface above.
 export class XmlNode {
+  static readonly ELEMENT_NODE = 1;
+  static readonly PI_NODE = 7;
+  static readonly COMMENT_NODE = 8;
   static readonly DOCUMENT_NODE = 9;
   static readonly IMPLIED_XPATH_CONTEXTS: readonly string[] = [".//"];
   static readonly SaveOptions = SaveOptions;
@@ -63,6 +69,141 @@ export class XmlNode {
 
   get type(): number {
     return Nokogiri.LibXml2!.XmlTreeCommonStruct.type(this.pointerId);
+  }
+
+  equals(other: unknown): boolean {
+    if (other == null) return false;
+    if (!(typeof other === "object" && "pointerId" in other)) return false;
+    return this.pointerId === (other as XmlNode).pointerId;
+  }
+
+  decorateBang(): void {
+    (this.document as XmlDocument).decorate(this);
+  }
+
+  addChild(nodeOrTags: unknown): XmlNode | NodeSet {
+    const coerced = this.coerce(nodeOrTags);
+    if (coerced instanceof NodeSet) {
+      coerced.each((n) => this.addChildNodeAndReparentAttrs(n));
+    } else {
+      this.addChildNodeAndReparentAttrs(coerced);
+    }
+    return coerced;
+  }
+
+  get parent(): XmlNode | null {
+    const cParent = Nokogiri.LibXml2!.XmlTreeCommonStruct.parent(this.pointerId);
+    if (!cParent) return null;
+    const document = this.document as XmlNode | null;
+    if (document !== null && cParent === document.pointerId) return document;
+    return new XmlNode(Nokogiri.LibXml2!.createNode(cParent), this.document);
+  }
+
+  set parent(parentNode: XmlNode | DocumentFragment) {
+    parentNode.addChild(this);
+  }
+
+  get namespace(): Namespace | null {
+    const libxml = Nokogiri.LibXml2!;
+    if (this.type !== XmlNode.ELEMENT_NODE) return null;
+    const cNamespace = libxml.XmlNodeStruct.namespace(this.pointerId);
+    if (cNamespace) return nokoXmlNamespaceWrap(cNamespace, this.document);
+    return null;
+  }
+
+  set namespace(ns: Namespace | null) {
+    if (ns == null) {
+      this.setNamespace(ns);
+      return;
+    }
+
+    if (!(ns instanceof Namespace)) {
+      throw new TypeError(`${rbObjClassname(ns)} can't be coerced into Nokogiri::XML::Namespace`);
+    }
+    if (ns.document !== this.document) {
+      throw new ArgumentError("namespace must be declared on the same document");
+    }
+
+    this.setNamespace(ns);
+  }
+
+  get namespaceDefinitions(): Namespace[] {
+    const libxml = Nokogiri.LibXml2!;
+    const definitions: Namespace[] = [];
+    if (this.type !== XmlNode.ELEMENT_NODE) return definitions;
+
+    let cNamespace = libxml.XmlNodeStruct.nsDef(this.pointerId);
+    if (!cNamespace) return definitions;
+
+    while (cNamespace) {
+      definitions.push(nokoXmlNamespaceWrap(cNamespace, this.document));
+      cNamespace = libxml.XmlNsStruct.next(cNamespace);
+    }
+
+    return definitions;
+  }
+
+  addNamespaceDefinition(prefix: string | null, href: string): Namespace | null {
+    const libxml = Nokogiri.LibXml2!;
+    const cNode = this.pointerId;
+    let element = cNode;
+
+    let cNamespace = libxml.xmlSearchNs(libxml.XmlTreeCommonStruct.doc(cNode), cNode, prefix);
+
+    if (!cNamespace) {
+      if (this.type !== XmlNode.ELEMENT_NODE) {
+        element = libxml.XmlTreeCommonStruct.parent(cNode);
+      }
+      cNamespace = libxml.xmlNewNs(element, href, prefix ?? undefined);
+    }
+
+    if (!cNamespace) return null;
+
+    if (prefix == null || cNode !== element) {
+      libxml.xmlSetNs(cNode, cNamespace);
+    }
+
+    return nokoXmlNamespaceWrap(cNamespace, this.document);
+  }
+
+  ancestors(selector: string | null = null): NodeSet {
+    if (!("parent" in (this as object))) return new NodeSet(this.document);
+    if (!this.parent) return new NodeSet(this.document);
+
+    const parents: XmlNode[] = [this.parent];
+
+    while ("parent" in parents.at(-1)!) {
+      const ctxParent = parents.at(-1)!.parent;
+      if (!ctxParent) break;
+
+      parents.push(ctxParent);
+    }
+
+    if (selector === null) return new NodeSet(this.document, parents as Node[]);
+
+    const root = parents.at(-1)!;
+    const searchResults = root.search(selector);
+
+    return new NodeSet(
+      this.document,
+      parents.filter((parent) =>
+        searchResults.toA().some((result) => (result as XmlNode).equals(parent)),
+      ) as Node[],
+    );
+  }
+
+  /** @missingRailsCall get — PERMANENT */
+  get(name: string): string | null {
+    if (!(this._node instanceof Nokogiri.LibXml2!.XmlElement)) return null;
+    return this._node.attr(String(name))?.value ?? null;
+  }
+
+  isComment(): boolean {
+    return this.type === XmlNode.COMMENT_NODE;
+  }
+
+  isProcessingInstruction(): boolean {
+    return this.type === XmlNode.PI_NODE;
   }
 
   isXml(): boolean {
@@ -103,6 +244,32 @@ export class XmlNode {
     return (this._node as XmlTreeNode).content ?? "";
   }
 
+  set content(string: unknown) {
+    this.nativeContent = this.encodeSpecialChars(String(string));
+  }
+
+  set nativeContent(content: string) {
+    const libxml = Nokogiri.LibXml2!;
+    let child = libxml.XmlTreeCommonStruct.children(this.pointerId);
+    while (child) {
+      const next = libxml.XmlTreeCommonStruct.next(child);
+      libxml.xmlUnlinkNode(child);
+      child = next;
+    }
+
+    libxml.xmlNodeSetContent(this.pointerId, content);
+  }
+
+  /** @missingRailsCall xmlEncodeSpecialChars — CONVERGEABLE nokogiri-libxml2-wasm-encode-special-chars */
+  encodeSpecialChars(string: string): string {
+    return string
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/\r/g, "&#13;");
+  }
+
   get text(): string {
     return this.content;
   }
@@ -137,8 +304,9 @@ export class XmlNode {
     return this;
   }
 
-  set(name: string, value: string): void {
-    if (this._node instanceof Nokogiri.LibXml2!.XmlElement) this._node.setAttr(name, value);
+  set(name: unknown, value: unknown): void {
+    if (this._node instanceof Nokogiri.LibXml2!.XmlElement)
+      this._node.setAttr(String(name), String(value));
   }
 
   values(): string[] {
@@ -269,9 +437,28 @@ export class XmlNode {
   }
 
   /** @internal */
+  protected setNamespace(namespace: Namespace | null): void {
+    const libxml = Nokogiri.LibXml2!;
+    const node = this.pointerId;
+    const ns = namespace === null ? 0 : namespace._node.nsPtr!;
+
+    libxml.xmlSetNs(node, ns);
+
+    if (
+      ns &&
+      this.type === XmlNode.ELEMENT_NODE &&
+      !libxml.xmlSearchNs(libxml.XmlTreeCommonStruct.doc(node), node, namespace!.prefix)
+    ) {
+      const definition = libxml.xmlNewNs(node, namespace!.href, namespace!.prefix ?? undefined);
+      if (definition) libxml.xmlSetNs(node, definition);
+    }
+  }
+
+  /** @internal */
   protected addChildNode(node: XmlNode): void {
     Nokogiri.LibXml2!.xmlUnlinkNode(node.pointerId);
     Nokogiri.LibXml2!.xmlAddChild(this.pointerId, node.pointerId);
+    relinkNamespace(node);
   }
 
   /** @internal */
@@ -284,6 +471,51 @@ export class XmlNode {
       node.set(name, value);
     }
   }
+}
+
+/**
+ * @internal
+ * @missingRailsCall xmlSplitQName2 — CONVERGEABLE nokogiri-relink-namespace-qname-and-nsdef-arms
+ */
+function relinkNamespace(reparented: XmlNode): void {
+  const libxml = Nokogiri.LibXml2!;
+  const cReparented = reparented.pointerId;
+
+  if (reparented.type !== XmlNode.ELEMENT_NODE) return;
+
+  const cNs = libxml.XmlNodeStruct.namespace(cReparented);
+  if (!cNs || !libxml.XmlNsStruct.prefix(cNs)) {
+    if (!reparented.name.includes(":")) {
+      const ns = libxml.xmlSearchNs(libxml.XmlTreeCommonStruct.doc(cReparented), cReparented, null);
+
+      if (ns) libxml.xmlSetNs(cReparented, ns);
+    }
+  }
+
+  if (!libxml.XmlTreeCommonStruct.parent(cReparented)) return;
+
+  const cDoc = libxml.XmlTreeCommonStruct.doc(cReparented);
+  const cParent = libxml.XmlTreeCommonStruct.parent(cReparented);
+  if (
+    !libxml.XmlNodeStruct.namespace(cReparented) &&
+    cDoc !== cParent &&
+    (reparented.document as XmlDocument | null)?.namespaceInheritance === true
+  ) {
+    libxml.xmlSetNs(cReparented, libxml.XmlNodeStruct.namespace(cParent));
+  }
+}
+
+/** @internal */
+function nokoXmlNamespaceWrap(cNamespace: number, cDocument: unknown): Namespace {
+  const libxml = Nokogiri.LibXml2!;
+  return new Namespace(
+    {
+      prefix: libxml.XmlNsStruct.prefix(cNamespace) || null,
+      href: libxml.XmlNsStruct.href(cNamespace),
+      nsPtr: cNamespace,
+    },
+    cDocument,
+  );
 }
 
 include(XmlNode, Searchable);
