@@ -711,6 +711,8 @@ describe("AttrNames.defineAttributeAccessorMethod (attribute_methods.rb:577-589)
     for (const attr of ["title", "_foo", "URL", "string_value"]) {
       expect(pattern.match(pattern.methodName(attr))?.attrName).toBe(attr);
     }
+    expect(pattern.match(pattern.methodName("A"))?.attrName).toBe("a");
+    expect(pattern.match(pattern.methodName("Title"))?.attrName).toBe("title");
     expect(pattern.methodName("title")).toBe("hasTitle");
     expect(pattern.match("hasTitle")?.proxyTarget).toBe("attribute?");
 
