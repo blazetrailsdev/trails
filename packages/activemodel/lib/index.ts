@@ -83,7 +83,19 @@ export type {
   TransactionalCallbackConditions,
 } from "./callbacks.js";
 export { serializableHash } from "./serialization.js";
-export type { SerializeOptions, SerializableHash } from "./serialization.js";
+export type {
+  SerializeOptions,
+  SerializableHash,
+  AttributeKeys,
+  AssociationKeys,
+  AssociationTarget,
+  MethodNames,
+  TypedSerializeOptions,
+  TypedIncludeHash,
+  JsonValue,
+  Serialized,
+  SerializedJson,
+} from "./serialization.js";
 
 export { JSON as JSONSerializer } from "./serializers/json.js";
 

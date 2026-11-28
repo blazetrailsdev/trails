@@ -14,12 +14,12 @@
   },
   "activemodel": {
     "tarball": {
-      "value": 111060,
-      "reason": "ruby-compat barrel imports moved to longer subpath specifiers (RFC 0192)"
+      "value": 112265,
+      "reason": "Serialized / SerializedJson type declarations for typed as_json (RFC typed-json-openapi)"
     },
     "unpacked": {
-      "value": 569920,
-      "reason": "ruby-compat barrel imports moved to longer subpath specifiers (RFC 0192)"
+      "value": 574543,
+      "reason": "Serialized / SerializedJson type declarations for typed as_json (RFC typed-json-openapi)"
     },
     "entries": {
       "value": 227
