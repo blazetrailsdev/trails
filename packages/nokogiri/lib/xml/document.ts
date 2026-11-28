@@ -8,7 +8,7 @@ import { HTML5, XML, Nokogiri } from "../namespaces.js";
 import type { DocumentFragment } from "./document-fragment.js";
 import { NodeSet } from "./node-set.js";
 import * as Searchable from "./searchable.js";
-import { XmlNode, nokoXmlNodeWrap } from "./node.js";
+import { XmlNode, nodeCaches, nokoXmlNodeWrap } from "./node.js";
 import { ParseOptions } from "./parse-options.js";
 import { type Readable, readSource } from "../readable.js";
 import { SyntaxError } from "./syntax-error.js";
@@ -292,6 +292,7 @@ export class XmlDocument extends XmlNode {
   dispose(): void {
     this._doc?.dispose();
     this._doc = null;
+    nodeCaches.delete(this);
   }
 
   [Symbol.dispose](): void {

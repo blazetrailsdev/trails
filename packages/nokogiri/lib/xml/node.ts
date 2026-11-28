@@ -510,7 +510,8 @@ function relinkNamespace(reparented: XmlNode): void {
   }
 }
 
-const nodeCaches = new WeakMap<object, Map<number, XmlNode>>();
+/** @internal */
+export const nodeCaches = new WeakMap<object, Map<number, XmlNode>>();
 
 /** @internal */
 export function nokoXmlNodeWrap(cNode: number, rbDocument: unknown): XmlNode {
