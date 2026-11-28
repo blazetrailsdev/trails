@@ -1,4 +1,6 @@
-import { rbCSymbol, symbolToS, rbClearMethodCache } from "@blazetrails/ruby-compat";
+import { rbClearMethodCache } from "@blazetrails/ruby-compat/include";
+import { rbCSymbol } from "@blazetrails/ruby-compat/object";
+import { symbolToS } from "@blazetrails/ruby-compat/symbol";
 
 export function toMsgpackExt(this: string): string {
   return symbolToS(this);

@@ -1,23 +1,24 @@
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { rbEnsure } from "@blazetrails/ruby-compat/ensure";
+import { FrozenError } from "@blazetrails/ruby-compat/frozen-error";
+import { Hash } from "@blazetrails/ruby-compat/hash";
 import {
   moduleVisibility,
-  ArgumentError,
-  FrozenError,
-  Hash,
-  Method,
-  RangeError,
-  TypeError,
-  rbEnsure,
+  rbClassInheritedP,
+  rbObjIsKindOf,
+} from "@blazetrails/ruby-compat/include";
+import { Method, rbObjMethod } from "@blazetrails/ruby-compat/method";
+import {
   rbFSend,
   rbCInteger,
   rbCSymbol,
-  rbClassInheritedP,
   rbInspect,
   rbObjClass,
   rbObjClassname,
-  rbObjIsKindOf,
-  rbObjMethod,
   rbObjRespondTo,
-} from "@blazetrails/ruby-compat";
+} from "@blazetrails/ruby-compat/object";
+import { RangeError } from "@blazetrails/ruby-compat/range-error";
+import { TypeError } from "@blazetrails/ruby-compat/type-error";
 import { MessagePack } from "./namespaces.js";
 import { MSGPACK_EXT_RECURSIVE, Packer } from "./packer.js";
 import type { PackerExtRegistry, PackerProc } from "./packer.js";
