@@ -9,6 +9,9 @@ import { Application } from "../../lib/application.js";
 import { Trails } from "../../lib/trails.js";
 import type { Generation } from "../support/isolation/abstract-unit.js";
 import "../support/isolation/abstract-unit.js";
+import { OrderedOptions } from "@blazetrails/activesupport";
+import { NoMethodError } from "@blazetrails/ruby-compat/no-method-error";
+import { rbFSend } from "@blazetrails/ruby-compat/object";
 import { Trailtie, resetTrailtieRegistry } from "../../lib/trailtie.js";
 import "../../lib/trailties/action-controller.js";
 
@@ -16,6 +19,8 @@ class RailtieTest extends TestCase {}
 include(RailtieTest, Isolation);
 include(RailtieTest, Methods);
 registerSpecType(/^RailtieTest$/, RailtieTest);
+
+type FooConfig = { foo: OrderedOptions & { greetings?: string } };
 
 type Host = Generation & {
   get(path: string, params?: unknown, env?: Record<string, unknown>): Promise<unknown>;
@@ -43,6 +48,14 @@ describe("RailtieTest", { timeout: 240_000 }, () => {
     expect(() => new Trailtie()).toThrow(/abstract/);
   });
 
+  it("respond_to? works in the abstract railties", () => {
+    expect(Trailtie).not.toRespondTo("somethingNice");
+  });
+
+  it("method_missing works in the abstract railties", () => {
+    expect(() => Trailtie.methodMissing("somethingNice")).toThrow(NoMethodError);
+  });
+
   it("Railtie provides railtie_name", () => {
     class FooBarBaz extends Trailtie {}
     Trailtie.register(FooBarBaz);
@@ -67,6 +80,25 @@ describe("RailtieTest", { timeout: 240_000 }, () => {
     ).toBeUndefined();
   });
 
+  it("config name is available for the railtie", () => {
+    class Foo extends Trailtie {}
+    Trailtie.register(Foo);
+    const config = Foo.config as unknown as FooConfig;
+    config.foo = new OrderedOptions();
+    config.foo.greetings = "hello";
+    expect((Foo.config as unknown as FooConfig).foo.greetings).toBe("hello");
+  });
+
+  it("railtie configurations are available in the application", async () => {
+    class Foo extends Trailtie {}
+    Trailtie.register(Foo);
+    const config = Foo.config as unknown as FooConfig;
+    config.foo = new OrderedOptions();
+    config.foo.greetings = "hello";
+    await import(await t.appPath("config", "application.ts"));
+    expect((Trails.application!.config as unknown as FooConfig).foo.greetings).toBe("hello");
+  });
+
   it("railtie can add to_prepare callbacks", async () => {
     let toPrepare = false;
     class Foo extends Trailtie {}
@@ -78,6 +110,42 @@ describe("RailtieTest", { timeout: 240_000 }, () => {
     await t.bootTrails();
     await t.get("/");
     expect(toPrepare).toBeTruthy();
+  });
+
+  it("railtie have access to application in before_configuration callbacks", async () => {
+    let beforeConfiguration: string | false = false;
+    class Foo extends Trailtie {}
+    Trailtie.register(Foo);
+    Foo.config.beforeConfiguration(() => {
+      beforeConfiguration = Trails.root()!.toPath();
+    });
+    expect(beforeConfiguration).toBeFalsy();
+    await t.bootTrails();
+    expect(beforeConfiguration).toBe(await t.appPath());
+  });
+
+  it("before_configuration callbacks run as soon as the application constant inherits from Rails::Application", async () => {
+    let beforeConfiguration = false;
+    class Foo extends Trailtie {}
+    Trailtie.register(Foo);
+    Foo.config.beforeConfiguration(() => {
+      beforeConfiguration = true;
+    });
+    class TestApplication extends Application {}
+    Application.register(TestApplication, await t.appPath());
+    expect(beforeConfiguration).toBeTruthy();
+  });
+
+  it("railtie can add after_initialize callbacks", async () => {
+    let afterInitialize = false;
+    class Foo extends Trailtie {}
+    Trailtie.register(Foo);
+    Foo.config.afterInitialize(() => {
+      afterInitialize = true;
+    });
+    expect(afterInitialize).toBeFalsy();
+    await t.bootTrails();
+    expect(afterInitialize).toBeTruthy();
   });
 
   it("railtie can add initializers", async () => {
@@ -155,4 +223,37 @@ describe("RailtieTest", { timeout: 240_000 }, () => {
       expect(ranBlock).toBeTruthy();
     });
   }
+
+  it("we can change our environment if we want to", () => {
+    const originalEnv = Trails.env;
+    try {
+      Trails.env = "foo";
+      expect(String(Trails.env)).toBe("foo");
+    } finally {
+      Trails.env = originalEnv;
+      expect(Trails.env).toEqual(originalEnv);
+    }
+  });
+
+  it("Railtie object isn't output when a NoMethodError is raised", () => {
+    class Foo extends Trailtie {}
+    Trailtie.register(Foo);
+    const config = Foo.config as unknown as FooConfig;
+    config.foo = new OrderedOptions();
+    config.foo.greetings = "hello";
+
+    let error: unknown;
+    expect(() => {
+      try {
+        rbFSend(Foo.instance(), "abc");
+      } catch (e) {
+        error = e;
+        throw e;
+      }
+    }).toThrow(NoMethodError);
+
+    expect((error as NoMethodError & { originalMessage(): string }).originalMessage()).toMatch(
+      /undefined method [`']abc' for.*Foo/,
+    );
+  });
 });
