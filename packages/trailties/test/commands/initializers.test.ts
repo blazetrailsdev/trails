@@ -51,11 +51,15 @@ describe("Trails::Command::InitializersTest", { timeout: 120_000 }, () => {
 `);
 
     let output = (await runInitializersCommand()).split("\n");
-    expect(output).toContain("AppTemplate::Application.set_added_development_module");
+    expect(output, output.join("\n")).toContain(
+      "AppTemplate::Application.set_added_development_module",
+    );
     expect(output).not.toContain("AppTemplate::Application.set_added_production_module");
 
     output = (await runInitializersCommand(["-e", "production"])).split("\n");
     expect(output).not.toContain("AppTemplate::Application.set_added_development_module");
-    expect(output).toContain("AppTemplate::Application.set_added_production_module");
+    expect(output, output.join("\n")).toContain(
+      "AppTemplate::Application.set_added_production_module",
+    );
   });
 });
