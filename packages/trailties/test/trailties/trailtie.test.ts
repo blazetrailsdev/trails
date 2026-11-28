@@ -252,7 +252,7 @@ describe("RailtieTest", { timeout: 240_000 }, () => {
       }
     }).toThrow(NoMethodError);
 
-    expect((error as NoMethodError).originalMessage()).toMatch(
+    expect((error as NoMethodError & { originalMessage(): string }).originalMessage()).toMatch(
       /undefined method [`']abc' for.*Foo/,
     );
   });
