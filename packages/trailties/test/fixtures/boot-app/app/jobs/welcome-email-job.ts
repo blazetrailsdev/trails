@@ -1,4 +1,4 @@
-import { ApplicationJob } from "./application-job.js";
+import { ApplicationJob } from "./application-job.ts";
 
 export class WelcomeEmailJob extends ApplicationJob {
   static performed: unknown[][] = [];

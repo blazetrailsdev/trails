@@ -52,7 +52,6 @@ import {
 import type { Application } from "../application.js";
 import { Trails } from "../trails.js";
 import { Trailtie as BaseTrailtie } from "../trailtie.js";
-import { ENGINE_ROOT } from "../app-path.js";
 import { Engine } from "../engine.js";
 
 export type ActiveRecordEncryptionConfig = Parameters<typeof Encryption.configure>[0];
@@ -168,7 +167,10 @@ export class Trailtie extends BaseTrailtie {
           "load_config",
           block(async () => {
             let engine: Engine | undefined;
-            if (ENGINE_ROOT !== undefined && (engine = await Engine.find(ENGINE_ROOT))) {
+            if (
+              TopLevel.ENGINE_ROOT !== undefined &&
+              (engine = await Engine.find(TopLevel.ENGINE_ROOT))
+            ) {
               const paths = engine.paths().get("db/migrate")!;
               if (paths.existent()) {
                 DatabaseTasks.migrationsPaths = [

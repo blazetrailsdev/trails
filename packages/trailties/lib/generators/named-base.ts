@@ -14,7 +14,6 @@ import { rbObjRespondTo, rbModName, TopLevel } from "@blazetrails/ruby-compat/ob
 import { Base as GeneratorBase, type GeneratorConfig } from "./base.js";
 import { Generators } from "../generators.js";
 import { GeneratedAttribute } from "./generated-attribute.js";
-import { ENGINE_ROOT } from "../app-path.js";
 
 export class NamedBase extends GeneratorBase {
   static {
@@ -253,7 +252,7 @@ export class NamedBase extends GeneratorBase {
 
   /** @internal */
   protected isMountableEngine(): ReturnType<GeneratorBase["isNamespaced"]> {
-    return ENGINE_ROOT !== undefined && this.isNamespaced();
+    return TopLevel.ENGINE_ROOT !== undefined && this.isNamespaced();
   }
 
   static checkClassCollision(options: { prefix?: string; suffix?: string } = {}): void {

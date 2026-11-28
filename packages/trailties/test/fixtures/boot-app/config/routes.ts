@@ -1,4 +1,4 @@
-import { Trails } from "../../../../lib/trails.js";
+import { Trails } from "@blazetrails/trailties";
 
 Trails.application!.routes().draw(function () {
   this.get("/posts", { to: "posts#index", as: "posts" });

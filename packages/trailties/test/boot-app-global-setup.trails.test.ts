@@ -30,6 +30,7 @@ describe("a generated app's vitest globalSetup", () => {
 
     const { setup } = await import("./fixtures/boot-app/test/global-setup.js");
     await setup();
+    Base.connectionPool().schemaReflection.clearBang();
 
     const loadSchemaBang = vi.spyOn(
       Migration as unknown as { loadSchemaBang(): Promise<void> },

@@ -1,6 +1,5 @@
-import { rbFSend } from "@blazetrails/ruby-compat/object";
+import { TopLevel, rbFSend } from "@blazetrails/ruby-compat/object";
 import { PluginGenerator } from "../generators/trails/plugin/plugin-generator.js";
-import { ENGINE_ROOT } from "../app-path.js";
 
 export class Updater {
   private static _generator?: PluginGenerator;
@@ -9,7 +8,7 @@ export class Updater {
     return (this._generator ??= new PluginGenerator(
       ["plugin"],
       { engine: true },
-      { destinationRoot: ENGINE_ROOT },
+      { destinationRoot: TopLevel.ENGINE_ROOT },
     ));
   }
 

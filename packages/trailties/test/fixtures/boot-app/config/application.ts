@@ -1,6 +1,6 @@
-import { Application } from "../../../../lib/application.js";
+import { Application } from "@blazetrails/trailties";
 
-import "../../../../lib/all.js";
+import "@blazetrails/trailties/all";
 
 export class BootApp extends Application {
   static {

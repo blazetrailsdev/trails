@@ -1,10 +1,11 @@
+import { TopLevel } from "@blazetrails/ruby-compat/object";
 import { Rake } from "@blazetrails/rake";
 import { Dir } from "@blazetrails/ruby-compat/dir";
 import { File } from "@blazetrails/ruby-compat/file";
 import { getPath } from "@blazetrails/ruby-compat/fs-adapter";
 import { defineModule } from "@blazetrails/ruby-compat/include";
 import { resolveTsThenJs } from "@blazetrails/ruby-compat/load";
-import { APP_PATH, ENGINE_PATH, ENGINE_ROOT } from "../app-path.js";
+import { APP_PATH, ENGINE_PATH } from "../app-path.js";
 import { Engine } from "../engine.js";
 import { Generators } from "../generators.js";
 import { Trails } from "../trails.js";
@@ -48,7 +49,7 @@ async function loadTasks(): Promise<void> {
 
 async function loadGenerators(): Promise<void> {
   if (ENGINE_PATH != null) {
-    const engine = (await Engine.find(ENGINE_ROOT!))!;
+    const engine = (await Engine.find(TopLevel.ENGINE_ROOT!))!;
     Generators.namespace = engine.railtieNamespace() ?? null;
     await engine.loadGenerators();
   } else {

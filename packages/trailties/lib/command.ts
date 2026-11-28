@@ -1,3 +1,4 @@
+import { TopLevel } from "@blazetrails/ruby-compat/object";
 import "./constants.command.generated.js";
 import { Trails } from "./trails.js";
 import { presence } from "@blazetrails/activesupport";
@@ -10,7 +11,7 @@ import { Pathname } from "@blazetrails/ruby-compat/pathname";
 import { env, rbArgv, stdout } from "@blazetrails/ruby-compat/process-adapter";
 import { StandardError } from "@blazetrails/ruby-compat/standard-error";
 import { exit } from "@blazetrails/ruby-compat/process-adapter";
-import { APP_PATH, ENGINE_ROOT } from "./app-path.js";
+import { APP_PATH } from "./app-path.js";
 import type { ThorClass } from "@blazetrails/thor";
 import type { Base } from "./command/base.js";
 import { lookup, lookupBang, subclasses } from "./command/behavior.js";
@@ -57,8 +58,8 @@ export function environment(): string {
 }
 
 export function root(): Pathname | undefined {
-  if (ENGINE_ROOT != null) {
-    return new Pathname(ENGINE_ROOT);
+  if (TopLevel.ENGINE_ROOT != null) {
+    return new Pathname(TopLevel.ENGINE_ROOT);
   } else {
     return applicationRoot();
   }

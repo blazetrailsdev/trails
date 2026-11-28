@@ -1,3 +1,3 @@
-import { User } from "./user.js";
+import { User } from "./user.ts";
 
 export class Superuser extends User {}

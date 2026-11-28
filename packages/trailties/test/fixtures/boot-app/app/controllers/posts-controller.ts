@@ -1,5 +1,5 @@
-import { ApplicationController } from "./application-controller.js";
-import { Post } from "../models/post.js";
+import { ApplicationController } from "./application-controller.ts";
+import { Post } from "../models/post.ts";
 
 export class PostsController extends ApplicationController {
   async index(): Promise<void> {

@@ -1,0 +1,13 @@
+#!/usr/bin/env node
+import { access } from "node:fs/promises";
+import { join } from "node:path";
+import { setAppPath } from "@blazetrails/trailties/app-path";
+
+const APP_PATH = join(import.meta.dirname, "../config/application");
+setAppPath(
+  await access(`${APP_PATH}.ts`).then(
+    () => `${APP_PATH}.ts`,
+    () => `${APP_PATH}.js`,
+  ),
+);
+await import("@blazetrails/trailties/commands");

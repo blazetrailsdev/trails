@@ -6,7 +6,7 @@ import { FileUtils } from "@blazetrails/ruby-compat/file-utils";
 import { rbFLoad } from "@blazetrails/ruby-compat/load";
 import { TopLevel } from "@blazetrails/ruby-compat/object";
 import type {} from "../../lib/tasks/engine.js";
-import { ENGINE_ROOT, setEngineRoot } from "../../lib/app-path.js";
+import { setEngineRoot } from "../../lib/app-path.js";
 
 describe("tasks/engine", () => {
   let root: string;
@@ -41,7 +41,7 @@ DSL.namespace("db", () => DSL.task("migrate"));
       expect(rake.lookup("db:migrate")!.prerequisites).toEqual(["load_app", "app:db:migrate"]);
       expect(rake.currentScope.isEmpty()).toBe(true);
     });
-    expect(ENGINE_ROOT).toBe("/engine");
+    expect(TopLevel.ENGINE_ROOT).toBe("/engine");
   });
 
   it("writes the engine's bin files from update:bin", async () => {
@@ -59,6 +59,6 @@ DSL.namespace("db", () => DSL.task("migrate"));
     await Rake.withApplication(async () => {
       await rbFLoad(File.join(import.meta.dirname, "../../lib/tasks/engine.ts"));
     });
-    expect(ENGINE_ROOT).toBe(File.expandPath(Dir.pwd()));
+    expect(TopLevel.ENGINE_ROOT).toBe(File.expandPath(Dir.pwd()));
   });
 });

@@ -129,8 +129,10 @@ declare module "@blazetrails/ruby-compat/object" {
     I18n?: typeof import("@blazetrails/i18n");
     ActiveSupport?: typeof ActiveSupport;
     ActionView?: { name: string };
+    ENGINE_ROOT?: string;
     Trails?: {
       env: EnvironmentInquirer;
+      root(): Pathname | null | undefined;
       logger: Logger | null;
       cache: CacheStore | null;
       error: ErrorReporter;

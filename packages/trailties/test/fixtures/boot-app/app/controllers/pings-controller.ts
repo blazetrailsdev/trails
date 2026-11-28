@@ -1,5 +1,5 @@
 import { ActionController } from "@blazetrails/actionpack";
-import { Trails } from "../../../../../lib/trails.js";
+import { Trails } from "@blazetrails/trailties";
 
 export class PingsController extends ActionController.API {
   async show(): Promise<void> {

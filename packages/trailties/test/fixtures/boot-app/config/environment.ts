@@ -1,5 +1,5 @@
-import { Trails } from "../../../../lib/trails.js";
+import { Trails } from "@blazetrails/trailties";
 
-await import("./application.js");
+await import("./application.ts");
 
 await Trails.application!.initializeBang();

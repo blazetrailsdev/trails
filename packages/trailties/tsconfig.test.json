@@ -3,6 +3,7 @@
   "compilerOptions": {
     "outDir": "dist-test",
     "rootDir": ".",
+    "rewriteRelativeImportExtensions": true,
     "paths": {
       "@blazetrails/actioncable/test/support/*": ["../actioncable/test/support/*.ts"]
     }

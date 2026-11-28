@@ -1,11 +1,9 @@
+import { TopLevel } from "@blazetrails/ruby-compat/object";
 /** @noRailsEquivalent PERMANENT */
 export let APP_PATH: string | undefined;
 
 /** @noRailsEquivalent PERMANENT */
 export let ENGINE_PATH: string | undefined;
-
-/** @noRailsEquivalent PERMANENT */
-export let ENGINE_ROOT: string | undefined;
 
 /** @noRailsEquivalent PERMANENT */
 export function setAppPath(path: string | undefined): void {
@@ -19,5 +17,5 @@ export function setEnginePath(path: string | undefined): void {
 
 /** @noRailsEquivalent PERMANENT */
 export function setEngineRoot(path: string | undefined): void {
-  ENGINE_ROOT = path;
+  TopLevel.ENGINE_ROOT = path;
 }

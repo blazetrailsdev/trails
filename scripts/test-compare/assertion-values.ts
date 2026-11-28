@@ -205,6 +205,14 @@ const SNAKE_IDENTIFIER_RE = /\b[a-z][a-z0-9]*(?:_[a-z0-9]+)+\b/g;
  */
 const KEBAB_NAMESPACE_RE = /(?<![\w-])[a-z][a-z0-9]*(?:-[a-z0-9]+)+(?=:[a-z])/g;
 
+/**
+ * A Ruby Symbol argument inside a rendered call, `create_table(:users)`
+ * (railties/test/application/test_test.rb:131), is a JS string in trails
+ * (CLAUDE.md, "A Ruby Symbol is a JS string"): the migration log line is
+ * `createTable("users")`. Folds the Symbol onto that spelling on both sides.
+ */
+const SYMBOL_ARGUMENT_RE = /(?<=[(,]\s*):([a-z_][a-zA-Z0-9_]*)/g;
+
 function foldNameToken(token: string): string {
   if (!token.startsWith("s:")) return token;
   const text = token.slice(2);
@@ -214,7 +222,8 @@ function foldNameToken(token: string): string {
     )
     .replace(SNAKE_IDENTIFIER_RE, (name) =>
       name.replace(/_([a-z0-9])/g, (_, ch: string) => ch.toUpperCase()),
-    )}`;
+    )
+    .replace(SYMBOL_ARGUMENT_RE, '"$1"')}`;
 }
 
 /**

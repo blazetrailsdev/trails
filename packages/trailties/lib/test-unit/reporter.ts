@@ -1,3 +1,4 @@
+import { TopLevel } from "@blazetrails/ruby-compat/object";
 import { classAttribute } from "@blazetrails/activesupport";
 import { Dir } from "@blazetrails/ruby-compat/dir";
 import { File } from "@blazetrails/ruby-compat/file";
@@ -7,7 +8,6 @@ import { rbObjRespondTo } from "@blazetrails/ruby-compat/object";
 import { env as ENV } from "@blazetrails/ruby-compat/process-adapter";
 import { Interrupt } from "@blazetrails/ruby-compat/signal-exception";
 import type { StringIO } from "@blazetrails/ruby-compat/string-io";
-import { ENGINE_ROOT } from "../app-path.js";
 import { Trails } from "../trails.js";
 
 type Io = Pick<StringIO, "print" | "puts" | "write"> & { isTty?(): boolean };
@@ -145,8 +145,8 @@ export class TestUnitReporter {
       (this.constructor as typeof TestUnitReporter).appRoot ??
       (ENV["TRAILS_TEST_PWD"] != null
         ? ENV["TRAILS_TEST_PWD"]
-        : ENGINE_ROOT != null
-          ? ENGINE_ROOT
+        : TopLevel.ENGINE_ROOT != null
+          ? TopLevel.ENGINE_ROOT
           : rbObjRespondTo(Trails, "root")
             ? Trails.root()?.toString()
             : Dir.pwd()));

@@ -1,3 +1,4 @@
+import { TopLevel } from "@blazetrails/ruby-compat/object";
 import { classAttribute, underscore } from "@blazetrails/activesupport";
 import { File } from "@blazetrails/ruby-compat/file";
 import { include, type Included } from "@blazetrails/ruby-compat/include";
@@ -12,7 +13,6 @@ import type { Command as ThorCommand } from "@blazetrails/thor/command";
 import type { Base as ThorBase, BaseConfig } from "@blazetrails/thor/base";
 import { Error as ThorError } from "@blazetrails/thor/error";
 import type { Shell } from "@blazetrails/thor/shell";
-import { ENGINE_ROOT } from "../app-path.js";
 import { HELP_MAPPINGS, hiddenCommands } from "../command.js";
 import { Actions } from "./actions.js";
 import { subclasses } from "./behavior.js";
@@ -56,7 +56,7 @@ export class Base extends Thor {
   }
 
   static isEngine(): boolean {
-    return ENGINE_ROOT != null;
+    return TopLevel.ENGINE_ROOT != null;
   }
 
   static desc(
