@@ -1,9 +1,12 @@
-import { Dir, File, FileUtils, env as ENV, getFs } from "@blazetrails/ruby-compat";
-import { AppGenerator } from "../../../lib/generators/trails/app/app-generator.js";
-import { Paths, TRAILS_FRAMEWORK_ROOT } from "./paths.js";
-
 export default async function setup(): Promise<void> {
+  const { env: ENV } = await import("@blazetrails/ruby-compat/process-adapter");
   if (ENV["ISOLATION_TEST"] != null) return;
+  const { Dir } = await import("@blazetrails/ruby-compat/dir");
+  const { File } = await import("@blazetrails/ruby-compat/file");
+  const { FileUtils } = await import("@blazetrails/ruby-compat/file-utils");
+  const { getFs } = await import("@blazetrails/ruby-compat/fs-adapter");
+  const { AppGenerator } = await import("../../../lib/generators/trails/app/app-generator.js");
+  const { Paths, TRAILS_FRAMEWORK_ROOT } = await import("./paths.js");
 
   const appTemplatePath = Paths.prototype.appTemplatePath();
 
