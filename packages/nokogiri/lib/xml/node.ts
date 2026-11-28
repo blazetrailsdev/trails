@@ -51,7 +51,12 @@ export class XmlNode {
      */
     readonly _node: XmlTreeNode | LibXmlNode | DefaultTreeAdapterMap["node"],
     public document: unknown = null,
-  ) {}
+  ) {
+    if (document === null) return;
+    let rbNodeCache = nodeCaches.get(document as object);
+    if (rbNodeCache === undefined) nodeCaches.set(document as object, (rbNodeCache = new Map()));
+    rbNodeCache.set(this.pointerId, this);
+  }
 
   get pointerId(): number {
     return (this._node as unknown as { _nodePtr: number })._nodePtr;
@@ -94,9 +99,7 @@ export class XmlNode {
   get parent(): XmlNode | null {
     const cParent = Nokogiri.LibXml2!.XmlTreeCommonStruct.parent(this.pointerId);
     if (!cParent) return null;
-    const document = this.document as XmlNode | null;
-    if (document !== null && cParent === document.pointerId) return document;
-    return new XmlNode(Nokogiri.LibXml2!.createNode(cParent), this.document);
+    return nokoXmlNodeWrap(cParent, this.document);
   }
 
   set parent(parentNode: XmlNode | DocumentFragment) {
@@ -276,11 +279,12 @@ export class XmlNode {
 
   get children(): NodeSet {
     if (!(this._node instanceof Nokogiri.LibXml2!.XmlElement)) return new NodeSet(this.document);
+    const libxml = Nokogiri.LibXml2!;
     const result: XmlNode[] = [];
-    let child = this._node.firstChild;
-    while (child !== null) {
-      result.push(new XmlNode(child, this.document));
-      child = child.next;
+    let child = libxml.XmlTreeCommonStruct.children(this.pointerId);
+    while (child) {
+      result.push(nokoXmlNodeWrap(child, this.document));
+      child = libxml.XmlTreeCommonStruct.next(child);
     }
     return new NodeSet(this.document, result as Node[]);
   }
@@ -503,6 +507,20 @@ function relinkNamespace(reparented: XmlNode): void {
   ) {
     libxml.xmlSetNs(cReparented, libxml.XmlNodeStruct.namespace(cParent));
   }
+}
+
+const nodeCaches = new WeakMap<object, Map<number, XmlNode>>();
+
+/** @internal */
+export function nokoXmlNodeWrap(cNode: number, document: unknown): XmlNode {
+  const libxml = Nokogiri.LibXml2!;
+  const document_ = document as XmlNode | null;
+  if (document_ !== null && cNode === document_.pointerId) return document_;
+
+  const cached = document_ === null ? undefined : nodeCaches.get(document_)?.get(cNode);
+  if (cached !== undefined) return cached;
+
+  return new XmlNode(libxml.createNode(cNode), document);
 }
 
 /** @internal */

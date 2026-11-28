@@ -8,7 +8,7 @@ import { HTML5, XML, Nokogiri } from "../namespaces.js";
 import type { DocumentFragment } from "./document-fragment.js";
 import { NodeSet } from "./node-set.js";
 import * as Searchable from "./searchable.js";
-import { XmlNode } from "./node.js";
+import { XmlNode, nokoXmlNodeWrap } from "./node.js";
 import { ParseOptions } from "./parse-options.js";
 import { type Readable, readSource } from "../readable.js";
 import { SyntaxError } from "./syntax-error.js";
@@ -41,8 +41,6 @@ export class XmlDocument extends XmlNode {
   namespaceInheritance = false;
   url: string | null = null;
   encoding: string | null = null;
-
-  private _root: XmlNode | null = null;
 
   private _doc: LibXmlDocument | null;
 
@@ -191,10 +189,7 @@ export class XmlDocument extends XmlNode {
     if (this._doc === null) return null;
     const root = Nokogiri.LibXml2!.xmlDocGetRootElement(this.pointerId);
     if (!root) return null;
-    if (this._root?.pointerId !== root) {
-      this._root = new XmlNode(Nokogiri.LibXml2!.createNode(root), this);
-    }
-    return this._root;
+    return nokoXmlNodeWrap(root, this);
   }
 
   createElement(name: string, ...contentsOrAttrs: (string | Record<string, unknown>)[]): XmlNode {
@@ -297,7 +292,6 @@ export class XmlDocument extends XmlNode {
   dispose(): void {
     this._doc?.dispose();
     this._doc = null;
-    this._root = null;
   }
 
   [Symbol.dispose](): void {
