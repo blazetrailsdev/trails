@@ -328,3 +328,110 @@ function rubyArray(value: string | string[] | null | undefined): string[] {
   const list = Array.isArray(value) ? value : [value];
   return list.map((entry) => String(entry));
 }
+
+type MemberFn = (...args: never[]) => unknown;
+
+type DataKeys<M> = {
+  [K in keyof M]-?: M[K] extends MemberFn ? never : M[K] extends PromiseLike<unknown> ? never : K;
+}[keyof M] &
+  string;
+
+type ThenableKeys<M> = {
+  [K in keyof M]-?: M[K] extends PromiseLike<unknown> ? K : never;
+}[keyof M] &
+  string;
+
+type Elements<X> = X extends readonly (infer E)[] ? E : X;
+
+type Camelize<S extends string> = S extends `${infer H}_${infer T}`
+  ? `${H}${Capitalize<Camelize<T>>}`
+  : S;
+
+/** @noRailsEquivalent PERMANENT */
+export type AttributeKeys<M, B = object> = Exclude<DataKeys<M>, keyof B>;
+
+/** @noRailsEquivalent PERMANENT */
+export type AssociationKeys<M, B = object> = Exclude<ThenableKeys<M>, keyof B>;
+
+/** @noRailsEquivalent PERMANENT */
+export type AssociationTarget<M, A extends keyof M> = NonNullable<Elements<Awaited<M[A]>>>;
+
+/** @noRailsEquivalent PERMANENT */
+export interface TypedSerializeOptions<M, B = object> {
+  only?: AttributeKeys<M, B> | readonly AttributeKeys<M, B>[];
+  except?: AttributeKeys<M, B> | readonly AttributeKeys<M, B>[];
+  methods?: string | readonly string[];
+  include?:
+    | AssociationKeys<M, B>
+    | TypedIncludeHash<M, B>
+    | readonly (AssociationKeys<M, B> | TypedIncludeHash<M, B>)[];
+}
+
+/** @noRailsEquivalent PERMANENT */
+export type TypedIncludeHash<M, B = object> = {
+  [A in AssociationKeys<M, B>]?: TypedSerializeOptions<AssociationTarget<M, A>, B>;
+};
+
+/** @noRailsEquivalent PERMANENT */
+export type JsonValue<V> = V extends string | number | boolean | null
+  ? V
+  : V extends undefined
+    ? null
+    : V extends { toJSON(): infer R }
+      ? R
+      : V extends { asJson(): infer R }
+        ? R
+        : V extends readonly (infer E)[]
+          ? JsonValue<E>[]
+          : V extends object
+            ? { [K in keyof V]: JsonValue<V[K]> }
+            : unknown;
+
+type SelectedKeys<M, O, B> = O extends { only: infer On }
+  ? Extract<Elements<On>, AttributeKeys<M, B>>
+  : O extends { except: infer Ex }
+    ? Exclude<AttributeKeys<M, B>, Elements<Ex>>
+    : AttributeKeys<M, B>;
+
+type MethodsPart<M, O> = O extends { methods: infer Ms }
+  ? {
+      [S in Elements<Ms> & string]: Camelize<S> extends keyof M
+        ? M[Camelize<S>] extends () => infer R
+          ? JsonValue<Awaited<R>>
+          : never
+        : never;
+    }
+  : unknown;
+
+type IncludeKeys<E> = E extends string ? E : E extends object ? keyof E & string : never;
+
+type IncludeOptionsFor<E, K extends string> = E extends string
+  ? E extends K
+    ? object
+    : never
+  : E extends { [P in K]?: infer Opt }
+    ? Opt
+    : never;
+
+type AssociationJson<T, Opt, B> = T extends null | undefined
+  ? null
+  : T extends readonly (infer R)[]
+    ? Serialized<R, Opt, B>[]
+    : Serialized<T, Opt, B>;
+
+type IncludesPart<M, O, B> = O extends { include: infer I }
+  ? {
+      [K in IncludeKeys<Elements<I>> & keyof M]: AssociationJson<
+        Awaited<M[K]>,
+        IncludeOptionsFor<Elements<I>, K>,
+        B
+      >;
+    }
+  : unknown;
+
+type Flatten<T> = { [K in keyof T]: T[K] } & {};
+
+/** @noRailsEquivalent PERMANENT */
+export type Serialized<M, O = object, B = object> = Flatten<
+  { [K in SelectedKeys<M, O, B>]: JsonValue<M[K]> } & MethodsPart<M, O> & IncludesPart<M, O, B>
+>;
