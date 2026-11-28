@@ -41,7 +41,7 @@ describe("RakeTasksTest", () => {
     vi.spyOn(Configuration.prototype as never, "isSkipRecurringTasks").mockReturnValue(true);
 
     const [out, err] = await captureIo(async () => {
-      await expect((await rake.get("solid_queue:check")).invoke()).resolves.not.toThrow();
+      await expect((await rake.get("solid-queue:check")).invoke()).resolves.not.toThrow();
     });
 
     expect(out).toMatch("Solid Queue configuration is valid.");
@@ -57,7 +57,7 @@ describe("RakeTasksTest", () => {
     let status: number | null = null;
     const [out, err] = await captureIo(async () => {
       try {
-        await (await rake.get("solid_queue:check")).invoke();
+        await (await rake.get("solid-queue:check")).invoke();
       } catch (e) {
         if (!(e instanceof SystemExit)) throw e;
         status = e.status;

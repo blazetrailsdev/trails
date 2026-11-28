@@ -40,6 +40,7 @@
     "@blazetrails/arel": "workspace:*",
     "@blazetrails/date": "workspace:*",
     "@blazetrails/msgpack": "workspace:*",
+    "@blazetrails/rake": "workspace:*",
     "@blazetrails/ruby-compat": "workspace:*",
     "@blazetrails/thor": "workspace:*",
     "@blazetrails/trailties": "workspace:*"

@@ -1,5 +1,7 @@
 import { TopLevel } from "@blazetrails/activesupport";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { Task } from "@blazetrails/rake";
+import "@blazetrails/trailties";
 import { Engine } from "../lib/engine.js";
 import { Record } from "../lib/record.js";
 import { SolidCable } from "../lib/solid-cable.js";
@@ -22,6 +24,13 @@ async function runConfigInitializer(options: { [key: string]: unknown }): Promis
 
 describe("SolidCable::Engine", () => {
   afterEach(() => vi.restoreAllMocks());
+
+  it("loads lib/tasks/solid_cable_tasks.rake from its tasks path", async () => {
+    await Engine.instance().runTasksBlocks({});
+
+    expect(Task.isTaskDefined("solid-cable:install")).toBe(true);
+    expect(Task.isTaskDefined("solid-cable:update")).toBe(true);
+  });
 
   it("connects Record to the configured connects_to", async () => {
     const connectsTo = vi.spyOn(Record, "connectsTo").mockResolvedValue([]);

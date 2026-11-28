@@ -8,13 +8,32 @@
   "include": ["lib"],
   "exclude": ["lib/generators/solid-cable/update/templates"],
   "references": [
-    { "path": "../actioncable" },
-    { "path": "../activejob" },
-    { "path": "../activerecord" },
-    { "path": "../activesupport" },
-    { "path": "../arel" },
-    { "path": "../date" },
-    { "path": "../ruby-compat" },
-    { "path": "../trailties" }
+    {
+      "path": "../actioncable"
+    },
+    {
+      "path": "../activejob"
+    },
+    {
+      "path": "../activerecord"
+    },
+    {
+      "path": "../activesupport"
+    },
+    {
+      "path": "../arel"
+    },
+    {
+      "path": "../date"
+    },
+    {
+      "path": "../rake"
+    },
+    {
+      "path": "../ruby-compat"
+    },
+    {
+      "path": "../trailties"
+    }
   ]
 }

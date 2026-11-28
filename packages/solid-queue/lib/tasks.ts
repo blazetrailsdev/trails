@@ -4,12 +4,12 @@ import { Trails } from "@blazetrails/trailties";
 import { Configuration } from "./configuration.js";
 import { Supervisor } from "./supervisor.js";
 
-DSL.namespace("solid_queue", () => {
+DSL.namespace("solid-queue", () => {
   DSL.desc("Install Solid Queue");
   DSL.task(
     "install",
     block(async () => {
-      await Trails.Command!.invoke("generate", ["solid_queue:install"]);
+      await Trails.Command!.invoke("generate", ["solid-queue:install"]);
     }),
   );
 
@@ -17,7 +17,7 @@ DSL.namespace("solid_queue", () => {
   DSL.task(
     "update",
     block(async () => {
-      await Trails.Command!.invoke("generate", ["solid_queue:update"]);
+      await Trails.Command!.invoke("generate", ["solid-queue:update"]);
     }),
   );
 
