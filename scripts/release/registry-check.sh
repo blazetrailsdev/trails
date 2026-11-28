@@ -30,8 +30,11 @@ block=$(awk '
 ' "$TRAILS/README.md")
 [ -n "$block" ] || fail "README.md has no npm-new block"
 
+block=${block//@alpha/@$VERSION}
+[[ $block == *"@blazetrails/trailties@$VERSION"* ]] || fail "README.md's npm-new block no longer names @blazetrails/trailties@alpha"
+
 echo "== README npm-new"
-(cd "$WORK" && bash -euo pipefail -c "${block//@alpha/@$VERSION}") || fail "trails new / pnpm install failed"
+(cd "$WORK" && bash -euo pipefail -c "$block") || fail "trails new / pnpm install failed"
 
 echo "== single copy of shared singletons"
 mkdir "$WORK/singletons"

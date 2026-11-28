@@ -41,6 +41,7 @@
     "@blazetrails/arel": "workspace:*",
     "@blazetrails/date": "workspace:*",
     "@blazetrails/ruby-compat": "workspace:*",
+    "@blazetrails/rake": "workspace:*",
     "@blazetrails/trailties": "workspace:*"
   },
   "engines": {

@@ -1,6 +1,6 @@
 ## Hand-written entry points
 
-`solid_queue:install` writes `bin/jobs`. If you write your own entry point, load job classes
+`solid-queue:install` writes `bin/jobs`. If you write your own entry point, load job classes
 with a dynamic `import()` after the boot:
 
 ```ts
