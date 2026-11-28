@@ -11,7 +11,6 @@
   const installs = {
     npm: "npm install -g @blazetrails/trails && trails new blog",
     pnpm: "pnpm add -g @blazetrails/trails && trails new blog",
-    yarn: "yarn global add @blazetrails/trails && trails new blog",
     bun: "bun add -g @blazetrails/trails && trails new blog",
   };
   let pm = $state("npm");
