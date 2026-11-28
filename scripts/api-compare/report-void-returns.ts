@@ -176,8 +176,6 @@ async function gate(
   scope: string | null,
 ): Promise<number> {
   const current = blockReturnCounts(rows, scope === null ? packages : [scope]);
-  if (scope !== null)
-    for (const pkg of Object.keys(current)) if (pkg !== scope) delete current[pkg];
   const committed = JSON.parse(await readFile(RETURNS_BLOCK_MARK_PATH, "utf8")) as PackageCounts;
   const marks = scopedMarks(committed, scope);
   const grew = exceedances(marks, current);
