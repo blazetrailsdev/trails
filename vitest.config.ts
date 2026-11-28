@@ -716,6 +716,8 @@ export default defineConfig({
           globalSetup: [
             "./packages/activerecord/test/support/template-global-setup.ts",
             "./packages/solid-queue/test/support/fork-bundle-global-setup.ts",
+            "./packages/actiontext/test/support/local-secret.ts",
+            "./packages/turbo/test/support/local-secret.ts",
           ],
           setupFiles: [
             "./packages/activerecord/test/support/test-setup-worker-db.ts",
