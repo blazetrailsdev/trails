@@ -1,8 +1,9 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, onTestFinished, vi, type MockInstance } from "vitest";
 import { rbAryReplace } from "@blazetrails/ruby-compat/array";
 import { File } from "@blazetrails/ruby-compat/file";
 import { rbFLoad } from "@blazetrails/ruby-compat/load";
 import { SystemExit, rbArgv, getProcessAdapter } from "@blazetrails/ruby-compat/process-adapter";
+import { Handler } from "@blazetrails/rackup";
 import { invoke } from "../lib/command.js";
 
 vi.mock("@blazetrails/activesupport/node", () => ({}));
@@ -14,8 +15,12 @@ describe("trails/commands", () => {
     return rbFLoad(File.join(import.meta.dirname, "../lib/commands.ts"));
   };
 
+  let exit: MockInstance<(code?: number) => never>;
+
   beforeEach(() => {
     vi.mocked(invoke).mockReset();
+    exit = vi.spyOn(getProcessAdapter(), "exit").mockImplementation((() => undefined) as never);
+    onTestFinished(() => exit.mockRestore());
   });
 
   it("invokes the aliased command with the remaining ARGV", async () => {
@@ -38,5 +43,23 @@ describe("trails/commands", () => {
 
     expect(setExitCode).toHaveBeenCalledWith(4);
     setExitCode.mockRestore();
+  });
+
+  it("ends the process once the command returns, as bin/rails does", async () => {
+    await load("db:migrate");
+
+    expect(exit).toHaveBeenCalledOnce();
+  });
+
+  it("does not end the process while the Node handler is serving", async () => {
+    const node = (await Handler.get("node")) as typeof Handler.Node;
+    node.server = {} as never;
+    onTestFinished(() => {
+      node.server = null;
+    });
+
+    await load("server");
+
+    expect(exit).not.toHaveBeenCalled();
   });
 });

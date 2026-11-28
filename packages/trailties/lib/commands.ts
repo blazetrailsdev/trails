@@ -1,5 +1,6 @@
 import "@blazetrails/activesupport/node";
-import { SystemExit, rbArgv, setExitCode } from "@blazetrails/ruby-compat/process-adapter";
+import { Handler } from "@blazetrails/rackup";
+import { SystemExit, exit, rbArgv, setExitCode } from "@blazetrails/ruby-compat/process-adapter";
 import { invoke } from "./command.js";
 import "./constants.generated.js";
 
@@ -22,3 +23,6 @@ try {
   if (!(error instanceof SystemExit)) throw error;
   setExitCode(error.status);
 }
+
+/** @inventedArm if — CONVERGEABLE node-handler-run-blocks-while-serving */
+if (Handler.Node?.server == null) exit();
