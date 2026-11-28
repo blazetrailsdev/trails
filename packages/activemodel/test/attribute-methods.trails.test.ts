@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 import {
   AttrNames,
   AttributeMethods,
+  AttributeMethodPattern,
   MissingAttributeError,
   defineMethodAttribute,
 } from "../lib/attribute-methods.js";
@@ -703,5 +704,36 @@ describe("AttrNames.defineAttributeAccessorMethod (attribute_methods.rb:577-589)
       expect(b[`${prefix}Other`]).toBe("z");
       expect(b[`${prefix}Shared`]).toBe("12");
     }
+  });
+
+  it("a ? suffix pattern answers has-prefixed members and matches them back", () => {
+    const pattern = new AttributeMethodPattern({ suffix: "?" });
+    for (const attr of ["title", "_foo", "URL", "string_value"]) {
+      expect(pattern.match(pattern.methodName(attr))?.attrName).toBe(attr);
+    }
+    expect(pattern.match(pattern.methodName("A"))?.attrName).toBe("a");
+    expect(pattern.match(pattern.methodName("Title"))?.attrName).toBe("title");
+    expect(pattern.methodName("title")).toBe("hasTitle");
+    expect(pattern.match("hasTitle")?.proxyTarget).toBe("attribute?");
+
+    class Topic {
+      declare static attributeMethodSuffix: AttributesClassHalf["attributeMethodSuffix"];
+      declare static defineAttributeMethods: AttributesClassHalf["defineAttributeMethods"];
+      static {
+        include(this, AttributeMethods);
+        this.attributeMethodSuffix("?");
+        this.defineAttributeMethods("title", "body");
+      }
+      get hasBody(): string {
+        return "own";
+      }
+      "attribute?"(_name: string): string {
+        return "generated";
+      }
+    }
+    const topic = new Topic() as unknown as { hasTitle(): string; hasBody: string };
+    expect(topic.hasTitle()).toBe("generated");
+    expect(topic.hasBody).toBe("own");
+    expect("title?" in topic).toBe(false);
   });
 });
