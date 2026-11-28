@@ -2311,9 +2311,6 @@ class ApiExtractor
     maybe_update_module_file(fqn, target)
   end
 
-  # `delegate_missing_to :target` defines `respond_to_missing?` and
-  # `method_missing` on the owner through `generate_method_missing`
-  # (core_ext/module/delegation.rb:218-220, active_support/delegation.rb:152-187).
   def process_delegate_missing_to
     fqn = current_fqn
     target = @classes[fqn] || @modules[fqn]
@@ -2834,9 +2831,6 @@ class ApiExtractor
     entry[:returnsBlock] = true if returns_block?(body)
   end
 
-  # The method answers its block's value: its final statement is `yield`, a
-  # call whose block's final statement is (`with_lock`'s `transaction do …
-  # yield end`, locking/pessimistic.rb:92-99), or a call forwarding `&block`.
   def returns_block?(body)
     stmts = body.is_a?(Array) && body[0] == :bodystmt ? body[1] : body
     last = stmts.is_a?(Array) && stmts[0].is_a?(Array) ? stmts.last : stmts

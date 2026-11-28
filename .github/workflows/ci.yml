@@ -924,10 +924,6 @@ jobs:
       - run: pnpm build
       - run: pnpm guides:typecheck
 
-  # RFC 0260. `pnpm typecheck` in each examples/* app with a `typecheck`
-  # script, on a change under packages/ or examples/. The job always runs
-  # (an examples-only change reads as docs_only to `changes`); its first step
-  # decides whether the rest do. SKIP lists the apps left out, with reasons.
   examples-typecheck:
     name: Examples Type Check
     needs: changes
@@ -2585,11 +2581,6 @@ jobs:
         # `pnpm parity:api:predicates:tighten` — there is no reseed.
         run: pnpm exec tsx scripts/api-compare/lint-predicate-kinds.ts
       - name: Returns-block ratchet
-        # RFC 0260. A Ruby method answering its block's value (final `yield`,
-        # a block ending in `yield`, a forwarded `&block`) paired with a TS
-        # signature returning void, counted per package against
-        # scripts/api-compare/returns-block-mark.json. Only-shrink; narrow with
-        # `pnpm parity:api:returns --gate --tighten` — there is no reseed.
         run: pnpm exec tsx scripts/api-compare/report-void-returns.ts --gate
       - name: Inlined-from staleness gate
         # RFC 0188. An `@inlinedFrom` tag naming a `def` the Rails manifest
