@@ -72,6 +72,31 @@ function trailsPackageUrls(): Plugin {
   };
 }
 
+const TYPE_CHECK_URL = "\0trails-type-check-url";
+
+/**
+ * The type checker's URL as a chunk of the main graph, which the worker
+ * imports: a worker bundle shares no chunks, so this way TypeScript and the
+ * `.tse` virtualizer are the runtime's own, downloaded once.
+ */
+function trailsTypeCheckUrl(): Plugin {
+  let build = false;
+  return {
+    name: "trails-type-check-url",
+    configResolved(config) {
+      build = config.command === "build";
+    },
+    resolveId: (id) => (id === "virtual:trails-type-check-url" ? TYPE_CHECK_URL : null),
+    load(id) {
+      if (id !== TYPE_CHECK_URL) return null;
+      const path = resolve("src/host/type-check.ts");
+      if (!build) return `export default ${JSON.stringify(`/@fs${path}`)};`;
+      const ref = this.emitFile({ type: "chunk", id: path, preserveSignature: "strict" });
+      return `export default import.meta.ROLLUP_FILE_URL_${ref};`;
+    },
+  };
+}
+
 const DECLARATIONS = "\0trails-declarations";
 
 function trailsDeclarations(): Plugin {
@@ -128,6 +153,7 @@ export default defineConfig({
   plugins: [
     nodeBuiltinStubs(),
     trailsPackageUrls(),
+    trailsTypeCheckUrl(),
     trailsDeclarations(),
     importMetaPaths(),
     offlinePrecache(),

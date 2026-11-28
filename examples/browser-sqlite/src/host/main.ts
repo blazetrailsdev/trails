@@ -7,6 +7,7 @@ import { highlight } from "./highlight.ts";
 import { loadDatabase, saveDatabase } from "./storage.ts";
 import { applyChanges, changesFrom, decodeChanges, encodeChanges, isFilePath } from "./share.ts";
 import { zip } from "./zip.ts";
+import typeCheckUrl from "virtual:trails-type-check-url";
 
 const TEMPLATES = import.meta.glob<string>("../../templates/*/**/*", {
   query: "?raw",
@@ -128,7 +129,7 @@ function checkTypes(): void {
     checker.onerror = (e) => log("warn", `The type checker stopped: ${e.message}`);
   }
   clearTimeout(checkTimer);
-  checkTimer = setTimeout(() => checker!.postMessage(files), 300);
+  checkTimer = setTimeout(() => checker!.postMessage({ checker: typeCheckUrl, files }), 300);
 }
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;

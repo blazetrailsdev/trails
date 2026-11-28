@@ -200,6 +200,22 @@ try {
   await status.filter({ hasText: "Running" }).waitFor({ timeout: 30_000 });
   console.log("a type error is a warning in the editor, and the app keeps running");
 
+  await page.locator("#tree .file", { hasText: "index.html.tse" }).click();
+  const view = await editor.inputValue();
+  await editor.fill(`<% const typo: number = "x"; %>\n${view}`);
+  await page
+    .locator("#problems button.warning", { hasText: "Line 1: Type 'string' is not assignable" })
+    .waitFor({ timeout: 60_000 });
+  await page.locator("#gutter .warning").first().waitFor();
+  await see("h1", "Edited posts");
+  await status.filter({ hasText: "Running" }).waitFor({ timeout: 30_000 });
+  await editor.fill(view);
+  await page.locator("#problems").waitFor({ state: "hidden", timeout: 30_000 });
+  await see("h1", "Edited posts");
+  console.log(
+    "a type error in a view is a warning on the view's own line, and the app keeps running",
+  );
+
   if (engine === "chromium") {
     const cdp = await context.newCDPSession(page);
     await cdp.send("ServiceWorker.enable");
