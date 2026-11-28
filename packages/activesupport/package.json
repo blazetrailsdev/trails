@@ -1,6 +1,6 @@
 {
   "name": "@blazetrails/activesupport",
-  "version": "0.1.0-alpha0.1",
+  "version": "0.1.0-alpha0.2",
   "description": "Core utilities and inflection, mirroring Ruby's ActiveSupport",
   "license": "MIT",
   "repository": {

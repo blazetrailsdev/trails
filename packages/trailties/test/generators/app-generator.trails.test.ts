@@ -12,6 +12,7 @@ import { SecureRandom } from "@blazetrails/ruby-compat/secure-random";
 import { AppBuilder, AppGenerator } from "../../lib/generators/trails/app/app-generator.js";
 import { TopLevel } from "@blazetrails/activesupport";
 import { Generators } from "../../lib/generators.js";
+import { VERSION } from "../../lib/gem-version.js";
 
 describe("AppGenerator (trails-only)", () => {
   let tmpDir: string;
@@ -323,10 +324,14 @@ describe("AppGenerator (trails-only)", () => {
     ).invokeAll();
 
     const pkg = JSON.parse(File.read(File.join(tmpDir, "my-app", "package.json")));
-    expect(pkg.dependencies["@blazetrails/trails"]).toBe("~0.1.0-alpha0.1");
+    expect(pkg.dependencies["@blazetrails/trails"]).toBe(
+      `~${VERSION.MAJOR}.${VERSION.MINOR}.${VERSION.TINY}-${VERSION.PRE}`,
+    );
     expect(pkg.dependencies["@blazetrails/trailties"]).toBeUndefined();
     expect(pkg.dependencies["@blazetrails/activerecord"]).toBeUndefined();
-    expect(pkg.dependencies["@blazetrails/rackup"]).toBe("~0.1.0-alpha0.1");
+    expect(pkg.dependencies["@blazetrails/rackup"]).toBe(
+      `~${VERSION.MAJOR}.${VERSION.MINOR}.${VERSION.TINY}-${VERSION.PRE}`,
+    );
     expect(File.isExist(File.join(tmpDir, "my-app", "pnpm-workspace.yaml"))).toBe(false);
   });
 

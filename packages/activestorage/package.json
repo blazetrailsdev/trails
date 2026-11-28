@@ -1,6 +1,6 @@
 {
   "name": "@blazetrails/activestorage",
-  "version": "0.1.0-alpha0.1",
+  "version": "0.1.0-alpha0.2",
   "description": "File attachments for Trails models, mirroring the activestorage gem",
   "license": "MIT",
   "repository": {

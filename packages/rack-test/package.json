@@ -1,6 +1,6 @@
 {
   "name": "@blazetrails/rack-test",
-  "version": "0.1.0-alpha0.1",
+  "version": "0.1.0-alpha0.2",
   "description": "Simple testing API built on Rack, mirroring Ruby's rack-test",
   "license": "MIT",
   "repository": {

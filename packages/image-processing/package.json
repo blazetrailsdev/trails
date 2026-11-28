@@ -1,6 +1,6 @@
 {
   "name": "@blazetrails/image-processing",
-  "version": "0.1.0-alpha0.1",
+  "version": "0.1.0-alpha0.2",
   "description": "Image processing pipelines for Trails, mirroring the image_processing gem",
   "license": "MIT",
   "repository": {

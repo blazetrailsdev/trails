@@ -1,6 +1,6 @@
 {
   "name": "@blazetrails/nokogiri",
-  "version": "0.1.0-alpha0.1",
+  "version": "0.1.0-alpha0.2",
   "description": "XML/SAX parsing for Trails, mirroring Nokogiri's XML surface",
   "license": "MIT",
   "repository": {
