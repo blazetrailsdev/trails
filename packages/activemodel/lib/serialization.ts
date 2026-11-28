@@ -328,3 +328,171 @@ function rubyArray(value: string | string[] | null | undefined): string[] {
   const list = Array.isArray(value) ? value : [value];
   return list.map((entry) => String(entry));
 }
+
+type MemberFn = (...args: never[]) => unknown;
+
+type DataKeys<M> = {
+  [K in keyof M]-?: M[K] extends MemberFn ? never : M[K] extends PromiseLike<unknown> ? never : K;
+}[keyof M] &
+  string;
+
+type ThenableKeys<M> = {
+  [K in keyof M]-?: M[K] extends PromiseLike<unknown> ? K : never;
+}[keyof M] &
+  string;
+
+type ReaderKeys<M> = {
+  [K in keyof M]-?: M[K] extends MemberFn ? (M[K] extends () => unknown ? K : never) : K;
+}[keyof M] &
+  string;
+
+type Elements<X> = X extends readonly (infer E)[] ? E : X;
+
+type Camelize<S extends string> = S extends `${infer H}_${infer T}`
+  ? `${H}${Capitalize<Camelize<T>>}`
+  : S;
+
+type Underscore<S extends string> = S extends `${infer C}${infer R}`
+  ? `${C extends Lowercase<C> ? C : `_${Lowercase<C>}`}${Underscore<R>}`
+  : S;
+
+type MethodMember<S extends string> = S extends `${infer P}?` ? Camelize<`is_${P}`> : Camelize<S>;
+
+type RailsMethodName<K extends string> =
+  | K
+  | Underscore<K>
+  | (K extends `is${infer P}`
+      ? P extends Capitalize<P>
+        ? `${Underscore<Uncapitalize<P>>}?`
+        : never
+      : never);
+
+/** @noRailsEquivalent PERMANENT */
+export type AttributeKeys<M, B = object> = Exclude<DataKeys<M>, keyof B>;
+
+/** @noRailsEquivalent PERMANENT */
+export type AssociationKeys<M, B = object> = Exclude<ThenableKeys<M>, keyof B>;
+
+/** @noRailsEquivalent PERMANENT */
+export type MethodNames<M, B = object> = RailsMethodName<Exclude<ReaderKeys<M>, keyof B>>;
+
+/** @noRailsEquivalent PERMANENT */
+export type AssociationTarget<M, A extends keyof M> = NonNullable<Elements<Awaited<M[A]>>>;
+
+/** @noRailsEquivalent PERMANENT */
+export interface TypedSerializeOptions<M, B = object> {
+  only?: AttributeKeys<M, B> | readonly AttributeKeys<M, B>[] | null;
+  except?: AttributeKeys<M, B> | readonly AttributeKeys<M, B>[] | null;
+  methods?: MethodNames<M, B> | readonly MethodNames<M, B>[] | null;
+  include?:
+    | AssociationKeys<M, B>
+    | TypedIncludeHash<M, B>
+    | readonly (AssociationKeys<M, B> | TypedIncludeHash<M, B>)[]
+    | null;
+}
+
+/** @noRailsEquivalent PERMANENT */
+export type TypedIncludeHash<M, B = object> = {
+  [A in AssociationKeys<M, B>]?: TypedSerializeOptions<AssociationTarget<M, A>, B>;
+};
+
+/** @noRailsEquivalent PERMANENT */
+export type JsonValue<V> = V extends string | number | boolean | null
+  ? V
+  : V extends undefined
+    ? null
+    : V extends bigint
+      ? string
+      : V extends { asJson(): infer R }
+        ? JsonValue<R>
+        : V extends { toJSON(): infer R }
+          ? JsonValue<R>
+          : V extends readonly (infer E)[]
+            ? JsonValue<E>[]
+            : V extends PromiseLike<unknown>
+              ? Record<string, never>
+              : V extends ReadonlyMap<unknown, infer MV>
+                ? Record<string, JsonValue<MV>>
+                : V extends Iterable<infer E>
+                  ? JsonValue<E>[]
+                  : V extends object
+                    ? { [K in DataKeys<V> | ThenableKeys<V>]: JsonValue<V[K]> }
+                    : unknown;
+
+type Present<X> = X extends null | undefined ? never : X;
+
+type SelectedKeys<M, O, B> = O extends { only: infer On }
+  ? [Present<On>] extends [never]
+    ? ExceptKeys<M, O, B>
+    : Extract<Elements<Present<On>>, AttributeKeys<M, B>>
+  : ExceptKeys<M, O, B>;
+
+type ExceptKeys<M, O, B> = O extends { except: infer Ex }
+  ? Exclude<AttributeKeys<M, B>, Elements<Present<Ex>>>
+  : AttributeKeys<M, B>;
+
+type MethodsPart<M, O> = O extends { methods: infer Ms }
+  ? {
+      [S in Elements<Present<Ms>> & string]: MethodMember<S> extends keyof M
+        ? M[MethodMember<S>] extends MemberFn
+          ? M[MethodMember<S>] extends () => infer R
+            ? R
+            : never
+          : M[MethodMember<S>]
+        : never;
+    }
+  : unknown;
+
+type IncludeKeys<E> = E extends string ? E : E extends object ? keyof E & string : never;
+
+type IncludeOptionsFor<E, K extends string> = E extends string
+  ? E extends K
+    ? object
+    : never
+  : E extends { [P in K]?: infer Opt }
+    ? Opt
+    : never;
+
+type IncludedKeys<M, O> = O extends { include: infer I }
+  ? IncludeKeys<Elements<Present<I>>> & keyof M
+  : never;
+
+type IncludedOptions<O, K extends string> = O extends { include: infer I }
+  ? IncludeOptionsFor<Elements<Present<I>>, K>
+  : never;
+
+type RecordJson<T, Opt, B> = T extends readonly (infer R)[]
+  ? Serialized<R, Opt, B>[]
+  : Serialized<T, Opt, B>;
+
+type NullableIncludes<M, O> = {
+  [K in IncludedKeys<M, O>]: null extends Awaited<M[K]>
+    ? K
+    : undefined extends Awaited<M[K]>
+      ? K
+      : never;
+}[IncludedKeys<M, O>];
+
+type IncludesPart<M, O, B> = {
+  [K in Exclude<IncludedKeys<M, O>, NullableIncludes<M, O>>]: RecordJson<
+    Awaited<M[K]>,
+    IncludedOptions<O, K & string>,
+    B
+  >;
+} & {
+  [K in NullableIncludes<M, O>]?: RecordJson<
+    NonNullable<Awaited<M[K]>>,
+    IncludedOptions<O, K & string>,
+    B
+  >;
+};
+
+type Flatten<T> = { [K in keyof T]: T[K] } & {};
+
+/** @noRailsEquivalent PERMANENT */
+export type Serialized<M, O = object, B = object> = Flatten<
+  { [K in SelectedKeys<M, O, B>]: M[K] } & MethodsPart<M, O> & IncludesPart<M, O, B>
+>;
+
+/** @noRailsEquivalent PERMANENT */
+export type SerializedJson<M, O = object, B = object> = JsonValue<Serialized<M, O, B>>;
