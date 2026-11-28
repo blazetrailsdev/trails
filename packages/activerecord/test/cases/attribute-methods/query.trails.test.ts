@@ -109,10 +109,10 @@ describe("QueryTest", () => {
     }
     Post.defineAttributeMethods();
     const p = new Post({}) as Post & Record<string, unknown>;
-    expect(p["published?"]).toBe(false);
+    expect(p.hasPublished).toBe(false);
     p.published = true;
-    expect(p["published?"]).toBe(true);
+    expect(p.hasPublished).toBe(true);
     p.published = false;
-    expect(p["published?"]).toBe(false);
+    expect(p.hasPublished).toBe(false);
   });
 });

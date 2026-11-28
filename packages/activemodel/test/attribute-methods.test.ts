@@ -454,7 +454,7 @@ describe("AttributeMethodsTest", () => {
     }
   }
   interface Model1 extends Host {
-    "x_changed?"(): unknown;
+    hasX_changed(): unknown;
   }
 
   class Model2 {
@@ -474,12 +474,12 @@ describe("AttributeMethodsTest", () => {
     }
   }
   interface Model2 extends Host {
-    "x_changed?"(): unknown;
+    hasX_changed(): unknown;
   }
 
   it("name clashes are handled", () => {
-    expect(new Model1()["x_changed?"]()).toEqual(":model_1");
-    expect(new Model2()["x_changed?"]()).toEqual(":model_2");
+    expect(new Model1().hasX_changed()).toEqual(":model_1");
+    expect(new Model2().hasX_changed()).toEqual(":model_2");
   });
 
   it("alias attribute respects user defined method", () => {

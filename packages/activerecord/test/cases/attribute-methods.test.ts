@@ -447,7 +447,7 @@ describe("AttributeMethodsTest", () => {
     }
 
     const topic = new klass({ user_defined_time: Temporal.Now.instant() }) as any;
-    expect(topic["user_defined_time?"]).toBeTruthy();
+    expect(topic.hasUser_defined_time).toBeTruthy();
   });
   it("user-defined JSON attribute predicate", async () => {
     class klass extends Base {
@@ -459,10 +459,10 @@ describe("AttributeMethodsTest", () => {
     }
 
     let topic = new klass({ user_defined_json: { key: "value" } }) as any;
-    expect(topic["user_defined_json?"]).toBeTruthy();
+    expect(topic.hasUser_defined_json).toBeTruthy();
 
     topic = new klass({ user_defined_json: {} }) as any;
-    expect(topic["user_defined_json?"]).toBeFalsy();
+    expect(topic.hasUser_defined_json).toBeFalsy();
   });
   it("undeclared attribute method does not affect respond_to? and method_missing", async () => {
     const topic = new target({ title: "Budget" }) as any;
@@ -787,15 +787,15 @@ describe("AttributeMethodsTest", () => {
         this.tableName = "topics";
         this.attribute("title", "string");
       }
-      private get ["title?"](): string {
+      private get hasTitle(): string {
         return "I'm private";
       }
     }
     const topic = new Target({ title: "Isaac Newton's pants" }) as any;
-    assertNotRespondTo(topic, "title?");
-    const exception = await assertRaises([NoMethodError], {}, () => topic["title?"]);
+    assertNotRespondTo(topic, "hasTitle");
+    const exception = await assertRaises([NoMethodError], {}, () => topic.hasTitle);
     assertIncludes(exception.message, "private method");
-    expect(topic["title?"]).toBeTruthy();
+    expect(topic.hasTitle).toBeTruthy();
   });
   // PERMANENT-SKIP: Ruby method visibility is not carried at run time (CLAUDE.md, "Method visibility is compile-time only").
   it.skip("bulk updates respect access control", async () => {
@@ -927,20 +927,20 @@ describe("AttributeMethodsTest", () => {
   });
   it("on-the-fly super-invokable generated attribute predicates via method_missing", async () => {
     const TopicBase = Base as unknown as Omit<typeof Base, "prototype"> &
-      (new (...args: never[]) => Base & { get "title?"(): boolean });
+      (new (...args: never[]) => Base & { get hasTitle(): boolean });
     class Klass extends TopicBase {
       static {
         this.tableName = "topics";
       }
-      get ["title?"](): boolean {
-        return !super["title?"];
+      get hasTitle(): boolean {
+        return !super.hasTitle;
       }
     }
     assertEmpty((Klass as any).generatedAttributeMethods().instanceMethods());
 
     const realTopic = topics("first") as any;
-    expect(((await (Klass as unknown as typeof Base).find(realTopic.id)) as any)["title?"]).toBe(
-      !realTopic["title?"],
+    expect(((await (Klass as unknown as typeof Base).find(realTopic.id)) as any).hasTitle).toBe(
+      !realTopic.hasTitle,
     );
   });
   it("calling super when the parent does not define method raises NoMethodError", async () => {
@@ -1228,10 +1228,10 @@ describe("AttributeMethodsTest", () => {
   it("respond_to?", async () => {
     const topic = (await CanonicalTopic.find(1)) as any;
     assertRespondTo(topic, "title");
-    assertRespondTo(topic, "title?");
+    assertRespondTo(topic, "hasTitle");
     assertRespondTo(topic, "title=");
     assertRespondTo(topic, "title");
-    assertRespondTo(topic, "title?");
+    assertRespondTo(topic, "hasTitle");
     assertRespondTo(topic, "title=");
     assertRespondTo(topic, "author_name");
     assertRespondTo(topic, "attributeNames");
@@ -1274,7 +1274,7 @@ describe("AttributeMethodsTest", () => {
 
     Object.defineProperty(topic, "approved", { value: false, configurable: true });
 
-    expect(topic["approved?"]).toBeFalsy();
+    expect(topic.hasApproved).toBeFalsy();
   });
   it("write time to date attribute", async () => {
     await inTimeZone("Pacific Time (US & Canada)", () => {
@@ -1366,13 +1366,13 @@ describe("AttributeMethodsTest", () => {
 
   it("string attribute predicate", async () => {
     for (const value of [null, "", " "]) {
-      expect((new CanonicalTopic({ author_name: value }) as any)["author_name?"]).toBe(false);
+      expect((new CanonicalTopic({ author_name: value }) as any).hasAuthor_name).toBe(false);
     }
 
-    expect((new CanonicalTopic({ author_name: "Name" }) as any)["author_name?"]).toBe(true);
+    expect((new CanonicalTopic({ author_name: "Name" }) as any).hasAuthor_name).toBe(true);
 
     for (const value of BooleanType.FALSE_VALUES) {
-      expect((new CanonicalTopic({ author_name: value }) as any)["author_name?"]).toBeTruthy();
+      expect((new CanonicalTopic({ author_name: value }) as any).hasAuthor_name).toBeTruthy();
     }
   });
 
@@ -1460,49 +1460,49 @@ describe("AttributeMethodsTest", () => {
   });
 
   it("boolean attributes", async () => {
-    expect(((await CanonicalTopic.find(1)) as any)["approved?"]).toBeFalsy();
-    expect(((await CanonicalTopic.find(2)) as any)["approved?"]).toBeTruthy();
+    expect(((await CanonicalTopic.find(1)) as any).hasApproved).toBeFalsy();
+    expect(((await CanonicalTopic.find(2)) as any).hasApproved).toBeTruthy();
   });
 
   it("read_attribute when false", async () => {
     const topic = topics("first") as any;
     topic.approved = false;
-    expect(topic["approved?"]).toBeFalsy();
+    expect(topic.hasApproved).toBeFalsy();
     topic.approved = "false";
-    expect(topic["approved?"]).toBeFalsy();
+    expect(topic.hasApproved).toBeFalsy();
   });
 
   it("read_attribute when true", async () => {
     const topic = topics("first") as any;
     topic.approved = true;
-    expect(topic["approved?"]).toBeTruthy();
+    expect(topic.hasApproved).toBeTruthy();
     topic.approved = "true";
-    expect(topic["approved?"]).toBeTruthy();
+    expect(topic.hasApproved).toBeTruthy();
   });
 
   it("boolean attribute predicate", async () => {
     for (const value of [null, "", false, "false", "f", 0]) {
-      expect((new CanonicalTopic({ approved: value } as any) as any)["approved?"]).toBe(false);
+      expect((new CanonicalTopic({ approved: value } as any) as any).hasApproved).toBe(false);
     }
 
     for (const value of [true, "true", "1", 1]) {
-      expect((new CanonicalTopic({ approved: value } as any) as any)["approved?"]).toBe(true);
+      expect((new CanonicalTopic({ approved: value } as any) as any).hasApproved).toBe(true);
     }
   });
 
   it("boolean attributes writing and reading", async () => {
     const topic = new CanonicalTopic({}) as any;
     topic.approved = "false";
-    expect(topic["approved?"]).toBeFalsy();
+    expect(topic.hasApproved).toBeFalsy();
 
     topic.approved = "false";
-    expect(topic["approved?"]).toBeFalsy();
+    expect(topic.hasApproved).toBeFalsy();
 
     topic.approved = "true";
-    expect(topic["approved?"]).toBeTruthy();
+    expect(topic.hasApproved).toBeTruthy();
 
     topic.approved = "true";
-    expect(topic["approved?"]).toBeTruthy();
+    expect(topic.hasApproved).toBeTruthy();
   });
 
   function newTopicLikeArClass(block?: (klass: typeof Base) => void): typeof Base {
@@ -1539,11 +1539,11 @@ describe("AttributeMethodsTest", () => {
 
   it("number attribute predicate", async () => {
     for (const value of [null, 0, "0"]) {
-      expect((new Developer({ salary: value } as any) as any)["salary?"]).toBe(false);
+      expect((new Developer({ salary: value } as any) as any).hasSalary).toBe(false);
     }
 
-    expect((new Developer({ salary: 1 } as any) as any)["salary?"]).toBe(true);
-    expect((new Developer({ salary: "1" } as any) as any)["salary?"]).toBe(true);
+    expect((new Developer({ salary: 1 } as any) as any).hasSalary).toBe(true);
+    expect((new Developer({ salary: "1" } as any) as any).hasSalary).toBe(true);
   });
 
   it("write_attribute can write aliased attributes as well", async () => {
@@ -1805,11 +1805,11 @@ describe("AttributeMethodsTest", () => {
     klass.attribute("user_defined_text", "text");
 
     let topic = new klass({ user_defined_text: "text" }) as any;
-    expect(topic["user_defined_text?"]).toBeTruthy();
+    expect(topic.hasUser_defined_text).toBeTruthy();
 
     for (const value of BooleanType.FALSE_VALUES) {
       topic = new klass({ user_defined_text: value }) as any;
-      expect(topic["user_defined_text?"]).toBeTruthy();
+      expect(topic.hasUser_defined_text).toBeTruthy();
     }
   });
 
@@ -1844,16 +1844,16 @@ describe("AttributeMethodsTest", () => {
     )[0] as any;
 
     expect(object.string_value).toBe("Firm");
-    expect(object["string_value?"]).toBeTruthy();
+    expect(object.hasString_value).toBeTruthy();
 
     object.string_value = "  ";
-    expect(object["string_value?"]).toBeFalsy();
+    expect(object.hasString_value).toBeFalsy();
 
     expect(Number(object.int_value)).toBe(1);
-    expect(object["int_value?"]).toBeTruthy();
+    expect(object.hasInt_value).toBeTruthy();
 
     object.int_value = "0";
-    expect(object["int_value?"]).toBeFalsy();
+    expect(object.hasInt_value).toBeFalsy();
   });
 
   it("update array content", async () => {
