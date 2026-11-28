@@ -1,6 +1,6 @@
 {
   "name": "@blazetrails/mysql2",
-  "version": "0.1.0-alpha0.2",
+  "version": "0.1.0-alpha0.3",
   "description": "The MySQL client, mirroring Ruby's mysql2 gem",
   "license": "MIT",
   "repository": {

@@ -1,6 +1,6 @@
 {
   "name": "@blazetrails/ruby-compat",
-  "version": "0.1.0-alpha0.2",
+  "version": "0.1.0-alpha0.3",
   "description": "Ruby core/stdlib primitives that trails calls but Rails does not define: a leaf package with no workspace dependencies",
   "license": "MIT",
   "repository": {

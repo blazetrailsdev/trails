@@ -1,6 +1,6 @@
 {
   "name": "@blazetrails/rack-cache",
-  "version": "0.1.0-alpha0.2",
+  "version": "0.1.0-alpha0.3",
   "description": "HTTP caching for Rack, mirroring Ruby's rack-cache",
   "license": "MIT",
   "repository": {

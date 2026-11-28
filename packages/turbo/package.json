@@ -1,6 +1,6 @@
 {
   "name": "@blazetrails/turbo",
-  "version": "0.1.0-alpha0.2",
+  "version": "0.1.0-alpha0.3",
   "description": "Turbo for Trails, mirroring the turbo-rails gem",
   "license": "MIT",
   "repository": {

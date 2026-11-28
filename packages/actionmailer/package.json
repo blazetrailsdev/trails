@@ -1,6 +1,6 @@
 {
   "name": "@blazetrails/actionmailer",
-  "version": "0.1.0-alpha0.2",
+  "version": "0.1.0-alpha0.3",
   "description": "Email composition and delivery for Trails, mirroring the actionmailer gem",
   "license": "MIT",
   "repository": {

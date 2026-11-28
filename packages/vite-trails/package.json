@@ -1,6 +1,6 @@
 {
   "name": "@blazetrails/vite-trails",
-  "version": "0.1.0-alpha0.2",
+  "version": "0.1.0-alpha0.3",
   "description": "Vite tag helpers and engine for Trails, mirroring the vite_rails gem",
   "license": "MIT",
   "repository": {

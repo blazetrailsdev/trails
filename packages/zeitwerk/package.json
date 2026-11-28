@@ -1,6 +1,6 @@
 {
   "name": "@blazetrails/zeitwerk",
-  "version": "0.1.0-alpha0.2",
+  "version": "0.1.0-alpha0.3",
   "description": "Build-time autoloader for Trails, mirroring Zeitwerk",
   "license": "MIT",
   "repository": {
