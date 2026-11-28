@@ -156,6 +156,12 @@ for (let i = 0; i < queued.length; i++) {
   console.log("::endgroup::");
   const { testModules, unhandledErrors } = await vitest.runTestSpecifications(queued[i], false);
   if (unhandledErrors.length || testModules.some((module) => !module.ok())) failed = true;
+  if (testModules.length < queued[i].length) {
+    console.log(
+      `::error title=AR batch ran short::batch ${i + 1} ran ${testModules.length} of ${queued[i].length} files`,
+    );
+    failed = true;
+  }
 }
 console.log(`leg ${index}/${count} ran ${ran} of ${specs.length} files`);
 clearInterval(keepAlive);

@@ -8,7 +8,16 @@ rm -f "$report"
 AR_SPLIT=cases pnpm vitest run packages/activerecord/ --project activerecord \
   --shard="$shard" --reporter=default --reporter=json --outputFile.json="$report"
 status=$?
-[ "$status" -eq 0 ] && exit 0
+if [ "$status" -eq 0 ]; then
+  if [ -s "$report" ] && node -e '
+    const report = JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8"));
+    process.exit(report.numTotalTestSuites > 0 ? 0 : 1);
+  ' "$report"; then
+    exit 0
+  fi
+  echo "::error title=AR non-isolated ran no files::vitest exited 0 with no Test Files summary" >&2
+  exit 1
+fi
 
 if [ ! -s "$report" ]; then
   echo "vitest exit was $status and it wrote no report" >&2
