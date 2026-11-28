@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Time } from "@blazetrails/date";
 import { Engine, Errors, Password } from "../lib/index.js";
 
@@ -13,6 +13,21 @@ describe("BCrypt::Engine", () => {
 });
 
 describe("The BCrypt engine", () => {
+  beforeEach(() => {
+    let clock = 0;
+    vi.spyOn(Time, "now").mockImplementation(() => Time.at(clock));
+    const create = Password.create.bind(Password);
+    vi.spyOn(Password, "create").mockImplementation((secret, options) => {
+      const password = create(secret, options);
+      clock += 2 ** (options as { cost: number }).cost / 1000;
+      return password;
+    });
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it("should calculate the optimal cost factor to fit in a specific time", () => {
     const startTime = Time.now();
     Password.create("testing testing", { cost: Engine.MIN_COST + 1 });
