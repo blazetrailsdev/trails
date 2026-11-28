@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { ActiveStorage } from "@blazetrails/activestorage";
 import { freezeTime, travelBack } from "@blazetrails/activesupport/testing/time-helpers";
 import { zone, type TimeZone } from "@blazetrails/activesupport";
 import { StringIO } from "@blazetrails/ruby-compat";
 import { fixturesAll } from "../test-helper.js";
+
+const { ActiveStorage } = await import("@blazetrails/activestorage");
 
 type AttachableBlob = {
   id: unknown;
