@@ -1,11 +1,25 @@
 import { readdir, readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
+import ts from "typescript-5";
 import { PACKAGE_NAMES } from "../src/runtime/package-names.ts";
 
 const PACKAGES_DIR = fileURLToPath(new URL("../../../packages/", import.meta.url));
 const TS_LIB_DIR = fileURLToPath(new URL("../node_modules/typescript-5/lib/", import.meta.url));
 
 type Manifest = { name: string; dependencies?: Record<string, string> };
+
+const printer = ts.createPrinter({ removeComments: true });
+
+/**
+ * A declaration file without its comments, which the checker does not read:
+ * about two thirds of TypeScript's lib files. The `/// <reference>`
+ * directives are comments too, and are kept.
+ */
+function slim(path: string, text: string): string {
+  const directives = text.match(/^\/\/\/ *<reference [^>]*>/gm) ?? [];
+  const source = ts.createSourceFile(path, text, ts.ScriptTarget.Latest, false);
+  return [...directives, printer.printFile(source)].join("\n");
+}
 
 async function walk(dir: string, rel = ""): Promise<string[]> {
   const out: string[] = [];
@@ -47,12 +61,15 @@ export async function declarationFiles(): Promise<Record<string, string>> {
     files[`/node_modules/${name}/package.json`] = await readFile(`${root}package.json`, "utf8");
     const dist = await walk(`${root}dist/`).catch(() => []);
     for (const path of dist) {
-      files[`/node_modules/${name}/dist/${path}`] = await readFile(`${root}dist/${path}`, "utf8");
+      files[`/node_modules/${name}/dist/${path}`] = slim(
+        path,
+        await readFile(`${root}dist/${path}`, "utf8"),
+      );
     }
   }
   for (const path of await readdir(TS_LIB_DIR)) {
     if (/^lib\..*\.d\.ts$/.test(path))
-      files[`/lib/${path}`] = await readFile(`${TS_LIB_DIR}${path}`, "utf8");
+      files[`/lib/${path}`] = slim(path, await readFile(`${TS_LIB_DIR}${path}`, "utf8"));
   }
   return files;
 }

@@ -1,3 +1,4 @@
+import { virtualizeTseWithDeltas } from "@blazetrails/trails-tsc/plugins/tse";
 import ts from "typescript-5";
 
 export type TypeProblem = {
@@ -90,7 +91,7 @@ function languageService(): ts.LanguageService {
   service ??= ts.createLanguageService(
     {
       getCompilationSettings: () => config.options,
-      getScriptFileNames: () => [...config.fileNames, IMPORT_META],
+      getScriptFileNames: () => [...config.fileNames, ...views.keys(), IMPORT_META],
       getScriptVersion: (path) => String(versions.get(path) ?? 0),
       getScriptSnapshot: (path) => {
         const text = read(path);
@@ -112,31 +113,91 @@ function languageService(): ts.LanguageService {
   return service;
 }
 
+type Mapping = { genLine: number; genCol?: number; srcLine: number; srcCol?: number };
+
+/** Each `.tse` view, as the `.ts` module `trails-tsc` checks it as, keyed by `<view>.ts`. */
+const views = new Map<string, { source: string; mappings: readonly Mapping[] }>();
+
+function virtualize(files: Record<string, string>): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [path, text] of Object.entries(files)) {
+    if (path.endsWith(".ts")) out[path] = text;
+    if (!path.endsWith(".tse")) continue;
+    let view = views.get(`${path}.ts`);
+    if (view?.source !== text) {
+      try {
+        const { ts: code, mappings } = virtualizeTseWithDeltas(text, { view: "any" });
+        out[`${path}.ts`] = code;
+        view = { source: text, mappings };
+      } catch {
+        continue;
+      }
+      views.set(`${path}.ts`, view);
+    } else out[`${path}.ts`] = app[`${path}.ts`]!;
+  }
+  for (const key of views.keys()) if (!(key in out)) views.delete(key);
+  return out;
+}
+
+/** A position in a virtualized view, mapped back to the view's own line, or null in generated code. */
+function viewPosition(
+  mappings: readonly Mapping[],
+  line: number,
+  character: number,
+): { line: number; character: number } | null {
+  let best: Mapping | undefined;
+  for (const m of mappings) {
+    const col = m.genCol ?? 0;
+    if (m.genLine > line || (m.genLine === line && col > character)) continue;
+    if (
+      !best ||
+      m.genLine > best.genLine ||
+      (m.genLine === best.genLine && col >= (best.genCol ?? 0))
+    )
+      best = m;
+  }
+  if (!best) return null;
+  return {
+    line: best.srcLine,
+    character:
+      best.genLine === line
+        ? (best.srcCol ?? 0) + character - (best.genCol ?? 0)
+        : (best.srcCol ?? 0),
+  };
+}
+
 /**
- * The type errors in an app's `.ts` files, as warnings: the playground runs
- * an app that does not type-check, as `tsx` would, and shows them alongside.
- * Syntax errors are left to the runtime, which stops the boot on them.
+ * The type errors in an app's `.ts` files and `.tse` views, as warnings: the
+ * playground runs an app that does not type-check, as `tsx` would, and shows
+ * them alongside. Syntax errors are left to the runtime, which stops the boot
+ * on them. A view is checked as the module `trails-tsc` virtualizes it to.
  */
 export function typeProblems(
   declarationFiles: Record<string, string>,
   files: Record<string, string>,
 ): TypeProblem[] {
   declarations = declarationFiles;
-  const next = Object.fromEntries(Object.entries(files).filter(([path]) => path.endsWith(".ts")));
+  const next = virtualize(files);
   for (const [path, text] of Object.entries(next)) {
     if (app[path] !== text) versions.set(path, (versions.get(path) ?? 0) + 1);
   }
   app = next;
   config = readConfig(files);
+  const roots = [...config.fileNames, ...views.keys()];
   const ls = languageService();
-  return config.fileNames.flatMap((path) =>
+  return roots.flatMap((path) =>
     ls.getSyntacticDiagnostics(path).length
       ? []
       : ls.getSemanticDiagnostics(path).flatMap((d) => {
           if (d.file?.fileName !== path) return [];
-          const at = d.file.getLineAndCharacterOfPosition(d.start ?? 0);
+          const generated = d.file.getLineAndCharacterOfPosition(d.start ?? 0);
+          const view = views.get(path);
+          const at = view
+            ? viewPosition(view.mappings, generated.line, generated.character)
+            : generated;
+          if (!at) return [];
           return {
-            path,
+            path: view ? path.slice(0, -3) : path,
             line: at.line + 1,
             column: at.character + 1,
             message: ts.flattenDiagnosticMessageText(d.messageText, " "),
