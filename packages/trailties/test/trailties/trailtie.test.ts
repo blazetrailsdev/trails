@@ -20,6 +20,8 @@ include(RailtieTest, Isolation);
 include(RailtieTest, Methods);
 registerSpecType(/^RailtieTest$/, RailtieTest);
 
+type FooConfig = { foo: OrderedOptions & { greetings?: string } };
+
 type Host = Generation & {
   get(path: string, params?: unknown, env?: Record<string, unknown>): Promise<unknown>;
 };
@@ -81,25 +83,20 @@ describe("RailtieTest", { timeout: 240_000 }, () => {
   it("config name is available for the railtie", () => {
     class Foo extends Trailtie {}
     Trailtie.register(Foo);
-    const config = Foo.config as unknown as { foo: OrderedOptions & { greetings?: string } };
+    const config = Foo.config as unknown as FooConfig;
     config.foo = new OrderedOptions();
     config.foo.greetings = "hello";
-    expect(
-      (Foo.config as unknown as { foo: OrderedOptions & { greetings?: string } }).foo.greetings,
-    ).toBe("hello");
+    expect((Foo.config as unknown as FooConfig).foo.greetings).toBe("hello");
   });
 
   it("railtie configurations are available in the application", async () => {
     class Foo extends Trailtie {}
     Trailtie.register(Foo);
-    const config = Foo.config as unknown as { foo: OrderedOptions & { greetings?: string } };
+    const config = Foo.config as unknown as FooConfig;
     config.foo = new OrderedOptions();
     config.foo.greetings = "hello";
     await import(await t.appPath("config", "application.ts"));
-    expect(
-      (Trails.application!.config as unknown as { foo: OrderedOptions & { greetings?: string } })
-        .foo.greetings,
-    ).toBe("hello");
+    expect((Trails.application!.config as unknown as FooConfig).foo.greetings).toBe("hello");
   });
 
   it("railtie can add to_prepare callbacks", async () => {
@@ -241,7 +238,7 @@ describe("RailtieTest", { timeout: 240_000 }, () => {
   it("Railtie object isn't output when a NoMethodError is raised", () => {
     class Foo extends Trailtie {}
     Trailtie.register(Foo);
-    const config = Foo.config as unknown as { foo: OrderedOptions & { greetings?: string } };
+    const config = Foo.config as unknown as FooConfig;
     config.foo = new OrderedOptions();
     config.foo.greetings = "hello";
 
@@ -255,6 +252,8 @@ describe("RailtieTest", { timeout: 240_000 }, () => {
       }
     }).toThrow(NoMethodError);
 
-    expect((error as NoMethodError).message).toMatch(/undefined method [`']abc' for.*Foo/);
+    expect((error as NoMethodError).originalMessage()).toMatch(
+      /undefined method [`']abc' for.*Foo/,
+    );
   });
 });
