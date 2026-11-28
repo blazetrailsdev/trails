@@ -18,6 +18,7 @@ Trails.env = "test";
 await import("./dummy/config/environment.js");
 const { ActiveStorage } = await import("@blazetrails/activestorage");
 export const app = Trails.application!;
+const { ActiveStorage } = await import("@blazetrails/activestorage");
 await import("./support/engine.js");
 const { RichText } = await import("../lib/rich-text.js");
 const { Message } = await import("./dummy/app/models/message.js");
