@@ -124,8 +124,7 @@ describe("HelperPathsTest", () => {
 });
 
 describe("HelpersTypoControllerTest", () => {
-  // BLOCKED: helper-name-error-has-no-did-you-mean
-  it.skip("helper typo error message", () => {
+  it("helper typo error message", () => {
     let e!: NameError & { detailedMessage(): string };
     expect(() => {
       try {
