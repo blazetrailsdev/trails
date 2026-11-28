@@ -5,10 +5,39 @@ import {
   RoutesHelpers,
   type RoutesHelpersControllerClass,
 } from "../../../lib/abstract-controller/trailties/routes-helpers.js";
-import { constSet, include } from "@blazetrails/ruby-compat/include";
+import {
+  constSet,
+  include,
+  rbClassInheritedP,
+  rbModAncestors,
+} from "@blazetrails/ruby-compat/include";
 import { rbFSend, TopLevel } from "@blazetrails/ruby-compat/object";
 
 describe("RoutesHelpers.with (trails)", () => {
+  it("records the url helpers in a subclass's ancestry, not the wired class's", () => {
+    const routes = new RouteSet();
+    const cls = class {};
+    RoutesHelpers.with(routes)(cls);
+    const sub = class extends cls {};
+    const { urlHelpersModule, pathHelpersModule } = routes.namedRoutes;
+    for (const m of [urlHelpersModule, pathHelpersModule]) {
+      expect(rbClassInheritedP(sub, m)).toBe(true);
+      expect(rbClassInheritedP(cls, m)).not.toBe(true);
+    }
+    expect(rbModAncestors(sub).filter((m) => m === urlHelpersModule)).toHaveLength(1);
+    expect(rbModAncestors(cls)).not.toContain(urlHelpersModule);
+    const mod = routes.urlHelpers();
+    for (const klass of [sub, class extends sub {}]) {
+      const ancestors = rbModAncestors(klass);
+      const at = (m: object): number => ancestors.indexOf(m);
+      expect(at(sub)).toBeLessThan(at(mod));
+      expect(at(mod)).toBeLessThan(at(pathHelpersModule));
+      expect(at(pathHelpersModule)).toBeLessThan(at(urlHelpersModule));
+      expect(at(urlHelpersModule)).toBeLessThan(at(cls));
+      expect(rbClassInheritedP(klass, urlHelpersModule)).toBe(true);
+    }
+  });
+
   it("accepts a real RouteSet with no cast", () => {
     expect(typeof RoutesHelpers.with(new RouteSet())).toBe("function");
   });

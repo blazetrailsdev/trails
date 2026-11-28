@@ -956,6 +956,7 @@ const extendedKeys = Symbol.for("@blazetrails/ruby-compat:extendedKeys");
 
 const includedModulesKey = Symbol.for("@blazetrails/ruby-compat:includedModules");
 const moduleIncludesKey = Symbol.for("@blazetrails/ruby-compat:moduleIncludes");
+const includedForSubclassesKey = Symbol.for("@blazetrails/ruby-compat:includedForSubclasses");
 const extendedOwners = new WeakMap<object, Map<string, object>>();
 
 const delegateClass = Symbol.for("@blazetrails/ruby-compat:delegateClass");
@@ -1063,6 +1064,16 @@ export function includedModules(mod: { prototype: object }): unknown[] {
   return result;
 }
 
+/** @noRailsEquivalent PERMANENT */
+export function includeForSubclasses(klass: { prototype: object }, mod: object): void {
+  const visit = (m: object): void => {
+    trackIncludedModule(klass.prototype, m, includedForSubclassesKey);
+    if (!Object.hasOwn(m, moduleIncludesKey)) return;
+    for (const n of [...(m as Record<symbol, Set<object>>)[moduleIncludesKey]].reverse()) visit(n);
+  };
+  visit(mod);
+}
+
 /**
  * Ruby's `Module#ancestors`: the class, the modules mixed into it most
  * recently first, and then the same for each superclass up to `Object`.
@@ -1096,6 +1107,14 @@ export function rbModAncestors(mod: { prototype: object } | ModuleObject): objec
     p;
     p = Object.getPrototypeOf(p) as object | null
   ) {
+    if (
+      p !== (mod as { prototype: object }).prototype &&
+      Object.hasOwn(p, includedForSubclassesKey)
+    ) {
+      for (const m of (p as Record<symbol, Set<object>>)[includedForSubclassesKey]) {
+        if (!ary.includes(m)) ary.push(m);
+      }
+    }
     if (Object.hasOwn(p, "constructor")) {
       const klass = (p as { constructor: object }).constructor;
       if (!ary.includes(reopened(klass))) ary.push(klass);
@@ -1223,6 +1242,13 @@ function classSearchAncestor(cl: { prototype: object }, c: object): boolean {
     }
     if (Object.hasOwn(p, includedModulesKey)) {
       if (((p as Record<symbol, unknown>)[includedModulesKey] as Set<object>).has(c)) return true;
+    }
+    if (
+      p !== cl.prototype &&
+      Object.hasOwn(p, includedForSubclassesKey) &&
+      (p as Record<symbol, Set<object>>)[includedForSubclassesKey].has(c)
+    ) {
+      return true;
     }
     if (p === Uint8Array.prototype) return c === rbCString || classSearchAncestor(rbCString, c);
     if (p === String.prototype && (c === rbCString || classSearchAncestor(rbCString, c))) {
