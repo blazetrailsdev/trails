@@ -1107,10 +1107,6 @@ export function rbModAncestors(mod: { prototype: object } | ModuleObject): objec
     p;
     p = Object.getPrototypeOf(p) as object | null
   ) {
-    if (Object.hasOwn(p, "constructor")) {
-      const klass = (p as { constructor: object }).constructor;
-      if (!ary.includes(reopened(klass))) ary.push(klass);
-    }
     if (
       p !== (mod as { prototype: object }).prototype &&
       Object.hasOwn(p, includedForSubclassesKey)
@@ -1118,6 +1114,10 @@ export function rbModAncestors(mod: { prototype: object } | ModuleObject): objec
       for (const m of (p as Record<symbol, Set<object>>)[includedForSubclassesKey]) {
         if (!ary.includes(m)) ary.push(m);
       }
+    }
+    if (Object.hasOwn(p, "constructor")) {
+      const klass = (p as { constructor: object }).constructor;
+      if (!ary.includes(reopened(klass))) ary.push(klass);
     }
     if (Object.hasOwn(p, includedModulesKey)) {
       const mods = [...((p as Record<symbol, unknown>)[includedModulesKey] as Set<object>)];
