@@ -57,11 +57,9 @@ describe("serializing namespaces", () => {
       const doc = new Builder((xml: Builder) => {
         xml.root({ xmlns: "http://default-namespace.org/" }, () => {
           xml.child("with default namespace");
-          xml
-            .get("specific")
-            .child("with specific namespace", {
-              "xmlns:specific": "http://specific-namespace.org/",
-            });
+          xml.get("specific").child("with specific namespace", {
+            "xmlns:specific": "http://specific-namespace.org/",
+          });
         });
       }).doc.toXml({ saveWith: AS_XML });
 
