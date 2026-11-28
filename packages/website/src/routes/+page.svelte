@@ -11,7 +11,6 @@
   const installs = {
     npm: "npm install -g @blazetrails/trails && trails new blog",
     pnpm: "pnpm add -g @blazetrails/trails && trails new blog",
-    yarn: "yarn global add @blazetrails/trails && trails new blog",
     bun: "bun add -g @blazetrails/trails && trails new blog",
   };
   let pm = $state("npm");
@@ -77,11 +76,11 @@
       <div class="pane">
         <div class="split">
           <div>
-            <div class="file">app/controllers/posts-controller.ts &middot; tsc --noEmit</div>
+            <div class="file">app/controllers/posts-controller.ts</div>
             {@html data.hero.check}
           </div>
           <div>
-            <div class="file">app/views/post-mailer/published.html.tse &middot; trails-tsc-views build &amp;&amp; tsc</div>
+            <div class="file">app/views/post-mailer/published.html.tse</div>
             {@html data.hero.view}
           </div>
         </div>
@@ -162,7 +161,7 @@
   <footer class="foot">
     <ul>
       <li><a href={repo}>Source</a></li>
-      <li><a href="#ai">How trails was built</a></li>
+      <li>Built by <a href="https://dean.is">Dean Marano</a></li>
       <li><a href="{repo}/blob/main/LICENSES.md">License</a></li>
     </ul>
     <p>trails is an independent TypeScript re-implementation of Ruby on Rails. The Rails trademarks are exclusively licensed to the Rails Foundation. Uses of ‘Rails’ and ‘Ruby on Rails’ in this website are for identification purposes only and do not imply an endorsement by or affiliation with Rails, the trademark owner, or the Rails Foundation.</p>
