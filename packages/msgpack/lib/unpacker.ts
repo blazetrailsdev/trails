@@ -1,17 +1,13 @@
-import {
-  ArgumentError,
-  EOFError,
-  FrozenError,
-  Hash,
-  defineModule,
-  include,
-  RangeError,
-  StandardError,
-  rbDbl2num,
-  rbObjMethod,
-  rbObjClass,
-  rbObjIsKindOf,
-} from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat/argument-error";
+import { EOFError } from "@blazetrails/ruby-compat/eof-error";
+import { FrozenError } from "@blazetrails/ruby-compat/frozen-error";
+import { Hash } from "@blazetrails/ruby-compat/hash";
+import { defineModule, include, rbObjIsKindOf } from "@blazetrails/ruby-compat/include";
+import { rbObjMethod } from "@blazetrails/ruby-compat/method";
+import { rbDbl2num } from "@blazetrails/ruby-compat/numeric";
+import { rbObjClass } from "@blazetrails/ruby-compat/object";
+import { RangeError } from "@blazetrails/ruby-compat/range-error";
+import { StandardError } from "@blazetrails/ruby-compat/standard-error";
 import { Buffer } from "./buffer.js";
 import { ExtensionValue } from "./extension-value.js";
 import { MessagePack } from "./namespaces.js";
