@@ -1380,6 +1380,13 @@ ratified here so no port re-derives them.
   expo-sqlite expose it; better-sqlite3, node:sqlite and bun:sqlite do not,
   so on those engines `interrupt` raises `NotImplementedError`, as the gem's
   other unbound arms do. Ruled by the operator on 2026-11-27.
+- **A user-defined function on a binding that cannot register one.**
+  `SQLite3::Database#define_function_with_flags` is an unconditional
+  `sqlite3_create_function` (`vendor/sqlite3/v2.7.3/ext/sqlite3/database.c:507`).
+  better-sqlite3 and node:sqlite expose it; libsql's `Database#function`
+  throws "not implemented", and expo-sqlite and bun:sqlite have no
+  user-function API, so on those engines `defineFunctionWithFlags` raises
+  `NotImplementedError`. Ruled by the operator on 2026-11-27.
 
 - Package-specific facts:
   [activerecord](packages/activerecord/CLAUDE.md#a-classmethodsnew-that-runs-after-super-deduplicable)

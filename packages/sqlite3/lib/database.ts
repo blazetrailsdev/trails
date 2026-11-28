@@ -602,6 +602,7 @@ export class Database<E extends EngineDatabase = EngineDatabase> {
     flags: number,
     block: (...args: unknown[]) => unknown,
   ): this {
+    /** @inventedArm if — PERMANENT */
     if (!this._engine.defineFunctionWithFlags) {
       throw new NotImplementedError(
         "define_function_with_flags() function is unimplemented on this machine",
