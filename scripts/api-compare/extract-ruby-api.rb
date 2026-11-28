@@ -1226,6 +1226,8 @@ class ApiExtractor
       process_define_model_callbacks(args)
     when "delegate"
       process_delegate(args)
+    when "delegate_missing_to"
+      process_delegate_missing_to
     when "def_delegators", "def_delegator"
       process_def_delegators(args)
     when "define_column_methods"
@@ -1343,6 +1345,8 @@ class ApiExtractor
         process_mattr(node[2], reader: false, writer: true, predicate: false, class_attr: false)
       when "delegate"
         process_delegate(node[2])
+      when "delegate_missing_to"
+        process_delegate_missing_to
       when "def_delegators", "def_delegator"
         process_def_delegators(node[2])
       when "module_function"
@@ -2250,8 +2254,9 @@ class ApiExtractor
   # to the target. The leading positional symbols are the generated methods; a
   # leading splat of a symbol-array constant (`delegate(*QUERYING_METHODS, to:
   # :all)`) is expanded via @const_symbol_arrays. Only `… to:` forms are
-  # recorded — that's the static-resolvable surface (`delegate_missing_to` and
-  # dynamic targets are skipped). `prefix:` (renames to `prefix_method`) and
+  # recorded — that's the static-resolvable surface (dynamic targets are
+  # skipped; `delegate_missing_to` is process_delegate_missing_to). `prefix:`
+  # (renames to `prefix_method`) and
   # `private:` are NOT modeled — both appear only in doc comments across the
   # vendored lib, so recording bare public names is faithful in practice.
   def process_delegate(args)
@@ -2301,6 +2306,27 @@ class ApiExtractor
         file: @current_file,
         line: @current_line,
         notes: "delegate",
+      }
+    end
+    maybe_update_module_file(fqn, target)
+  end
+
+  def process_delegate_missing_to
+    fqn = current_fqn
+    target = @classes[fqn] || @modules[fqn]
+    return unless target
+
+    {
+      "respond_to_missing?" => "def respond_to_missing?(name, include_private = false); end",
+      "method_missing" => "def method_missing(method, ...); end",
+    }.each do |name, source|
+      target[:instanceMethods] << {
+        name: name,
+        visibility: "public",
+        params: extract_params(find_params(Ripper.sexp(source)[1][0])),
+        file: @current_file,
+        line: @current_line,
+        notes: "delegate_missing_to",
       }
     end
     maybe_update_module_file(fqn, target)
@@ -2805,6 +2831,29 @@ class ApiExtractor
     record_file_hash_keys(collect_ivar_option_keys(body))
     digest = body_digest(body)
     entry[:bodyDigest] = digest if digest
+    entry[:returnsBlock] = true if returns_block?(body)
+  end
+
+  def returns_block?(body)
+    stmts = body.is_a?(Array) && body[0] == :bodystmt ? body[1] : body
+    last = stmts.is_a?(Array) && stmts[0].is_a?(Array) ? stmts.last : stmts
+    return false unless last.is_a?(Array)
+    case last[0]
+    when :yield, :yield0
+      true
+    when :method_add_block
+      returns_block?(last[2].is_a?(Array) ? last[2][2] : nil)
+    when :method_add_arg, :command, :command_call, :call
+      forwards_block?(last)
+    else
+      false
+    end
+  end
+
+  def forwards_block?(call)
+    args = call.find { |el| el.is_a?(Array) && %i[arg_paren args_add_block].include?(el[0]) }
+    args = args[1] if args && args[0] == :arg_paren
+    args.is_a?(Array) && args[0] == :args_add_block && args[2] != false
   end
 
   # Members of an `.each` receiver, whichever way it is spelled: a literal

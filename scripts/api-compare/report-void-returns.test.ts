@@ -6,7 +6,10 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { MethodInfo } from "@blazetrails/parity/types";
 import type { SkeletonRow } from "./report-arms.js";
 import {
+  blockReturnCounts,
+  blockReturnRows,
   rubyPrivates,
+  rubyReturnsBlock,
   sampleRows,
   tsVoidReturns,
   voidReturnRows,
@@ -198,5 +201,115 @@ describe("extract-return-uses.rb", () => {
     expect(uses).not.toHaveProperty("each");
     expect(uses).not.toHaveProperty("statement_only");
     expect(uses).not.toHaveProperty("local");
+  });
+});
+
+describe("returns-block gate", () => {
+  // locking/pessimistic.rb:92-99, verbatim.
+  const PESSIMISTIC = `
+module ActiveRecord
+  module Locking
+    module Pessimistic
+      def with_lock(*args)
+        transaction_opts = args.extract_options!
+        lock = args.present? ? args.first : true
+        transaction(**transaction_opts) do
+          lock!(lock)
+          yield
+        end
+      end
+
+      def lock!(lock = true)
+        reload(lock: lock)
+        self
+      end
+
+      def forwards(&block)
+        transaction(&block)
+      end
+
+      def forwards_anonymously(&)
+        transaction(&)
+      end
+    end
+  end
+end
+`;
+  let rubyApi: ApiManifest;
+
+  beforeAll(async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "returns-block-"));
+    try {
+      await writeFile(path.join(dir, "pessimistic.rb"), PESSIMISTIC);
+      const driver = `
+        require_relative ${JSON.stringify(path.join(__dirname, "extract-ruby-api.rb"))}
+        require "json"
+        ex = ApiExtractor.new
+        ex.process_file(File.join(${JSON.stringify(dir)}, "pessimistic.rb"), ${JSON.stringify(dir)})
+        out = ex.modules.values.flat_map { |m| m[:instanceMethods] }.map do |m|
+          { name: m[:name], file: "locking/pessimistic.rb", returnsBlock: m[:returnsBlock] }
+        end
+        puts JSON.generate(out)
+      `;
+      const methods = JSON.parse(execFileSync("ruby", ["-e", driver], { encoding: "utf-8" }));
+      rubyApi = { packages: { activerecord: { fileFunctions: { x: methods } } } };
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  const row = (rubyName: string, tsName: string) =>
+    ({
+      package: "activerecord",
+      rubyFile: "locking/pessimistic.rb",
+      rubyName,
+      tsFile: "locking/pessimistic.ts",
+      tsName,
+      ruby: [],
+      ts: [],
+    }) as unknown as SkeletonRow;
+
+  const tsApi = (returnsVoid: boolean): ApiManifest => ({
+    packages: {
+      activerecord: {
+        fileFunctions: {
+          "locking/pessimistic.ts": [
+            {
+              name: "withLock",
+              visibility: "public",
+              params: [],
+              file: "locking/pessimistic.ts",
+              returnsVoid,
+            },
+          ],
+        },
+      },
+    },
+  });
+
+  it("records returnsBlock for a final yield, a block ending in yield, and a forwarded &block", () => {
+    const keys = rubyReturnsBlock(rubyApi);
+    expect([...keys].map((k) => k.split("\u0000")[2]).sort()).toEqual([
+      "forwards",
+      "forwards_anonymously",
+      "with_lock",
+    ]);
+  });
+
+  it("reds with_lock ported as Promise<void>, as before trails#10792", () => {
+    const skeletons = [row("with_lock", "withLock"), row("lock!", "lockBang")];
+    const before = blockReturnRows(
+      skeletons,
+      rubyReturnsBlock(rubyApi),
+      tsVoidReturns(tsApi(true)),
+    );
+    expect(before.map((r) => r.tsName)).toEqual(["withLock"]);
+    expect(blockReturnCounts(before, ["activerecord"])).toEqual({ activerecord: 1 });
+    const after = blockReturnRows(
+      skeletons,
+      rubyReturnsBlock(rubyApi),
+      tsVoidReturns(tsApi(false)),
+    );
+    expect(after).toEqual([]);
   });
 });

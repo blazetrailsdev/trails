@@ -43,6 +43,7 @@ export const STEPS: Step[] = [
   ["Parameter-name ratchet", "scripts/api-compare/lint-param-names.ts"],
   ["Block-parameter ratchet", "scripts/api-compare/lint-block-params.ts"],
   ["Predicate-kind ratchet", "scripts/api-compare/lint-predicate-kinds.ts"],
+  ["Returns-block ratchet", "scripts/api-compare/report-void-returns.ts --gate"],
   ["Inlined-from staleness gate", "scripts/api-compare/lint-inlined-from.ts"],
   ["Class-path table gate", "scripts/api-compare/class-paths.ts --check"],
   ["Ambiguous-parent ratchet", "scripts/api-compare/lint-ambiguous-parents.ts"],
