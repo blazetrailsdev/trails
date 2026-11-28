@@ -37,7 +37,10 @@ describe("Trails::Command::InitializersTest", { timeout: 120_000 }, () => {
     const finalOutput = await runInitializersCommand();
     const finalOutputLength = finalOutput.split("\n").length;
 
-    expect(finalOutputLength - initialOutputLength).toBe(1);
+    expect(
+      finalOutputLength - initialOutputLength,
+      `initial output:\n${initialOutput}\nfinal output:\n${finalOutput}`,
+    ).toBe(1);
     expect(finalOutput.includes("set_added_test_module")).toBeTruthy();
   });
 
