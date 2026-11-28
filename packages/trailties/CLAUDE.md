@@ -197,7 +197,9 @@ The same package ships its code in `dist/`, so `Engine#config` points a
 package-root engine's `paths["lib"]` at `called_from` when the root holds no
 `lib/`. `set_load_path` (`engine.rb:571-576`) then puts that directory on
 `LOAD_PATH`, as RubyGems puts a gem's `lib`, and `Generators.lookup` finds the
-package's `generators/` there. Ruled by the operator on 2026-11-11 (trails#10012).
+package's `generators/` there. `paths["lib/tasks"]` points at its `tasks/`
+the same way, so `run_tasks_blocks` loads a published package's
+`lib/tasks/*.rake` (solid_cache's `solid-cache:install`). Ruled by the operator on 2026-11-11 (trails#10012).
 
 This is a genuine runtime difference, ruled by the operator on 2026-10-23
 (trails#9280). `findRoot` carries `@inventedArm loop` / `if — PERMANENT`

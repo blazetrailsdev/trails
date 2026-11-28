@@ -946,8 +946,8 @@ ${requireStatements.join("\n")}`;
   protected async runSolid(): Promise<void> {
     if (this.skipSolid() || !this.isInstall()) return;
 
-    let commands = "solid_cache:install solid_queue:install";
-    if (!this.skipActionCable()) commands += " solid_cable:install";
+    let commands = "solid-cache:install solid-queue:install";
+    if (!this.skipActionCable()) commands += " solid-cable:install";
 
     await this.trailsCommand(commands);
   }

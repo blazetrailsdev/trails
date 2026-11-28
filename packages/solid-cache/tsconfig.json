@@ -23,6 +23,9 @@
       "path": "../date"
     },
     {
+      "path": "../rake"
+    },
+    {
       "path": "../ruby-compat"
     },
     {

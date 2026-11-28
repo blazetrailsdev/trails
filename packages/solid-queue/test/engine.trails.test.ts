@@ -37,18 +37,18 @@ describe("SolidQueue::Engine", () => {
   it("loads solid_queue/tasks from its rake_tasks block", async () => {
     await Engine.instance().runTasksBlocks({});
 
-    expect(Task.isTaskDefined("solid_queue:install")).toBe(true);
-    expect(Task.isTaskDefined("solid_queue:start")).toBe(true);
-    expect((await Task.get("solid_queue:start")).prerequisites).toEqual(["environment"]);
+    expect(Task.isTaskDefined("solid-queue:install")).toBe(true);
+    expect(Task.isTaskDefined("solid-queue:start")).toBe(true);
+    expect((await Task.get("solid-queue:start")).prerequisites).toEqual(["environment"]);
   });
 
   it("solid_queue:install runs the solid_queue:install generator", async () => {
     await Engine.instance().runTasksBlocks({});
     const invoke = vi.spyOn(Trails.Command!, "invoke").mockResolvedValue(undefined);
 
-    await (await Task.get("solid_queue:install")).execute();
+    await (await Task.get("solid-queue:install")).execute();
 
-    expect(invoke).toHaveBeenCalledWith("generate", ["solid_queue:install"]);
+    expect(invoke).toHaveBeenCalledWith("generate", ["solid-queue:install"]);
   });
 
   it("reaches its install generator through the load path", async () => {
@@ -57,7 +57,7 @@ describe("SolidQueue::Engine", () => {
       .bind(Engine.instance())
       .run({ config: { addAutoloadPathsToLoadPath: false } });
 
-    expect(await Trails.Generators!.findByNamespace("solid_queue:install")).toBe(InstallGenerator);
+    expect(await Trails.Generators!.findByNamespace("solid-queue:install")).toBe(InstallGenerator);
   });
 
   it("includes Interruptible into Processes::Base and seats the app executor", () => {

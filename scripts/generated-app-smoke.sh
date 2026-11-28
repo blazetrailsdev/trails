@@ -66,7 +66,7 @@ EOF
 pnpm test
 
 # RFC 0258: build, drop dev dependencies, boot from dist/ with type stripping off.
-pnpm trails solid_queue:install
+pnpm trails solid-queue:install
 pnpm trails generate scaffold Post title:string
 pnpm trails generate job Ping
 node -e '

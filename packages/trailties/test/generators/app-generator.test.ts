@@ -1668,8 +1668,8 @@ describe("AppGeneratorTest", () => {
 
     expect(
       railsCommands,
-      "`solid_cache:install solid_queue:install solid_cable:install` expected to not be called.",
-    ).not.toContain("solid_cache:install solid_queue:install solid_cable:install");
+      "`solid-cache:install solid-queue:install solid-cable:install` expected to not be called.",
+    ).not.toContain("solid-cache:install solid-queue:install solid-cable:install");
     await assertNoGem("@blazetrails/solid-cache");
     await assertNoGem("@blazetrails/solid-queue");
     await assertNoGem("@blazetrails/solid-cable");
@@ -1705,7 +1705,7 @@ describe("AppGeneratorTest", () => {
       "credentials:diff --enroll",
       "vite:install",
       "turbo:install stimulus:install",
-      "solid_cache:install solid_queue:install solid_cable:install",
+      "solid-cache:install solid-queue:install solid-cable:install",
     ];
     expect(railsCommands).toEqual(expectedCommands);
   });

@@ -37,7 +37,7 @@ export class Record extends Base {
   static warnAboutPendingMigrations(): void {
     SolidQueue.deprecator()
       .warn(`Solid Queue has pending database migrations. To get the new migration files, run:
-  rails solid_queue:update
+  rails solid-queue:update
 And then:
   rails db:migrate
 These migrations will be required after version ${nextMajorVersion()}.0

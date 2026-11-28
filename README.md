@@ -21,11 +21,14 @@ dist-tag. Generate an app with the `trails` command from
 `@blazetrails/trailties`; its `package.json` depends on the matching `~`
 version of `@blazetrails/trails`:
 
+<!-- #region npm-new -->
+
 ```sh
-pnpm --package=@blazetrails/trailties@alpha --allow-build=esbuild dlx trails new blog --skip-install
+pnpm --package=@blazetrails/trailties@alpha --allow-build=esbuild dlx trails new blog
 cd blog
-pnpm install
 ```
+
+<!-- #endregion npm-new -->
 
 The [quickstart](#quickstart) below runs from a checkout of this repository,
 the contributor path, so CI can verify it against `main`.
@@ -102,7 +105,7 @@ them at it with pnpm overrides, then install:
 node -e '
 const fs = require("fs"), app = JSON.parse(fs.readFileSync("package.json"));
 const meta = require(process.env.TRAILS + "/packages/trails/package.json");
-for (const name of [...Object.keys(meta.dependencies), "@blazetrails/ruby-compat", "@blazetrails/date"])
+for (const name of Object.keys(meta.dependencies))
   app.dependencies[name] = `link:${process.env.TRAILS}/packages/${name.slice(13)}`;
 fs.writeFileSync("package.json", JSON.stringify(app, null, 2) + "\n");
 '
@@ -868,6 +871,13 @@ To release, run `pnpm release:version <version>`, merge it, and push the tag
 `v<version>`. `.github/workflows/release.yml` builds and publishes every public
 package with npm provenance; a rerun skips versions already on the registry.
 Pull requests that touch release config run it as a dry run.
+After the publish, its `registry` job runs `scripts/release/registry-check.sh`
+on Node 26 against the version just published: the `npm-new` block above, and
+an install of `@blazetrails/activerecord` and `@blazetrails/actionpack` that
+must hold exactly one copy each of `@blazetrails/ruby-compat` and
+`@blazetrails/activesupport`. Before promoting a prerelease to `latest`, check
+that job and trailmap's `canary` workflow, which builds, tests and smoke-tests
+trailmap against the newest `alpha`.
 
 No real publish runs until RFC 0100's publish-shape stories land:
 `exclude-compiled-tests-from-published-dist`, `stop-publishing-sourcemaps`,

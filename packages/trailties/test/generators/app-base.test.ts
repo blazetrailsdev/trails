@@ -185,7 +185,7 @@ describe("AppBase run tasks", () => {
 
   it("run_solid leaves out solid_cable when Action Cable is skipped", async () => {
     expect(await commandsFor({ skipActionCable: true }, "runSolid")).toEqual([
-      "solid_cache:install solid_queue:install",
+      "solid-cache:install solid-queue:install",
     ]);
   });
 
