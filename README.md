@@ -863,8 +863,8 @@ two copies of `ruby-compat` or `activesupport`.
 Before 1.0, a minor bump may break; a patch does not.
 
 The first official release is `0.1.0-alpha1`. Until then the packages sit at
-`0.1.0-alpha0`, and practice releases go out as `0.1.0-alpha0.1`,
-`0.1.0-alpha0.2`, … under the npm dist-tag `practice`, so semver sorts every
+`0.1.0-alpha0`, and alpha releases go out as `0.1.0-alpha0.1`,
+`0.1.0-alpha0.2`, … under the npm dist-tag `alpha`, so semver sorts every
 one of them below `0.1.0-alpha1` and `latest` never points at one.
 
 To release, run `pnpm release:version <version>`, merge it, and push the tag
