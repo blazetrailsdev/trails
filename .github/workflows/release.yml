@@ -38,3 +38,14 @@ jobs:
         run: |
           case "$GITHUB_REF_NAME" in *-alpha*) tag=alpha ;; *) tag=latest ;; esac
           pnpm -r publish --no-git-checks --provenance --tag "$tag"
+
+  registry:
+    name: Registry check
+    needs: publish
+    if: github.event_name == 'push'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-pnpm
+      - run: scripts/release/registry-check.sh "${GITHUB_REF_NAME#v}"

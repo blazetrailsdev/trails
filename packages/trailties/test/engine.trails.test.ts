@@ -142,7 +142,7 @@ describe("Engine#config paths", () => {
     const paths = PackageEngine.instance().paths();
     const root = new URL("./fixtures/package-engine", import.meta.url).pathname;
     expect(paths.loadPaths()).toEqual([out]);
-    expect(paths.get("lib/tasks")!.expanded()).toEqual([`${root}/lib/tasks`]);
+    expect(paths.get("lib/tasks")!.expanded()).toEqual([`${out}/tasks`]);
     expect(paths.get("lib/assets")!.expanded()).toEqual([`${root}/lib/assets`]);
   });
 });

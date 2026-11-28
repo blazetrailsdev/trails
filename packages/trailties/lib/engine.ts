@@ -226,6 +226,10 @@ export class Engine extends Trailtie {
     const newCfg = new EngineConfiguration(klass.findRoot(calledFrom));
     if (calledFrom !== undefined && !File.isExist(File.join(newCfg.root!, "lib"))) {
       newCfg.paths().add("lib", { with: calledFrom, loadPath: true });
+      newCfg.paths().add("lib/tasks", {
+        with: File.join(calledFrom, "tasks"),
+        glob: "**/*.rake.{ts,js}",
+      });
     }
     if (calledFrom !== undefined && File.isDirectory(File.join(calledFrom, "app"))) {
       for (const path of [
