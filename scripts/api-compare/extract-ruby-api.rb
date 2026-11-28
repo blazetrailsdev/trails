@@ -2316,11 +2316,14 @@ class ApiExtractor
     target = @classes[fqn] || @modules[fqn]
     return unless target
 
-    %w[respond_to_missing? method_missing].each do |name|
+    {
+      "respond_to_missing?" => "def respond_to_missing?(name, include_private = false); end",
+      "method_missing" => "def method_missing(method, ...); end",
+    }.each do |name, source|
       target[:instanceMethods] << {
         name: name,
         visibility: "public",
-        params: [],
+        params: extract_params(find_params(Ripper.sexp(source)[1][0])),
         file: @current_file,
         line: @current_line,
         notes: "delegate_missing_to",

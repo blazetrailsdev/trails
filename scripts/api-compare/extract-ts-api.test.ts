@@ -3817,7 +3817,7 @@ describe("extractFromProgram — include() detection", () => {
       `,
     });
     const methods = info.classes["one.ts:One"].instanceMethods.map((m) => m.name);
-    expect(methods).toEqual(expect.arrayContaining(["respondToMissing", "methodMissing"]));
+    expect(methods.sort()).toEqual(["attachment", "methodMissing", "respondToMissing"]);
   });
 
   it("does not record a SCREAMING_SNAKE method-table constant as a module", () => {

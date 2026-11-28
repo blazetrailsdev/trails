@@ -49,12 +49,7 @@ import { libPathsManifest, testPathsManifest } from "../../vendor/sources.js";
 import { OUTPUT_DIR, ROOT_DIR, SCRIPT_DIR } from "./config.js";
 import { section, tally } from "./lint-call-mismatches.js";
 import { serializeBaseline } from "./baseline-json.js";
-import {
-  exceedances,
-  staleMarks,
-  tightened,
-  type AmbiguousParentCounts as PackageCounts,
-} from "./lint-ambiguous-parents.js";
+import { exceedances, staleMarks, tightened } from "./lint-ambiguous-parents.js";
 import { scopeOf, scopedMarks } from "./scope.js";
 import type { SkeletonArtifact, SkeletonRow } from "./report-arms.js";
 import type { MethodInfo } from "@blazetrails/parity/types";
@@ -161,6 +156,8 @@ export function blockReturnRows(
   );
 }
 
+export type PackageCounts = Record<string, number>;
+
 export const RETURNS_BLOCK_MARK_PATH = path.join(SCRIPT_DIR, "returns-block-mark.json");
 
 export function blockReturnCounts(
@@ -168,7 +165,7 @@ export function blockReturnCounts(
   packages: readonly string[],
 ): PackageCounts {
   const counts: PackageCounts = Object.fromEntries(packages.map((pkg) => [pkg, 0]));
-  for (const r of rows) counts[r.package] = (counts[r.package] ?? 0) + 1;
+  for (const r of rows) if (Object.hasOwn(counts, r.package)) counts[r.package] += 1;
   return counts;
 }
 

@@ -227,6 +227,10 @@ module ActiveRecord
       def forwards(&block)
         transaction(&block)
       end
+
+      def forwards_anonymously(&)
+        transaction(&)
+      end
     end
   end
 end
@@ -285,7 +289,11 @@ end
 
   it("records returnsBlock for a final yield, a block ending in yield, and a forwarded &block", () => {
     const keys = rubyReturnsBlock(rubyApi);
-    expect([...keys].map((k) => k.split("\u0000")[2]).sort()).toEqual(["forwards", "with_lock"]);
+    expect([...keys].map((k) => k.split("\u0000")[2]).sort()).toEqual([
+      "forwards",
+      "forwards_anonymously",
+      "with_lock",
+    ]);
   });
 
   it("reds with_lock ported as Promise<void>, as before trails#10792", () => {

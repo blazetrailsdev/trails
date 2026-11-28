@@ -156,7 +156,9 @@ catches a class of drift a reviewer would otherwise spend a cycle on.
    a call whose block ends in `yield`, or in a call forwarding `&block`
    (`returnsBlock` in the Rails manifest), and whose TS signature returns
    `void` / `Promise<void>`, against `scripts/api-compare/returns-block-mark.json`.
-   `with_lock` (`locking/pessimistic.rb:92-99`) is the shape. Only-shrink: the
+   `with_lock` (`locking/pessimistic.rb:92-99`) is the shape. Only the literal last
+   statement is read, so a `yield` inside a final `if`, `case` or
+   `begin … ensure` is not counted: each mark is a floor, not an exact count. Only-shrink: the
    fix is returning the block's value, never the mark. Converged one?
    `pnpm parity:api:returns --gate --tighten`; there is no reseed. Without
    `--gate` the command is the report-only caller-read audit.

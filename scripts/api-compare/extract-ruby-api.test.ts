@@ -2027,8 +2027,12 @@ describe("Ruby extractor alias arity resolution", { timeout: RUBY_SUBPROCESS_TIM
         end
       `,
     });
-    expect(r["Pkg::One#respond_to_missing?"]).toMatchObject({ notes: "delegate_missing_to" });
+    expect(r["Pkg::One#respond_to_missing?"]).toMatchObject({
+      params: ["name", "include_private"],
+      notes: "delegate_missing_to",
+    });
     expect(r["Pkg::One#method_missing"]).toMatchObject({ notes: "delegate_missing_to" });
+    expect(r["Pkg::One#method_missing"].params[0]).toBe("method");
   });
 
   it("reads a quoted symbol with no interpolation as a delegated name", () => {
