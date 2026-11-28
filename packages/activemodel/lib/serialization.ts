@@ -406,14 +406,18 @@ export type JsonValue<V> = V extends string | number | boolean | null
       : V extends { asJson(): infer R }
         ? JsonValue<R>
         : V extends { toJSON(): infer R }
-          ? R
+          ? JsonValue<R>
           : V extends readonly (infer E)[]
             ? JsonValue<E>[]
             : V extends PromiseLike<unknown>
               ? Record<string, never>
-              : V extends object
-                ? { [K in keyof V]: JsonValue<V[K]> }
-                : unknown;
+              : V extends ReadonlyMap<unknown, infer MV>
+                ? Record<string, JsonValue<MV>>
+                : V extends Iterable<infer E>
+                  ? JsonValue<E>[]
+                  : V extends object
+                    ? { [K in DataKeys<V> | ThenableKeys<V>]: JsonValue<V[K]> }
+                    : unknown;
 
 type Present<X> = X extends null | undefined ? never : X;
 

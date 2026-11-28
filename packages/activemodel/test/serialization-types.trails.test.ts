@@ -182,4 +182,23 @@ describe("SerializedJson", () => {
   it("dispatches asJson before toJSON, as the encoder does", () => {
     expectTypeOf<JsonValue<Encoded>>().toEqualTypeOf<{ x: number }>();
   });
+
+  it("encodes a toJSON return recursively", () => {
+    expectTypeOf<JsonValue<{ toJSON(): { n: bigint } }>>().toEqualTypeOf<{ n: string }>();
+  });
+
+  it("encodes a Map as Hash#as_json and other iterables as Enumerable#as_json", () => {
+    expectTypeOf<JsonValue<Map<string, bigint>>>().toEqualTypeOf<Record<string, string>>();
+    expectTypeOf<JsonValue<Set<bigint>>>().toEqualTypeOf<string[]>();
+  });
+
+  it("encodes a plain instance through instance_values, dropping its methods", () => {
+    class Point {
+      declare x: number;
+      norm(): number {
+        return 0;
+      }
+    }
+    expectTypeOf<JsonValue<Point>>().toEqualTypeOf<{ x: number }>();
+  });
 });
