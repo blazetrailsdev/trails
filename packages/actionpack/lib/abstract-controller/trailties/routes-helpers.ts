@@ -4,6 +4,7 @@ import {
   defineModule,
   include,
   includedModules,
+  includeForSubclasses,
   isModuleIncluded,
   constSet,
 } from "@blazetrails/ruby-compat/include";
@@ -95,6 +96,7 @@ Object.defineProperty(RoutesHelpers, "with", {
           ? namespace.trailtieRoutesUrlHelpers!(includePathHelpers)
           : routes.urlHelpers(includePathHelpers);
       const proto = cls.prototype;
+      includeForSubclasses(cls, mod);
       let earlier = installedMembers.get(proto);
       if (!earlier) installedMembers.set(proto, (earlier = []));
       const installed = new Map<string, PropertyDescriptor>();
