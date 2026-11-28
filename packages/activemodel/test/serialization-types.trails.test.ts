@@ -18,8 +18,15 @@ class Author extends Record {
   declare id: number;
   declare name: string;
   declare email: string | null;
+  declare karma: bigint;
   fullName(): string {
     return this.name;
+  }
+  isAdmin(): boolean {
+    return false;
+  }
+  async postCount(): Promise<number> {
+    return 0;
   }
 }
 
@@ -43,6 +50,9 @@ describe("Serialized", () => {
   it("lists attributes and associations without base-class members", () => {
     expectTypeOf<AttributeKeys<Post, Record>>().toEqualTypeOf<
       "id" | "title" | "status" | "published_at"
+    >();
+    expectTypeOf<AttributeKeys<Author, Record>>().toEqualTypeOf<
+      "id" | "name" | "email" | "karma"
     >();
     expectTypeOf<AssociationKeys<Post, Record>>().toEqualTypeOf<"author" | "comments">();
   });
@@ -73,14 +83,29 @@ describe("Serialized", () => {
       id: number;
       full_name: string;
     }>();
+    expectTypeOf<
+      S<Author, { only: []; methods: ["admin?", "post_count", "fullName"] }>
+    >().toEqualTypeOf<{ "admin?": boolean; post_count: number; fullName: string }>();
   });
 
-  it("includes singular and collection associations, recursively", () => {
+  it("falls through to except when only is nil, as Ruby's `if only = options[:only]` does", () => {
+    expectTypeOf<S<Post, { only: null; except: ["published_at", "status"] }>>().toEqualTypeOf<{
+      id: number;
+      title: string;
+    }>();
+    expectTypeOf<keyof S<Post, { only: [] }>>().toEqualTypeOf<never>();
+  });
+
+  it("encodes bigint as a string, as Numeric#as_json does", () => {
+    expectTypeOf<S<Author, { only: ["karma"] }>>().toEqualTypeOf<{ karma: string }>();
+  });
+
+  it("includes associations recursively, omitting a nil one as `if records = send(association)` does", () => {
     expectTypeOf<
       S<Post, { only: ["id"]; include: { author: { only: ["name"] }; comments: object } }>
     >().toEqualTypeOf<{
       id: number;
-      author: { name: string } | null;
+      author?: { name: string };
       comments: { id: number; body: string }[];
     }>();
     expectTypeOf<S<Post, { only: ["id"]; include: ["comments"] }>>().toEqualTypeOf<{
@@ -92,6 +117,12 @@ describe("Serialized", () => {
   it("rejects unknown keys in the options", () => {
     expectTypeOf<{ only: ["id", "nope"] }>().not.toMatchTypeOf<
       TypedSerializeOptions<Post, Record>
+    >();
+    expectTypeOf<{ methods: ["nope"] }>().not.toMatchTypeOf<
+      TypedSerializeOptions<Author, Record>
+    >();
+    expectTypeOf<{ methods: ["save"] }>().not.toMatchTypeOf<
+      TypedSerializeOptions<Author, Record>
     >();
     expectTypeOf<{ include: ["save"] }>().not.toMatchTypeOf<TypedSerializeOptions<Post, Record>>();
     expectTypeOf<{

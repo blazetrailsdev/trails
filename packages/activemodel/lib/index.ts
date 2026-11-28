@@ -89,6 +89,7 @@ export type {
   AttributeKeys,
   AssociationKeys,
   AssociationTarget,
+  MethodNames,
   TypedSerializeOptions,
   TypedIncludeHash,
   JsonValue,
