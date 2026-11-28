@@ -367,19 +367,14 @@ type RailsMethodName<K extends string> =
         : never
       : never);
 
-/** @noRailsEquivalent PERMANENT */
 export type AttributeKeys<M, B = object> = Exclude<DataKeys<M>, keyof B>;
 
-/** @noRailsEquivalent PERMANENT */
 export type AssociationKeys<M, B = object> = Exclude<ThenableKeys<M>, keyof B>;
 
-/** @noRailsEquivalent PERMANENT */
 export type MethodNames<M, B = object> = RailsMethodName<Exclude<ReaderKeys<M>, keyof B>>;
 
-/** @noRailsEquivalent PERMANENT */
 export type AssociationTarget<M, A extends keyof M> = NonNullable<Elements<Awaited<M[A]>>>;
 
-/** @noRailsEquivalent PERMANENT */
 export interface TypedSerializeOptions<M, B = object> {
   only?: AttributeKeys<M, B> | readonly AttributeKeys<M, B>[] | null;
   except?: AttributeKeys<M, B> | readonly AttributeKeys<M, B>[] | null;
@@ -391,12 +386,10 @@ export interface TypedSerializeOptions<M, B = object> {
     | null;
 }
 
-/** @noRailsEquivalent PERMANENT */
 export type TypedIncludeHash<M, B = object> = {
   [A in AssociationKeys<M, B>]?: TypedSerializeOptions<AssociationTarget<M, A>, B>;
 };
 
-/** @noRailsEquivalent PERMANENT */
 export type JsonValue<V> = V extends string | number | boolean | null
   ? V
   : V extends undefined
@@ -489,10 +482,8 @@ type IncludesPart<M, O, B> = {
 
 type Flatten<T> = { [K in keyof T]: T[K] } & {};
 
-/** @noRailsEquivalent PERMANENT */
 export type Serialized<M, O = object, B = object> = Flatten<
   { [K in SelectedKeys<M, O, B>]: M[K] } & MethodsPart<M, O> & IncludesPart<M, O, B>
 >;
 
-/** @noRailsEquivalent PERMANENT */
 export type SerializedJson<M, O = object, B = object> = JsonValue<Serialized<M, O, B>>;
