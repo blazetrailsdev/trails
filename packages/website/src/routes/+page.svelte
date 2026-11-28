@@ -77,11 +77,11 @@
       <div class="pane">
         <div class="split">
           <div>
-            <div class="file">app/controllers/posts-controller.ts &middot; tsc --noEmit</div>
+            <div class="file">app/controllers/posts-controller.ts</div>
             {@html data.hero.check}
           </div>
           <div>
-            <div class="file">app/views/post-mailer/published.html.tse &middot; trails-tsc-views build &amp;&amp; tsc</div>
+            <div class="file">app/views/post-mailer/published.html.tse</div>
             {@html data.hero.view}
           </div>
         </div>
