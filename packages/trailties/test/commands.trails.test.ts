@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
+import { beforeEach, describe, expect, it, onTestFinished, vi, type MockInstance } from "vitest";
 import { rbAryReplace } from "@blazetrails/ruby-compat/array";
 import { File } from "@blazetrails/ruby-compat/file";
 import { rbFLoad } from "@blazetrails/ruby-compat/load";
@@ -15,7 +15,7 @@ describe("trails/commands", () => {
     return rbFLoad(File.join(import.meta.dirname, "../lib/commands.ts"));
   };
 
-  let exit: ReturnType<typeof vi.spyOn>;
+  let exit: MockInstance<(code?: number) => never>;
 
   beforeEach(() => {
     vi.mocked(invoke).mockReset();
