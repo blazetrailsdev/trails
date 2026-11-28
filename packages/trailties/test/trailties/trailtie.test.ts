@@ -11,7 +11,7 @@ import type { Generation } from "../support/isolation/abstract-unit.js";
 import "../support/isolation/abstract-unit.js";
 import { OrderedOptions } from "@blazetrails/activesupport";
 import { NoMethodError } from "@blazetrails/ruby-compat/no-method-error";
-import { rbFSend, rbObjRespondTo } from "@blazetrails/ruby-compat/object";
+import { rbFSend } from "@blazetrails/ruby-compat/object";
 import { Trailtie, resetTrailtieRegistry } from "../../lib/trailtie.js";
 import "../../lib/trailties/action-controller.js";
 
@@ -47,7 +47,7 @@ describe("RailtieTest", { timeout: 240_000 }, () => {
   });
 
   it("respond_to? works in the abstract railties", () => {
-    expect(rbObjRespondTo(Trailtie, "somethingNice")).toBe(false);
+    expect(Trailtie).not.toRespondTo("somethingNice");
   });
 
   it("method_missing works in the abstract railties", () => {
@@ -81,22 +81,25 @@ describe("RailtieTest", { timeout: 240_000 }, () => {
   it("config name is available for the railtie", () => {
     class Foo extends Trailtie {}
     Trailtie.register(Foo);
-    const config = Foo.config as unknown as { foo: OrderedOptions };
+    const config = Foo.config as unknown as { foo: OrderedOptions & { greetings?: string } };
     config.foo = new OrderedOptions();
     config.foo.greetings = "hello";
-    expect((Foo.config as unknown as { foo: OrderedOptions }).foo.greetings).toBe("hello");
+    expect(
+      (Foo.config as unknown as { foo: OrderedOptions & { greetings?: string } }).foo.greetings,
+    ).toBe("hello");
   });
 
   it("railtie configurations are available in the application", async () => {
     class Foo extends Trailtie {}
     Trailtie.register(Foo);
-    const config = Foo.config as unknown as { foo: OrderedOptions };
+    const config = Foo.config as unknown as { foo: OrderedOptions & { greetings?: string } };
     config.foo = new OrderedOptions();
     config.foo.greetings = "hello";
     await import(await t.appPath("config", "application.ts"));
-    expect((Trails.application!.config as unknown as { foo: OrderedOptions }).foo.greetings).toBe(
-      "hello",
-    );
+    expect(
+      (Trails.application!.config as unknown as { foo: OrderedOptions & { greetings?: string } })
+        .foo.greetings,
+    ).toBe("hello");
   });
 
   it("railtie can add to_prepare callbacks", async () => {
@@ -238,17 +241,20 @@ describe("RailtieTest", { timeout: 240_000 }, () => {
   it("Railtie object isn't output when a NoMethodError is raised", () => {
     class Foo extends Trailtie {}
     Trailtie.register(Foo);
-    const config = Foo.config as unknown as { foo: OrderedOptions };
+    const config = Foo.config as unknown as { foo: OrderedOptions & { greetings?: string } };
     config.foo = new OrderedOptions();
     config.foo.greetings = "hello";
 
-    let error: NoMethodError | undefined;
-    try {
-      rbFSend(Foo.instance(), "abc");
-    } catch (e) {
-      error = e as NoMethodError;
-    }
-    expect(error).toBeInstanceOf(NoMethodError);
-    expect(error!.message).toMatch(/undefined method [`']abc' for.*Foo/);
+    let error: unknown;
+    expect(() => {
+      try {
+        rbFSend(Foo.instance(), "abc");
+      } catch (e) {
+        error = e;
+        throw e;
+      }
+    }).toThrow(NoMethodError);
+
+    expect((error as NoMethodError).message).toMatch(/undefined method [`']abc' for.*Foo/);
   });
 });
