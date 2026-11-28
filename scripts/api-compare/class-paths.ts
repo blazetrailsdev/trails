@@ -123,7 +123,14 @@ const SUBPATH_EXPORT_TABLES: Record<string, string[]> = {
   actioncable: ["engine.ts"],
   actionmailbox: ["engine.ts"],
   actiontext: ["engine.ts"],
-  activestorage: ["engine.ts"],
+  activestorage: [
+    "app/models/active-storage/blob.ts",
+    "app/models/active-storage/blob/analyzable.ts",
+    "app/models/active-storage/blob/identifiable.ts",
+    "app/models/active-storage/blob/representable.ts",
+    "app/models/active-storage/variant-record.ts",
+    "engine.ts",
+  ],
   trailties: [
     "autoloaders.ts",
     "autoloaders/inflector.ts",
