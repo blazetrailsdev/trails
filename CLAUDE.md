@@ -1382,7 +1382,7 @@ ratified here so no port re-derives them.
   other unbound arms do. Ruled by the operator on 2026-11-27.
 - **A user-defined function on a binding that cannot register one.**
   `SQLite3::Database#define_function_with_flags` is an unconditional
-  `sqlite3_create_function` (`vendor/sqlite3/v2.7.3/ext/sqlite3/database.c:507`).
+  `sqlite3_create_function` (`vendor/sqlite3/v2.7.3/ext/sqlite3/database.c:507-540`).
   better-sqlite3 and node:sqlite expose it; libsql's `Database#function`
   throws "not implemented", and expo-sqlite and bun:sqlite have no
   user-function API, so on those engines `defineFunctionWithFlags` raises

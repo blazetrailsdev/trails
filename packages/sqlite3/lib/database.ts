@@ -602,6 +602,8 @@ export class Database<E extends EngineDatabase = EngineDatabase> {
     flags: number,
     block: (...args: unknown[]) => unknown,
   ): this {
+    if (this.isClosed()) throw new Exception("cannot use a closed database");
+
     /** @inventedArm if — PERMANENT */
     if (!this._engine.defineFunctionWithFlags) {
       throw new NotImplementedError(
