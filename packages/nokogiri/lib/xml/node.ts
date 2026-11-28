@@ -41,6 +41,7 @@ export class XmlNode {
   static readonly PI_NODE = 7;
   static readonly COMMENT_NODE = 8;
   static readonly DOCUMENT_NODE = 9;
+  static readonly HTML_DOCUMENT_NODE = 13;
   static readonly IMPLIED_XPATH_CONTEXTS: readonly string[] = [".//"];
   static readonly SaveOptions = SaveOptions;
 
@@ -512,15 +513,19 @@ function relinkNamespace(reparented: XmlNode): void {
 const nodeCaches = new WeakMap<object, Map<number, XmlNode>>();
 
 /** @internal */
-export function nokoXmlNodeWrap(cNode: number, document: unknown): XmlNode {
+export function nokoXmlNodeWrap(cNode: number, rbDocument: unknown): XmlNode {
   const libxml = Nokogiri.LibXml2!;
-  const document_ = document as XmlNode | null;
-  if (document_ !== null && cNode === document_.pointerId) return document_;
+  const type = libxml.XmlTreeCommonStruct.type(cNode);
+  if (type === XmlNode.DOCUMENT_NODE || type === XmlNode.HTML_DOCUMENT_NODE) {
+    return rbDocument as XmlNode;
+  }
 
-  const cached = document_ === null ? undefined : nodeCaches.get(document_)?.get(cNode);
-  if (cached !== undefined) return cached;
+  const nodeHasADocument = rbDocument !== null;
 
-  return new XmlNode(libxml.createNode(cNode), document);
+  const rbNode = nodeHasADocument ? nodeCaches.get(rbDocument as object)?.get(cNode) : undefined;
+  if (rbNode !== undefined) return rbNode;
+
+  return new XmlNode(libxml.createNode(cNode), rbDocument);
 }
 
 /** @internal */
