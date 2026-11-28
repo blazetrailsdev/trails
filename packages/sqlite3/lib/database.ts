@@ -602,13 +602,16 @@ export class Database<E extends EngineDatabase = EngineDatabase> {
     flags: number,
     block: (...args: unknown[]) => unknown,
   ): this {
+    if (this.isClosed()) throw new Exception("cannot use a closed database");
+
+    /** @inventedArm if — PERMANENT */
     if (!this._engine.defineFunctionWithFlags) {
       throw new NotImplementedError(
         "define_function_with_flags() function is unimplemented on this machine",
       );
     }
-    this.#functions[name] = block;
     this._engine.defineFunctionWithFlags(name, flags, block);
+    this.#functions[name] = block;
     return this;
   }
 
