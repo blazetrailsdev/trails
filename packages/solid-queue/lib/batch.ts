@@ -26,7 +26,7 @@ export class AlreadyFinished extends StandardError {}
 
 export class PendingMigrations extends StandardError {
   constructor(
-    message = "The batches schema hasn't been installed yet. Run `bin/rails solid_queue:update` to copy the pending migrations to your application, and then `bin/rails db:migrate` to run them",
+    message = "The batches schema hasn't been installed yet. Run `bin/rails solid-queue:update` to copy the pending migrations to your application, and then `bin/rails db:migrate` to run them",
   ) {
     super(message);
   }

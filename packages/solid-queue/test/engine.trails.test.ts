@@ -57,7 +57,7 @@ describe("SolidQueue::Engine", () => {
       .bind(Engine.instance())
       .run({ config: { addAutoloadPathsToLoadPath: false } });
 
-    expect(await Trails.Generators!.findByNamespace("solid_queue:install")).toBe(InstallGenerator);
+    expect(await Trails.Generators!.findByNamespace("solid-queue:install")).toBe(InstallGenerator);
   });
 
   it("includes Interruptible into Processes::Base and seats the app executor", () => {
