@@ -4208,7 +4208,8 @@ function isClassAttributeCallee(expr: ts.Expression): boolean {
     (expr.name.text === "call"
       ? attributeMacro(expr.expression.text) !== undefined ||
         attrInternalMacro(expr.expression.text) !== undefined ||
-        importedName(expr.expression, expr.getSourceFile()) === "delegate"
+        importedName(expr.expression, expr.getSourceFile()) === "delegate" ||
+        importedName(expr.expression, expr.getSourceFile()) === "delegateMissingTo"
       : attrMacro(expr.name.text) !== undefined)
   );
 }
@@ -4245,6 +4246,12 @@ function readClassAttributeCall(
     importedName(callee.expression as ts.Identifier, sourceFile) === "delegate"
   ) {
     return readPrototypeDelegateCall(node, sourceFile);
+  }
+  if (
+    callee.name.text === "call" &&
+    importedName(callee.expression as ts.Identifier, sourceFile) === "delegateMissingTo"
+  ) {
+    return readDelegateMissingToCall(node, sourceFile);
   }
   const internal =
     callee.name.text === "call"
@@ -4444,6 +4451,32 @@ function readPrototypeDelegateCall(
   return {
     receiver,
     names,
+    reader: false,
+    writer: false,
+    instanceReader: true,
+    instanceWriter: false,
+    instancePredicate: false,
+    line: sourceFile.getLineAndCharacterOfPosition(node.getStart()).line + 1,
+  };
+}
+
+/**
+ * `delegateMissingTo.call(Klass, "target", …)` at a file's top level — Ruby's
+ * `delegate_missing_to :target`, whose `generate_method_missing`
+ * (`active_support/delegation.rb:150-187`) defines `respond_to_missing?` and
+ * `method_missing` on the owner.
+ */
+function readDelegateMissingToCall(
+  node: ts.CallExpression,
+  sourceFile: ts.SourceFile,
+): ClassAttributeCall | null {
+  const [recv, target] = node.arguments;
+  if (enclosingEntity(node) !== undefined) return null;
+  if (recv === undefined || !ts.isIdentifier(recv)) return null;
+  if (target === undefined || !ts.isStringLiteralLike(target)) return null;
+  return {
+    receiver: importedName(recv, sourceFile),
+    names: ["respondToMissing", "methodMissing"],
     reader: false,
     writer: false,
     instanceReader: true,

@@ -69,6 +69,7 @@ arm-throws after compare: $api/lint-arm-throws.ts --package $pkg
 params after compare: $api/lint-param-names.ts --package $pkg
 blocks after compare: $api/lint-block-params.ts --package $pkg
 predicates after compare: $api/lint-predicate-kinds.ts --package $pkg
+returns after compare: $api/report-void-returns.ts --gate --package $pkg
 parents after compare: $api/lint-ambiguous-parents.ts --package $pkg
 inlined after compare: $api/lint-inlined-from.ts
 class-paths after compare: $api/class-paths.ts --check --package $pkg

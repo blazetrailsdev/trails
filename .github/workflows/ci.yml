@@ -924,6 +924,48 @@ jobs:
       - run: pnpm build
       - run: pnpm guides:typecheck
 
+  # RFC 0260. `pnpm typecheck` in each examples/* app with a `typecheck`
+  # script, on a change under packages/ or examples/. The job always runs
+  # (an examples-only change reads as docs_only to `changes`); its first step
+  # decides whether the rest do. SKIP lists the apps left out, with reasons.
+  examples-typecheck:
+    name: Examples Type Check
+    needs: changes
+    runs-on: ${{ vars.RUNNER || 'ubuntu-24.04' }}
+    timeout-minutes: 20
+    env:
+      SKIP: ""
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 2
+      - id: gate
+        run: |
+          if [ "${{ github.event_name }}" != pull_request ] ||
+            git diff --name-only HEAD^1 HEAD | grep -qE '^(packages|examples)/'; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.gate.outputs.run == 'true'
+        uses: ./.github/actions/setup-pnpm
+      - if: steps.gate.outputs.run == 'true'
+        run: pnpm install --frozen-lockfile --prefer-offline
+      - if: steps.gate.outputs.run == 'true'
+        uses: ./.github/actions/cache-build
+      - if: steps.gate.outputs.run == 'true'
+        run: pnpm build
+      - if: steps.gate.outputs.run == 'true'
+        run: |
+          status=0
+          for dir in examples/*/; do
+            app=$(basename "$dir")
+            case " $SKIP " in *" $app "*) echo "skip $app"; continue ;; esac
+            node -e "process.exit(require('./${dir}package.json').scripts?.typecheck ? 0 : 1)" || continue
+            echo "::group::$app"
+            (cd "$dir" && pnpm typecheck) || { echo "::error::$app typecheck failed"; status=1; }
+            echo "::endgroup::"
+          done
+          exit $status
+
   virtualized-dx-type-tests:
     name: Virtualized DX Type Tests
     needs: changes
@@ -2542,6 +2584,13 @@ jobs:
         # scripts/api-compare/predicate-kind-mark.json. Only-shrink; narrow with
         # `pnpm parity:api:predicates:tighten` — there is no reseed.
         run: pnpm exec tsx scripts/api-compare/lint-predicate-kinds.ts
+      - name: Returns-block ratchet
+        # RFC 0260. A Ruby method answering its block's value (final `yield`,
+        # a block ending in `yield`, a forwarded `&block`) paired with a TS
+        # signature returning void, counted per package against
+        # scripts/api-compare/returns-block-mark.json. Only-shrink; narrow with
+        # `pnpm parity:api:returns --gate --tighten` — there is no reseed.
+        run: pnpm exec tsx scripts/api-compare/report-void-returns.ts --gate
       - name: Inlined-from staleness gate
         # RFC 0188. An `@inlinedFrom` tag naming a `def` the Rails manifest
         # does not hold, citing it at another path or span, naming a module the
@@ -3021,6 +3070,7 @@ jobs:
       - promise-counts
       - preflight
       - guides-typecheck
+      - examples-typecheck
       - leaf-tests
       - virtualized-dx-type-tests
       - trails-tsc-tests

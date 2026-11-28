@@ -27,16 +27,35 @@
  * body on both sides. A Ruby name defined twice in one file answers with its
  * first definition, as compare.ts' first-sighting maps do.
  *
+ * `--gate` (RFC 0260) is the half that needs no caller: a pair whose Rails
+ * method answers its block's value (`returnsBlock`, extract-ruby-api.rb
+ * `returns_block?`) and whose port returns void. `with_lock`
+ * (`locking/pessimistic.rb:92-99`) is the shape; no Rails file reads its
+ * value, so the report above never finds it. Each package's count is held to
+ * returns-block-mark.json, only-shrink: `--tighten` writes it DOWN, and a
+ * package with no mark is held to zero.
+ *
+ *   pnpm parity:api:returns --gate               # gate (CI)
+ *   pnpm parity:api:returns --gate --tighten     # narrow marks
+ *
  * Run `pnpm parity:api --calls` first so output/call-skeletons.json is fresh.
  */
 import * as path from "path";
 import { execFile } from "child_process";
-import { readFile } from "fs/promises";
+import { readFile, writeFile } from "fs/promises";
 import { fileURLToPath } from "url";
 import { promisify } from "util";
 import { libPathsManifest, testPathsManifest } from "../../vendor/sources.js";
 import { OUTPUT_DIR, ROOT_DIR, SCRIPT_DIR } from "./config.js";
 import { section, tally } from "./lint-call-mismatches.js";
+import { serializeBaseline } from "./baseline-json.js";
+import {
+  exceedances,
+  staleMarks,
+  tightened,
+  type AmbiguousParentCounts as PackageCounts,
+} from "./lint-ambiguous-parents.js";
+import { scopeOf, scopedMarks } from "./scope.js";
 import type { SkeletonArtifact, SkeletonRow } from "./report-arms.js";
 import type { MethodInfo } from "@blazetrails/parity/types";
 
@@ -116,6 +135,86 @@ export function rubyPrivates(rubyApi: ApiManifest): Set<string> {
     }
   }
   return privates;
+}
+
+/** (package, Ruby file, name) keys of the methods that answer their block's value. */
+export function rubyReturnsBlock(rubyApi: ApiManifest): Set<string> {
+  const keys = new Set<string>();
+  for (const [pkg, info] of Object.entries(rubyApi.packages)) {
+    for (const m of methodsOf(info)) {
+      if (m.returnsBlock === true) keys.add(key(pkg, m.file ?? "", m.name));
+    }
+  }
+  return keys;
+}
+
+/** Matched pairs whose Rails method returns its block's value and whose port returns void. */
+export function blockReturnRows(
+  skeletons: readonly SkeletonRow[],
+  returnsBlock: ReadonlySet<string>,
+  voids: ReadonlySet<string>,
+): SkeletonRow[] {
+  return skeletons.filter(
+    (row) =>
+      returnsBlock.has(key(row.package, row.rubyFile, row.rubyName)) &&
+      voids.has(key(row.package, row.tsFile, row.tsName)),
+  );
+}
+
+export const RETURNS_BLOCK_MARK_PATH = path.join(SCRIPT_DIR, "returns-block-mark.json");
+
+export function blockReturnCounts(
+  rows: readonly SkeletonRow[],
+  packages: readonly string[],
+): PackageCounts {
+  const counts: PackageCounts = Object.fromEntries(packages.map((pkg) => [pkg, 0]));
+  for (const r of rows) counts[r.package] = (counts[r.package] ?? 0) + 1;
+  return counts;
+}
+
+async function gate(
+  rows: readonly SkeletonRow[],
+  packages: readonly string[],
+  tighten: boolean,
+  scope: string | null,
+): Promise<number> {
+  const current = blockReturnCounts(rows, scope === null ? packages : [scope]);
+  if (scope !== null)
+    for (const pkg of Object.keys(current)) if (pkg !== scope) delete current[pkg];
+  const committed = JSON.parse(await readFile(RETURNS_BLOCK_MARK_PATH, "utf8")) as PackageCounts;
+  const marks = scopedMarks(committed, scope);
+  const grew = exceedances(marks, current);
+  const stale = staleMarks(marks, current);
+  if (tighten) {
+    if (grew.length > 0) {
+      console.error("returns-block gate: refusing to tighten while the mark is EXCEEDED.");
+      return 1;
+    }
+    await writeFile(RETURNS_BLOCK_MARK_PATH, serializeBaseline(tightened(marks, current)));
+    console.log(`returns-block gate: narrowed ${stale.length} package(s).`);
+    return 0;
+  }
+  if (grew.length > 0) {
+    console.error(
+      `\nreturns-block gate: ${grew.length} package(s) GREW past the committed mark.\n` +
+        "Return the block's value, as Rails does, rather than raising the mark.\n",
+    );
+    for (const v of grew) {
+      console.error(`  + ${v.package}: mark ${v.mark} → current ${v.current}`);
+      for (const r of rows.filter((row) => row.package === v.package)) {
+        console.error(`      ${r.tsFile}#${r.tsName}  <-  ${r.rubyFile}#${r.rubyName}`);
+      }
+    }
+    return 1;
+  }
+  for (const v of stale) {
+    console.log(
+      `returns-block gate: ${v.package} mark ${v.mark} is above the current ${v.current} — ` +
+        "narrow it with `pnpm parity:api:returns --gate --tighten`.",
+    );
+  }
+  console.log("returns-block gate: OK");
+  return 0;
 }
 
 export function voidReturnRows(
@@ -220,6 +319,14 @@ async function main(argv: string[]): Promise<number> {
         "must all exist — run `pnpm parity:api --calls` first.",
     );
     return 2;
+  }
+  if (argv.includes("--gate")) {
+    const rows = blockReturnRows(
+      artifact.skeletons,
+      rubyReturnsBlock(rubyApi),
+      tsVoidReturns(tsApi),
+    );
+    return gate(rows, artifact.packages, argv.includes("--tighten"), scopeOf(argv));
   }
   const rows = voidReturnRows(
     artifact.skeletons,

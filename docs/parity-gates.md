@@ -146,6 +146,21 @@ catches a class of drift a reviewer would otherwise spend a cycle on.
    Only-shrink: the fix is the predicate, never the mark. Converged one?
    `pnpm parity:api:predicates:tighten`; there is no reseed.
 
+   **Does the Rails method answer its block's value?**
+
+   ```bash
+   pnpm parity:api:returns --gate   # the returns-block ratchet (RFC 0260)
+   ```
+
+   counts, per package, each matched pair whose Rails body ends in `yield`, in
+   a call whose block ends in `yield`, or in a call forwarding `&block`
+   (`returnsBlock` in the Rails manifest), and whose TS signature returns
+   `void` / `Promise<void>`, against `scripts/api-compare/returns-block-mark.json`.
+   `with_lock` (`locking/pessimistic.rb:92-99`) is the shape. Only-shrink: the
+   fix is returning the block's value, never the mark. Converged one?
+   `pnpm parity:api:returns --gate --tighten`; there is no reseed. Without
+   `--gate` the command is the report-only caller-read audit.
+
 4. **Did you add any public TS name?** `pnpm parity:api:extra --package <pkg>` — it
    lists every public TS method, getter, class, and top-level function in a
    Rails-matched file with no Ruby counterpart. Anything you added and can't
@@ -241,6 +256,15 @@ catches a class of drift a reviewer would otherwise spend a cycle on.
    constructor), and `pnpm parity:promises:tighten` writes each mark DOWN
    after a convergence. CI runs `pnpm parity:promises:ci` over the packages
    the PR changes.
+
+## Example apps typecheck (`Examples Type Check`)
+
+The `Examples Type Check` CI job runs `pnpm typecheck` in every `examples/*`
+app whose `package.json` has a `typecheck` script, on any change under
+`packages/` or `examples/`. An app is only an API consumer, so a type-only
+break in a package's published surface (an export, a declaration, a writer
+type) reds here before an app finds it. The apps it leaves out, each with its
+reason, are listed in the job's `SKIP` variable.
 
 ## Bump ledger (`parity:api:pins:ledger`)
 
