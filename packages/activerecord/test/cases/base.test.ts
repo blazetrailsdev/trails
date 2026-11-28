@@ -683,7 +683,7 @@ describe("BasicsTest", async () => {
 
   it("default values", async () => {
     let topic = new Topic() as any;
-    assertPredicate(topic, (t: any) => t["approved?"]);
+    assertPredicate(topic, (t: any) => t.hasApproved);
     expect(topic.written_on).toBeNull();
     expect(topic.bonus_time).toBeNull();
     expect(topic.last_read).toBeNull();
@@ -691,7 +691,7 @@ describe("BasicsTest", async () => {
     await topic.save();
 
     topic = await Topic.find(topic.id);
-    assertPredicate(topic, (t: any) => t["approved?"]);
+    assertPredicate(topic, (t: any) => t.hasApproved);
     expect(topic.last_read).toBeNull();
   });
 
@@ -1399,14 +1399,14 @@ describe("BasicsTest", async () => {
   });
 
   it("toggle attribute", async () => {
-    assertNotPredicate(await topics("first"), (t: any) => t["approved?"]);
+    assertNotPredicate(await topics("first"), (t: any) => t.hasApproved);
     await ((await topics("first")) as any).toggleBang("approved");
-    assertPredicate(await topics("first"), (t: any) => t["approved?"]);
+    assertPredicate(await topics("first"), (t: any) => t.hasApproved);
     const topic = (await topics("first")) as any;
     topic.toggle("approved");
-    assertNotPredicate(topic, (t: any) => t["approved?"]);
+    assertNotPredicate(topic, (t: any) => t.hasApproved);
     await topic.reload();
-    assertPredicate(topic, (t: any) => t["approved?"]);
+    assertPredicate(topic, (t: any) => t.hasApproved);
   });
 
   it("reload", async () => {
@@ -1848,25 +1848,25 @@ describe("BasicsTest", async () => {
   it("ignored columns have no attribute methods", () => {
     assertNotRespondTo(new Developer(), "first_name");
     assertNotRespondTo(new Developer(), "first_name=");
-    assertNotRespondTo(new Developer(), "first_name?");
+    assertNotRespondTo(new Developer(), "hasFirst_name");
     assertNotRespondTo(new SubDeveloper(), "first_name");
     assertNotRespondTo(new SubDeveloper(), "first_name=");
-    assertNotRespondTo(new SubDeveloper(), "first_name?");
+    assertNotRespondTo(new SubDeveloper(), "hasFirst_name");
     assertNotRespondTo(new SymbolIgnoredDeveloper(), "first_name");
     assertNotRespondTo(new SymbolIgnoredDeveloper(), "first_name=");
-    assertNotRespondTo(new SymbolIgnoredDeveloper(), "first_name?");
+    assertNotRespondTo(new SymbolIgnoredDeveloper(), "hasFirst_name");
   });
 
   it("ignored columns don't prevent explicit declaration of attribute methods", () => {
     assertRespondTo(new Developer(), "last_name");
     assertRespondTo(new Developer(), "last_name=");
-    assertRespondTo(new Developer(), "last_name?");
+    assertRespondTo(new Developer(), "hasLast_name");
     assertRespondTo(new SubDeveloper(), "last_name");
     assertRespondTo(new SubDeveloper(), "last_name=");
-    assertRespondTo(new SubDeveloper(), "last_name?");
+    assertRespondTo(new SubDeveloper(), "hasLast_name");
     assertRespondTo(new SymbolIgnoredDeveloper(), "last_name");
     assertRespondTo(new SymbolIgnoredDeveloper(), "last_name=");
-    assertRespondTo(new SymbolIgnoredDeveloper(), "last_name?");
+    assertRespondTo(new SymbolIgnoredDeveloper(), "hasLast_name");
   });
 
   it("ignored columns are stored as an array of string", () => {

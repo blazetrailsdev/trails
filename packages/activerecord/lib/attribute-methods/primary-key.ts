@@ -204,7 +204,7 @@ export function id(this: PrimaryKeyInstance, value?: unknown): unknown {
 const ID_ATTRIBUTE_METHODS = new Set([
   "id",
   "id=",
-  "id?",
+  "hasId",
   "idBeforeTypeCast",
   "idWas",
   "idInDatabase",
