@@ -610,8 +610,8 @@ export class Database<E extends EngineDatabase = EngineDatabase> {
         "define_function_with_flags() function is unimplemented on this machine",
       );
     }
-    this.#functions[name] = block;
     this._engine.defineFunctionWithFlags(name, flags, block);
+    this.#functions[name] = block;
     return this;
   }
 
