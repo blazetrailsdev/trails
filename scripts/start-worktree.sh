@@ -287,7 +287,16 @@ TASKS_WT="$TASKS_WORKTREES_ROOT/$NAME"
   mkdir -p "$TASKS_WORKTREES_ROOT"
   # Branch `tasks-<NAME>` tracks origin/main. push `HEAD:main` from this
   # branch always lands on origin/main regardless of branch name.
-  if ! git -C "$TASKS_CANONICAL" worktree add -b "tasks-$NAME" "$TASKS_WT" origin/main 2>/dev/null; then
+  # Under --branch the reaped worktree's `tasks-<NAME>` branch usually
+  # survives, so `-b` would fail. Prune its stale registration and reuse the
+  # branch, reset to origin/main (`-B`), rather than fall back to canonical.
+  TASKS_BRANCH_FLAG="-b"
+  if [[ -n "$BRANCH" ]] && git -C "$TASKS_CANONICAL" show-ref --verify --quiet "refs/heads/tasks-$NAME"; then
+    git -C "$TASKS_CANONICAL" worktree prune
+    TASKS_BRANCH_FLAG="-B"
+    echo "    reusing existing branch tasks-$NAME, reset to origin/main"
+  fi
+  if ! git -C "$TASKS_CANONICAL" worktree add "$TASKS_BRANCH_FLAG" "tasks-$NAME" "$TASKS_WT" origin/main 2>/dev/null; then
     echo "    warning: git worktree add for tasks failed (branch tasks-$NAME may already exist)" >&2
     echo "    Falling back to canonical $TASKS_CANONICAL for pnpm tasks" >&2
     exit 0
