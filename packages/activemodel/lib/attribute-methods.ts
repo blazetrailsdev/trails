@@ -86,7 +86,10 @@ export class AttributeMethodPattern {
   }
 
   match(methodName: string): AttributeMethod | null {
-    const md = this.regex.exec(this.predicate ? rubyPredicateName(methodName) : methodName);
+    const has = this.suffix.endsWith("?") ? /^has([A-Z])(.*)$/.exec(methodName) : null;
+    const md = this.regex.exec(
+      this.suffix.endsWith("?") ? (has ? `${has[1].toLowerCase()}${has[2]}?` : "") : methodName,
+    );
     if (md) {
       return new AttributeMethod(this.proxyTarget, this.attrName(md[1]));
     }
@@ -95,15 +98,11 @@ export class AttributeMethodPattern {
 
   methodName(attrName: string): string {
     const name = this.camelJoined ? attrName.charAt(0).toUpperCase() + attrName.slice(1) : attrName;
-    if (this.predicate) {
+    if (this.suffix.endsWith("?")) {
       const base = `${this.prefix}${name}${this.suffix.slice(0, -1)}`;
       return `has${base.charAt(0).toUpperCase()}${base.slice(1)}`;
     }
     return `${this.prefix}${name}${this.suffix}`;
-  }
-
-  private get predicate(): boolean {
-    return this.suffix.endsWith("?");
   }
 
   private attrName(name: string): string {
@@ -113,11 +112,6 @@ export class AttributeMethodPattern {
   private get camelJoined(): boolean {
     return this.prefix !== "" && !this.prefix.endsWith("_");
   }
-}
-
-function rubyPredicateName(methodName: string): string {
-  const md = /^has([A-Z])(.*)$/.exec(methodName);
-  return md ? `${md[1].toLowerCase()}${md[2]}?` : "";
 }
 
 export class AttributeMethod {
