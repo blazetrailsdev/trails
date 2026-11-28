@@ -41,6 +41,7 @@ export class XmlNode {
   static readonly PI_NODE = 7;
   static readonly COMMENT_NODE = 8;
   static readonly DOCUMENT_NODE = 9;
+  static readonly HTML_DOCUMENT_NODE = 13;
   static readonly IMPLIED_XPATH_CONTEXTS: readonly string[] = [".//"];
   static readonly SaveOptions = SaveOptions;
 
@@ -51,7 +52,12 @@ export class XmlNode {
      */
     readonly _node: XmlTreeNode | LibXmlNode | DefaultTreeAdapterMap["node"],
     public document: unknown = null,
-  ) {}
+  ) {
+    if (document === null) return;
+    let rbNodeCache = nodeCaches.get(document as object);
+    if (rbNodeCache === undefined) nodeCaches.set(document as object, (rbNodeCache = new Map()));
+    rbNodeCache.set(this.pointerId, this);
+  }
 
   get pointerId(): number {
     return (this._node as unknown as { _nodePtr: number })._nodePtr;
@@ -94,9 +100,7 @@ export class XmlNode {
   get parent(): XmlNode | null {
     const cParent = Nokogiri.LibXml2!.XmlTreeCommonStruct.parent(this.pointerId);
     if (!cParent) return null;
-    const document = this.document as XmlNode | null;
-    if (document !== null && cParent === document.pointerId) return document;
-    return new XmlNode(Nokogiri.LibXml2!.createNode(cParent), this.document);
+    return nokoXmlNodeWrap(cParent, this.document);
   }
 
   set parent(parentNode: XmlNode | DocumentFragment) {
@@ -276,11 +280,12 @@ export class XmlNode {
 
   get children(): NodeSet {
     if (!(this._node instanceof Nokogiri.LibXml2!.XmlElement)) return new NodeSet(this.document);
+    const libxml = Nokogiri.LibXml2!;
     const result: XmlNode[] = [];
-    let child = this._node.firstChild;
-    while (child !== null) {
-      result.push(new XmlNode(child, this.document));
-      child = child.next;
+    let child = libxml.XmlTreeCommonStruct.children(this.pointerId);
+    while (child) {
+      result.push(nokoXmlNodeWrap(child, this.document));
+      child = libxml.XmlTreeCommonStruct.next(child);
     }
     return new NodeSet(this.document, result as Node[]);
   }
@@ -503,6 +508,25 @@ function relinkNamespace(reparented: XmlNode): void {
   ) {
     libxml.xmlSetNs(cReparented, libxml.XmlNodeStruct.namespace(cParent));
   }
+}
+
+/** @internal */
+export const nodeCaches = new WeakMap<object, Map<number, XmlNode>>();
+
+/** @internal */
+export function nokoXmlNodeWrap(cNode: number, rbDocument: unknown): XmlNode {
+  const libxml = Nokogiri.LibXml2!;
+  const type = libxml.XmlTreeCommonStruct.type(cNode);
+  if (type === XmlNode.DOCUMENT_NODE || type === XmlNode.HTML_DOCUMENT_NODE) {
+    return rbDocument as XmlNode;
+  }
+
+  const nodeHasADocument = rbDocument !== null;
+
+  const rbNode = nodeHasADocument ? nodeCaches.get(rbDocument as object)?.get(cNode) : undefined;
+  if (rbNode !== undefined) return rbNode;
+
+  return new XmlNode(libxml.createNode(cNode), rbDocument);
 }
 
 /** @internal */

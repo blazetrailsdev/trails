@@ -36,3 +36,20 @@ describe("Nokogiri::XML::Node serialization", () => {
     }
   });
 });
+
+describe("Nokogiri::XML::Node wrapper identity", () => {
+  it("answers the same wrapper for the same C node on every read", () => {
+    const doc = XmlDocument.parse("<root><a/></root>");
+    try {
+      const a = doc.root!.children.first()!;
+      expect(doc.root!.children.first()).toBe(a);
+      expect(a.parent).toBe(doc.root);
+      expect(doc.root!.parent).toBe(doc);
+      const b = doc.createElement("b");
+      doc.root!.addChild(b);
+      expect(doc.root!.children.toA()[1]).toBe(b);
+    } finally {
+      doc.dispose();
+    }
+  });
+});
