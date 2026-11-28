@@ -157,13 +157,9 @@ function viewPosition(
       best = m;
   }
   if (!best) return null;
-  return {
-    line: best.srcLine,
-    character:
-      best.genLine === line
-        ? (best.srcCol ?? 0) + character - (best.genCol ?? 0)
-        : (best.srcCol ?? 0),
-  };
+  return best.genLine === line
+    ? { line: best.srcLine, character: (best.srcCol ?? 0) + character - (best.genCol ?? 0) }
+    : { line: best.srcLine + line - best.genLine, character };
 }
 
 /**

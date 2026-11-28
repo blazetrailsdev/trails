@@ -12,13 +12,11 @@ const printer = ts.createPrinter({ removeComments: true });
 
 /**
  * A declaration file without its comments, which the checker does not read:
- * about two thirds of TypeScript's lib files. The `/// <reference>`
- * directives are comments too, and are kept.
+ * about two thirds of TypeScript's lib files. The printer keeps
+ * the `/// <reference>` directives.
  */
 function slim(path: string, text: string): string {
-  const directives = text.match(/^\/\/\/ *<reference [^>]*>/gm) ?? [];
-  const source = ts.createSourceFile(path, text, ts.ScriptTarget.Latest, false);
-  return [...directives, printer.printFile(source)].join("\n");
+  return printer.printFile(ts.createSourceFile(path, text, ts.ScriptTarget.Latest, false));
 }
 
 async function walk(dir: string, rel = ""): Promise<string[]> {
