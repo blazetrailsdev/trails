@@ -165,4 +165,27 @@ describe("start-worktree.sh --branch", () => {
     const target = path.join(worktreesRoot, "brand-new-work");
     expect(git(target, "rev-parse", "--abbrev-ref", "HEAD")).toBe("brand-new-work");
   });
+
+  it("reuses a surviving tasks-<name> branch on respawn, reset to origin/main", () => {
+    const tasksOrigin = path.join(sandbox, "tasks-origin.git");
+    const tasksCanonical = path.join(sandbox, "github", "blazetrailsdev", "tasks");
+    git(sandbox, "clone", "-q", "--bare", originRepo, tasksOrigin);
+    git(sandbox, "clone", "-q", tasksOrigin, tasksCanonical);
+    const originMain = git(tasksCanonical, "rev-parse", "origin/main");
+    // The reaped worktree left its branch behind, ahead of origin/main, and a
+    // stale registration whose directory is gone.
+    const reaped = path.join(sandbox, "tasks-worktrees", "respawn");
+    git(tasksCanonical, "worktree", "add", "-q", "-b", "tasks-respawn", reaped, "origin/main");
+    git(reaped, "commit", "-q", "--allow-empty", "-m", "stale");
+    fs.rmSync(reaped, { recursive: true, force: true });
+    git(mainRepo, "branch", "respawn");
+
+    const { status, output } = runScript(["--branch", "respawn"]);
+    expect(status, output).toBe(0);
+    expect(output).not.toContain("Falling back to canonical");
+    const link = path.join(worktreesRoot, "respawn", "tasks");
+    expect(fs.realpathSync(link)).toBe(fs.realpathSync(reaped));
+    expect(git(reaped, "rev-parse", "--abbrev-ref", "HEAD")).toBe("tasks-respawn");
+    expect(git(reaped, "rev-parse", "HEAD")).toBe(originMain);
+  });
 });
