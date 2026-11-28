@@ -1,4 +1,6 @@
-import { pack, rbEqual, rbObjClass, unpack } from "@blazetrails/ruby-compat";
+import { pack, unpack } from "@blazetrails/ruby-compat/array";
+import { rbObjClass } from "@blazetrails/ruby-compat/object";
+import { rbEqual } from "@blazetrails/ruby-compat/rb-equal";
 import { MessagePack } from "./namespaces.js";
 import { MalformedFormatError } from "./unpacker.js";
 
