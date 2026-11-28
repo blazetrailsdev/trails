@@ -3,24 +3,29 @@ import { describe, it, expectTypeOf } from "vitest";
 import type {
   AssociationKeys,
   AttributeKeys,
+  JsonValue,
   Serialized,
+  SerializedJson,
   TypedSerializeOptions,
 } from "../lib/index.js";
 
-class Record {
+class Model {
   declare errors: unknown;
   save(): boolean {
     return true;
   }
 }
 
-class Author extends Record {
+class Author extends Model {
   declare id: number;
   declare name: string;
   declare email: string | null;
   declare karma: bigint;
   fullName(): string {
     return this.name;
+  }
+  fullURL(): string {
+    return "";
   }
   isAdmin(): boolean {
     return false;
@@ -30,12 +35,12 @@ class Author extends Record {
   }
 }
 
-class Comment extends Record {
+class Comment extends Model {
   declare id: number;
   declare body: string;
 }
 
-class Post extends Record {
+class Post extends Model {
   declare id: number;
   declare title: string;
   declare status: "draft" | "published";
@@ -44,26 +49,35 @@ class Post extends Record {
   declare comments: PromiseLike<Comment[]>;
 }
 
-type S<M, O> = Serialized<M, O, Record>;
+class Encoded {
+  asJson(): { x: number } {
+    return { x: 1 };
+  }
+  toJSON(): string {
+    return "";
+  }
+}
+
+type S<M, O> = Serialized<M, O, Model>;
+type J<M, O> = SerializedJson<M, O, Model>;
 
 describe("Serialized", () => {
   it("lists attributes and associations without base-class members", () => {
-    expectTypeOf<AttributeKeys<Post, Record>>().toEqualTypeOf<
+    expectTypeOf<AttributeKeys<Post, Model>>().toEqualTypeOf<
       "id" | "title" | "status" | "published_at"
     >();
-    expectTypeOf<AttributeKeys<Author, Record>>().toEqualTypeOf<
-      "id" | "name" | "email" | "karma"
-    >();
-    expectTypeOf<AssociationKeys<Post, Record>>().toEqualTypeOf<"author" | "comments">();
+    expectTypeOf<AttributeKeys<Author, Model>>().toEqualTypeOf<"id" | "name" | "email" | "karma">();
+    expectTypeOf<AssociationKeys<Post, Model>>().toEqualTypeOf<"author" | "comments">();
   });
 
-  it("serializes every attribute with no options, through toJSON", () => {
+  it("keeps raw attribute values, as serializable_attributes does", () => {
     expectTypeOf<S<Post, object>>().toEqualTypeOf<{
       id: number;
       title: string;
       status: "draft" | "published";
-      published_at: string;
+      published_at: Date;
     }>();
+    expectTypeOf<S<Author, { only: ["karma"] }>>().toEqualTypeOf<{ karma: bigint }>();
   });
 
   it("narrows with only and except", () => {
@@ -78,16 +92,6 @@ describe("Serialized", () => {
     }>();
   });
 
-  it("adds methods by their Rails name, camelized to the member", () => {
-    expectTypeOf<S<Author, { only: ["id"]; methods: ["full_name"] }>>().toEqualTypeOf<{
-      id: number;
-      full_name: string;
-    }>();
-    expectTypeOf<
-      S<Author, { only: []; methods: ["admin?", "post_count", "fullName"] }>
-    >().toEqualTypeOf<{ "admin?": boolean; post_count: number; fullName: string }>();
-  });
-
   it("falls through to except when only is nil, as Ruby's `if only = options[:only]` does", () => {
     expectTypeOf<S<Post, { only: null; except: ["published_at", "status"] }>>().toEqualTypeOf<{
       id: number;
@@ -96,8 +100,28 @@ describe("Serialized", () => {
     expectTypeOf<keyof S<Post, { only: [] }>>().toEqualTypeOf<never>();
   });
 
-  it("encodes bigint as a string, as Numeric#as_json does", () => {
-    expectTypeOf<S<Author, { only: ["karma"] }>>().toEqualTypeOf<{ karma: string }>();
+  it("sends methods by their Rails name, readers included, returning unawaited", () => {
+    expectTypeOf<S<Author, { only: ["id"]; methods: ["full_name"] }>>().toEqualTypeOf<{
+      id: number;
+      full_name: string;
+    }>();
+    expectTypeOf<
+      S<Author, { only: []; methods: ["admin?", "post_count", "fullName", "name"] }>
+    >().toEqualTypeOf<{
+      "admin?": boolean;
+      post_count: Promise<number>;
+      fullName: string;
+      name: string;
+    }>();
+  });
+
+  it("camelizes acronym members the way the runtime's camelized does", () => {
+    expectTypeOf<{ methods: ["fullURL", "full_u_r_l"] }>().toMatchTypeOf<
+      TypedSerializeOptions<Author, Model>
+    >();
+    expectTypeOf<{ methods: ["full_url"] }>().not.toMatchTypeOf<
+      TypedSerializeOptions<Author, Model>
+    >();
   });
 
   it("includes associations recursively, omitting a nil one as `if records = send(association)` does", () => {
@@ -116,30 +140,46 @@ describe("Serialized", () => {
 
   it("rejects unknown keys in the options", () => {
     expectTypeOf<{ only: ["id", "nope"] }>().not.toMatchTypeOf<
-      TypedSerializeOptions<Post, Record>
+      TypedSerializeOptions<Post, Model>
     >();
-    expectTypeOf<{ methods: ["nope"] }>().not.toMatchTypeOf<
-      TypedSerializeOptions<Author, Record>
-    >();
-    expectTypeOf<{ methods: ["save"] }>().not.toMatchTypeOf<
-      TypedSerializeOptions<Author, Record>
-    >();
-    expectTypeOf<{ include: ["save"] }>().not.toMatchTypeOf<TypedSerializeOptions<Post, Record>>();
+    expectTypeOf<{ methods: ["nope"] }>().not.toMatchTypeOf<TypedSerializeOptions<Author, Model>>();
+    expectTypeOf<{ methods: ["save"] }>().not.toMatchTypeOf<TypedSerializeOptions<Author, Model>>();
+    expectTypeOf<{ include: ["save"] }>().not.toMatchTypeOf<TypedSerializeOptions<Post, Model>>();
     expectTypeOf<{
       include: { author: { only: ["title"] } };
-    }>().not.toMatchTypeOf<TypedSerializeOptions<Post, Record>>();
+    }>().not.toMatchTypeOf<TypedSerializeOptions<Post, Model>>();
     expectTypeOf<{
       only: ["id"];
       include: { author: { only: ["name"] } };
-    }>().toMatchTypeOf<TypedSerializeOptions<Post, Record>>();
+    }>().toMatchTypeOf<TypedSerializeOptions<Post, Model>>();
   });
 
   it("infers literal options at a call site through a const type parameter", () => {
-    const asJson = <const O extends TypedSerializeOptions<Post, Record>>(
+    const serializableHash = <const O extends TypedSerializeOptions<Post, Model>>(
       _post: Post,
       _options: O,
     ): S<Post, O> => ({}) as S<Post, O>;
-    const json = asJson(new Post(), { only: ["id", "status"] });
-    expectTypeOf(json).toEqualTypeOf<{ id: number; status: "draft" | "published" }>();
+    const hash = serializableHash(new Post(), { only: ["id", "status"] });
+    expectTypeOf(hash).toEqualTypeOf<{ id: number; status: "draft" | "published" }>();
+  });
+});
+
+describe("SerializedJson", () => {
+  it("encodes the hash the way as_json does", () => {
+    expectTypeOf<J<Post, { only: ["id", "published_at"] }>>().toEqualTypeOf<{
+      id: number;
+      published_at: string;
+    }>();
+    expectTypeOf<J<Author, { only: ["karma"] }>>().toEqualTypeOf<{ karma: string }>();
+  });
+
+  it("encodes an unawaited method Promise as Object#as_json's empty hash", () => {
+    expectTypeOf<J<Author, { only: []; methods: ["post_count"] }>>().toEqualTypeOf<{
+      post_count: Record<string, never>;
+    }>();
+  });
+
+  it("dispatches asJson before toJSON, as the encoder does", () => {
+    expectTypeOf<JsonValue<Encoded>>().toEqualTypeOf<{ x: number }>();
   });
 });

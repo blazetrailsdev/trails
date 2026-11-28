@@ -342,7 +342,7 @@ type ThenableKeys<M> = {
   string;
 
 type ReaderKeys<M> = {
-  [K in keyof M]-?: M[K] extends () => unknown ? K : never;
+  [K in keyof M]-?: M[K] extends MemberFn ? (M[K] extends () => unknown ? K : never) : K;
 }[keyof M] &
   string;
 
@@ -403,15 +403,17 @@ export type JsonValue<V> = V extends string | number | boolean | null
     ? null
     : V extends bigint
       ? string
-      : V extends { toJSON(): infer R }
-        ? R
-        : V extends { asJson(): infer R }
+      : V extends { asJson(): infer R }
+        ? JsonValue<R>
+        : V extends { toJSON(): infer R }
           ? R
           : V extends readonly (infer E)[]
             ? JsonValue<E>[]
-            : V extends object
-              ? { [K in keyof V]: JsonValue<V[K]> }
-              : unknown;
+            : V extends PromiseLike<unknown>
+              ? Record<string, never>
+              : V extends object
+                ? { [K in keyof V]: JsonValue<V[K]> }
+                : unknown;
 
 type Present<X> = X extends null | undefined ? never : X;
 
@@ -428,9 +430,11 @@ type ExceptKeys<M, O, B> = O extends { except: infer Ex }
 type MethodsPart<M, O> = O extends { methods: infer Ms }
   ? {
       [S in Elements<Present<Ms>> & string]: MethodMember<S> extends keyof M
-        ? M[MethodMember<S>] extends () => infer R
-          ? JsonValue<Awaited<R>>
-          : never
+        ? M[MethodMember<S>] extends MemberFn
+          ? M[MethodMember<S>] extends () => infer R
+            ? R
+            : never
+          : M[MethodMember<S>]
         : never;
     }
   : unknown;
@@ -483,5 +487,8 @@ type Flatten<T> = { [K in keyof T]: T[K] } & {};
 
 /** @noRailsEquivalent PERMANENT */
 export type Serialized<M, O = object, B = object> = Flatten<
-  { [K in SelectedKeys<M, O, B>]: JsonValue<M[K]> } & MethodsPart<M, O> & IncludesPart<M, O, B>
+  { [K in SelectedKeys<M, O, B>]: M[K] } & MethodsPart<M, O> & IncludesPart<M, O, B>
 >;
+
+/** @noRailsEquivalent PERMANENT */
+export type SerializedJson<M, O = object, B = object> = JsonValue<Serialized<M, O, B>>;
