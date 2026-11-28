@@ -1,0 +1,19 @@
+{
+  "actioncable": 7,
+  "actioncontroller": 2,
+  "actiondispatch": 13,
+  "actionview": 4,
+  "activejob": 6,
+  "activemodel": 1,
+  "activerecord": 34,
+  "activestorage": 3,
+  "activesupport": 11,
+  "libxml-ruby": 1,
+  "mail": 3,
+  "rack": 3,
+  "rake": 3,
+  "solid-queue": 5,
+  "thor": 2,
+  "trailties": 24,
+  "zeitwerk": 3
+}

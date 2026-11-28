@@ -3806,6 +3806,20 @@ describe("extractFromProgram — include() detection", () => {
     expect(methods.map((m) => m.name)).toEqual(["isSupervisor", "onStart", "onStop"]);
   });
 
+  it("credits a top-level delegateMissingTo with respondToMissing and methodMissing", () => {
+    const info = extractFromFiles("/p", {
+      "one.ts": `
+        declare function delegateMissingTo(this: object, target: string, options?: object): void;
+        export class One {
+          get attachment(): unknown { return null; }
+        }
+        delegateMissingTo.call(One, "attachment", { allowNil: true });
+      `,
+    });
+    const methods = info.classes["one.ts:One"].instanceMethods.map((m) => m.name);
+    expect(methods.sort()).toEqual(["attachment", "methodMissing", "respondToMissing"]);
+  });
+
   it("does not record a SCREAMING_SNAKE method-table constant as a module", () => {
     // `ActiveSupport::Deprecation::DEFAULT_BEHAVIORS`
     // (deprecation/behaviors.rb:13-63) is a Ruby Hash, not a module. Counting

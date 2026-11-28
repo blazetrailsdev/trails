@@ -143,6 +143,10 @@ export interface MethodInfo {
   /** Ruby side only (RFC 0156): declares `&blk`, or its body `yield`s or tests
    *  `block_given?`. Compared by block-params.ts. */
   takesBlock?: boolean;
+  /** Ruby side only (RFC 0260): the method answers its block's value — its
+   *  final statement is `yield`, a call whose block ends in `yield`, or a call
+   *  forwarding `&block`. Gated by `parity:api:returns --gate`. */
+  returnsBlock?: boolean;
   /** TS side only (RFC 0156): a class property assigned a callable
    *  (`static assertRaises = assertRaises`), or a `declare`d one typed by a
    *  function type (`declare transaction: (block: () => void) => void`),

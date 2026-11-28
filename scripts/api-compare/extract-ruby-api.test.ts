@@ -2017,6 +2017,24 @@ describe("Ruby extractor alias arity resolution", { timeout: RUBY_SUBPROCESS_TIM
     expect(r["Pkg::Querying#in_groups_of"]).toMatchObject({ params: [], notes: "delegate" });
   });
 
+  it("records `delegate_missing_to`'s generated respond_to_missing? and method_missing", () => {
+    const r = aliasParams({
+      "one.rb": `
+        module Pkg
+          class One
+            delegate_missing_to :attachment, allow_nil: true
+          end
+        end
+      `,
+    });
+    expect(r["Pkg::One#respond_to_missing?"]).toMatchObject({
+      params: ["name", "include_private"],
+      notes: "delegate_missing_to",
+    });
+    expect(r["Pkg::One#method_missing"]).toMatchObject({ notes: "delegate_missing_to" });
+    expect(r["Pkg::One#method_missing"].params[0]).toBe("method");
+  });
+
   it("reads a quoted symbol with no interpolation as a delegated name", () => {
     const r = aliasParams({
       "d.rb": `
