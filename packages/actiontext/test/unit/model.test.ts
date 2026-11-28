@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import { createFileBlob, fixturesAll } from "../test-helper.js";
-import { ActiveStorage } from "@blazetrails/activestorage";
 import {
   assertNoQueries,
   assertQueriesCount,
@@ -16,6 +15,8 @@ import { RichText } from "../../lib/rich-text.js";
 import { Message } from "../dummy/app/models/message.js";
 import { MessageWithoutBlanks } from "../dummy/app/models/message-without-blanks.js";
 import { MessageWithoutBlanksWithContentValidation } from "../dummy/app/models/message-without-blanks-with-content-validation.js";
+
+const { ActiveStorage } = await import("@blazetrails/activestorage");
 
 type RichTextMessage = Message & {
   content: RichText;

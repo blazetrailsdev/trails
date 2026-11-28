@@ -1,12 +1,13 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import "./test-helper.js";
 import type { Base } from "@blazetrails/activerecord";
-import { ActiveStorage } from "@blazetrails/activestorage";
 import { StringIO } from "@blazetrails/ruby-compat";
 import { Attachment } from "../lib/attachment.js";
 import { Content } from "../lib/content.js";
 import { Message } from "./dummy/app/models/message.js";
 import { MessageWithoutBlanks } from "./dummy/app/models/message-without-blanks.js";
+
+const { ActiveStorage } = await import("@blazetrails/activestorage");
 
 type RichTextMessage = Message & {
   content: import("../lib/rich-text.js").RichText;
