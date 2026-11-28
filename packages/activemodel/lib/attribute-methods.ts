@@ -17,6 +17,7 @@ import {
   type Extended,
   type Included,
   Module,
+  upcaseFirst,
 } from "@blazetrails/activesupport";
 import { NoMethodError } from "./attribute-assignment.js";
 import { AttributeRegistration } from "./attribute-registration.js";
@@ -77,19 +78,18 @@ export class AttributeMethodPattern {
     this.prefix = prefix;
     this.suffix = bang ? suffix.slice(0, -1) : suffix;
     this.parameters = parameters == null ? "..." : bang && parameters === false ? "" : parameters;
-    this.regex = new RegExp(
-      `^(?:${regexpEscape(this.prefix)})(.*)(?:${regexpEscape(this.suffix)})$`,
-    );
+    this.regex = this.suffix.endsWith("?")
+      ? new RegExp(
+          `^has(?:${regexpEscape(upcaseFirst(this.prefix))})(.*)(?:${regexpEscape(this.suffix.slice(0, -1))})$`,
+        )
+      : new RegExp(`^(?:${regexpEscape(this.prefix)})(.*)(?:${regexpEscape(this.suffix)})$`);
     this.proxyTarget = `${prefix}${this.camelJoined ? "Attribute" : "attribute"}${this.suffix}${
       bang ? "Bang" : ""
     }`;
   }
 
   match(methodName: string): AttributeMethod | null {
-    const has = this.suffix.endsWith("?") ? /^has([A-Z])(.*)$/.exec(methodName) : null;
-    const md = this.regex.exec(
-      this.suffix.endsWith("?") ? (has ? `${has[1].toLowerCase()}${has[2]}?` : "") : methodName,
-    );
+    const md = this.regex.exec(methodName);
     if (md) {
       return new AttributeMethod(this.proxyTarget, this.attrName(md[1]));
     }
@@ -97,16 +97,16 @@ export class AttributeMethodPattern {
   }
 
   methodName(attrName: string): string {
-    const name = this.camelJoined ? attrName.charAt(0).toUpperCase() + attrName.slice(1) : attrName;
+    const name = this.camelJoined ? upcaseFirst(attrName) : attrName;
     if (this.suffix.endsWith("?")) {
-      const base = `${this.prefix}${name}${this.suffix.slice(0, -1)}`;
-      return `has${base.charAt(0).toUpperCase()}${base.slice(1)}`;
+      return `has${upcaseFirst(`${this.prefix}${name}`)}${this.suffix.slice(0, -1)}`;
     }
     return `${this.prefix}${name}${this.suffix}`;
   }
 
   private attrName(name: string): string {
-    return this.camelJoined ? name.charAt(0).toLowerCase() + name.slice(1) : name;
+    if (!this.camelJoined && !(this.suffix.endsWith("?") && this.prefix === "")) return name;
+    return /^[A-Z][A-Z]/.test(name) ? name : name.charAt(0).toLowerCase() + name.slice(1);
   }
 
   private get camelJoined(): boolean {
