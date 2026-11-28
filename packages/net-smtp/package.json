@@ -1,6 +1,6 @@
 {
   "name": "@blazetrails/net-smtp",
-  "version": "0.1.0-alpha0.2",
+  "version": "0.1.0-alpha0.3",
   "description": "SMTP client for Trails, mirroring the net-smtp gem over nodemailer's SMTPConnection",
   "license": "MIT",
   "repository": {

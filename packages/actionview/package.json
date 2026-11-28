@@ -1,6 +1,6 @@
 {
   "name": "@blazetrails/actionview",
-  "version": "0.1.0-alpha0.2",
+  "version": "0.1.0-alpha0.3",
   "description": "ActionView — mirroring Rails ActionView",
   "license": "MIT",
   "repository": {

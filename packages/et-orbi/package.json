@@ -1,6 +1,6 @@
 {
   "name": "@blazetrails/et-orbi",
-  "version": "0.1.0-alpha0.2",
+  "version": "0.1.0-alpha0.3",
   "description": "Zoned times for Trails, mirroring the et-orbi gem",
   "license": "MIT",
   "repository": {

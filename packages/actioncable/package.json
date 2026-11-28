@@ -1,6 +1,6 @@
 {
   "name": "@blazetrails/actioncable",
-  "version": "0.1.0-alpha0.2",
+  "version": "0.1.0-alpha0.3",
   "description": "Integrated WebSockets for Trails, mirroring the actioncable gem",
   "license": "MIT",
   "repository": {

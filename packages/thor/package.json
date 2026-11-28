@@ -1,6 +1,6 @@
 {
   "name": "@blazetrails/thor",
-  "version": "0.1.0-alpha0.2",
+  "version": "0.1.0-alpha0.3",
   "description": "Port of the thor gem: a toolkit for building command-line interfaces",
   "license": "MIT",
   "repository": {
