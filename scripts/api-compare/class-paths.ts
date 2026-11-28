@@ -118,12 +118,19 @@ const LAZY_DIRS: Record<string, string[]> = {
   ],
 };
 
-/** A package subpath export whose module, imported alone, must answer its classes' paths, so it carries its own table. */
+/** A module imported alone (a named subpath or a `./*` deep import) that must answer its classes' paths before its body runs, so it carries its own table even where the root also reaches it. */
 const SUBPATH_EXPORT_TABLES: Record<string, string[]> = {
   actioncable: ["engine.ts"],
   actionmailbox: ["engine.ts"],
   actiontext: ["engine.ts"],
-  activestorage: ["engine.ts"],
+  activestorage: [
+    "app/models/active-storage/blob.ts",
+    "app/models/active-storage/blob/analyzable.ts",
+    "app/models/active-storage/blob/identifiable.ts",
+    "app/models/active-storage/blob/representable.ts",
+    "app/models/active-storage/variant-record.ts",
+    "engine.ts",
+  ],
   trailties: [
     "autoloaders.ts",
     "autoloaders/inflector.ts",
