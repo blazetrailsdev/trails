@@ -1,6 +1,6 @@
+import { Hash as RubyHash } from "@blazetrails/ruby-compat/hash";
+import { include, rbObjIsKindOf } from "@blazetrails/ruby-compat/include";
 import {
-  Hash as RubyHash,
-  include,
   rbCArray,
   rbCFalseClass,
   rbCFloat,
@@ -11,8 +11,7 @@ import {
   rbCTrueClass,
   rbFSend,
   rbModDefineMethod,
-  rbObjIsKindOf,
-} from "@blazetrails/ruby-compat";
+} from "@blazetrails/ruby-compat/object";
 import { MessagePack } from "./namespaces.js";
 import { Packer } from "./packer.js";
 
