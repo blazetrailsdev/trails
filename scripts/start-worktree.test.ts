@@ -172,8 +172,6 @@ describe("start-worktree.sh --branch", () => {
     git(sandbox, "clone", "-q", "--bare", originRepo, tasksOrigin);
     git(sandbox, "clone", "-q", tasksOrigin, tasksCanonical);
     const originMain = git(tasksCanonical, "rev-parse", "origin/main");
-    // The reaped worktree left its branch behind, ahead of origin/main, and a
-    // stale registration whose directory is gone.
     const reaped = path.join(sandbox, "tasks-worktrees", "respawn");
     git(tasksCanonical, "worktree", "add", "-q", "-b", "tasks-respawn", reaped, "origin/main");
     git(reaped, "commit", "-q", "--allow-empty", "-m", "stale");

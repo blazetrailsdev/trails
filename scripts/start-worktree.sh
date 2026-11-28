@@ -287,9 +287,6 @@ TASKS_WT="$TASKS_WORKTREES_ROOT/$NAME"
   mkdir -p "$TASKS_WORKTREES_ROOT"
   # Branch `tasks-<NAME>` tracks origin/main. push `HEAD:main` from this
   # branch always lands on origin/main regardless of branch name.
-  # Under --branch the reaped worktree's `tasks-<NAME>` branch usually
-  # survives, so `-b` would fail. Prune its stale registration and reuse the
-  # branch, reset to origin/main (`-B`), rather than fall back to canonical.
   TASKS_BRANCH_FLAG="-b"
   if [[ -n "$BRANCH" ]] && git -C "$TASKS_CANONICAL" show-ref --verify --quiet "refs/heads/tasks-$NAME"; then
     git -C "$TASKS_CANONICAL" worktree prune
